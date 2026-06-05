@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="theme-color" content="#0f172a"/>
+<title>GarageOS</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overscroll-behavior:none}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#f1f5f9;min-height:100vh;min-height:100dvh}
+input,textarea,select{font-family:inherit;font-size:16px!important}
+button{touch-action:manipulation}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:2px}
+.modal-scroll{-webkit-overflow-scrolling:touch;overflow-y:auto}
+.card-tap:active{opacity:0.75}
+@media(max-width:640px){.grid-half{grid-template-columns:1fr!important}}
+.status-scroll{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.status-scroll::-webkit-scrollbar{display:none}
+.fab{position:fixed;right:16px;width:56px;height:56px;border-radius:28px;background:#6366f1;color:#fff;border:none;font-size:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(99,102,241,0.5);z-index:50;transition:transform 0.2s}
+.fab:active{transform:scale(0.92)!important}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const{useState,useEffect,useRef}=React;
+
+// ── CONFIG ───────────────────────────────────────────────────────────────────
+const SUPA_URL="https://xpggpkmqwescbcrnnpod.supabase.co";
+const SUPA_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhwZ2dwa21xd2VzY2Jjcm5ucG9kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NjIxMjIsImV4cCI6MjA5NjEzODEyMn0.egPJ4OYOegRKIBV6PHUz_VfRib8g7sVIcNNy_7bFxjg";
+const ADMIN_EMAIL="stucki06@gmail.com";
+
+// ── SUPABASE API ─────────────────────────────────────────────────────────────
+const h=(token)=>({
+  "Content-Type":"application/json",
+  "apikey":SUPA_KEY,
+  "Authorization":`Bearer ${token||SUPA_KEY}`
+});
+
+const auth={
+  async signUp(email,password){
+    const r=await fetch(`${SUPA_URL}/auth/v1/signup`,{method:"POST",headers:h(),body:JSON.stringify({email,password})});
+    return r.json();
+  },
+  async signIn(email,password){
+    const r=await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`,{method:"POST",headers:h(),body:JSON.stringify({email,password})});
+    return r.json();
+  },
+  async signOut(token){
+    await fetch(`${SUPA_URL}/auth/v1/logout`,{method:"POST",headers:h(token)});
+  },
+  async getUser(token){
+    const r=await fetch(`${SUPA_URL}/auth/v1/user`,{headers:h(token)});
+    return r.json();
+  }
+};
+
+const db={
+  async get(table,token){
+    const r=await fetch(`${SUPA_URL}/rest/v1/${table}?select=*`,{headers:h(token)});
+    return r.json();
+  },
+  async upsert(table,obj,token){
+    await fetch(`${SUPA_URL}/rest/v1/${table}`,{method:"POST",headers:{...h(token),"Prefer":"resolution=merge-duplicates"},body:JSON.stringify(obj)});
+  },
+  async delete(table,id,token){
+    await fetch(`${SUPA_URL}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`,{method:"DELETE",headers:h(token)});
+  },
+  async deleteEmail(table,email,token){
+    await fetch(`${SUPA_URL}/rest/v1/${table}?email=eq.${encodeURIComponent(email)}`,{method:"DELETE",headers:h(token)});
+  },
+  async getCounter(token){
+    const r=await fetch(`${SUPA_URL}/rest/v1/counters?id=eq.orderNum&select=value`,{headers:h(token)});
+    const d=await r.json();
+    return d[0]?.value||0;
+  },
+  async setCounter(val,token){
+    await fetch(`${SUPA_URL}/rest/v1/counters?id=eq.orderNum`,{method:"PATCH",headers:h(token),body:JSON.stringify({value:val})});
+  }
+};
+
+// ── CONSTANTS ────────────────────────────────────────────────────────────────
+const SC={
+  aufnahme:{label:"Aufnahme",short:"Aufnahme",color:"#6366f1",bg:"#eef2ff"},
+  offerte_versendet:{label:"Offerte versendet",short:"Offerte",color:"#f59e0b",bg:"#fffbeb"},
+  offerte_bestaetigt:{label:"Offerte bestätigt",short:"Bestätigt",color:"#10b981",bg:"#ecfdf5"},
+  teile_arbeit:{label:"Teile & Arbeit",short:"Arbeit",color:"#3b82f6",bg:"#eff6ff"},
+  zahlung_versendet:{label:"Zahlung versendet",short:"Zahlung",color:"#f97316",bg:"#fff7ed"},
+  zahlung_erhalten:{label:"Zahlung erhalten",short:"Bezahlt",color:"#8b5cf6",bg:"#f5f3ff"},
+  abgeschlossen:{label:"Abgeschlossen",short:"Fertig",color:"#64748b",bg:"#f8fafc"},
+};
+const SO=["aufnahme","offerte_versendet","offerte_bestaetigt","teile_arbeit","zahlung_versendet","zahlung_erhalten","abgeschlossen"];
+const daysSince=d=>d?Math.floor((Date.now()-new Date(d).getTime())/86400000):0;
+const hoursSince=d=>d?Math.floor((Date.now()-new Date(d).getTime())/3600000):0;
+const isOverdue=o=>{
+  if(o.status==="offerte_versendet"&&hoursSince(o.statusChangedAt)>48)return true;
+  if(o.status==="zahlung_versendet"&&daysSince(o.statusChangedAt)>10)return true;
+  return false;
+};
+const needsAttention=o=>o.status!=="abgeschlossen"&&isOverdue(o);
+const getActiveStatus=(orders,cid)=>{
+  const a=orders.filter(o=>o.customerId===cid&&o.status!=="abgeschlossen");
+  if(!a.length)return null;
+  return a.sort((x,y)=>new Date(y.createdAt)-new Date(x.createdAt))[0].status;
+};
+
+// ── SHARED STYLES ────────────────────────────────────────────────────────────
+const inp={padding:"12px",border:"1.5px solid #e2e8f0",borderRadius:10,fontSize:"16px",background:"#f8fafc",outline:"none",width:"100%",display:"block",WebkitAppearance:"none"};
+const lbl={display:"block",fontSize:11,fontWeight:700,color:"#64748b",marginBottom:5,textTransform:"uppercase",letterSpacing:0.5};
+
+function Badge({status,small}){
+  const c=SC[status]||SC.aufnahme;
+  return <span style={{background:c.bg,color:c.color,border:`1px solid ${c.color}30`,borderRadius:20,padding:small?"1px 8px":"3px 10px",fontSize:small?10:11,fontWeight:700,whiteSpace:"nowrap",display:"inline-block"}}>{small?c.short:c.label}</span>;
+}
+function Spinner({text="Wird geladen…"}){
+  return(
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"60vh",gap:14}}>
+      <div style={{width:36,height:36,border:"4px solid #e2e8f0",borderTopColor:"#6366f1",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+      <div style={{color:"#64748b",fontSize:14,fontWeight:600}}>{text}</div>
+    </div>
+  );
+}
+
+// ── LOGIN PAGE ────────────────────────────────────────────────────────────────
+function LoginPage({onLogin}){
+  const[mode,setMode]=useState("login"); // login | register
+  const[email,setEmail]=useState("");
+  const[password,setPassword]=useState("");
+  const[password2,setPassword2]=useState("");
+  const[loading,setLoading]=useState(false);
+  const[error,setError]=useState("");
+  const[success,setSuccess]=useState("");
+
+  async function handleLogin(){
+    if(!email.trim()||!password.trim())return setError("Bitte alle Felder ausfüllen.");
+    setLoading(true);setError("");
+    try{
+      const res=await auth.signIn(email.trim().toLowerCase(),password);
+      if(res.error||!res.access_token){
+        setError("Fehler: "+(res.error?.message||"Email oder Passwort falsch."));
+        setLoading(false);return;
+      }
+      localStorage.setItem("garage_token",res.access_token);
+      localStorage.setItem("garage_email",email.trim().toLowerCase());
+      onLogin(res.access_token,email.trim().toLowerCase());
+    }catch(e){
+      setError("Verbindungsfehler: "+e.message);
+    }
+    setLoading(false);
+  }
+
+  async function handleRegister(){
+    if(!email.trim()||!password.trim()||!password2.trim())return setError("Bitte alle Felder ausfüllen.");
+    if(password!==password2)return setError("Passwörter stimmen nicht überein.");
+    if(password.length<6)return setError("Passwort muss mindestens 6 Zeichen haben.");
+    setLoading(true);setError("");
+    // Check whitelist first
+    const wlCheck=await db.get("whitelist",null);
+    const allowed=Array.isArray(wlCheck)&&wlCheck.some(w=>w.email.toLowerCase()===email.trim().toLowerCase());
+    if(!allowed){setError("Diese Email hat keine Berechtigung. Bitte den Administrator kontaktieren.");setLoading(false);return;}
+    // Sign up
+    const res=await auth.signUp(email.trim().toLowerCase(),password);
+    if(res.error){setError(res.error.message||"Fehler bei der Registrierung.");setLoading(false);return;}
+    // Auto-login immediately after signup
+    const login=await auth.signIn(email.trim().toLowerCase(),password);
+    if(login.access_token){
+      localStorage.setItem("garage_token",login.access_token);
+      localStorage.setItem("garage_email",email.trim().toLowerCase());
+      onLogin(login.access_token,email.trim().toLowerCase());
+      setLoading(false);return;
+    }
+    // Fallback: ask user to login manually
+    setSuccess("Konto erstellt! Bitte jetzt einloggen.");
+    setMode("login");setPassword("");setPassword2("");
+    setLoading(false);
+  }
+
+  return(
+    <div style={{minHeight:"100dvh",background:"linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#0f172a 100%)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{width:"100%",maxWidth:400,animation:"fadeIn 0.4s ease"}}>
+        {/* Logo */}
+        <div style={{textAlign:"center",marginBottom:32}}>
+          <div style={{fontSize:56,marginBottom:8}}>🔧</div>
+          <h1 style={{color:"#fff",fontWeight:900,fontSize:28,letterSpacing:-1}}>GarageOS</h1>
+          <p style={{color:"#94a3b8",fontSize:14,marginTop:4}}>Werkstatt Management System</p>
+        </div>
+
+        {/* Card */}
+        <div style={{background:"#fff",borderRadius:20,padding:"28px 24px",boxShadow:"0 24px 64px rgba(0,0,0,0.4)"}}>
+          {/* Tabs */}
+          <div style={{display:"flex",background:"#f1f5f9",borderRadius:12,padding:4,marginBottom:24}}>
+            {[["login","Anmelden"],["register","Registrieren"]].map(([m,l])=>(
+              <button key={m} onClick={()=>{setMode(m);setError("");setSuccess("");}} style={{flex:1,padding:"9px",border:"none",borderRadius:9,background:mode===m?"#fff":"transparent",color:mode===m?"#0f172a":"#64748b",fontWeight:700,cursor:"pointer",fontSize:14,boxShadow:mode===m?"0 2px 8px rgba(0,0,0,0.1)":"none",transition:"all 0.2s"}}>{l}</button>
+            ))}
+          </div>
+
+          {error&&<div style={{background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:10,padding:"10px 14px",marginBottom:14,color:"#dc2626",fontWeight:600,fontSize:13}}>⚠️ {error}</div>}
+          {success&&<div style={{background:"#dcfce7",border:"1px solid #86efac",borderRadius:10,padding:"10px 14px",marginBottom:14,color:"#166534",fontWeight:600,fontSize:13}}>✅ {success}</div>}
+
+          <div style={{marginBottom:14}}>
+            <label style={lbl}>E-Mail</label>
+            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="deine@email.ch"
+              style={{...inp,borderColor:"#e2e8f0"}} onKeyDown={e=>e.key==="Enter"&&(mode==="login"?handleLogin():handleRegister())}/>
+          </div>
+          <div style={{marginBottom:mode==="register"?14:20}}>
+            <label style={lbl}>Passwort</label>
+            <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••"
+              style={{...inp,borderColor:"#e2e8f0"}} onKeyDown={e=>e.key==="Enter"&&(mode==="login"?handleLogin():null)}/>
+          </div>
+          {mode==="register"&&(
+            <div style={{marginBottom:20}}>
+              <label style={lbl}>Passwort bestätigen</label>
+              <input type="password" value={password2} onChange={e=>setPassword2(e.target.value)} placeholder="••••••••"
+                style={{...inp,borderColor:"#e2e8f0"}} onKeyDown={e=>e.key==="Enter"&&handleRegister()}/>
+            </div>
+          )}
+
+          <button onClick={mode==="login"?handleLogin:handleRegister} disabled={loading}
+            style={{width:"100%",background:loading?"#a5b4fc":"#6366f1",color:"#fff",border:"none",borderRadius:12,padding:"15px",fontWeight:800,cursor:"pointer",fontSize:16,boxShadow:"0 4px 16px rgba(99,102,241,0.4)"}}>
+            {loading?"Bitte warten…":mode==="login"?"🔑 Anmelden":"✅ Konto erstellen"}
+          </button>
+
+          {mode==="register"&&(
+            <p style={{fontSize:12,color:"#94a3b8",textAlign:"center",marginTop:14,lineHeight:1.5}}>
+              Nur Personen mit Berechtigung können sich registrieren.<br/>Kontaktiere den Administrator für Zugang.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── ADMIN PANEL ───────────────────────────────────────────────────────────────
+function AdminPanel({token,onClose}){
+  const[whitelist,setWhitelist]=useState([]);
+  const[newEmail,setNewEmail]=useState("");
+  const[loading,setLoading]=useState(true);
+  const[saving,setSaving]=useState(false);
+  const[error,setError]=useState("");
+
+  useEffect(()=>{
+    db.get("whitelist",token).then(d=>{setWhitelist(Array.isArray(d)?d:[]);setLoading(false);});
+  },[]);
+
+  async function addEmail(){
+    const e=newEmail.trim().toLowerCase();
+    if(!e||!/\S+@\S+\.\S+/.test(e))return setError("Ungültige Email-Adresse.");
+    if(whitelist.some(w=>w.email===e))return setError("Email bereits vorhanden.");
+    setSaving(true);setError("");
+    await db.upsert("whitelist",{email:e,added_by:ADMIN_EMAIL},token);
+    setWhitelist(p=>[...p,{email:e,added_by:ADMIN_EMAIL,created_at:new Date().toISOString()}]);
+    setNewEmail("");setSaving(false);
+  }
+
+  async function removeEmail(email){
+    if(email===ADMIN_EMAIL)return alert("Admin-Email kann nicht entfernt werden.");
+    if(!window.confirm(`${email} entfernen?`))return;
+    await db.deleteEmail("whitelist",email,token);
+    setWhitelist(p=>p.filter(w=>w.email!==email));
+  }
+
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:600,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+      <div style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",maxWidth:600,maxHeight:"85dvh",display:"flex",flexDirection:"column",boxShadow:"0 -8px 40px rgba(0,0,0,0.3)"}}>
+        <div style={{display:"flex",justifyContent:"center",padding:"10px 0 0"}}><div style={{width:40,height:4,background:"#e2e8f0",borderRadius:2}}/></div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 18px",borderBottom:"1px solid #f1f5f9"}}>
+          <h2 style={{margin:0,fontSize:17,fontWeight:800,color:"#0f172a"}}>🛡️ Zugangsverwaltung</h2>
+          <button onClick={onClose} style={{background:"#f1f5f9",border:"none",width:32,height:32,borderRadius:8,cursor:"pointer",fontSize:15,color:"#64748b"}}>✕</button>
+        </div>
+        <div className="modal-scroll" style={{padding:"16px 18px",overflowY:"auto",flexGrow:1,paddingBottom:"calc(24px + env(safe-area-inset-bottom))"}}>
+          <p style={{fontSize:13,color:"#64748b",marginBottom:16}}>Nur Emails auf dieser Liste können sich einloggen oder registrieren.</p>
+
+          {/* Add email */}
+          <div style={{background:"#f8fafc",borderRadius:12,padding:"14px",marginBottom:20,border:"1px solid #e2e8f0"}}>
+            <label style={lbl}>Neue Email hinzufügen</label>
+            {error&&<div style={{background:"#fee2e2",borderRadius:8,padding:"8px 12px",marginBottom:10,color:"#dc2626",fontSize:13,fontWeight:600}}>⚠️ {error}</div>}
+            <div style={{display:"flex",gap:8}}>
+              <input type="email" value={newEmail} onChange={e=>setNewEmail(e.target.value)} placeholder="mitarbeiter@email.ch"
+                style={{...inp,flex:1}} onKeyDown={e=>e.key==="Enter"&&addEmail()}/>
+              <button onClick={addEmail} disabled={saving} style={{background:"#6366f1",color:"#fff",border:"none",borderRadius:10,padding:"0 16px",cursor:"pointer",fontWeight:700,fontSize:15,flexShrink:0,height:46}}>
+                {saving?"…":"+"}
+              </button>
+            </div>
+          </div>
+
+          {/* List */}
+          <div style={{...lbl,marginBottom:10}}>Berechtigte Emails ({whitelist.length})</div>
+          {loading?<Spinner text="Wird geladen…"/>:whitelist.map(w=>(
+            <div key={w.email} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 14px",background:"#fff",border:"1px solid #e2e8f0",borderRadius:10,marginBottom:8}}>
+              <div>
+                <div style={{fontWeight:700,color:"#0f172a",fontSize:14}}>{w.email}</div>
+                <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>
+                  {w.email===ADMIN_EMAIL?"👑 Administrator":"👤 Mitarbeiter"}
+                  {w.created_at&&` · ${new Date(w.created_at).toLocaleDateString("de-CH")}`}
+                </div>
+              </div>
+              {w.email!==ADMIN_EMAIL&&(
+                <button onClick={()=>removeEmail(w.email)} style={{background:"#fee2e2",color:"#ef4444",border:"none",borderRadius:8,padding:"7px 12px",cursor:"pointer",fontWeight:700,fontSize:12,flexShrink:0}}>
+                  Entfernen
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── MODAL ─────────────────────────────────────────────────────────────────────
+function Modal({title,onClose,children,full}){
+  useEffect(()=>{
+    const prev=document.body.style.overflow;
+    document.body.style.overflow="hidden";
+    return()=>{document.body.style.overflow=prev};
+  },[]);
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:500,display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
+      <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.5)"}} onClick={onClose}/>
+      <div style={{position:"relative",background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",maxHeight:full?"95dvh":"90dvh",display:"flex",flexDirection:"column",boxShadow:"0 -8px 40px rgba(0,0,0,0.2)"}}>
+        <div style={{display:"flex",justifyContent:"center",padding:"10px 0 0"}}><div style={{width:40,height:4,background:"#e2e8f0",borderRadius:2}}/></div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 18px 12px",borderBottom:"1px solid #f1f5f9",flexShrink:0}}>
+          <h2 style={{margin:0,fontSize:17,fontWeight:800,color:"#0f172a"}}>{title}</h2>
+          <button onClick={onClose} style={{background:"#f1f5f9",border:"none",width:32,height:32,borderRadius:8,cursor:"pointer",fontSize:15,color:"#64748b"}}>✕</button>
+        </div>
+        <div className="modal-scroll" style={{padding:"14px 18px",overflowY:"auto",flexGrow:1,paddingBottom:"calc(24px + env(safe-area-inset-bottom))"}}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// ── FIELD ─────────────────────────────────────────────────────────────────────
+function Field({label,value,onChange,placeholder,required,type="text"}){
+  const[focus,setFocus]=useState(false);
+  return(
+    <div style={{marginBottom:12}}>
+      {label&&<label style={lbl}>{label}{required&&<span style={{color:"#ef4444"}}> *</span>}</label>}
+      <input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
+        style={{...inp,borderColor:focus?"#6366f1":"#e2e8f0"}}
+        onFocus={()=>setFocus(true)} onBlur={()=>setFocus(false)}/>
+    </div>
+  );
+}
+function FieldArea({label,value,onChange,placeholder}){
+  const[focus,setFocus]=useState(false);
+  return(
+    <div style={{marginBottom:12}}>
+      {label&&<label style={lbl}>{label}</label>}
+      <textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={3}
+        style={{...inp,resize:"vertical",borderColor:focus?"#6366f1":"#e2e8f0"}}
+        onFocus={()=>setFocus(true)} onBlur={()=>setFocus(false)}/>
+    </div>
+  );
+}
+
+// ── CUSTOMER FORM ─────────────────────────────────────────────────────────────
+function CustomerForm({initial,onSave,onCancel,saving}){
+  const[f,setF]=useState(initial||{vorname:"",nachname:"",telefon:"",email:"",marke:"",modell:"",kennzeichen:"",km:""});
+  const s=k=>v=>setF(p=>({...p,[k]:v}));
+  function submit(){
+    if(!f.vorname.trim()||!f.nachname.trim()||!f.telefon.trim())return alert("Bitte Pflichtfelder ausfüllen.");
+    onSave(f);
+  }
+  return(
+    <div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 12px"}} className="grid-half">
+        <Field label="Vorname *" value={f.vorname} onChange={s("vorname")} placeholder="Max"/>
+        <Field label="Nachname *" value={f.nachname} onChange={s("nachname")} placeholder="Muster"/>
+      </div>
+      <Field label="Telefon *" value={f.telefon} onChange={s("telefon")} placeholder="+41 79 000 00 00" type="tel"/>
+      <Field label="E-Mail" value={f.email} onChange={s("email")} placeholder="optional" type="email"/>
+      <div style={{background:"#f8fafc",borderRadius:12,padding:"12px",marginBottom:14,border:"1px solid #e2e8f0"}}>
+        <div style={{...lbl,marginBottom:10}}>🚗 Fahrzeugdaten</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 12px"}} className="grid-half">
+          <Field label="Marke" value={f.marke} onChange={s("marke")} placeholder="BMW"/>
+          <Field label="Modell" value={f.modell} onChange={s("modell")} placeholder="320i"/>
+          <Field label="Kennzeichen" value={f.kennzeichen} onChange={s("kennzeichen")} placeholder="ZH 123 456"/>
+          <Field label="KM-Stand" value={f.km} onChange={s("km")} placeholder="optional" type="number"/>
+        </div>
+      </div>
+      <button onClick={submit} disabled={saving} style={{width:"100%",background:saving?"#a5b4fc":"#6366f1",color:"#fff",border:"none",borderRadius:12,padding:"15px",fontWeight:700,cursor:"pointer",fontSize:16,marginBottom:10}}>
+        {saving?"Wird gespeichert…":"💾 Speichern"}
+      </button>
+      <button onClick={onCancel} style={{width:"100%",padding:"13px",border:"1.5px solid #e2e8f0",borderRadius:12,background:"#fff",cursor:"pointer",fontWeight:600,color:"#64748b",fontSize:15}}>Abbrechen</button>
+    </div>
+  );
+}
+
+// ── ORDER FORM ────────────────────────────────────────────────────────────────
+function OrderForm({customers,customerId:preCid,onSave,onCancel,saving}){
+  const[cid,setCid]=useState(preCid||"");
+  const[bs,setBs]=useState([""]);
+  const[notizen,setNotizen]=useState("");
+  const addB=()=>setBs(p=>[...p,""]);
+  const updB=(i,v)=>setBs(p=>{const n=[...p];n[i]=v;return n;});
+  const remB=i=>setBs(p=>p.filter((_,j)=>j!==i));
+  function submit(){
+    if(!cid)return alert("Bitte Kunden wählen.");
+    const b=bs.filter(x=>x.trim());
+    if(!b.length)return alert("Mindestens eine Beanstandung eingeben.");
+    onSave({customerId:cid,beanstandungen:b,notizen});
+  }
+  return(
+    <div>
+      {!preCid&&(
+        <div style={{marginBottom:12}}>
+          <label style={lbl}>Kunde *</label>
+          <select value={cid} onChange={e=>setCid(e.target.value)} style={{...inp}}>
+            <option value="">-- Kunde wählen --</option>
+            {customers.map(c=><option key={c.id} value={c.id}>{c.vorname} {c.nachname} – {c.kennzeichen}</option>)}
+          </select>
+        </div>
+      )}
+      <label style={{...lbl,marginBottom:10}}>Beanstandungen *</label>
+      {bs.map((b,i)=>(
+        <div key={i} style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
+          <input value={b} onChange={e=>updB(i,e.target.value)} placeholder={`Beanstandung ${i+1}…`} style={{...inp,flex:1}}/>
+          {bs.length>1&&<button onClick={()=>remB(i)} style={{background:"#fee2e2",color:"#ef4444",border:"none",borderRadius:10,width:44,height:44,cursor:"pointer",flexShrink:0,fontSize:18}}>✕</button>}
+        </div>
+      ))}
+      <button onClick={addB} style={{width:"100%",background:"#f1f5f9",border:"1.5px dashed #cbd5e1",borderRadius:10,padding:"11px",cursor:"pointer",color:"#64748b",fontWeight:700,marginBottom:14,fontSize:14}}>+ Beanstandung hinzufügen</button>
+      <FieldArea label="Notizen" value={notizen} onChange={setNotizen} placeholder="Interne Notizen…"/>
+      <button onClick={submit} disabled={saving} style={{width:"100%",background:saving?"#a5b4fc":"#6366f1",color:"#fff",border:"none",borderRadius:12,padding:"15px",fontWeight:700,cursor:"pointer",fontSize:16,marginBottom:10}}>
+        {saving?"Wird gespeichert…":"✅ Auftrag erstellen"}
+      </button>
+      <button onClick={onCancel} style={{width:"100%",padding:"13px",border:"1.5px solid #e2e8f0",borderRadius:12,background:"#fff",cursor:"pointer",fontWeight:600,color:"#64748b",fontSize:15}}>Abbrechen</button>
+    </div>
+  );
+}
+
+// ── ORDER DETAIL ──────────────────────────────────────────────────────────────
+function OrderDetail({order,customer,onClose,onUpdate,onDelete}){
+  const[edit,setEdit]=useState(false);
+  const[saving,setSaving]=useState(false);
+  const[status,setStatus]=useState(order.status);
+  const[bs,setBs]=useState(order.beanstandungen||[""]);
+  const[notizen,setNotizen]=useState(order.notizen||"");
+  const[items,setItems]=useState(order.offertItems||[]);
+  const[newItem,setNewItem]=useState("");
+  const[offB,setOffB]=useState(order.offertBetrag||"");
+  const[recB,setRecB]=useState(order.rechnungsBetrag||"");
+  const[editCust,setEditCust]=useState(false);
+  const[cv,setCv]=useState(customer?.vorname||"");
+  const[cn,setCn]=useState(customer?.nachname||"");
+  const[ct,setCt]=useState(customer?.telefon||"");
+  const[ck,setCk]=useState(customer?.kennzeichen||"");
+  const[cm,setCm]=useState(customer?.modell||"");
+  const[cma,setCma]=useState(customer?.marke||"");
+  const ov=isOverdue({...order,status});
+  const d=daysSince(order.statusChangedAt);
+  const h=hoursSince(order.statusChangedAt);
+  const addB=()=>setBs(p=>[...p,""]);
+  const updB=(i,v)=>setBs(p=>{const n=[...p];n[i]=v;return n;});
+  const remB=i=>setBs(p=>p.filter((_,j)=>j!==i));
+  const addItem=()=>{if(newItem.trim()){setItems(p=>[...p,{text:newItem.trim(),checked:false}]);setNewItem("");}};
+  const togItem=i=>setItems(p=>p.map((x,j)=>j===i?{...x,checked:!x.checked}:x));
+  const remItem=i=>setItems(p=>p.filter((_,j)=>j!==i));
+  async function save(){
+    setSaving(true);
+    const upd={...order,status,beanstandungen:bs.filter(x=>x.trim()),notizen,offertItems:items,offertBetrag:offB,rechnungsBetrag:recB};
+    if(status!==order.status)upd.statusChangedAt=new Date().toISOString();
+    const cp=editCust?{vorname:cv,nachname:cn,telefon:ct,kennzeichen:ck,modell:cm,marke:cma}:null;
+    await onUpdate(upd,cp);
+    setSaving(false);setEdit(false);setEditCust(false);
+  }
+  const showOffert=["offerte_bestaetigt","teile_arbeit","zahlung_versendet","zahlung_erhalten","abgeschlossen"].includes(status);
+  return(
+    <Modal title={`Auftrag #${order.orderNumber}`} onClose={onClose} full>
+      {ov&&<div style={{background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:10,padding:"10px 14px",marginBottom:14,color:"#dc2626",fontWeight:700,fontSize:13}}>⚠️ {order.status==="offerte_versendet"?"Offerte >48h ohne Antwort!":"Zahlung >10 Tage offen!"}</div>}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,gap:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+          <Badge status={status}/>
+          <span style={{fontSize:12,color:"#94a3b8"}}>{d<1?`${h}h`:`${d}T`}</span>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          {!edit?<button onClick={()=>setEdit(true)} style={{background:"#f1f5f9",border:"none",borderRadius:10,padding:"9px 14px",cursor:"pointer",fontWeight:700,fontSize:13,color:"#334155"}}>✏️</button>
+            :<button onClick={save} disabled={saving} style={{background:saving?"#a5b4fc":"#10b981",color:"#fff",border:"none",borderRadius:10,padding:"9px 14px",cursor:"pointer",fontWeight:700,fontSize:13}}>{saving?"…":"✓ OK"}</button>}
+          <button onClick={async()=>{if(window.confirm("Auftrag wirklich löschen?"))await onDelete(order.id);}} style={{background:"#fee2e2",color:"#ef4444",border:"none",borderRadius:10,padding:"9px 14px",cursor:"pointer",fontWeight:700,fontSize:13}}>🗑️</button>
+        </div>
+      </div>
+      <div style={{marginBottom:16}}>
+        <div style={lbl}>Status ändern</div>
+        <div className="status-scroll" style={{marginTop:8}}>
+          {SO.map(s=>(
+            <button key={s} onClick={()=>setStatus(s)}
+              style={{flexShrink:0,padding:"8px 14px",borderRadius:20,border:`1.5px solid ${SC[s].color}`,background:status===s?SC[s].color:SC[s].bg,color:status===s?"#fff":SC[s].color,fontWeight:700,fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}}>
+              {SC[s].short}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{background:"#f8fafc",borderRadius:12,padding:"12px",marginBottom:14,border:"1px solid #e2e8f0"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div>
+            <div style={{fontWeight:800,color:"#0f172a",fontSize:15}}>{customer?.vorname} {customer?.nachname}</div>
+            <div style={{fontSize:13,color:"#64748b"}}>{customer?.telefon} · {customer?.kennzeichen}</div>
+          </div>
+          {edit&&<button onClick={()=>setEditCust(p=>!p)} style={{background:"none",border:"1px solid #cbd5e1",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:12,color:"#64748b"}}>{editCust?"✓":"Bearbeiten"}</button>}
+        </div>
+        {editCust&&(
+          <div style={{marginTop:10,display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px 12px"}} className="grid-half">
+            <input value={cv} onChange={e=>setCv(e.target.value)} placeholder="Vorname" style={inp}/>
+            <input value={cn} onChange={e=>setCn(e.target.value)} placeholder="Nachname" style={inp}/>
+            <input value={ct} onChange={e=>setCt(e.target.value)} placeholder="Telefon" style={inp}/>
+            <input value={ck} onChange={e=>setCk(e.target.value)} placeholder="Kennzeichen" style={inp}/>
+            <input value={cma} onChange={e=>setCma(e.target.value)} placeholder="Marke" style={inp}/>
+            <input value={cm} onChange={e=>setCm(e.target.value)} placeholder="Modell" style={inp}/>
+          </div>
+        )}
+      </div>
+      <div style={{marginBottom:14}}>
+        <div style={lbl}>Beanstandungen</div>
+        {edit?(
+          <div style={{marginTop:8}}>
+            {bs.map((b,i)=>(
+              <div key={i} style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
+                <input value={b} onChange={e=>updB(i,e.target.value)} style={{...inp,flex:1}} placeholder={`Beanstandung ${i+1}`}/>
+                {bs.length>1&&<button onClick={()=>remB(i)} style={{background:"#fee2e2",color:"#ef4444",border:"none",borderRadius:8,width:44,height:44,flexShrink:0,cursor:"pointer",fontSize:18}}>✕</button>}
+              </div>
+            ))}
+            <button onClick={addB} style={{width:"100%",background:"#f1f5f9",border:"1.5px dashed #cbd5e1",borderRadius:10,padding:"10px",cursor:"pointer",color:"#64748b",fontWeight:700,fontSize:13}}>+ Hinzufügen</button>
+          </div>
+        ):(
+          <div style={{marginTop:6}}>
+            {(order.beanstandungen||[]).map((b,i)=>(
+              <div key={i} style={{padding:"8px 12px",background:"#f8fafc",borderRadius:8,marginBottom:6,border:"1px solid #e2e8f0",fontSize:14,color:"#334155"}}>
+                <span style={{color:"#6366f1",fontWeight:700,marginRight:8}}>#{i+1}</span>{b}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {showOffert&&(
+        <div style={{marginBottom:14,background:"#f0fdf4",borderRadius:12,padding:"12px",border:"1px solid #a7f3d0"}}>
+          <div style={{...lbl,color:"#065f46",marginBottom:10}}>✅ Bestätigte Positionen</div>
+          {items.map((item,i)=>(
+            <label key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:item.checked?"#dcfce7":"#fff",borderRadius:10,marginBottom:6,border:`1px solid ${item.checked?"#86efac":"#e2e8f0"}`,cursor:"pointer",minHeight:44}}>
+              <input type="checkbox" checked={item.checked} onChange={()=>togItem(i)} style={{width:20,height:20,cursor:"pointer",accentColor:"#10b981"}}/>
+              <span style={{flex:1,fontSize:14,color:item.checked?"#166534":"#334155"}}>{item.text}</span>
+              <button onClick={e=>{e.preventDefault();remItem(i);}} style={{background:"none",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:18,padding:"0 4px"}}>✕</button>
+            </label>
+          ))}
+          <div style={{display:"flex",gap:8,marginTop:8}}>
+            <input value={newItem} onChange={e=>setNewItem(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addItem()} placeholder="Neue Position…" style={{...inp,flex:1}}/>
+            <button onClick={addItem} style={{background:"#6366f1",color:"#fff",border:"none",borderRadius:10,width:48,height:48,cursor:"pointer",fontWeight:700,fontSize:22,flexShrink:0}}>+</button>
+          </div>
+        </div>
+      )}
+      {edit&&(
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 12px",marginBottom:4}} className="grid-half">
+          <div style={{marginBottom:12}}><label style={lbl}>Offerte CHF</label><input value={offB} onChange={e=>setOffB(e.target.value)} placeholder="350.00" style={inp} type="number"/></div>
+          <div style={{marginBottom:12}}><label style={lbl}>Rechnung CHF</label><input value={recB} onChange={e=>setRecB(e.target.value)} placeholder="380.00" style={inp} type="number"/></div>
+        </div>
+      )}
+      {!edit&&(offB||recB)&&(
+        <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+          {offB&&<div style={{background:"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:"8px 14px",flex:1,textAlign:"center"}}><div style={{color:"#92400e",fontSize:11,fontWeight:700}}>OFFERTE</div><div style={{fontWeight:800,fontSize:16}}>CHF {offB}</div></div>}
+          {recB&&<div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,padding:"8px 14px",flex:1,textAlign:"center"}}><div style={{color:"#1e40af",fontSize:11,fontWeight:700}}>RECHNUNG</div><div style={{fontWeight:800,fontSize:16}}>CHF {recB}</div></div>}
+        </div>
+      )}
+      {edit?<FieldArea label="Notizen" value={notizen} onChange={setNotizen}/>
+        :notizen?<div style={{background:"#f8fafc",borderRadius:10,padding:"10px 12px",fontSize:13,color:"#475569",border:"1px solid #e2e8f0",marginBottom:10}}><strong>Notizen:</strong> {notizen}</div>:null}
+      <div style={{marginTop:14,paddingTop:10,borderTop:"1px solid #f1f5f9",fontSize:11,color:"#94a3b8"}}>
+        Erstellt: {new Date(order.createdAt).toLocaleDateString("de-CH")} · Auftrag #{order.orderNumber}
+      </div>
+    </Modal>
+  );
+}
+
+// ── CUSTOMER DETAIL ───────────────────────────────────────────────────────────
+function CustomerDetail({customer,orders,onClose,onEdit,onNewOrder,onOrderClick}){
+  const cos=orders.filter(o=>o.customerId===customer.id).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+  return(
+    <Modal title="Kundenakte" onClose={onClose} full>
+      <div style={{background:"linear-gradient(135deg,#6366f1,#8b5cf6)",borderRadius:14,padding:"16px",marginBottom:16,color:"#fff"}}>
+        <div style={{fontSize:18,fontWeight:900,marginBottom:4}}>{customer.vorname} {customer.nachname}</div>
+        <div style={{fontSize:14,opacity:0.9}}>{customer.telefon}</div>
+        {customer.email&&<div style={{fontSize:13,opacity:0.75}}>{customer.email}</div>}
+        <div style={{marginTop:8,background:"rgba(255,255,255,0.15)",borderRadius:8,padding:"8px 10px",display:"inline-block",fontSize:13}}>
+          🚗 {customer.marke} {customer.modell} · <strong>{customer.kennzeichen}</strong>
+          {customer.km&&<span style={{opacity:0.8}}> · {Number(customer.km).toLocaleString()} km</span>}
+        </div>
+      </div>
+      <div style={{display:"flex",gap:10,marginBottom:16}}>
+        <button onClick={onEdit} style={{flex:1,background:"#f1f5f9",border:"none",borderRadius:12,padding:"12px",cursor:"pointer",fontWeight:700,fontSize:14,color:"#334155"}}>✏️ Bearbeiten</button>
+        <button onClick={onNewOrder} style={{flex:1,background:"#6366f1",color:"#fff",border:"none",borderRadius:12,padding:"12px",cursor:"pointer",fontWeight:700,fontSize:14}}>+ Auftrag</button>
+      </div>
+      <div style={{...lbl,marginBottom:10}}>Aufträge ({cos.length})</div>
+      {!cos.length&&<p style={{color:"#94a3b8",fontSize:14,textAlign:"center",padding:"20px 0"}}>Noch keine Aufträge.</p>}
+      {cos.map(o=>(
+        <div key={o.id} onClick={()=>onOrderClick(o)} className="card-tap"
+          style={{border:`1.5px solid ${isOverdue(o)?"#fca5a5":"#e2e8f0"}`,borderRadius:12,padding:"12px",marginBottom:8,cursor:"pointer",background:"#fff",minHeight:64,display:"flex",flexDirection:"column",justifyContent:"space-between"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+            <div>
+              <div style={{fontWeight:700,color:"#0f172a",marginBottom:2}}>Auftrag #{o.orderNumber}</div>
+              <div style={{fontSize:12,color:"#64748b"}}>{(o.beanstandungen||[]).slice(0,2).join(", ")}</div>
+            </div>
+            <Badge status={o.status} small/>
+          </div>
+          <div style={{fontSize:11,color:"#94a3b8",marginTop:6}}>{new Date(o.createdAt).toLocaleDateString("de-CH")}</div>
+        </div>
+      ))}
+    </Modal>
+  );
+}
+
+// ── MAIN APP ──────────────────────────────────────────────────────────────────
+function App(){
+  const[token,setToken]=useState(()=>localStorage.getItem("garage_token")||null);
+  const[userEmail,setUserEmail]=useState(()=>localStorage.getItem("garage_email")||null);
+  const[authChecked,setAuthChecked]=useState(false);
+  const[tab,setTab]=useState("dashboard");
+  const[customers,setCustomers]=useState([]);
+  const[orders,setOrders]=useState([]);
+  const[orderNum,setOrderNum]=useState(0);
+  const[loading,setLoading]=useState(true);
+  const[syncStatus,setSyncStatus]=useState("ok");
+  const[showNC,setShowNC]=useState(false);
+  const[showNO,setShowNO]=useState(false);
+  const[newOCid,setNewOCid]=useState(null);
+  const[selC,setSelC]=useState(null);
+  const[editC,setEditC]=useState(null);
+  const[selO,setSelO]=useState(null);
+  const[afterSave,setAfterSave]=useState(null);
+  const[search,setSearch]=useState("");
+  const[filterK,setFilterK]=useState("all");
+  const[fabOpen,setFabOpen]=useState(false);
+  const[showAdmin,setShowAdmin]=useState(false);
+  const isAdmin=userEmail===ADMIN_EMAIL;
+
+  // Verify token on load
+  useEffect(()=>{
+    if(!token){setAuthChecked(true);return;}
+    auth.getUser(token).then(u=>{
+      if(u.error||!u.email){
+        localStorage.removeItem("garage_token");
+        localStorage.removeItem("garage_email");
+        setToken(null);setUserEmail(null);
+      }
+      setAuthChecked(true);
+    });
+  },[]);
+
+  // Load data
+  useEffect(()=>{
+    if(!token||!authChecked)return;
+    (async()=>{
+      try{
+        const[cr,or,cnt]=await Promise.all([db.get("customers",token),db.get("orders",token),db.getCounter(token)]);
+        setCustomers((Array.isArray(cr)?cr:[]).map(r=>r.data));
+        setOrders((Array.isArray(or)?or:[]).map(r=>r.data));
+        setOrderNum(cnt);
+      }catch(e){console.error(e);}
+      setLoading(false);
+    })();
+  },[token,authChecked]);
+
+  function handleLogin(t,e){setToken(t);setUserEmail(e);setLoading(true);}
+
+  async function handleLogout(){
+    if(!window.confirm("Abmelden?"))return;
+    await auth.signOut(token);
+    localStorage.removeItem("garage_token");
+    localStorage.removeItem("garage_email");
+    setToken(null);setUserEmail(null);setCustomers([]);setOrders([]);
+  }
+
+  async function syncOk(fn){
+    setSyncStatus("saving");
+    try{await fn();setSyncStatus("ok");}
+    catch(e){console.error(e);setSyncStatus("error");alert("Fehler beim Speichern!");}
+  }
+
+  async function addCustomer(data){
+    const id=`c_${Date.now()}`;
+    const newC={id,...data,createdAt:new Date().toISOString()};
+    await syncOk(()=>db.upsert("customers",{id,data:newC},token));
+    setCustomers(p=>[...p,newC]);setShowNC(false);setAfterSave(id);
+  }
+  async function updateCustomer(id,data){
+    const updated={...customers.find(c=>c.id===id),...data};
+    await syncOk(()=>db.upsert("customers",{id,data:updated},token));
+    setCustomers(p=>p.map(c=>c.id===id?updated:c));
+  }
+  async function addOrder(data){
+    const num=orderNum+1;
+    const newO={id:`o_${Date.now()}`,orderNumber:num,status:"aufnahme",statusChangedAt:new Date().toISOString(),createdAt:new Date().toISOString(),...data};
+    await syncOk(async()=>{await db.upsert("orders",{id:newO.id,data:newO},token);await db.setCounter(num,token);});
+    setOrders(p=>[...p,newO]);setOrderNum(num);
+    setShowNO(false);setNewOCid(null);setAfterSave(null);
+  }
+  async function updateOrder(upd,cp){
+    await syncOk(()=>db.upsert("orders",{id:upd.id,data:upd},token));
+    setOrders(p=>p.map(o=>o.id===upd.id?upd:o));setSelO(upd);
+    if(cp)await updateCustomer(upd.customerId,cp);
+  }
+  async function deleteOrder(id){
+    await syncOk(()=>db.delete("orders",id,token));
+    setOrders(p=>p.filter(o=>o.id!==id));setSelO(null);
+  }
+
+  if(!authChecked)return(
+    <div style={{minHeight:"100dvh",background:"#0f172a",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{width:36,height:36,border:"4px solid #334155",borderTopColor:"#6366f1",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+    </div>
+  );
+
+  if(!token)return <LoginPage onLogin={handleLogin}/>;
+
+  const activeOrders=orders.filter(o=>o.status!=="abgeschlossen");
+  const todos=orders.filter(needsAttention);
+  const filteredC=customers.filter(c=>{
+    const q=search.toLowerCase();
+    const m=!q||`${c.vorname} ${c.nachname} ${c.telefon} ${c.kennzeichen}`.toLowerCase().includes(q);
+    const as=getActiveStatus(orders,c.id);
+    if(filterK==="active"&&!as)return false;
+    if(filterK==="inactive"&&as)return false;
+    return m;
+  });
+
+  const navBtn=(t,icon,label)=>(
+    <button onClick={()=>setTab(t)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",border:"none",background:"none",cursor:"pointer",padding:"8px 4px",gap:3,color:tab===t?"#6366f1":"#94a3b8"}}>
+      <span style={{fontSize:22}}>{icon}</span>
+      <span style={{fontSize:10,fontWeight:700,letterSpacing:0.3}}>{label}</span>
+    </button>
+  );
+
+  if(loading)return(
+    <div style={{minHeight:"100dvh",background:"#f1f5f9"}}>
+      <div style={{background:"#0f172a",height:52,display:"flex",alignItems:"center",padding:"0 16px",gap:8}}>
+        <span style={{fontSize:20}}>🔧</span><span style={{fontWeight:900,fontSize:17,color:"#fff"}}>GarageOS</span>
+      </div>
+      <Spinner text="Daten werden geladen…"/>
+    </div>
+  );
+
+  return(
+    <div style={{minHeight:"100dvh",background:"#f1f5f9",paddingBottom:80}}>
+      {/* Header */}
+      <div style={{background:"#0f172a",color:"#fff",padding:"0 16px",position:"sticky",top:0,zIndex:100,boxShadow:"0 2px 12px rgba(0,0,0,0.3)",paddingTop:"env(safe-area-inset-top)"}}>
+        <div style={{maxWidth:900,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:52}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:20}}>🔧</span>
+            <span style={{fontWeight:900,fontSize:17}}>GarageOS</span>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            {syncStatus==="saving"&&<span style={{fontSize:11,color:"#94a3b8",fontWeight:600}}>☁️…</span>}
+            {syncStatus==="ok"&&<span style={{fontSize:11,color:"#10b981",fontWeight:600}}>☁️</span>}
+            {todos.length>0&&<div style={{background:"#ef4444",color:"#fff",borderRadius:20,padding:"3px 8px",fontSize:12,fontWeight:700}}>⚠️{todos.length}</div>}
+            {isAdmin&&<button onClick={()=>setShowAdmin(true)} style={{background:"#1e293b",border:"none",borderRadius:8,padding:"5px 10px",cursor:"pointer",color:"#94a3b8",fontSize:12,fontWeight:700}}>🛡️</button>}
+            <button onClick={handleLogout} style={{background:"#1e293b",border:"none",borderRadius:8,padding:"5px 10px",cursor:"pointer",color:"#94a3b8",fontSize:12,fontWeight:700}}>Logout</button>
+          </div>
+        </div>
+      </div>
+
+      <div style={{maxWidth:900,margin:"0 auto",padding:"16px 14px"}}>
+
+        {/* DASHBOARD */}
+        {tab==="dashboard"&&(
+          <div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+              {[
+                {label:"Kunden",v:customers.length,icon:"👤",c:"#6366f1"},
+                {label:"Aktive Aufträge",v:activeOrders.length,icon:"🔧",c:"#3b82f6"},
+                {label:"Heute nachhaken",v:todos.length,icon:"⚠️",c:"#ef4444"},
+                {label:"Abgeschlossen",v:orders.filter(o=>o.status==="abgeschlossen").length,icon:"✅",c:"#10b981"},
+              ].map(s=>(
+                <div key={s.label} style={{background:"#fff",borderRadius:14,padding:"14px",border:"1px solid #e2e8f0"}}>
+                  <div style={{fontSize:20,marginBottom:4}}>{s.icon}</div>
+                  <div style={{fontSize:24,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
+                  <div style={{fontSize:11,color:"#64748b",marginTop:3}}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+            {customers.length===0?(
+              <div style={{textAlign:"center",padding:"60px 20px"}}>
+                <div style={{fontSize:64,marginBottom:14}}>🚗</div>
+                <h2 style={{fontSize:22,fontWeight:900,color:"#0f172a",marginBottom:8}}>Willkommen, {userEmail?.split("@")[0]}!</h2>
+                <p style={{color:"#64748b",marginBottom:24,fontSize:15}}>Noch keine Kunden vorhanden.</p>
+                <button onClick={()=>setShowNC(true)} style={{background:"#6366f1",color:"#fff",border:"none",borderRadius:14,padding:"16px 32px",fontWeight:900,fontSize:17,cursor:"pointer",width:"100%",boxShadow:"0 4px 20px rgba(99,102,241,0.4)"}}>+ Ersten Kunden anlegen</button>
+              </div>
+            ):(
+              <>
+                {todos.length>0&&(
+                  <div style={{background:"#fff5f5",borderRadius:14,padding:"14px",marginBottom:14,border:"1px solid #fca5a5"}}>
+                    <div style={{fontWeight:800,color:"#dc2626",marginBottom:10,fontSize:14}}>⚠️ Heute nachhaken ({todos.length})</div>
+                    {todos.map(o=>{
+                      const c=customers.find(x=>x.id===o.customerId);
+                      return(
+                        <div key={o.id} onClick={()=>setSelO(o)} className="card-tap"
+                          style={{background:"#fff",borderRadius:10,padding:"10px 12px",marginBottom:6,cursor:"pointer",border:"1px solid #fecaca"}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+                            <strong style={{fontSize:14,color:"#0f172a"}}>{c?.vorname} {c?.nachname}</strong>
+                            <Badge status={o.status} small/>
+                          </div>
+                          <div style={{fontSize:12,color:"#dc2626",marginTop:3,fontWeight:600}}>
+                            {o.status==="offerte_versendet"?`${hoursSince(o.statusChangedAt)}h ohne Antwort`:`${daysSince(o.statusChangedAt)} Tage offen`}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                <div style={{background:"#fff",borderRadius:14,padding:"14px",border:"1px solid #e2e8f0"}}>
+                  <div style={{fontWeight:800,color:"#0f172a",marginBottom:10,fontSize:14}}>🔧 Aktive Aufträge ({activeOrders.length})</div>
+                  {!activeOrders.length?<p style={{color:"#94a3b8",fontSize:13,textAlign:"center",padding:"10px 0"}}>Keine aktiven Aufträge.</p>:
+                    activeOrders.slice(0,8).map(o=>{
+                      const c=customers.find(x=>x.id===o.customerId);
+                      const dv=daysSince(o.statusChangedAt);
+                      return(
+                        <div key={o.id} onClick={()=>setSelO(o)} className="card-tap"
+                          style={{border:`1.5px solid ${isOverdue(o)?"#fca5a5":"#e2e8f0"}`,borderRadius:10,padding:"10px 12px",marginBottom:6,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,minHeight:56}}>
+                          <div style={{minWidth:0}}>
+                            <div style={{fontWeight:700,fontSize:14,color:"#0f172a"}}>{c?.vorname} {c?.nachname}</div>
+                            <div style={{fontSize:11,color:"#94a3b8"}}>#{o.orderNumber} · {dv<1?"heute":`${dv}T`}</div>
+                          </div>
+                          <Badge status={o.status} small/>
+                        </div>
+                      );
+                    })
+                  }
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* AUFTRÄGE */}
+        {tab==="auftraege"&&(
+          <div>
+            <div style={{fontWeight:900,fontSize:18,color:"#0f172a",marginBottom:14}}>Aufträge ({orders.length})</div>
+            {SO.filter(s=>s!=="abgeschlossen").map(s=>{
+              const grp=orders.filter(o=>o.status===s);
+              if(!grp.length)return null;
+              return(
+                <div key={s} style={{marginBottom:18}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                    <Badge status={s}/><span style={{fontSize:11,color:"#94a3b8"}}>{grp.length}×</span>
+                  </div>
+                  {grp.map(o=>{
+                    const c=customers.find(x=>x.id===o.customerId);
+                    const ov=isOverdue(o);const dv=daysSince(o.statusChangedAt);
+                    return(
+                      <div key={o.id} onClick={()=>setSelO(o)} className="card-tap"
+                        style={{background:"#fff",border:`1.5px solid ${ov?"#fca5a5":"#e2e8f0"}`,borderRadius:12,padding:"12px",marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,minHeight:64}}>
+                        <div style={{minWidth:0}}>
+                          {ov&&<div style={{fontSize:10,color:"#dc2626",fontWeight:700,marginBottom:2}}>⚠️ Frist überschritten</div>}
+                          <div style={{fontWeight:700,color:"#0f172a",fontSize:14}}>#{o.orderNumber} – {c?.vorname} {c?.nachname}</div>
+                          <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{c?.kennzeichen}</div>
+                          <div style={{fontSize:11,color:"#94a3b8",marginTop:1}}>{dv<1?"heute":`${dv}T`} in Phase</div>
+                        </div>
+                        <span style={{fontSize:20,color:"#cbd5e1"}}>›</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+            {(()=>{
+              const done=orders.filter(o=>o.status==="abgeschlossen");
+              if(!done.length)return null;
+              return(
+                <details>
+                  <summary style={{cursor:"pointer",color:"#64748b",fontWeight:700,fontSize:13,padding:"10px 0",userSelect:"none",listStyle:"none",display:"flex",alignItems:"center",gap:6}}>
+                    <span>▶</span><span>Abgeschlossen ({done.length})</span>
+                  </summary>
+                  <div style={{marginTop:8}}>
+                    {done.map(o=>{
+                      const c=customers.find(x=>x.id===o.customerId);
+                      return(
+                        <div key={o.id} onClick={()=>setSelO(o)} className="card-tap"
+                          style={{background:"#f8fafc",border:"1.5px solid #e2e8f0",borderRadius:10,padding:"10px 12px",marginBottom:6,cursor:"pointer",opacity:0.75,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                          <div>
+                            <div style={{fontWeight:600,color:"#475569",fontSize:13}}>#{o.orderNumber} – {c?.vorname} {c?.nachname}</div>
+                            <div style={{fontSize:11,color:"#94a3b8"}}>{new Date(o.createdAt).toLocaleDateString("de-CH")}</div>
+                          </div>
+                          <span style={{fontSize:18,color:"#94a3b8"}}>›</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </details>
+              );
+            })()}
+            {!orders.length&&<p style={{color:"#94a3b8",textAlign:"center",padding:"40px 0",fontSize:14}}>Noch keine Aufträge.</p>}
+          </div>
+        )}
+
+        {/* KUNDENKARTEI */}
+        {tab==="kunden"&&(
+          <div>
+            <div style={{fontWeight:900,fontSize:18,color:"#0f172a",marginBottom:12}}>Kundenkartei ({customers.length})</div>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Name, Telefon oder Kennzeichen…" style={{...inp,marginBottom:10,borderRadius:12}}/>
+            <div className="status-scroll" style={{marginBottom:14}}>
+              {[["all","Alle"],["active","Aktive"],["inactive","Inaktive"]].map(([f,l])=>(
+                <button key={f} onClick={()=>setFilterK(f)} style={{flexShrink:0,padding:"8px 16px",border:`1.5px solid ${filterK===f?"#6366f1":"#e2e8f0"}`,borderRadius:20,background:filterK===f?"#6366f1":"#fff",color:filterK===f?"#fff":"#64748b",fontWeight:700,fontSize:13,cursor:"pointer"}}>{l}</button>
+              ))}
+            </div>
+            {!filteredC.length&&<p style={{color:"#94a3b8",textAlign:"center",padding:"30px 0",fontSize:14}}>Keine Kunden gefunden.</p>}
+            {filteredC.map(c=>{
+              const as=getActiveStatus(orders,c.id);
+              return(
+                <div key={c.id} onClick={()=>setSelC(c)} className="card-tap"
+                  style={{background:"#fff",border:"1.5px solid #e2e8f0",borderRadius:12,padding:"14px",marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,minHeight:64}}>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontWeight:800,color:"#0f172a",fontSize:15}}>{c.vorname} {c.nachname}</div>
+                    <div style={{fontSize:12,color:"#64748b"}}>{c.telefon}</div>
+                    <div style={{fontSize:11,color:"#94a3b8",marginTop:1}}>🚗 {c.kennzeichen}{c.marke?` · ${c.marke}`:""}</div>
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6,flexShrink:0}}>
+                    {as?<Badge status={as} small/>:<span style={{fontSize:10,color:"#94a3b8",background:"#f1f5f9",padding:"2px 8px",borderRadius:20,border:"1px solid #e2e8f0",whiteSpace:"nowrap"}}>Inaktiv</span>}
+                    <span style={{fontSize:18,color:"#cbd5e1"}}>›</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* FAB */}
+      {fabOpen&&<div onClick={()=>setFabOpen(false)} style={{position:"fixed",inset:0,zIndex:49}}/>}
+      {fabOpen&&(
+        <div style={{position:"fixed",bottom:"calc(148px + env(safe-area-inset-bottom))",right:14,zIndex:51,display:"flex",flexDirection:"column",gap:10,alignItems:"flex-end"}}>
+          <button onClick={()=>{setShowNC(true);setFabOpen(false);}} style={{background:"#fff",border:"1.5px solid #e2e8f0",borderRadius:14,padding:"12px 18px",fontWeight:700,cursor:"pointer",fontSize:14,color:"#334155",boxShadow:"0 4px 16px rgba(0,0,0,0.12)",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:18}}>👤</span> Neuer Kunde
+          </button>
+          <button onClick={()=>{setNewOCid(null);setShowNO(true);setFabOpen(false);}} style={{background:"#fff",border:"1.5px solid #e2e8f0",borderRadius:14,padding:"12px 18px",fontWeight:700,cursor:"pointer",fontSize:14,color:"#334155",boxShadow:"0 4px 16px rgba(0,0,0,0.12)",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:18}}>🔧</span> Neuer Auftrag
+          </button>
+        </div>
+      )}
+      <button className="fab" onClick={()=>setFabOpen(p=>!p)} style={{bottom:"calc(72px + env(safe-area-inset-bottom))",transform:fabOpen?"rotate(45deg)":"rotate(0deg)"}}>+</button>
+
+      {/* Bottom Nav */}
+      <div style={{position:"fixed",bottom:0,left:0,right:0,background:"#fff",borderTop:"1px solid #e2e8f0",display:"flex",zIndex:100,boxShadow:"0 -4px 16px rgba(0,0,0,0.06)",paddingBottom:"env(safe-area-inset-bottom)"}}>
+        {navBtn("dashboard","🏠","Dashboard")}
+        {navBtn("auftraege","🔧","Aufträge")}
+        {navBtn("kunden","👥","Kunden")}
+      </div>
+
+      {/* MODALS */}
+      {showAdmin&&<AdminPanel token={token} onClose={()=>setShowAdmin(false)}/>}
+      {showNC&&<Modal title="Neuer Kunde" onClose={()=>setShowNC(false)}><CustomerForm onSave={addCustomer} onCancel={()=>setShowNC(false)}/></Modal>}
+      {afterSave&&!showNO&&(()=>{
+        const c=customers.find(x=>x.id===afterSave);
+        return(
+          <Modal title="Kunde gespeichert ✓" onClose={()=>setAfterSave(null)}>
+            <div style={{textAlign:"center",paddingBottom:8}}>
+              <div style={{fontSize:48,marginBottom:10}}>✅</div>
+              <p style={{color:"#475569",marginBottom:20,fontSize:15}}>Möchtest du direkt einen Auftrag für <strong>{c?.vorname} {c?.nachname}</strong> erstellen?</p>
+            </div>
+            <button onClick={()=>{setNewOCid(afterSave);setShowNO(true);}} style={{width:"100%",background:"#6366f1",color:"#fff",border:"none",borderRadius:12,padding:"15px",fontWeight:700,cursor:"pointer",fontSize:16,marginBottom:10}}>+ Auftrag erstellen</button>
+            <button onClick={()=>setAfterSave(null)} style={{width:"100%",padding:"13px",border:"1.5px solid #e2e8f0",borderRadius:12,background:"#fff",cursor:"pointer",fontWeight:600,color:"#64748b",fontSize:15}}>Später</button>
+          </Modal>
+        );
+      })()}
+      {showNO&&<Modal title="Neuer Auftrag" onClose={()=>{setShowNO(false);setNewOCid(null);}}><OrderForm customers={customers} customerId={newOCid} onSave={addOrder} onCancel={()=>{setShowNO(false);setNewOCid(null);}}/></Modal>}
+      {selC&&!selO&&<CustomerDetail customer={selC} orders={orders} onClose={()=>setSelC(null)} onEdit={()=>setEditC(selC)} onNewOrder={()=>{setNewOCid(selC.id);setShowNO(true);setSelC(null);}} onOrderClick={o=>{setSelO(o);setSelC(null);}}/>}
+      {editC&&<Modal title="Kunde bearbeiten" onClose={()=>setEditC(null)}><CustomerForm initial={editC} onSave={async data=>{await updateCustomer(editC.id,data);setEditC(null);}} onCancel={()=>setEditC(null)}/></Modal>}
+      {selO&&<OrderDetail order={selO} customer={customers.find(c=>c.id===selO.customerId)} onClose={()=>setSelO(null)} onUpdate={updateOrder} onDelete={deleteOrder}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
