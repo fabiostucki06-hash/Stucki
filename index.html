@@ -272,10 +272,9 @@ function CustomerForm({initial,onSave,onCancel,saving}){
   );
 }
 
-// ── ZE SCHÄTZUNG ─────────────────────────────────────────────────────────────
+// ── ZE SCHÄTZUNG (Fallback offline) ──────────────────────────────────────────
 function schaetzeZE(beschreibung){
   const t = beschreibung.toLowerCase();
-  // Bekannte Arbeiten mit typischen ZE-Werten
   const regeln = [
     [/oelwechsel|ölwechsel|oil change/,2],
     [/inspektion|service|jahresservice/,6],
@@ -298,8 +297,36 @@ function schaetzeZE(beschreibung){
   for(const [re, ze] of regeln){
     if(re.test(t)) return String(ze);
   }
-  // Standard: 1 ZE für unbekannte Arbeiten
   return "1";
+}
+
+// ── KI ZE SCHÄTZUNG ───────────────────────────────────────────────────────────
+async function schaetzeZEmitKI(beschreibung, fahrzeug){
+  const fahrzeugInfo = [fahrzeug.marke, fahrzeug.modell, fahrzeug.kennzeichen, fahrzeug.km ? fahrzeug.km+"km" : ""].filter(Boolean).join(" ") || "unbekanntes Fahrzeug";
+  const prompt = `Du bist ein erfahrener Automechaniker in der Schweiz. Schätze die Arbeitszeit in ZE (Zeiteinheiten, 1 ZE = 0.6 Minuten) für folgende Arbeit.
+
+Fahrzeug: ${fahrzeugInfo}
+Arbeit: ${beschreibung}
+
+Antworte NUR mit einem JSON-Objekt, ohne Markdown, ohne Erklärung:
+{"ze": <Zahl>, "begruendung": "<kurze Begründung auf Deutsch, max 60 Zeichen>"}
+
+Wichtig: ZE sind Zeiteinheiten à 0.6 Minuten. Typische Werte: Ölwechsel=200ZE, Bremsbelag=400ZE, Inspektion=600ZE, Batterie=100ZE, Diagnose=150ZE. Gib realistische Werte für das spezifische Fahrzeug.`;
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 150,
+      messages: [{role:"user", content: prompt}]
+    })
+  });
+  const data = await res.json();
+  const text = (data.content||[]).map(b=>b.text||"").join("");
+  const clean = text.replace(/```json|```/g,"").trim();
+  const parsed = JSON.parse(clean);
+  return { ze: String(Math.round(parsed.ze)), begruendung: parsed.begruendung };
 }
 
 // ── OFFERTE FORM ──────────────────────────────────────────────────────────────
@@ -307,24 +334,45 @@ function OfferteForm({customers,onSave,onCancel}){
   const[cid,setCid]=useState("");
   const[titel,setTitel]=useState("");
   const[aktTab,setAktTab]=useState("arbeit"); // "arbeit" | "material"
-  const[arbeit,setArbeit]=useState([{beschreibung:"",ze:"",stundenansatz:"",preis:""}]);
+  const[arbeit,setArbeit]=useState([{beschreibung:"",ze:"",stundenansatz:"",preis:"",zeKI:false,zeLoading:false,zeHint:""}]);
   const[material,setMaterial]=useState([{beschreibung:"",menge:"1",stueckpreis:"",preis:""}]);
   const[notizen,setNotizen]=useState("");
   const[gueltigBis,setGueltigBis]=useState("");
 
+  const selectedCustomer = customers.find(c=>c.id===cid)||null;
+
   // ── Arbeit updaten ──
-  const addArbeit=()=>setArbeit(a=>[...a,{beschreibung:"",ze:"",stundenansatz:"",preis:""}]);
+  const addArbeit=()=>setArbeit(a=>[...a,{beschreibung:"",ze:"",stundenansatz:"",preis:"",zeKI:false,zeLoading:false,zeHint:""}]);
   const remArbeit=i=>setArbeit(a=>a.filter((_,j)=>j!==i));
   const updArbeit=(i,k,v)=>setArbeit(a=>{
     const n=[...a]; n[i]={...n[i],[k]:v};
-    if(k==="beschreibung" && v.trim().length>3){ n[i].ze=schaetzeZE(v); }
-    // Preis = ZE * Stundenansatz / 100 * 60 → ZE * SA * 0.6min aber in CHF
-    // Formel: ZE * Stundenansatz / 100 = CHF (weil 100ZE=60min=1h)
+    if(k==="beschreibung" && v.trim().length>3){ n[i].ze=schaetzeZE(v); n[i].zeKI=false; n[i].zeHint=""; }
+    if(k==="ze"){ n[i].zeKI=false; n[i].zeHint=""; }
     const ze=parseFloat(k==="ze"?v:n[i].ze)||0;
     const sa=parseFloat(k==="stundenansatz"?v:n[i].stundenansatz)||0;
     n[i].preis=ze&&sa?((ze/100)*sa).toFixed(2):"";
     return n;
   });
+
+  // ── KI ZE Schätzung für eine Position ──
+  const kiSchaetzeZE=async(i)=>{
+    const pos=arbeit[i];
+    if(!pos.beschreibung.trim())return;
+    setArbeit(a=>{const n=[...a];n[i]={...n[i],zeLoading:true};return n;});
+    try{
+      const fahrzeug = selectedCustomer ? {marke:selectedCustomer.marke||"",modell:selectedCustomer.modell||"",kennzeichen:selectedCustomer.kennzeichen||"",km:selectedCustomer.km||""} : {};
+      const result = await schaetzeZEmitKI(pos.beschreibung, fahrzeug);
+      setArbeit(a=>{
+        const n=[...a];
+        const sa=parseFloat(n[i].stundenansatz)||0;
+        const ze=parseFloat(result.ze)||0;
+        n[i]={...n[i],ze:result.ze,zeKI:true,zeHint:result.begruendung,zeLoading:false,preis:ze&&sa?((ze/100)*sa).toFixed(2):""};
+        return n;
+      });
+    }catch(e){
+      setArbeit(a=>{const n=[...a];n[i]={...n[i],zeLoading:false,zeHint:"⚠️ KI-Fehler, manuell eingeben"};return n;});
+    }
+  };
 
   // ── Material updaten ──
   const addMaterial=()=>setMaterial(m=>[...m,{beschreibung:"",menge:"1",stueckpreis:"",preis:""}]);
@@ -421,9 +469,35 @@ function OfferteForm({customers,onSave,onCancel}){
               )
               , React.createElement('div', {style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}
                 , React.createElement('div', null
-                  , React.createElement('label', {style:{...lbl,color:"#1d4ed8"}}, "⏱ ZE (Auto)")
-                  , React.createElement('input', {type:"number", value:pos.ze, onChange:e=>updArbeit(i,"ze",e.target.value), placeholder:"Auto", style:{...inp,background:"#fff"}, min:"0", step:"1"})
-                  , pos.ze?React.createElement('div', {style:{fontSize:10,color:"#3b82f6",marginTop:2}}, "= "+(parseFloat(pos.ze)*0.6).toFixed(0)+" min"):null
+                  , React.createElement('label', {style:{...lbl,color:"#1d4ed8"}}, pos.zeKI?"🤖 ZE (KI)":"⏱ ZE")
+                  , React.createElement('div', {style:{display:"flex",gap:4}}
+                    , React.createElement('input', {
+                        type:"number",
+                        value:pos.ze,
+                        onChange:e=>updArbeit(i,"ze",e.target.value),
+                        placeholder:"Auto",
+                        style:{...inp,background:pos.zeKI?"#e0f2fe":"#fff",borderColor:pos.zeKI?"#38bdf8":"#e2e8f0",fontWeight:pos.zeKI?700:400,flex:1},
+                        min:"0", step:"1"
+                      })
+                    , React.createElement('button', {
+                        onClick:()=>kiSchaetzeZE(i),
+                        disabled:pos.zeLoading||!pos.beschreibung.trim(),
+                        title:"KI-Schätzung anfordern",
+                        style:{
+                          background:pos.zeLoading?"#e0f2fe":pos.zeKI?"#0ea5e9":"#6366f1",
+                          color:"#fff",border:"none",borderRadius:8,
+                          width:36,height:44,cursor:"pointer",fontSize:14,flexShrink:0,
+                          opacity:(pos.zeLoading||!pos.beschreibung.trim())?0.5:1,
+                          display:"flex",alignItems:"center",justifyContent:"center"
+                        }
+                      }
+                      , pos.zeLoading
+                        ? React.createElement('div', {style:{width:14,height:14,border:"2px solid #fff",borderTopColor:"transparent",borderRadius:"50%",animation:"spin 0.7s linear infinite"}})
+                        : "🤖"
+                    )
+                  )
+                  , pos.zeHint&&React.createElement('div', {style:{fontSize:10,color:pos.zeKI?"#0369a1":"#ef4444",marginTop:3,lineHeight:1.3}}, pos.zeHint)
+                  , !pos.zeHint&&pos.ze&&React.createElement('div', {style:{fontSize:10,color:"#3b82f6",marginTop:2}}, "= "+(parseFloat(pos.ze)*0.6).toFixed(0)+" min")
                 )
                 , React.createElement('div', null
                   , React.createElement('label', {style:{...lbl,color:"#1d4ed8"}}, "Ansatz CHF/h")
@@ -935,6 +1009,9 @@ function App(){
     const newOff={id:`off_${Date.now()}`,offertNumber:num,status:"entwurf",createdAt:new Date().toISOString(),...data};
     await syncOk(()=>db.upsert("offerten",{id:newOff.id,data:newOff},token));
     setOfferten(p=>[...p,newOff]);setOffertNum(num);setShowNOff(false);
+    // Automatisch Excel-Datei erstellen
+    const cust=customers.find(c=>c.id===newOff.customerId);
+    exportOfferteExcel(newOff,cust);
   }
   async function updateOfferte(upd){
     await syncOk(()=>db.upsert("offerten",{id:upd.id,data:upd},token));
