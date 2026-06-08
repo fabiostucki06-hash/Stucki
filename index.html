@@ -271,6 +271,135 @@ function CustomerForm({initial,onSave,onCancel,saving}){
   );
 }
 
+// ── OFFERTE FORM ──────────────────────────────────────────────────────────────
+function OfferteForm({customers,onSave,onCancel}){
+  const[cid,setCid]=useState("");
+  const[titel,setTitel]=useState("");
+  const[positionen,setPositionen]=useState([{beschreibung:"",menge:"1",preis:""}]);
+  const[notizen,setNotizen]=useState("");
+  const[gueltigBis,setGueltigBis]=useState("");
+  const addPos=()=>setPositionen(p=>[...p,{beschreibung:"",menge:"1",preis:""}]);
+  const updPos=(i,k,v)=>setPositionen(p=>{const n=[...p];n[i]={...n[i],[k]:v};return n;});
+  const remPos=i=>setPositionen(p=>p.filter((_,j)=>j!==i));
+  const total=positionen.reduce((s,p)=>{const v=parseFloat(p.preis||0)*parseFloat(p.menge||1);return s+(isNaN(v)?0:v);},0);
+  function submit(){
+    if(!cid)return alert("Bitte Kunden wählen.");
+    const pos=positionen.filter(p=>p.beschreibung.trim());
+    if(!pos.length)return alert("Mindestens eine Position eingeben.");
+    onSave({customerId:cid,titel,positionen:pos,notizen,gueltigBis,totalBetrag:total.toFixed(2)});
+  }
+  return(
+    React.createElement('div', null
+      , React.createElement('div', { style: {marginBottom:12},}
+        , React.createElement('label', { style: lbl,}, "Kunde *")
+        , React.createElement('select', { value: cid, onChange: e=>setCid(e.target.value), style: {...inp},}
+          , React.createElement('option', { value: "",}, "-- Kunde wählen --")
+          , customers.map(c=>React.createElement('option', { key: c.id, value: c.id,}, c.vorname, " ", c.nachname, " – ", c.kennzeichen))
+        )
+      )
+      , React.createElement('div', { style: {marginBottom:12},}
+        , React.createElement('label', { style: lbl,}, "Titel / Betreff")
+        , React.createElement('input', { value: titel, onChange: e=>setTitel(e.target.value), placeholder: "z.B. Jahresservice BMW 320i", style: inp,})
+      )
+      , React.createElement('div', { style: {marginBottom:12},}
+        , React.createElement('label', { style: lbl,}, "Gültig bis")
+        , React.createElement('input', { type: "date", value: gueltigBis, onChange: e=>setGueltigBis(e.target.value), style: inp,})
+      )
+      , React.createElement('div', { style: {...lbl,marginBottom:10},}, "Positionen *")
+      , positionen.map((pos,i)=>
+        React.createElement('div', { key: i, style: {background:"#f8fafc",borderRadius:10,padding:"10px",marginBottom:8,border:"1px solid #e2e8f0"},}
+          , React.createElement('input', { value: pos.beschreibung, onChange: e=>updPos(i,"beschreibung",e.target.value), placeholder: "Beschreibung", style: {...inp,marginBottom:8},})
+          , React.createElement('div', { style: {display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:8,alignItems:"center"},}
+            , React.createElement('div', null
+              , React.createElement('label', { style: lbl,}, "Menge")
+              , React.createElement('input', { type: "number", value: pos.menge, onChange: e=>updPos(i,"menge",e.target.value), style: inp, min:"1",})
+            )
+            , React.createElement('div', null
+              , React.createElement('label', { style: lbl,}, "Preis CHF")
+              , React.createElement('input', { type: "number", value: pos.preis, onChange: e=>updPos(i,"preis",e.target.value), placeholder: "0.00", style: inp,})
+            )
+            , React.createElement('button', { onClick: ()=>remPos(i), disabled: positionen.length===1, style: {background:"#fee2e2",color:"#ef4444",border:"none",borderRadius:8,width:40,height:40,cursor:"pointer",fontSize:18,marginTop:16,flexShrink:0},}, "✕")
+          )
+        )
+      )
+      , React.createElement('button', { onClick: addPos, style: {width:"100%",background:"#f1f5f9",border:"1.5px dashed #cbd5e1",borderRadius:10,padding:"11px",cursor:"pointer",color:"#64748b",fontWeight:700,marginBottom:14,fontSize:14},}, "+ Position hinzufügen")
+      , React.createElement('div', { style: {background:"#eef2ff",borderRadius:10,padding:"12px 14px",marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center"},}
+        , React.createElement('span', { style: {fontWeight:700,color:"#4338ca"},}, "Total")
+        , React.createElement('span', { style: {fontWeight:900,fontSize:18,color:"#4338ca"},}, "CHF ", total.toFixed(2))
+      )
+      , React.createElement('div', { style: {marginBottom:14},}
+        , React.createElement('label', { style: lbl,}, "Notizen")
+        , React.createElement('textarea', { value: notizen, onChange: e=>setNotizen(e.target.value), placeholder: "Interne Notizen…", rows: 2, style: {...inp,resize:"vertical"},})
+      )
+      , React.createElement('button', { onClick: submit, style: {width:"100%",background:"#6366f1",color:"#fff",border:"none",borderRadius:12,padding:"15px",fontWeight:700,cursor:"pointer",fontSize:16,marginBottom:10},}, "📄 Offerte erstellen")
+      , React.createElement('button', { onClick: onCancel, style: {width:"100%",padding:"13px",border:"1.5px solid #e2e8f0",borderRadius:12,background:"#fff",cursor:"pointer",fontWeight:600,color:"#64748b",fontSize:15},}, "Abbrechen")
+    )
+  );
+}
+
+// ── OFFERTE DETAIL ────────────────────────────────────────────────────────────
+function OfferteDetail({offerte,customer,onClose,onUpdate,onDelete}){
+  const[saving,setSaving]=useState(false);
+  const stColors={entwurf:{c:"#6366f1",bg:"#eef2ff",l:"Entwurf"},versendet:{c:"#f59e0b",bg:"#fffbeb",l:"Versendet"},angenommen:{c:"#10b981",bg:"#ecfdf5",l:"Angenommen"},abgelehnt:{c:"#ef4444",bg:"#fee2e2",l:"Abgelehnt"}};
+  const sc=stColors[offerte.status]||stColors.entwurf;
+  async function setStatus(s){
+    setSaving(true);
+    await onUpdate({...offerte,status:s});
+    setSaving(false);
+  }
+  const total=parseFloat(offerte.totalBetrag||0);
+  const isExpired=offerte.gueltigBis&&new Date(offerte.gueltigBis)<new Date();
+  return(
+    React.createElement(Modal, { title: `Offerte #${offerte.offertNumber}`, onClose: onClose, full: true,}
+      , React.createElement('div', { style: {background:`linear-gradient(135deg,${sc.c},${sc.c}cc)`,borderRadius:14,padding:"16px",marginBottom:16,color:"#fff"},}
+        , React.createElement('div', { style: {fontSize:11,fontWeight:700,opacity:0.8,marginBottom:4},}, "STATUS")
+        , React.createElement('div', { style: {fontSize:20,fontWeight:900},}, sc.l)
+        , offerte.titel&&React.createElement('div', { style: {fontSize:14,opacity:0.9,marginTop:4},}, offerte.titel)
+      )
+      , isExpired&&offerte.status==="versendet"&&React.createElement('div', { style: {background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:10,padding:"10px 14px",marginBottom:14,color:"#dc2626",fontWeight:700,fontSize:13},}, "⚠️ Offerte abgelaufen!")
+      , React.createElement('div', { style: {marginBottom:16},}
+        , React.createElement('div', { style: {...lbl,marginBottom:8},}, "Status ändern")
+        , React.createElement('div', { style: {display:"flex",gap:8,flexWrap:"wrap"},}
+          , Object.entries(stColors).map(([s,sc])=>
+            React.createElement('button', { key: s, onClick: ()=>setStatus(s), disabled: saving||offerte.status===s,
+              style: {padding:"8px 14px",borderRadius:20,border:`1.5px solid ${sc.c}`,background:offerte.status===s?sc.c:sc.bg,color:offerte.status===s?"#fff":sc.c,fontWeight:700,fontSize:12,cursor:"pointer",opacity:saving?0.7:1},}
+              , sc.l
+            )
+          )
+        )
+      )
+      , React.createElement('div', { style: {background:"#f8fafc",borderRadius:12,padding:"12px",marginBottom:14,border:"1px solid #e2e8f0"},}
+        , React.createElement('div', { style: {fontWeight:800,color:"#0f172a",fontSize:15},}, customer?`${customer.vorname} ${customer.nachname}`:"Kein Kunde")
+        , customer&&React.createElement('div', { style: {fontSize:13,color:"#64748b"},}, customer.telefon, " · ", customer.kennzeichen)
+      )
+      , offerte.gueltigBis&&React.createElement('div', { style: {fontSize:13,color:isExpired?"#dc2626":"#64748b",marginBottom:14,fontWeight:isExpired?700:400},}
+        , "Gültig bis: ", new Date(offerte.gueltigBis).toLocaleDateString("de-CH"), isExpired?" (abgelaufen)":""
+      )
+      , React.createElement('div', { style: {marginBottom:14},}
+        , React.createElement('div', { style: lbl,}, "Positionen")
+        , (offerte.positionen||[]).map((pos,i)=>
+          React.createElement('div', { key: i, style: {display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",background:i%2===0?"#f8fafc":"#fff",borderRadius:8,marginBottom:4,border:"1px solid #e2e8f0"},}
+            , React.createElement('div', null
+              , React.createElement('div', { style: {fontWeight:600,color:"#0f172a",fontSize:14},}, pos.beschreibung)
+              , React.createElement('div', { style: {fontSize:12,color:"#64748b"},}, pos.menge, "× à CHF ", parseFloat(pos.preis||0).toFixed(2))
+            )
+            , React.createElement('div', { style: {fontWeight:700,fontSize:14,color:"#0f172a"},}, "CHF ", (parseFloat(pos.menge||1)*parseFloat(pos.preis||0)).toFixed(2))
+          )
+        )
+        , React.createElement('div', { style: {display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 14px",background:"#eef2ff",borderRadius:10,marginTop:8,border:"1px solid #c7d2fe"},}
+          , React.createElement('span', { style: {fontWeight:800,color:"#4338ca",fontSize:15},}, "Total")
+          , React.createElement('span', { style: {fontWeight:900,fontSize:20,color:"#4338ca"},}, "CHF ", total.toFixed(2))
+        )
+      )
+      , offerte.notizen&&React.createElement('div', { style: {background:"#f8fafc",borderRadius:10,padding:"10px 12px",fontSize:13,color:"#475569",border:"1px solid #e2e8f0",marginBottom:14},}
+        , React.createElement('strong', null, "Notizen:"), " ", offerte.notizen
+      )
+      , React.createElement('button', { onClick: async()=>{if(window.confirm("Offerte wirklich löschen?"))await onDelete(offerte.id);}, style: {width:"100%",background:"#fee2e2",color:"#ef4444",border:"none",borderRadius:12,padding:"13px",fontWeight:700,cursor:"pointer",fontSize:15,marginTop:8},}, "🗑️ Offerte löschen")
+      , React.createElement('div', { style: {marginTop:14,fontSize:11,color:"#94a3b8"},}, "Erstellt: ", new Date(offerte.createdAt).toLocaleDateString("de-CH"), " · Offerte #", offerte.offertNumber)
+    )
+  );
+}
+
 // ── ORDER FORM ────────────────────────────────────────────────────────────────
 function OrderForm({customers,customerId:preCid,onSave,onCancel,saving}){
   const[cid,setCid]=useState(preCid||"");
@@ -542,6 +671,10 @@ function App(){
   const[search,setSearch]=useState("");
   const[filterK,setFilterK]=useState("all");
   const[fabOpen,setFabOpen]=useState(false);
+  const[offerten,setOfferten]=useState([]);
+  const[showNOff,setShowNOff]=useState(false);
+  const[selOff,setSelOff]=useState(null);
+  const[offertNum,setOffertNum]=useState(0);
 
   // Verify token on load
   useEffect(()=>{
@@ -561,10 +694,13 @@ function App(){
     if(!token||!authChecked)return;
     (async()=>{
       try{
-        const[cr,or,cnt]=await Promise.all([db.get("customers",token),db.get("orders",token),db.getCounter(token)]);
+        const[cr,or,cnt,offr]=await Promise.all([db.get("customers",token),db.get("orders",token),db.getCounter(token),db.get("offerten",token)]);
         setCustomers((Array.isArray(cr)?cr:[]).map(r=>r.data));
         setOrders((Array.isArray(or)?or:[]).map(r=>r.data));
         setOrderNum(cnt);
+        const offs=(Array.isArray(offr)?offr:[]).map(r=>r.data);
+        setOfferten(offs);
+        if(offs.length)setOffertNum(Math.max(...offs.map(o=>o.offertNumber||0)));
       }catch(e){console.error(e);}
       setLoading(false);
     })();
@@ -608,6 +744,20 @@ function App(){
     await syncOk(()=>db.upsert("orders",{id:upd.id,data:upd},token));
     setOrders(p=>p.map(o=>o.id===upd.id?upd:o));setSelO(upd);
     if(cp)await updateCustomer(upd.customerId,cp);
+  }
+  async function addOfferte(data){
+    const num=offertNum+1;
+    const newOff={id:`off_${Date.now()}`,offertNumber:num,status:"entwurf",createdAt:new Date().toISOString(),...data};
+    await syncOk(()=>db.upsert("offerten",{id:newOff.id,data:newOff},token));
+    setOfferten(p=>[...p,newOff]);setOffertNum(num);setShowNOff(false);
+  }
+  async function updateOfferte(upd){
+    await syncOk(()=>db.upsert("offerten",{id:upd.id,data:upd},token));
+    setOfferten(p=>p.map(o=>o.id===upd.id?upd:o));setSelOff(upd);
+  }
+  async function deleteOfferte(id){
+    await syncOk(()=>db.delete("offerten",id,token));
+    setOfferten(p=>p.filter(o=>o.id!==id));setSelOff(null);
   }
   async function deleteOrder(id){
     await syncOk(()=>db.delete("orders",id,token));
@@ -740,6 +890,47 @@ function App(){
           )
         )
 
+        /* OFFERTEN */
+        , tab==="offerten"&&(
+          React.createElement('div', null
+            , React.createElement('div', { style: {display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14},}
+              , React.createElement('div', { style: {fontWeight:900,fontSize:18,color:"#0f172a"},}, "Offerten (" , offerten.length, ")")
+              , React.createElement('button', { onClick: ()=>setShowNOff(true), style: {background:"#6366f1",color:"#fff",border:"none",borderRadius:12,padding:"10px 18px",fontWeight:700,cursor:"pointer",fontSize:14},}, "+ Neue Offerte")
+            )
+            , !offerten.length&&React.createElement('div', { style: {textAlign:"center",padding:"60px 20px",color:"#94a3b8",fontSize:14},}
+              , React.createElement('div', { style: {fontSize:48,marginBottom:12},}, "📄")
+              , React.createElement('div', null, "Noch keine Offerten erstellt.")
+            )
+            , ["entwurf","versendet","angenommen","abgelehnt"].map(st=>{
+              const grp=offerten.filter(o=>o.status===st).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+              if(!grp.length)return null;
+              const stColors={entwurf:{c:"#6366f1",bg:"#eef2ff",l:"Entwurf"},versendet:{c:"#f59e0b",bg:"#fffbeb",l:"Versendet"},angenommen:{c:"#10b981",bg:"#ecfdf5",l:"Angenommen"},abgelehnt:{c:"#ef4444",bg:"#fee2e2",l:"Abgelehnt"}};
+              const sc=stColors[st];
+              return React.createElement('div', { key: st, style: {marginBottom:18},}
+                , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8,marginBottom:8},}
+                  , React.createElement('span', { style: {background:sc.bg,color:sc.c,border:`1px solid ${sc.c}30`,borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700},}, sc.l)
+                  , React.createElement('span', { style: {fontSize:11,color:"#94a3b8"},}, grp.length, "×")
+                )
+                , grp.map(off=>{
+                  const c=customers.find(x=>x.id===off.customerId);
+                  return React.createElement('div', { key: off.id, onClick: ()=>setSelOff(off), className: "card-tap",
+                    style: {background:"#fff",border:"1.5px solid #e2e8f0",borderRadius:12,padding:"12px",marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8},}
+                    , React.createElement('div', null
+                      , React.createElement('div', { style: {fontWeight:700,color:"#0f172a",fontSize:14},}, "Offerte #" , off.offertNumber)
+                      , React.createElement('div', { style: {fontSize:12,color:"#64748b",marginTop:2},}, c?`${c.vorname} ${c.nachname}`:"Kein Kunde")
+                      , off.totalBetrag&&React.createElement('div', { style: {fontSize:13,fontWeight:800,color:"#0f172a",marginTop:2},}, "CHF " , off.totalBetrag)
+                    )
+                    , React.createElement('div', { style: {textAlign:"right"},}
+                      , React.createElement('div', { style: {fontSize:11,color:"#94a3b8"},}, new Date(off.createdAt).toLocaleDateString("de-CH"))
+                      , React.createElement('span', { style: {fontSize:18,color:"#cbd5e1"},}, "›")
+                    )
+                  );
+                })
+              );
+            })
+          )
+        )
+
         /* AUFTRÄGE */
         , tab==="auftraege"&&(
           React.createElement('div', null
@@ -851,6 +1042,7 @@ function App(){
       , React.createElement('div', { style: {position:"fixed",bottom:0,left:0,right:0,background:"#fff",borderTop:"1px solid #e2e8f0",display:"flex",zIndex:100,boxShadow:"0 -4px 16px rgba(0,0,0,0.06)",paddingBottom:"env(safe-area-inset-bottom)"},}
         , navBtn("dashboard","🏠","Dashboard")
         , navBtn("auftraege","🔧","Aufträge")
+        , navBtn("offerten","📄","Offerten")
         , navBtn("kunden","👥","Kunden")
       )
 
@@ -869,6 +1061,8 @@ function App(){
           )
         );
       })()
+      , showNOff&&React.createElement(Modal, { title: "Neue Offerte", onClose: ()=>setShowNOff(false),}, React.createElement(OfferteForm, { customers: customers, onSave: addOfferte, onCancel: ()=>setShowNOff(false),}))
+      , selOff&&React.createElement(OfferteDetail, { offerte: selOff, customer: customers.find(c=>c.id===selOff.customerId), onClose: ()=>setSelOff(null), onUpdate: updateOfferte, onDelete: deleteOfferte,})
       , showNO&&React.createElement(Modal, { title: "Neuer Auftrag" , onClose: ()=>{setShowNO(false);setNewOCid(null);},}, React.createElement(OrderForm, { customers: customers, customerId: newOCid, onSave: addOrder, onCancel: ()=>{setShowNO(false);setNewOCid(null);},}))
       , selC&&!selO&&React.createElement(CustomerDetail, { customer: selC, orders: orders, onClose: ()=>setSelC(null), onEdit: ()=>setEditC(selC), onNewOrder: ()=>{setNewOCid(selC.id);setShowNO(true);setSelC(null);}, onOrderClick: o=>{setSelO(o);setSelC(null);},})
       , editC&&React.createElement(Modal, { title: "Kunde bearbeiten" , onClose: ()=>setEditC(null),}, React.createElement(CustomerForm, { initial: editC, onSave: async data=>{await updateCustomer(editC.id,data);setEditC(null);}, onCancel: ()=>setEditC(null),}))
