@@ -13,7 +13,7 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overscroll-behavior:none}
-body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#f8fafc;color:#0f172a;min-height:100vh;min-height:100dvh}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#f1f5f9;min-height:100vh;min-height:100dvh}
 input,textarea,select{font-family:inherit;font-size:16px!important}
 button{touch-action:manipulation}
 ::-webkit-scrollbar{width:4px}
@@ -33,16 +33,19 @@ button{touch-action:manipulation}
 <div id="root"></div>
 <script>
  function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }const{useState,useEffect,useRef}=React;
+
 // ── CONFIG ───────────────────────────────────────────────────────────────────
 const SUPA_URL="https://xpggpkmqwescbcrnnpod.supabase.co";
 const SUPA_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhwZ2dwa21xd2VzY2Jjcm5ucG9kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NjIxMjIsImV4cCI6MjA5NjEzODEyMn0.egPJ4OYOegRKIBV6PHUz_VfRib8g7sVIcNNy_7bFxjg";
 const ADMIN_EMAIL="fabio.stucki06@gmail.com";
+
 // ── SUPABASE API ─────────────────────────────────────────────────────────────
 const h=(token)=>({
   "Content-Type":"application/json",
   "apikey":SUPA_KEY,
   "Authorization":`Bearer ${token||SUPA_KEY}`
 });
+
 const auth={
   async signUp(email,password){
     const r=await fetch(`${SUPA_URL}/auth/v1/signup`,{method:"POST",headers:h(),body:JSON.stringify({email,password})});
@@ -60,6 +63,7 @@ const auth={
     return r.json();
   }
 };
+
 const db={
   async get(table,token){
     const r=await fetch(`${SUPA_URL}/rest/v1/${table}?select=*`,{headers:h(token)});
@@ -80,6 +84,7 @@ const db={
     await fetch(`${SUPA_URL}/rest/v1/counters?id=eq.orderNum`,{method:"PATCH",headers:h(token),body:JSON.stringify({value:val})});
   }
 };
+
 // ── CONSTANTS ────────────────────────────────────────────────────────────────
 const SC={
   aufnahme:{label:"Aufnahme",short:"Aufnahme",color:"#6366f1",bg:"#eef2ff"},
@@ -101,25 +106,17 @@ const isOverdue=o=>{
   }
   return false;
 };
-const paymentDueText=o=>{
-  if(o.status!=="zahlung_versendet"&&o.status!=="zahlung_erhalten")return "";
-  if(o.status==="zahlung_erhalten")return "Zahlung erhalten";
-  const frist=parseInt(o.zahlungsFrist||"10");
-  const rest=frist-daysSince(o.statusChangedAt);
-  if(rest<0)return `Zahlung: ${Math.abs(rest)} Tage überfällig`;
-  if(rest===0)return "Zahlung: heute fällig";
-  if(rest===1)return "Zahlung: noch 1 Tag";
-  return `Zahlung: noch ${rest} Tage`;
-};
 const needsAttention=o=>o.status!=="abgeschlossen"&&isOverdue(o);
 const getActiveStatus=(orders,cid)=>{
   const a=orders.filter(o=>o.customerId===cid&&o.status!=="abgeschlossen");
   if(!a.length)return null;
   return a.sort((x,y)=>new Date(y.createdAt)-new Date(x.createdAt))[0].status;
 };
+
 // ── SHARED STYLES ────────────────────────────────────────────────────────────
-const inp={padding:"11px 12px",border:"1px solid #dbe3ee",borderRadius:8,fontSize:"16px",background:"#fff",outline:"none",width:"100%",display:"block",WebkitAppearance:"none"};
-const lbl={display:"block",fontSize:11,fontWeight:700,color:"#64748b",marginBottom:5,textTransform:"uppercase",letterSpacing:0};
+const inp={padding:"12px",border:"1.5px solid #e2e8f0",borderRadius:10,fontSize:"16px",background:"#f8fafc",outline:"none",width:"100%",display:"block",WebkitAppearance:"none"};
+const lbl={display:"block",fontSize:11,fontWeight:700,color:"#64748b",marginBottom:5,textTransform:"uppercase",letterSpacing:0.5};
+
 function Badge({status,small}){
   const c=SC[status]||SC.aufnahme;
   return React.createElement('span', { style: {background:c.bg,color:c.color,border:`1px solid ${c.color}30`,borderRadius:20,padding:small?"1px 8px":"3px 10px",fontSize:small?10:11,fontWeight:700,whiteSpace:"nowrap",display:"inline-block"},}, small?c.short:c.label);
@@ -132,6 +129,7 @@ function Spinner({text="Wird geladen…"}){
     )
   );
 }
+
 // ── LOGIN PAGE ────────────────────────────────────────────────────────────────
 function LoginPage({onLogin}){
     const[email,setEmail]=useState("");
@@ -139,6 +137,7 @@ function LoginPage({onLogin}){
   const[loading,setLoading]=useState(false);
   const[error,setError]=useState("");
   const[success,setSuccess]=useState("");
+
   async function handleLogin(){
     if(!email.trim()||!password.trim())return setError("Bitte alle Felder ausfüllen.");
     setLoading(true);setError("");
@@ -156,6 +155,7 @@ function LoginPage({onLogin}){
     }
     setLoading(false);
   }
+
   return(
     React.createElement('div', { style: {minHeight:"100dvh",background:"linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#0f172a 100%)",display:"flex",alignItems:"center",justifyContent:"center",padding:16},}
       , React.createElement('div', { style: {width:"100%",maxWidth:400,animation:"fadeIn 0.4s ease"},}
@@ -165,10 +165,13 @@ function LoginPage({onLogin}){
           , React.createElement('h1', { style: {color:"#fff",fontWeight:900,fontSize:28,letterSpacing:-1},}, "GarageOS")
           , React.createElement('p', { style: {color:"#94a3b8",fontSize:14,marginTop:4},}, "Werkstatt Management System"  )
         )
+
         /* Card */
         , React.createElement('div', { style: {background:"#fff",borderRadius:20,padding:"28px 24px",boxShadow:"0 24px 64px rgba(0,0,0,0.4)"},}
           , React.createElement('h2', { style: {fontSize:18,fontWeight:800,color:"#0f172a",marginBottom:20,textAlign:"center"},}, "Anmelden")
+
           , error&&React.createElement('div', { style: {background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:10,padding:"10px 14px",marginBottom:14,color:"#dc2626",fontWeight:600,fontSize:13},}, "⚠️ " , error)
+
           , React.createElement('div', { style: {marginBottom:14},}
             , React.createElement('label', { style: lbl,}, "E-Mail")
             , React.createElement('input', { type: "email", value: email, onChange: e=>setEmail(e.target.value), placeholder: "deine@email.ch",
@@ -179,8 +182,1082 @@ function LoginPage({onLogin}){
             , React.createElement('input', { type: "password", value: password, onChange: e=>setPassword(e.target.value), placeholder: "••••••••",
               style: {...inp,borderColor:"#e2e8f0"}, onKeyDown: e=>e.key==="Enter"&&handleLogin(),})
           )
+
           , React.createElement('button', { onClick: handleLogin, disabled: loading,
             style: {width:"100%",background:loading?"#a5b4fc":"#6366f1",color:"#fff",border:"none",borderRadius:12,padding:"15px",fontWeight:800,cursor:"pointer",fontSize:16,boxShadow:"0 4px 16px rgba(99,102,241,0.4)"},}
             , loading?"Bitte warten…":"🔑 Anmelden"
           )
         )
+      )
+    )
+  );
+}
+
+// ── MODAL ─────────────────────────────────────────────────────────────────────
+function Modal({title,onClose,children,full}){
+  useEffect(()=>{
+    const prev=document.body.style.overflow;
+    document.body.style.overflow="hidden";
+    return()=>{document.body.style.overflow=prev};
+  },[]);
+  return(
+    React.createElement('div', { style: {position:"fixed",inset:0,zIndex:500,display:"flex",flexDirection:"column",justifyContent:"flex-end"},}
+      , React.createElement('div', { style: {position:"absolute",inset:0,background:"rgba(0,0,0,0.5)"}, onClick: onClose,})
+      , React.createElement('div', { style: {position:"relative",background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",maxHeight:full?"95dvh":"90dvh",display:"flex",flexDirection:"column",boxShadow:"0 -8px 40px rgba(0,0,0,0.2)"},}
+        , React.createElement('div', { style: {display:"flex",justifyContent:"center",padding:"10px 0 0"},}, React.createElement('div', { style: {width:40,height:4,background:"#e2e8f0",borderRadius:2},}))
+        , React.createElement('div', { style: {display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 18px 12px",borderBottom:"1px solid #f1f5f9",flexShrink:0},}
+          , React.createElement('h2', { style: {margin:0,fontSize:17,fontWeight:800,color:"#0f172a"},}, title)
+          , React.createElement('button', { onClick: onClose, style: {background:"#f1f5f9",border:"none",width:32,height:32,borderRadius:8,cursor:"pointer",fontSize:15,color:"#64748b"},}, "✕")
+        )
+        , React.createElement('div', { className: "modal-scroll", style: {padding:"14px 18px",overflowY:"auto",flexGrow:1,paddingBottom:"calc(24px + env(safe-area-inset-bottom))"},}, children)
+      )
+    )
+  );
+}
+
+// ── FIELD ─────────────────────────────────────────────────────────────────────
+function Field({label,value,onChange,placeholder,required,type="text"}){
+  const[focus,setFocus]=useState(false);
+  return(
+    React.createElement('div', { style: {marginBottom:12},}
+      , label&&React.createElement('label', { style: lbl,}, label, required&&React.createElement('span', { style: {color:"#ef4444"},}, " *" ))
+      , React.createElement('input', { type: type, value: value, onChange: e=>onChange(e.target.value), placeholder: placeholder,
+        style: {...inp,borderColor:focus?"#6366f1":"#e2e8f0"},
+        onFocus: ()=>setFocus(true), onBlur: ()=>setFocus(false),})
+    )
+  );
+}
+function FieldArea({label,value,onChange,placeholder}){
+  const[focus,setFocus]=useState(false);
+  return(
+    React.createElement('div', { style: {marginBottom:12},}
+      , label&&React.createElement('label', { style: lbl,}, label)
+      , React.createElement('textarea', { value: value, onChange: e=>onChange(e.target.value), placeholder: placeholder, rows: 3,
+        style: {...inp,resize:"vertical",borderColor:focus?"#6366f1":"#e2e8f0"},
+        onFocus: ()=>setFocus(true), onBlur: ()=>setFocus(false),})
+    )
+  );
+}
+
+// ── CUSTOMER FORM ─────────────────────────────────────────────────────────────
+function CustomerForm({initial,onSave,onCancel,saving}){
+  const[f,setF]=useState(initial||{vorname:"",nachname:"",telefon:"",email:"",marke:"",modell:"",kennzeichen:"",km:""});
+  const s=k=>v=>setF(p=>({...p,[k]:v}));
+  function submit(){
+    if(!f.vorname.trim()||!f.nachname.trim()||!f.telefon.trim())return alert("Bitte Pflichtfelder ausfüllen.");
+    onSave(f);
+  }
+  return(
+    React.createElement('div', null
+      , React.createElement('div', { style: {display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 12px"}, className: "grid-half",}
+        , React.createElement(Field, { label: "Vorname *" , value: f.vorname, onChange: s("vorname"), placeholder: "Max",})
+        , React.createElement(Field, { label: "Nachname *" , value: f.nachname, onChange: s("nachname"), placeholder: "Muster",})
+      )
+      , React.createElement(Field, { label: "Telefon *" , value: f.telefon, onChange: s("telefon"), placeholder: "+41 79 000 00 00"    , type: "tel",})
+      , React.createElement(Field, { label: "E-Mail", value: f.email, onChange: s("email"), placeholder: "optional", type: "email",})
+      , React.createElement('div', { style: {background:"#f8fafc",borderRadius:12,padding:"12px",marginBottom:14,border:"1px solid #e2e8f0"},}
+        , React.createElement('div', { style: {...lbl,marginBottom:10},}, "🚗 Fahrzeugdaten" )
+        , React.createElement('div', { style: {display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 12px"}, className: "grid-half",}
+          , React.createElement(Field, { label: "Marke", value: f.marke, onChange: s("marke"), placeholder: "BMW",})
+          , React.createElement(Field, { label: "Modell", value: f.modell, onChange: s("modell"), placeholder: "320i",})
+          , React.createElement(Field, { label: "Kennzeichen", value: f.kennzeichen, onChange: s("kennzeichen"), placeholder: "ZH 123 456"  ,})
+          , React.createElement(Field, { label: "KM-Stand", value: f.km, onChange: s("km"), placeholder: "optional", type: "number",})
+        )
+      )
+      , React.createElement('button', { onClick: submit, disabled: saving, style: {width:"100%",background:saving?"#a5b4fc":"#6366f1",color:"#fff",border:"none",borderRadius:12,padding:"15px",fontWeight:700,cursor:"pointer",fontSize:16,marginBottom:10},}
+        , saving?"Wird gespeichert…":"💾 Speichern"
+      )
+      , React.createElement('button', { onClick: onCancel, style: {width:"100%",padding:"13px",border:"1.5px solid #e2e8f0",borderRadius:12,background:"#fff",cursor:"pointer",fontWeight:600,color:"#64748b",fontSize:15},}, "Abbrechen")
+    )
+  );
+}
+
+// ── ZE SCHÄTZUNG ─────────────────────────────────────────────────────────────
+function schaetzeZE(beschreibung){
+  const t = beschreibung.toLowerCase();
+  // Bekannte Arbeiten mit typischen ZE-Werten
+  const regeln = [
+    [/oelwechsel|ölwechsel|oil change/,2],
+    [/inspektion|service|jahresservice/,6],
+    [/bremsen|bremsbelag|bremse/,4],
+    [/reifen|pneu|reifenwechsel/,2],
+    [/getriebe/,10],
+    [/kupplung|clutch/,8],
+    [/zahnriemen|timing/,8],
+    [/stossdaempfer|stossdämpfer|shock/,5],
+    [/lenkung/,4],
+    [/auspuff|exhaust/,3],
+    [/batterie|akku/,1],
+    [/lampe|licht|birne/,1],
+    [/diagnose|fehler|auslesen/,1],
+    [/klimaanlage|klima|ac /,3],
+    [/wasserp|kühlwasser/,5],
+    [/achse|radlager/,4],
+    [/karosserie|delle|beule/,6],
+  ];
+  for(const [re, ze] of regeln){
+    if(re.test(t)) return String(ze);
+  }
+  // Standard: 1 ZE für unbekannte Arbeiten
+  return "1";
+}
+
+// ── OFFERTE FORM ──────────────────────────────────────────────────────────────
+function OfferteForm({customers,onSave,onCancel}){
+  const[cid,setCid]=useState("");
+  const[titel,setTitel]=useState("");
+  const[aktTab,setAktTab]=useState("arbeit"); // "arbeit" | "material"
+  const[arbeit,setArbeit]=useState([{beschreibung:"",ze:"",stundenansatz:"",preis:""}]);
+  const[material,setMaterial]=useState([{beschreibung:"",menge:"1",stueckpreis:"",preis:""}]);
+  const[notizen,setNotizen]=useState("");
+  const[gueltigBis,setGueltigBis]=useState("");
+
+  // ── Arbeit updaten ──
+  const addArbeit=()=>setArbeit(a=>[...a,{beschreibung:"",ze:"",stundenansatz:"",preis:""}]);
+  const remArbeit=i=>setArbeit(a=>a.filter((_,j)=>j!==i));
+  const updArbeit=(i,k,v)=>setArbeit(a=>{
+    const n=[...a]; n[i]={...n[i],[k]:v};
+    if(k==="beschreibung" && v.trim().length>3){ n[i].ze=schaetzeZE(v); }
+    // Preis = ZE * Stundenansatz / 100 * 60 → ZE * SA * 0.6min aber in CHF
+    // Formel: ZE * Stundenansatz / 100 = CHF (weil 100ZE=60min=1h)
+    const ze=parseFloat(k==="ze"?v:n[i].ze)||0;
+    const sa=parseFloat(k==="stundenansatz"?v:n[i].stundenansatz)||0;
+    n[i].preis=ze&&sa?((ze/100)*sa).toFixed(2):"";
+    return n;
+  });
+
+  // ── Material updaten ──
+  const addMaterial=()=>setMaterial(m=>[...m,{beschreibung:"",menge:"1",stueckpreis:"",preis:""}]);
+  const remMaterial=i=>setMaterial(m=>m.filter((_,j)=>j!==i));
+  const updMaterial=(i,k,v)=>setMaterial(m=>{
+    const n=[...m]; n[i]={...n[i],[k]:v};
+    if(k==="stueckpreis"||k==="menge"){
+      const sp=parseFloat(k==="stueckpreis"?v:n[i].stueckpreis)||0;
+      const mg=parseFloat(k==="menge"?v:n[i].menge)||1;
+      n[i].preis=(sp*mg).toFixed(2);
+    }
+    return n;
+  });
+
+  const totalArbeit=arbeit.reduce((s,p)=>s+(parseFloat(p.preis)||0),0);
+  const totalMaterial=material.reduce((s,p)=>s+(parseFloat(p.preis)||0),0);
+  const totalGesammt=totalArbeit+totalMaterial;
+  const totalZE=arbeit.reduce((s,p)=>s+(parseFloat(p.ze)||0),0);
+
+  function submit(){
+    if(!cid)return alert("Bitte Kunden wählen.");
+    const arbPos=arbeit.filter(p=>p.beschreibung.trim());
+    const matPos=material.filter(p=>p.beschreibung.trim());
+    if(!arbPos.length&&!matPos.length)return alert("Mindestens eine Position eingeben.");
+    const positionen=[
+      ...arbPos.map(p=>({...p,typ:"arbeit"})),
+      ...matPos.map(p=>({...p,typ:"material"}))
+    ];
+    onSave({customerId:cid,titel,positionen,notizen,gueltigBis,totalBetrag:totalGesammt.toFixed(2),totalArbeit:totalArbeit.toFixed(2),totalMaterial:totalMaterial.toFixed(2),totalZE});
+  }
+
+  const tabStyle=(active)=>({
+    flex:1,padding:"10px",border:"none",borderRadius:"10px 10px 0 0",cursor:"pointer",fontWeight:700,fontSize:14,
+    background:active?"#fff":"#f1f5f9",
+    color:active?(aktTab==="arbeit"?"#1d4ed8":"#15803d"):"#64748b",
+    borderBottom:active?"3px solid "+(aktTab==="arbeit"?"#3b82f6":"#22c55e"):"3px solid transparent"
+  });
+
+  return(
+    React.createElement('div', null
+      // ── Kopffelder ──
+      , React.createElement('div', {style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}
+        , React.createElement('div', null
+          , React.createElement('label', {style:lbl}, "Kunde *")
+          , React.createElement('select', {value:cid, onChange:e=>setCid(e.target.value), style:{...inp}}
+            , React.createElement('option', {value:""}, "-- Kunde wählen --")
+            , customers.map(c=>React.createElement('option', {key:c.id,value:c.id}, c.vorname+" "+c.nachname+" – "+c.kennzeichen))
+          )
+        )
+        , React.createElement('div', null
+          , React.createElement('label', {style:lbl}, "Gültig bis")
+          , React.createElement('input', {type:"date", value:gueltigBis, onChange:e=>setGueltigBis(e.target.value), style:inp})
+        )
+      )
+      , React.createElement('div', {style:{marginBottom:14}}
+        , React.createElement('label', {style:lbl}, "Titel / Betreff")
+        , React.createElement('input', {value:titel, onChange:e=>setTitel(e.target.value), placeholder:"z.B. Jahresservice BMW 320i", style:inp})
+      )
+
+      // ── Zusammenfassung ──
+      , React.createElement('div', {style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}
+        , React.createElement('div', {style:{background:"#eff6ff",borderRadius:10,padding:"10px 12px",textAlign:"center",border:"1px solid #bfdbfe"}}
+          , React.createElement('div', {style:{fontSize:11,color:"#1d4ed8",fontWeight:700,marginBottom:2}}, "🔧 ARBEIT")
+          , React.createElement('div', {style:{fontSize:16,fontWeight:900,color:"#1d4ed8"}}, "CHF "+totalArbeit.toFixed(2))
+          , React.createElement('div', {style:{fontSize:10,color:"#3b82f6"}}, totalZE+" ZE")
+        )
+        , React.createElement('div', {style:{background:"#f0fdf4",borderRadius:10,padding:"10px 12px",textAlign:"center",border:"1px solid #bbf7d0"}}
+          , React.createElement('div', {style:{fontSize:11,color:"#15803d",fontWeight:700,marginBottom:2}}, "📦 MATERIAL")
+          , React.createElement('div', {style:{fontSize:16,fontWeight:900,color:"#15803d"}}, "CHF "+totalMaterial.toFixed(2))
+          , React.createElement('div', {style:{fontSize:10,color:"#22c55e"}}, material.filter(m=>m.beschreibung).length+" Pos.")
+        )
+        , React.createElement('div', {style:{background:"#eef2ff",borderRadius:10,padding:"10px 12px",textAlign:"center",border:"1px solid #c7d2fe"}}
+          , React.createElement('div', {style:{fontSize:11,color:"#4338ca",fontWeight:700,marginBottom:2}}, "💰 TOTAL")
+          , React.createElement('div', {style:{fontSize:16,fontWeight:900,color:"#4338ca"}}, "CHF "+totalGesammt.toFixed(2))
+        )
+      )
+
+      // ── Tabs ──
+      , React.createElement('div', {style:{display:"flex",gap:4,marginBottom:0}}
+        , React.createElement('button', {onClick:()=>setAktTab("arbeit"), style:tabStyle(aktTab==="arbeit")}, "🔧 Arbeit ("+arbeit.filter(a=>a.beschreibung).length+")")
+        , React.createElement('button', {onClick:()=>setAktTab("material"), style:tabStyle(aktTab==="material")}, "📦 Material ("+material.filter(m=>m.beschreibung).length+")")
+      )
+
+      // ── Tab Inhalt ──
+      , React.createElement('div', {style:{background:"#fff",border:"1px solid #e2e8f0",borderRadius:"0 0 12px 12px",padding:12,marginBottom:14}}
+
+        // ARBEIT TAB
+        , aktTab==="arbeit" && React.createElement('div', null
+          , arbeit.map((pos,i)=>
+            React.createElement('div', {key:i, style:{background:"#f0f7ff",borderRadius:10,padding:10,marginBottom:8,border:"1px solid #bfdbfe"}}
+              , React.createElement('div', {style:{display:"flex",gap:8,alignItems:"center",marginBottom:8}}
+                , React.createElement('input', {value:pos.beschreibung, onChange:e=>updArbeit(i,"beschreibung",e.target.value), placeholder:"Beschreibung der Arbeit…", style:{...inp,marginBottom:0,flex:1,borderColor:"#93c5fd"}})
+                , React.createElement('button', {onClick:()=>remArbeit(i), disabled:arbeit.length===1, style:{background:"#fee2e2",color:"#ef4444",border:"none",borderRadius:8,width:36,height:36,cursor:"pointer",fontSize:16,flexShrink:0}}, "✕")
+              )
+              , React.createElement('div', {style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}
+                , React.createElement('div', null
+                  , React.createElement('label', {style:{...lbl,color:"#1d4ed8"}}, "⏱ ZE (Auto)")
+                  , React.createElement('input', {type:"number", value:pos.ze, onChange:e=>updArbeit(i,"ze",e.target.value), placeholder:"Auto", style:{...inp,background:"#fff"}, min:"0", step:"1"})
+                  , pos.ze?React.createElement('div', {style:{fontSize:10,color:"#3b82f6",marginTop:2}}, "= "+(parseFloat(pos.ze)*0.6).toFixed(0)+" min"):null
+                )
+                , React.createElement('div', null
+                  , React.createElement('label', {style:{...lbl,color:"#1d4ed8"}}, "Ansatz CHF/h")
+                  , React.createElement('input', {type:"number", value:pos.stundenansatz, onChange:e=>updArbeit(i,"stundenansatz",e.target.value), placeholder:"z.B. 120", style:{...inp,background:"#fff"}})
+                )
+                , React.createElement('div', null
+                  , React.createElement('label', {style:{...lbl,color:"#1e40af"}}, "Total CHF")
+                  , React.createElement('input', {value:pos.preis?parseFloat(pos.preis).toFixed(2):"—", readOnly:true, style:{...inp,background:"#dbeafe",color:"#1d4ed8",fontWeight:700,cursor:"default"}})
+                )
+              )
+            )
+          )
+          , React.createElement('button', {onClick:addArbeit, style:{width:"100%",background:"#eff6ff",border:"1.5px dashed #93c5fd",borderRadius:10,padding:"10px",cursor:"pointer",color:"#3b82f6",fontWeight:700,fontSize:13,marginTop:4}}, "+ Arbeitsposition hinzufügen")
+        )
+
+        // MATERIAL TAB
+        , aktTab==="material" && React.createElement('div', null
+          , material.map((pos,i)=>
+            React.createElement('div', {key:i, style:{background:"#f0fdf4",borderRadius:10,padding:10,marginBottom:8,border:"1px solid #86efac"}}
+              , React.createElement('div', {style:{display:"flex",gap:8,alignItems:"center",marginBottom:8}}
+                , React.createElement('input', {value:pos.beschreibung, onChange:e=>updMaterial(i,"beschreibung",e.target.value), placeholder:"Material / Ersatzteil…", style:{...inp,marginBottom:0,flex:1,borderColor:"#86efac"}})
+                , React.createElement('button', {onClick:()=>remMaterial(i), disabled:material.length===1, style:{background:"#fee2e2",color:"#ef4444",border:"none",borderRadius:8,width:36,height:36,cursor:"pointer",fontSize:16,flexShrink:0}}, "✕")
+              )
+              , React.createElement('div', {style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}
+                , React.createElement('div', null
+                  , React.createElement('label', {style:{...lbl,color:"#15803d"}}, "Menge")
+                  , React.createElement('input', {type:"number", value:pos.menge, onChange:e=>updMaterial(i,"menge",e.target.value), style:{...inp,background:"#fff"}, min:"1"})
+                )
+                , React.createElement('div', null
+                  , React.createElement('label', {style:{...lbl,color:"#15803d"}}, "Stückpreis CHF")
+                  , React.createElement('input', {type:"number", value:pos.stueckpreis, onChange:e=>updMaterial(i,"stueckpreis",e.target.value), placeholder:"0.00", style:{...inp,background:"#fff"}})
+                )
+                , React.createElement('div', null
+                  , React.createElement('label', {style:{...lbl,color:"#166534"}}, "Total CHF")
+                  , React.createElement('input', {value:pos.preis?parseFloat(pos.preis).toFixed(2):"—", readOnly:true, style:{...inp,background:"#dcfce7",color:"#15803d",fontWeight:700,cursor:"default"}})
+                )
+              )
+            )
+          )
+          , React.createElement('button', {onClick:addMaterial, style:{width:"100%",background:"#f0fdf4",border:"1.5px dashed #86efac",borderRadius:10,padding:"10px",cursor:"pointer",color:"#22c55e",fontWeight:700,fontSize:13,marginTop:4}}, "+ Materialposition hinzufügen")
+        )
+      )
+
+      // ── Notizen ──
+      , React.createElement('div', {style:{marginBottom:14}}
+        , React.createElement('label', {style:lbl}, "Notizen")
+        , React.createElement('textarea', {value:notizen, onChange:e=>setNotizen(e.target.value), placeholder:"Interne Notizen…", rows:2, style:{...inp,resize:"vertical"}})
+      )
+      , React.createElement('button', {onClick:submit, style:{width:"100%",background:"#6366f1",color:"#fff",border:"none",borderRadius:12,padding:"15px",fontWeight:700,cursor:"pointer",fontSize:16,marginBottom:10}}, "📄 Offerte erstellen")
+      , React.createElement('button', {onClick:onCancel, style:{width:"100%",padding:"13px",border:"1.5px solid #e2e8f0",borderRadius:12,background:"#fff",cursor:"pointer",fontWeight:600,color:"#64748b",fontSize:15}}, "Abbrechen")
+    )
+  );
+}
+
+// ── OFFERTE DETAIL ────────────────────────────────────────────────────────────
+
+// ── EXCEL EXPORT ──────────────────────────────────────────────────────────────
+function exportOfferteExcel(offerte, customer){
+  const wb = XLSX.utils.book_new();
+  const firmaName = "Stucki Repair Shop";
+  const datum = new Date(offerte.createdAt).toLocaleDateString("de-CH");
+  const gueltigBis = offerte.gueltigBis ? new Date(offerte.gueltigBis).toLocaleDateString("de-CH") : "–";
+  const wsData = [
+    [firmaName, "", "", ""],
+    ["", "", "", ""],
+    ["OFFERTE", "", "", "Offerte #" + offerte.offertNumber],
+    ["Datum:", datum, "", "Gültig bis: " + gueltigBis],
+    ["", "", "", ""],
+    ["KUNDE", "", "", ""],
+    ["Name:", customer ? (customer.vorname + " " + customer.nachname) : "–", "", ""],
+    ["Telefon:", customer ? customer.telefon : "–", "", ""],
+    ["Fahrzeug:", customer ? ((customer.marke||"") + " " + (customer.modell||"")).trim() || "–" : "–", "", ""],
+    ["Kennzeichen:", customer ? customer.kennzeichen : "–", "", ""],
+    ["", "", "", ""],
+    ["POSITIONEN", "", "", ""],
+    ["Beschreibung", "Menge", "Stückpreis CHF", "Total CHF", "Arbeitszeit (ZE)"],
+  ];
+  (offerte.positionen || []).forEach(function(pos){
+    const menge = parseFloat(pos.menge || 1);
+    const stueck = parseFloat(pos.stueckpreis || pos.preis || 0);
+    const total = parseFloat(pos.preis || (menge * stueck));
+    const ze = pos.ze ? (parseFloat(pos.ze) + " ZE (" + ((parseFloat(pos.ze)||0)*0.75).toFixed(1) + " h)") : "–";
+    wsData.push([pos.beschreibung, menge, stueck.toFixed(2), total.toFixed(2), ze]);
+  });
+  wsData.push(["", "", "", ""]);
+  wsData.push(["", "", "TOTAL CHF:", parseFloat(offerte.totalBetrag || 0).toFixed(2)]);
+  if(offerte.notizen){
+    wsData.push(["", "", "", ""]);
+    wsData.push(["Notizen:", offerte.notizen, "", ""]);
+  }
+  wsData.push(["", "", "", ""]);
+  wsData.push(["", "", "", "Unterschrift: ____________________"]);
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws["!cols"] = [{wch:32},{wch:10},{wch:14},{wch:18}];
+  XLSX.utils.book_append_sheet(wb, ws, "Offerte");
+  XLSX.writeFile(wb, "Offerte_" + offerte.offertNumber + "_" + (customer ? customer.nachname : "Kunde") + ".xlsx");
+}
+
+function OfferteDetail({offerte,customer,onClose,onUpdate,onDelete}){
+  const[saving,setSaving]=useState(false);
+  const stColors={entwurf:{c:"#6366f1",bg:"#eef2ff",l:"Entwurf"},versendet:{c:"#f59e0b",bg:"#fffbeb",l:"Versendet"},angenommen:{c:"#10b981",bg:"#ecfdf5",l:"Angenommen"},abgelehnt:{c:"#ef4444",bg:"#fee2e2",l:"Abgelehnt"}};
+  const sc=stColors[offerte.status]||stColors.entwurf;
+  async function setStatus(s){
+    setSaving(true);
+    await onUpdate({...offerte,status:s});
+    setSaving(false);
+  }
+  const total=parseFloat(offerte.totalBetrag||0);
+  const isExpired=offerte.gueltigBis&&new Date(offerte.gueltigBis)<new Date();
+  return(
+    React.createElement(Modal, { title: `Offerte #${offerte.offertNumber}`, onClose: onClose, full: true,}
+      , React.createElement('div', { style: {background:`linear-gradient(135deg,${sc.c},${sc.c}cc)`,borderRadius:14,padding:"16px",marginBottom:16,color:"#fff"},}
+        , React.createElement('div', { style: {fontSize:11,fontWeight:700,opacity:0.8,marginBottom:4},}, "STATUS")
+        , React.createElement('div', { style: {fontSize:20,fontWeight:900},}, sc.l)
+        , offerte.titel&&React.createElement('div', { style: {fontSize:14,opacity:0.9,marginTop:4},}, offerte.titel)
+      )
+      , isExpired&&offerte.status==="versendet"&&React.createElement('div', { style: {background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:10,padding:"10px 14px",marginBottom:14,color:"#dc2626",fontWeight:700,fontSize:13},}, "⚠️ Offerte abgelaufen!")
+      , React.createElement('div', { style: {marginBottom:16},}
+        , React.createElement('div', { style: {...lbl,marginBottom:8},}, "Status ändern")
+        , React.createElement('div', { style: {display:"flex",gap:8,flexWrap:"wrap"},}
+          , Object.entries(stColors).map(([s,sc])=>
+            React.createElement('button', { key: s, onClick: ()=>setStatus(s), disabled: saving||offerte.status===s,
+              style: {padding:"8px 14px",borderRadius:20,border:`1.5px solid ${sc.c}`,background:offerte.status===s?sc.c:sc.bg,color:offerte.status===s?"#fff":sc.c,fontWeight:700,fontSize:12,cursor:"pointer",opacity:saving?0.7:1},}
+              , sc.l
+            )
+          )
+        )
+      )
+      , React.createElement('div', { style: {background:"#f8fafc",borderRadius:12,padding:"12px",marginBottom:14,border:"1px solid #e2e8f0"},}
+        , React.createElement('div', { style: {fontWeight:800,color:"#0f172a",fontSize:15},}, customer?`${customer.vorname} ${customer.nachname}`:"Kein Kunde")
+        , customer&&React.createElement('div', { style: {fontSize:13,color:"#64748b"},}, customer.telefon, " · ", customer.kennzeichen)
+      )
+      , offerte.gueltigBis&&React.createElement('div', { style: {fontSize:13,color:isExpired?"#dc2626":"#64748b",marginBottom:14,fontWeight:isExpired?700:400},}
+        , "Gültig bis: ", new Date(offerte.gueltigBis).toLocaleDateString("de-CH"), isExpired?" (abgelaufen)":""
+      )
+      , React.createElement('div', { style: {marginBottom:14},}
+        , React.createElement('div', { style: lbl,}, "Positionen")
+        , (offerte.positionen||[]).map((pos,i)=>
+          React.createElement('div', { key: i, style: {display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",background:i%2===0?"#f8fafc":"#fff",borderRadius:8,marginBottom:4,border:"1px solid #e2e8f0"},}
+            , React.createElement('div', null
+              , React.createElement('div', { style: {fontWeight:600,color:"#0f172a",fontSize:14},}, pos.beschreibung)
+              , React.createElement('div', { style: {fontSize:12,color:"#64748b"},}, pos.menge, "× à CHF ", parseFloat(pos.preis||0).toFixed(2))
+            )
+            , React.createElement('div', { style: {fontWeight:700,fontSize:14,color:"#0f172a"},}, "CHF ", (parseFloat(pos.menge||1)*parseFloat(pos.preis||0)).toFixed(2))
+          )
+        )
+        , React.createElement('div', { style: {display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 14px",background:"#eef2ff",borderRadius:10,marginTop:8,border:"1px solid #c7d2fe"},}
+          , React.createElement('span', { style: {fontWeight:800,color:"#4338ca",fontSize:15},}, "Total")
+          , React.createElement('span', { style: {fontWeight:900,fontSize:20,color:"#4338ca"},}, "CHF ", total.toFixed(2))
+        )
+      )
+      , offerte.notizen&&React.createElement('div', { style: {background:"#f8fafc",borderRadius:10,padding:"10px 12px",fontSize:13,color:"#475569",border:"1px solid #e2e8f0",marginBottom:14},}
+        , React.createElement('strong', null, "Notizen:"), " ", offerte.notizen
+      )
+      , React.createElement('button', { onClick: ()=>exportOfferteExcel(offerte, customer), style: {width:"100%",background:"#16a34a",color:"#fff",border:"none",borderRadius:12,padding:"13px",fontWeight:700,cursor:"pointer",fontSize:15,marginTop:8,marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center",gap:8},}, "📊 Excel herunterladen")
+      , React.createElement('button', { onClick: async()=>{if(window.confirm("Offerte wirklich löschen?"))await onDelete(offerte.id);}, style: {width:"100%",background:"#fee2e2",color:"#ef4444",border:"none",borderRadius:12,padding:"13px",fontWeight:700,cursor:"pointer",fontSize:15},}, "🗑️ Offerte löschen")
+      , React.createElement('div', { style: {marginTop:14,fontSize:11,color:"#94a3b8"},}, "Erstellt: ", new Date(offerte.createdAt).toLocaleDateString("de-CH"), " · Offerte #", offerte.offertNumber)
+    )
+  );
+}
+
+// ── ORDER FORM ────────────────────────────────────────────────────────────────
+function OrderForm({customers,customerId:preCid,onSave,onCancel,saving}){
+  const[cid,setCid]=useState(preCid||"");
+  const[bs,setBs]=useState([""]);
+  const[notizen,setNotizen]=useState("");
+  const addB=()=>setBs(p=>[...p,""]);
+  const updB=(i,v)=>setBs(p=>{const n=[...p];n[i]=v;return n;});
+  const remB=i=>setBs(p=>p.filter((_,j)=>j!==i));
+  function submit(){
+    if(!cid)return alert("Bitte Kunden wählen.");
+    const b=bs.filter(x=>x.trim());
+    if(!b.length)return alert("Mindestens eine Beanstandung eingeben.");
+    onSave({customerId:cid,beanstandungen:b,notizen});
+  }
+  return(
+    React.createElement('div', null
+      , !preCid&&(
+        React.createElement('div', { style: {marginBottom:12},}
+          , React.createElement('label', { style: lbl,}, "Kunde *" )
+          , React.createElement('select', { value: cid, onChange: e=>setCid(e.target.value), style: {...inp},}
+            , React.createElement('option', { value: "",}, "-- Kunde wählen --"   )
+            , customers.map(c=>React.createElement('option', { key: c.id, value: c.id,}, c.vorname, " " , c.nachname, " – "  , c.kennzeichen))
+          )
+        )
+      )
+      , React.createElement('label', { style: {...lbl,marginBottom:10},}, "Beanstandungen *" )
+      , bs.map((b,i)=>(
+        React.createElement('div', { key: i, style: {display:"flex",gap:8,marginBottom:8,alignItems:"center"},}
+          , React.createElement('input', { value: b, onChange: e=>updB(i,e.target.value), placeholder: `Beanstandung ${i+1}…`, style: {...inp,flex:1},})
+          , bs.length>1&&React.createElement('button', { onClick: ()=>remB(i), style: {background:"#fee2e2",color:"#ef4444",border:"none",borderRadius:10,width:44,height:44,cursor:"pointer",flexShrink:0,fontSize:18},}, "✕")
+        )
+      ))
+      , React.createElement('button', { onClick: addB, style: {width:"100%",background:"#f1f5f9",border:"1.5px dashed #cbd5e1",borderRadius:10,padding:"11px",cursor:"pointer",color:"#64748b",fontWeight:700,marginBottom:14,fontSize:14},}, "+ Beanstandung hinzufügen"  )
+      , React.createElement(FieldArea, { label: "Notizen", value: notizen, onChange: setNotizen, placeholder: "Interne Notizen…" ,})
+      , React.createElement('button', { onClick: submit, disabled: saving, style: {width:"100%",background:saving?"#a5b4fc":"#6366f1",color:"#fff",border:"none",borderRadius:12,padding:"15px",fontWeight:700,cursor:"pointer",fontSize:16,marginBottom:10},}
+        , saving?"Wird gespeichert…":"✅ Auftrag erstellen"
+      )
+      , React.createElement('button', { onClick: onCancel, style: {width:"100%",padding:"13px",border:"1.5px solid #e2e8f0",borderRadius:12,background:"#fff",cursor:"pointer",fontWeight:600,color:"#64748b",fontSize:15},}, "Abbrechen")
+    )
+  );
+}
+
+// ── ORDER DETAIL ──────────────────────────────────────────────────────────────
+function OrderDetail({order,customer,onClose,onUpdate,onDelete}){
+  const[edit,setEdit]=useState(false);
+  const[saving,setSaving]=useState(false);
+  const[status,setStatus]=useState(order.status);
+  const[bs,setBs]=useState(order.beanstandungen||[""]);
+  const[notizen,setNotizen]=useState(order.notizen||"");
+  const[items,setItems]=useState(order.offertItems||[]);
+  const[newItem,setNewItem]=useState("");
+  const[offB,setOffB]=useState(order.offertBetrag||"");
+  const[recB,setRecB]=useState(order.rechnungsBetrag||"");
+  const[zahlungsFrist,setZahlungsFrist]=useState(order.zahlungsFrist||"");
+  const[editCust,setEditCust]=useState(false);
+  const[cv,setCv]=useState(_optionalChain([customer, 'optionalAccess', _6 => _6.vorname])||"");
+  const[cn,setCn]=useState(_optionalChain([customer, 'optionalAccess', _7 => _7.nachname])||"");
+  const[ct,setCt]=useState(_optionalChain([customer, 'optionalAccess', _8 => _8.telefon])||"");
+  const[ck,setCk]=useState(_optionalChain([customer, 'optionalAccess', _9 => _9.kennzeichen])||"");
+  const[cm,setCm]=useState(_optionalChain([customer, 'optionalAccess', _10 => _10.modell])||"");
+  const[cma,setCma]=useState(_optionalChain([customer, 'optionalAccess', _11 => _11.marke])||"");
+  const ov=isOverdue({...order,status});
+  const d=daysSince(order.statusChangedAt);
+  const h=hoursSince(order.statusChangedAt);
+  const addB=()=>setBs(p=>[...p,""]);
+  const updB=(i,v)=>setBs(p=>{const n=[...p];n[i]=v;return n;});
+  const remB=i=>setBs(p=>p.filter((_,j)=>j!==i));
+  const addItem=()=>{if(newItem.trim()){setItems(p=>[...p,{text:newItem.trim(),checked:false}]);setNewItem("");}};
+  const togItem=i=>setItems(p=>p.map((x,j)=>j===i?{...x,checked:!x.checked}:x));
+  const remItem=i=>setItems(p=>p.filter((_,j)=>j!==i));
+  async function save(){
+    setSaving(true);
+    const upd={...order,status,beanstandungen:bs.filter(x=>x.trim()),notizen,offertItems:items,offertBetrag:offB,rechnungsBetrag:recB,zahlungsFrist};
+    if(status!==order.status)upd.statusChangedAt=new Date().toISOString();
+    const cp=editCust?{vorname:cv,nachname:cn,telefon:ct,kennzeichen:ck,modell:cm,marke:cma}:null;
+    await onUpdate(upd,cp);
+    setSaving(false);setEdit(false);setEditCust(false);
+  }
+  async function saveStatus(newStatus){
+    setStatus(newStatus);
+    setSaving(true);
+    const upd={...order,status:newStatus,beanstandungen:bs.filter(x=>x.trim()),notizen,offertItems:items,offertBetrag:offB,rechnungsBetrag:recB,zahlungsFrist};
+    upd.statusChangedAt=new Date().toISOString();
+    await onUpdate(upd,null);
+    setSaving(false);
+  }
+  const showOffert=["offerte_bestaetigt","teile_arbeit","zahlung_versendet","zahlung_erhalten","abgeschlossen"].includes(status);
+  return(
+    React.createElement(Modal, { title: `Auftrag #${order.orderNumber}`, onClose: onClose, full: true,}
+      , ov&&React.createElement('div', { style: {background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:10,padding:"10px 14px",marginBottom:14,color:"#dc2626",fontWeight:700,fontSize:13},}, "⚠️ " , order.status==="offerte_versendet"?"Offerte >48h ohne Antwort!":"Zahlung >10 Tage offen!")
+      , React.createElement('div', { style: {display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,gap:8},}
+        , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"},}
+          , React.createElement(Badge, { status: status,})
+          , React.createElement('span', { style: {fontSize:12,color:"#94a3b8"},}, d<1?`${h}h`:`${d}T`)
+        )
+        , React.createElement('div', { style: {display:"flex",gap:8},}
+          , !edit?React.createElement('button', { onClick: ()=>setEdit(true), style: {background:"#f1f5f9",border:"none",borderRadius:10,padding:"9px 14px",cursor:"pointer",fontWeight:700,fontSize:13,color:"#334155"},}, "✏️")
+            :React.createElement('button', { onClick: save, disabled: saving, style: {background:saving?"#a5b4fc":"#10b981",color:"#fff",border:"none",borderRadius:10,padding:"9px 14px",cursor:"pointer",fontWeight:700,fontSize:13},}, saving?"…":"✓ OK")
+          , React.createElement('button', { onClick: async()=>{if(window.confirm("Auftrag wirklich löschen?"))await onDelete(order.id);}, style: {background:"#fee2e2",color:"#ef4444",border:"none",borderRadius:10,padding:"9px 14px",cursor:"pointer",fontWeight:700,fontSize:13},}, "🗑️")
+        )
+      )
+      , React.createElement('div', { style: {marginBottom:16},}
+        , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8,marginBottom:8},}
+          , React.createElement('div', { style: lbl,}, "Status ändern")
+          , saving&&React.createElement('span', { style: {fontSize:11,color:"#6366f1",fontWeight:700}}, "☁️ Speichert…")
+        )
+        , React.createElement('div', { className: "status-scroll",}
+          , SO.map(s=>(
+            React.createElement('button', { key: s, onClick: ()=>saveStatus(s), disabled: saving,
+              style: {flexShrink:0,padding:"8px 14px",borderRadius:20,border:`1.5px solid ${SC[s].color}`,background:status===s?SC[s].color:SC[s].bg,color:status===s?"#fff":SC[s].color,fontWeight:700,fontSize:12,cursor:saving?"not-allowed":"pointer",whiteSpace:"nowrap",opacity:saving?0.7:1},}
+              , SC[s].short
+            )
+          ))
+        )
+      )
+      , React.createElement('div', { style: {background:"#f8fafc",borderRadius:12,padding:"12px",marginBottom:14,border:"1px solid #e2e8f0"},}
+        , React.createElement('div', { style: {display:"flex",justifyContent:"space-between",alignItems:"center"},}
+          , React.createElement('div', null
+            , React.createElement('div', { style: {fontWeight:800,color:"#0f172a",fontSize:15},}, _optionalChain([customer, 'optionalAccess', _12 => _12.vorname]), " " , _optionalChain([customer, 'optionalAccess', _13 => _13.nachname]))
+            , React.createElement('div', { style: {fontSize:13,color:"#64748b"},}, _optionalChain([customer, 'optionalAccess', _14 => _14.telefon]), " · "  , _optionalChain([customer, 'optionalAccess', _15 => _15.kennzeichen]))
+          )
+          , edit&&React.createElement('button', { onClick: ()=>setEditCust(p=>!p), style: {background:"none",border:"1px solid #cbd5e1",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:12,color:"#64748b"},}, editCust?"✓":"Bearbeiten")
+        )
+        , editCust&&(
+          React.createElement('div', { style: {marginTop:10,display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px 12px"}, className: "grid-half",}
+            , React.createElement('input', { value: cv, onChange: e=>setCv(e.target.value), placeholder: "Vorname", style: inp,})
+            , React.createElement('input', { value: cn, onChange: e=>setCn(e.target.value), placeholder: "Nachname", style: inp,})
+            , React.createElement('input', { value: ct, onChange: e=>setCt(e.target.value), placeholder: "Telefon", style: inp,})
+            , React.createElement('input', { value: ck, onChange: e=>setCk(e.target.value), placeholder: "Kennzeichen", style: inp,})
+            , React.createElement('input', { value: cma, onChange: e=>setCma(e.target.value), placeholder: "Marke", style: inp,})
+            , React.createElement('input', { value: cm, onChange: e=>setCm(e.target.value), placeholder: "Modell", style: inp,})
+          )
+        )
+      )
+      , React.createElement('div', { style: {marginBottom:14},}
+        , React.createElement('div', { style: lbl,}, "Beanstandungen")
+        , edit?(
+          React.createElement('div', { style: {marginTop:8},}
+            , bs.map((b,i)=>(
+              React.createElement('div', { key: i, style: {display:"flex",gap:8,marginBottom:8,alignItems:"center"},}
+                , React.createElement('input', { value: b, onChange: e=>updB(i,e.target.value), style: {...inp,flex:1}, placeholder: `Beanstandung ${i+1}`,})
+                , bs.length>1&&React.createElement('button', { onClick: ()=>remB(i), style: {background:"#fee2e2",color:"#ef4444",border:"none",borderRadius:8,width:44,height:44,flexShrink:0,cursor:"pointer",fontSize:18},}, "✕")
+              )
+            ))
+            , React.createElement('button', { onClick: addB, style: {width:"100%",background:"#f1f5f9",border:"1.5px dashed #cbd5e1",borderRadius:10,padding:"10px",cursor:"pointer",color:"#64748b",fontWeight:700,fontSize:13},}, "+ Hinzufügen" )
+          )
+        ):(
+          React.createElement('div', { style: {marginTop:6},}
+            , (order.beanstandungen||[]).map((b,i)=>(
+              React.createElement('div', { key: i, style: {padding:"8px 12px",background:"#f8fafc",borderRadius:8,marginBottom:6,border:"1px solid #e2e8f0",fontSize:14,color:"#334155"},}
+                , React.createElement('span', { style: {color:"#6366f1",fontWeight:700,marginRight:8},}, "#", i+1), b
+              )
+            ))
+          )
+        )
+      )
+      , showOffert&&(
+        React.createElement('div', { style: {marginBottom:14,background:"#f0fdf4",borderRadius:12,padding:"12px",border:"1px solid #a7f3d0"},}
+          , React.createElement('div', { style: {...lbl,color:"#065f46",marginBottom:10},}, "✅ Bestätigte Positionen"  )
+          , items.map((item,i)=>(
+            React.createElement('label', { key: i, style: {display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:item.checked?"#dcfce7":"#fff",borderRadius:10,marginBottom:6,border:`1px solid ${item.checked?"#86efac":"#e2e8f0"}`,cursor:"pointer",minHeight:44},}
+              , React.createElement('input', { type: "checkbox", checked: item.checked, onChange: ()=>togItem(i), style: {width:20,height:20,cursor:"pointer",accentColor:"#10b981"},})
+              , React.createElement('span', { style: {flex:1,fontSize:14,color:item.checked?"#166534":"#334155"},}, item.text)
+              , React.createElement('button', { onClick: e=>{e.preventDefault();remItem(i);}, style: {background:"none",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:18,padding:"0 4px"},}, "✕")
+            )
+          ))
+          , React.createElement('div', { style: {display:"flex",gap:8,marginTop:8},}
+            , React.createElement('input', { value: newItem, onChange: e=>setNewItem(e.target.value), onKeyDown: e=>e.key==="Enter"&&addItem(), placeholder: "Neue Position…" , style: {...inp,flex:1},})
+            , React.createElement('button', { onClick: addItem, style: {background:"#6366f1",color:"#fff",border:"none",borderRadius:10,width:48,height:48,cursor:"pointer",fontWeight:700,fontSize:22,flexShrink:0},}, "+")
+          )
+        )
+      )
+      , edit&&(
+        React.createElement('div', { style: {display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 12px",marginBottom:4}, className: "grid-half",}
+          , React.createElement('div', { style: {marginBottom:12},}, React.createElement('label', { style: lbl,}, "Offerte CHF" ), React.createElement('input', { value: offB, onChange: e=>setOffB(e.target.value), placeholder: "350.00", style: inp, type: "number",}))
+          , React.createElement('div', { style: {marginBottom:12},}, React.createElement('label', { style: lbl,}, "Rechnung CHF" ), React.createElement('input', { value: recB, onChange: e=>setRecB(e.target.value), placeholder: "380.00", style: inp, type: "number",}))
+        )
+      )
+      , edit&&(status==="zahlung_versendet"||status==="zahlung_erhalten")&&(
+        React.createElement('div', { style: {background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:12,padding:"12px",marginBottom:14},}
+          , React.createElement('label', { style: {...lbl,color:"#c2410c"},}, "⏰ Zahlungsfrist (Tage)")
+          , React.createElement('input', { value: zahlungsFrist, onChange: e=>setZahlungsFrist(e.target.value), placeholder: "z.B. 10", style: {...inp,borderColor:"#fed7aa"}, type: "number", min:"1",})
+          , React.createElement('div', { style: {fontSize:11,color:"#9a3412",marginTop:4}}, "Standard: 10 Tage. Warnung erscheint nach Ablauf der Frist.")
+        )
+      )
+      , !edit&&zahlungsFrist&&(status==="zahlung_versendet"||status==="zahlung_erhalten")&&(()=>{
+        const frist=parseInt(zahlungsFrist);
+        const vergangen=daysSince(order.statusChangedAt);
+        const verbleibend=frist-vergangen;
+        const abgelaufen=verbleibend<0;
+        return React.createElement('div', { style: {background:abgelaufen?"#fee2e2":"#fff7ed",border:`1px solid ${abgelaufen?"#fca5a5":"#fed7aa"}`,borderRadius:10,padding:"10px 14px",marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center"}},
+          React.createElement('div', null,
+            React.createElement('div', { style: {fontSize:11,fontWeight:700,color:abgelaufen?"#dc2626":"#c2410c"}}, "⏰ ZAHLUNGSFRIST"),
+            React.createElement('div', { style: {fontWeight:800,fontSize:15,color:abgelaufen?"#dc2626":"#92400e"}}, abgelaufen?`${Math.abs(verbleibend)} Tage überfällig!`:`${verbleibend} Tage verbleibend`)
+          ),
+          React.createElement('div', { style: {fontSize:12,color:"#9a3412",textAlign:"right"}}, `${frist} Tage Frist`, React.createElement('br'), `gesetzt`)
+        );
+      })()
+      , !edit&&(offB||recB)&&(
+        React.createElement('div', { style: {display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"},}
+          , offB&&React.createElement('div', { style: {background:"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:"8px 14px",flex:1,textAlign:"center"},}, React.createElement('div', { style: {color:"#92400e",fontSize:11,fontWeight:700},}, "OFFERTE"), React.createElement('div', { style: {fontWeight:800,fontSize:16},}, "CHF " , offB))
+          , recB&&React.createElement('div', { style: {background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,padding:"8px 14px",flex:1,textAlign:"center"},}, React.createElement('div', { style: {color:"#1e40af",fontSize:11,fontWeight:700},}, "RECHNUNG"), React.createElement('div', { style: {fontWeight:800,fontSize:16},}, "CHF " , recB))
+        )
+      )
+      , edit?React.createElement(FieldArea, { label: "Notizen", value: notizen, onChange: setNotizen,})
+        :notizen?React.createElement('div', { style: {background:"#f8fafc",borderRadius:10,padding:"10px 12px",fontSize:13,color:"#475569",border:"1px solid #e2e8f0",marginBottom:10},}, React.createElement('strong', null, "Notizen:"), " " , notizen):null
+      , React.createElement('div', { style: {marginTop:14,paddingTop:10,borderTop:"1px solid #f1f5f9",fontSize:11,color:"#94a3b8"},}, "Erstellt: "
+         , new Date(order.createdAt).toLocaleDateString("de-CH"), " · Auftrag #"   , order.orderNumber
+      )
+    )
+  );
+}
+
+// ── CUSTOMER DETAIL ───────────────────────────────────────────────────────────
+function CustomerDetail({customer,orders,onClose,onEdit,onNewOrder,onOrderClick}){
+  const cos=orders.filter(o=>o.customerId===customer.id).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+  return(
+    React.createElement(Modal, { title: "Kundenakte", onClose: onClose, full: true,}
+      , React.createElement('div', { style: {background:"linear-gradient(135deg,#6366f1,#8b5cf6)",borderRadius:14,padding:"16px",marginBottom:16,color:"#fff"},}
+        , React.createElement('div', { style: {fontSize:18,fontWeight:900,marginBottom:4},}, customer.vorname, " " , customer.nachname)
+        , React.createElement('div', { style: {fontSize:14,opacity:0.9},}, customer.telefon)
+        , customer.email&&React.createElement('div', { style: {fontSize:13,opacity:0.75},}, customer.email)
+        , React.createElement('div', { style: {marginTop:8,background:"rgba(255,255,255,0.15)",borderRadius:8,padding:"8px 10px",display:"inline-block",fontSize:13},}, "🚗 "
+           , customer.marke, " " , customer.modell, " · "  , React.createElement('strong', null, customer.kennzeichen)
+          , customer.km&&React.createElement('span', { style: {opacity:0.8},}, " · "  , Number(customer.km).toLocaleString(), " km" )
+        )
+      )
+      , React.createElement('div', { style: {display:"flex",gap:10,marginBottom:16},}
+        , React.createElement('button', { onClick: onEdit, style: {flex:1,background:"#f1f5f9",border:"none",borderRadius:12,padding:"12px",cursor:"pointer",fontWeight:700,fontSize:14,color:"#334155"},}, "✏️ Bearbeiten" )
+        , React.createElement('button', { onClick: onNewOrder, style: {flex:1,background:"#6366f1",color:"#fff",border:"none",borderRadius:12,padding:"12px",cursor:"pointer",fontWeight:700,fontSize:14},}, "+ Auftrag" )
+      )
+      , React.createElement('div', { style: {...lbl,marginBottom:10},}, "Aufträge (" , cos.length, ")")
+      , !cos.length&&React.createElement('p', { style: {color:"#94a3b8",fontSize:14,textAlign:"center",padding:"20px 0"},}, "Noch keine Aufträge."  )
+      , cos.map(o=>(
+        React.createElement('div', { key: o.id, onClick: ()=>onOrderClick(o), className: "card-tap",
+          style: {border:`1.5px solid ${isOverdue(o)?"#fca5a5":"#e2e8f0"}`,borderRadius:12,padding:"12px",marginBottom:8,cursor:"pointer",background:"#fff",minHeight:64,display:"flex",flexDirection:"column",justifyContent:"space-between"},}
+          , React.createElement('div', { style: {display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8},}
+            , React.createElement('div', null
+              , React.createElement('div', { style: {fontWeight:700,color:"#0f172a",marginBottom:2},}, "Auftrag #" , o.orderNumber)
+              , React.createElement('div', { style: {fontSize:12,color:"#64748b"},}, (o.beanstandungen||[]).slice(0,2).join(", "))
+            )
+            , React.createElement(Badge, { status: o.status, small: true,})
+          )
+          , React.createElement('div', { style: {fontSize:11,color:"#94a3b8",marginTop:6},}, new Date(o.createdAt).toLocaleDateString("de-CH"))
+        )
+      ))
+    )
+  );
+}
+
+// ── MAIN APP ──────────────────────────────────────────────────────────────────
+function App(){
+  const[token,setToken]=useState(()=>localStorage.getItem("garage_token")||null);
+  const[userEmail,setUserEmail]=useState(()=>localStorage.getItem("garage_email")||null);
+  const[authChecked,setAuthChecked]=useState(false);
+  const[tab,setTab]=useState("dashboard");
+  const[customers,setCustomers]=useState([]);
+  const[orders,setOrders]=useState([]);
+  const[orderNum,setOrderNum]=useState(0);
+  const[loading,setLoading]=useState(true);
+  const[syncStatus,setSyncStatus]=useState("ok");
+  const[showNC,setShowNC]=useState(false);
+  const[showNO,setShowNO]=useState(false);
+  const[newOCid,setNewOCid]=useState(null);
+  const[selC,setSelC]=useState(null);
+  const[editC,setEditC]=useState(null);
+  const[selO,setSelO]=useState(null);
+  const[afterSave,setAfterSave]=useState(null);
+  const[search,setSearch]=useState("");
+  const[filterK,setFilterK]=useState("all");
+  const[fabOpen,setFabOpen]=useState(false);
+  const[offerten,setOfferten]=useState([]);
+  const[showNOff,setShowNOff]=useState(false);
+  const[selOff,setSelOff]=useState(null);
+  const[offertNum,setOffertNum]=useState(0);
+
+  // Verify token on load
+  useEffect(()=>{
+    if(!token){setAuthChecked(true);return;}
+    auth.getUser(token).then(u=>{
+      if(u.error||!u.email){
+        localStorage.removeItem("garage_token");
+        localStorage.removeItem("garage_email");
+        setToken(null);setUserEmail(null);
+      }
+      setAuthChecked(true);
+    });
+  },[]);
+
+  // Load data
+  useEffect(()=>{
+    if(!token||!authChecked)return;
+    (async()=>{
+      try{
+        const[cr,or,cnt,offr]=await Promise.all([db.get("customers",token),db.get("orders",token),db.getCounter(token),db.get("offerten",token).catch(()=>([]))]);
+        setCustomers((Array.isArray(cr)?cr:[]).map(r=>r.data));
+        setOrders((Array.isArray(or)?or:[]).map(r=>r.data));
+        setOrderNum(cnt);
+        const offs=(Array.isArray(offr)?offr:[]).map(r=>r.data).filter(Boolean);
+        setOfferten(offs);
+        if(offs.length)setOffertNum(Math.max(...offs.map(o=>o.offertNumber||0)));
+      }catch(e){console.error(e);}
+      setLoading(false);
+    })();
+  },[token,authChecked]);
+
+  function handleLogin(t,e){setToken(t);setUserEmail(e);setLoading(true);}
+
+  async function handleLogout(){
+    if(!window.confirm("Abmelden?"))return;
+    await auth.signOut(token);
+    localStorage.removeItem("garage_token");
+    localStorage.removeItem("garage_email");
+    setToken(null);setUserEmail(null);setCustomers([]);setOrders([]);
+  }
+
+  async function syncOk(fn){
+    setSyncStatus("saving");
+    try{await fn();setSyncStatus("ok");}
+    catch(e){console.error(e);setSyncStatus("error");alert("Fehler beim Speichern!");}
+  }
+
+  async function addCustomer(data){
+    const id=`c_${Date.now()}`;
+    const newC={id,...data,createdAt:new Date().toISOString()};
+    await syncOk(()=>db.upsert("customers",{id,data:newC},token));
+    setCustomers(p=>[...p,newC]);setShowNC(false);setAfterSave(id);
+  }
+  async function updateCustomer(id,data){
+    const updated={...customers.find(c=>c.id===id),...data};
+    await syncOk(()=>db.upsert("customers",{id,data:updated},token));
+    setCustomers(p=>p.map(c=>c.id===id?updated:c));
+  }
+  async function addOrder(data){
+    const num=orderNum+1;
+    const newO={id:`o_${Date.now()}`,orderNumber:num,status:"aufnahme",statusChangedAt:new Date().toISOString(),createdAt:new Date().toISOString(),...data};
+    await syncOk(async()=>{await db.upsert("orders",{id:newO.id,data:newO},token);await db.setCounter(num,token);});
+    setOrders(p=>[...p,newO]);setOrderNum(num);
+    setShowNO(false);setNewOCid(null);setAfterSave(null);
+  }
+  async function updateOrder(upd,cp){
+    await syncOk(()=>db.upsert("orders",{id:upd.id,data:upd},token));
+    setOrders(p=>p.map(o=>o.id===upd.id?upd:o));setSelO(upd);
+    if(cp)await updateCustomer(upd.customerId,cp);
+  }
+  async function addOfferte(data){
+    const num=offertNum+1;
+    const newOff={id:`off_${Date.now()}`,offertNumber:num,status:"entwurf",createdAt:new Date().toISOString(),...data};
+    await syncOk(()=>db.upsert("offerten",{id:newOff.id,data:newOff},token));
+    setOfferten(p=>[...p,newOff]);setOffertNum(num);setShowNOff(false);
+  }
+  async function updateOfferte(upd){
+    await syncOk(()=>db.upsert("offerten",{id:upd.id,data:upd},token));
+    setOfferten(p=>p.map(o=>o.id===upd.id?upd:o));setSelOff(upd);
+  }
+  async function deleteOfferte(id){
+    await syncOk(()=>db.delete("offerten",id,token));
+    setOfferten(p=>p.filter(o=>o.id!==id));setSelOff(null);
+  }
+  async function deleteOrder(id){
+    await syncOk(()=>db.delete("orders",id,token));
+    setOrders(p=>p.filter(o=>o.id!==id));setSelO(null);
+  }
+
+  if(!authChecked)return(
+    React.createElement('div', { style: {minHeight:"100dvh",background:"#0f172a",display:"flex",alignItems:"center",justifyContent:"center"},}
+      , React.createElement('div', { style: {width:36,height:36,border:"4px solid #334155",borderTopColor:"#6366f1",borderRadius:"50%",animation:"spin 0.8s linear infinite"},})
+    )
+  );
+
+  if(!token)return React.createElement(LoginPage, { onLogin: handleLogin,});
+
+  const activeOrders=orders.filter(o=>o.status!=="abgeschlossen");
+  const todos=orders.filter(needsAttention);
+  const filteredC=customers.filter(c=>{
+    const q=search.toLowerCase();
+    const m=!q||`${c.vorname} ${c.nachname} ${c.telefon} ${c.kennzeichen}`.toLowerCase().includes(q);
+    const as=getActiveStatus(orders,c.id);
+    if(filterK==="active"&&!as)return false;
+    if(filterK==="inactive"&&as)return false;
+    return m;
+  });
+
+  const navBtn=(t,icon,label)=>(
+    React.createElement('button', { onClick: ()=>setTab(t), style: {flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",border:"none",background:"none",cursor:"pointer",padding:"8px 4px",gap:3,color:tab===t?"#6366f1":"#94a3b8"},}
+      , React.createElement('span', { style: {fontSize:22},}, icon)
+      , React.createElement('span', { style: {fontSize:10,fontWeight:700,letterSpacing:0.3},}, label)
+    )
+  );
+
+  if(loading)return(
+    React.createElement('div', { style: {minHeight:"100dvh",background:"#f1f5f9"},}
+      , React.createElement('div', { style: {background:"#0f172a",height:52,display:"flex",alignItems:"center",padding:"0 16px",gap:8},}
+        , React.createElement('span', { style: {fontSize:20},}, "🔧"), React.createElement('span', { style: {fontWeight:900,fontSize:17,color:"#fff"},}, "GarageOS")
+      )
+      , React.createElement(Spinner, { text: "Daten werden geladen…"  ,})
+    )
+  );
+
+  return(
+    React.createElement('div', { style: {minHeight:"100dvh",background:"#f1f5f9",paddingBottom:80},}
+      /* Header */
+      , React.createElement('div', { style: {background:"#0f172a",color:"#fff",padding:"0 16px",position:"sticky",top:0,zIndex:100,boxShadow:"0 2px 12px rgba(0,0,0,0.3)",paddingTop:"env(safe-area-inset-top)"},}
+        , React.createElement('div', { style: {maxWidth:900,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:52},}
+          , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8},}
+            , React.createElement('span', { style: {fontSize:20},}, "🔧")
+            , React.createElement('span', { style: {fontWeight:900,fontSize:17},}, "GarageOS")
+          )
+          , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8},}
+            , syncStatus==="saving"&&React.createElement('span', { style: {fontSize:11,color:"#94a3b8",fontWeight:600},}, "☁️…")
+            , syncStatus==="ok"&&React.createElement('span', { style: {fontSize:11,color:"#10b981",fontWeight:600},}, "☁️")
+            , todos.length>0&&React.createElement('div', { style: {background:"#ef4444",color:"#fff",borderRadius:20,padding:"3px 8px",fontSize:12,fontWeight:700},}, "⚠️", todos.length)
+            
+            , React.createElement('button', { onClick: handleLogout, style: {background:"#1e293b",border:"none",borderRadius:8,padding:"5px 10px",cursor:"pointer",color:"#94a3b8",fontSize:12,fontWeight:700},}, "Logout")
+          )
+        )
+      )
+
+      , React.createElement('div', { style: {maxWidth:900,margin:"0 auto",padding:"16px 14px"},}
+
+        /* DASHBOARD */
+        , tab==="dashboard"&&(
+          React.createElement('div', null
+            , React.createElement('div', { style: {display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16},}
+              , [
+                {label:"Kunden",v:customers.length,icon:"👤",c:"#6366f1"},
+                {label:"Aktive Aufträge",v:activeOrders.length,icon:"🔧",c:"#3b82f6"},
+                {label:"Heute nachhaken",v:todos.length,icon:"⚠️",c:"#ef4444"},
+                {label:"Abgeschlossen",v:orders.filter(o=>o.status==="abgeschlossen").length,icon:"✅",c:"#10b981"},
+              ].map(s=>(
+                React.createElement('div', { key: s.label, style: {background:"#fff",borderRadius:14,padding:"14px",border:"1px solid #e2e8f0"},}
+                  , React.createElement('div', { style: {fontSize:20,marginBottom:4},}, s.icon)
+                  , React.createElement('div', { style: {fontSize:24,fontWeight:900,color:s.c,lineHeight:1},}, s.v)
+                  , React.createElement('div', { style: {fontSize:11,color:"#64748b",marginTop:3},}, s.label)
+                )
+              ))
+            )
+            , customers.length===0?(
+              React.createElement('div', { style: {textAlign:"center",padding:"60px 20px"},}
+                , React.createElement('div', { style: {fontSize:64,marginBottom:14},}, "🚗")
+                , React.createElement('h2', { style: {fontSize:22,fontWeight:900,color:"#0f172a",marginBottom:8},}, "Willkommen, " , _optionalChain([userEmail, 'optionalAccess', _16 => _16.split, 'call', _17 => _17("@"), 'access', _18 => _18[0]]), "!")
+                , React.createElement('p', { style: {color:"#64748b",marginBottom:24,fontSize:15},}, "Noch keine Kunden vorhanden."   )
+                , React.createElement('button', { onClick: ()=>setShowNC(true), style: {background:"#6366f1",color:"#fff",border:"none",borderRadius:14,padding:"16px 32px",fontWeight:900,fontSize:17,cursor:"pointer",width:"100%",boxShadow:"0 4px 20px rgba(99,102,241,0.4)"},}, "+ Ersten Kunden anlegen"   )
+              )
+            ):(
+              React.createElement(React.Fragment, null
+                , todos.length>0&&(
+                  React.createElement('div', { style: {background:"#fff5f5",borderRadius:14,padding:"14px",marginBottom:14,border:"1px solid #fca5a5"},}
+                    , React.createElement('div', { style: {fontWeight:800,color:"#dc2626",marginBottom:10,fontSize:14},}, "⚠️ Heute nachhaken ("   , todos.length, ")")
+                    , todos.map(o=>{
+                      const c=customers.find(x=>x.id===o.customerId);
+                      return(
+                        React.createElement('div', { key: o.id, onClick: ()=>setSelO(o), className: "card-tap",
+                          style: {background:"#fff",borderRadius:10,padding:"10px 12px",marginBottom:6,cursor:"pointer",border:"1px solid #fecaca"},}
+                          , React.createElement('div', { style: {display:"flex",justifyContent:"space-between",alignItems:"center",gap:8},}
+                            , React.createElement('strong', { style: {fontSize:14,color:"#0f172a"},}, _optionalChain([c, 'optionalAccess', _19 => _19.vorname]), " " , _optionalChain([c, 'optionalAccess', _20 => _20.nachname]))
+                            , React.createElement(Badge, { status: o.status, small: true,})
+                          )
+                          , React.createElement('div', { style: {fontSize:12,color:"#dc2626",marginTop:3,fontWeight:600},}
+                            , o.status==="offerte_versendet"?`${hoursSince(o.statusChangedAt)}h ohne Antwort`:`${daysSince(o.statusChangedAt)} Tage offen`
+                          )
+                        )
+                      );
+                    })
+                  )
+                )
+                , React.createElement('div', { style: {background:"#fff",borderRadius:14,padding:"14px",border:"1px solid #e2e8f0"},}
+                  , React.createElement('div', { style: {fontWeight:800,color:"#0f172a",marginBottom:10,fontSize:14},}, "🔧 Aktive Aufträge ("   , activeOrders.length, ")")
+                  , !activeOrders.length?React.createElement('p', { style: {color:"#94a3b8",fontSize:13,textAlign:"center",padding:"10px 0"},}, "Keine aktiven Aufträge."  ):
+                    activeOrders.slice(0,8).map(o=>{
+                      const c=customers.find(x=>x.id===o.customerId);
+                      const dv=daysSince(o.statusChangedAt);
+                      return(
+                        React.createElement('div', { key: o.id, onClick: ()=>setSelO(o), className: "card-tap",
+                          style: {border:`1.5px solid ${isOverdue(o)?"#fca5a5":"#e2e8f0"}`,borderRadius:10,padding:"10px 12px",marginBottom:6,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,minHeight:56},}
+                          , React.createElement('div', { style: {minWidth:0},}
+                            , React.createElement('div', { style: {fontWeight:700,fontSize:14,color:"#0f172a"},}, _optionalChain([c, 'optionalAccess', _21 => _21.vorname]), " " , _optionalChain([c, 'optionalAccess', _22 => _22.nachname]))
+                            , React.createElement('div', { style: {fontSize:11,color:"#94a3b8"},}, "#", o.orderNumber, " · "  , dv<1?"heute":`${dv}T`)
+                          )
+                          , React.createElement(Badge, { status: o.status, small: true,})
+                        )
+                      );
+                    })
+                  
+                )
+              )
+            )
+          )
+        )
+
+        /* OFFERTEN */
+        , tab==="offerten"&&(
+          React.createElement('div', null
+            , React.createElement('div', { style: {display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14},}
+              , React.createElement('div', { style: {fontWeight:900,fontSize:18,color:"#0f172a"},}, "Offerten (" , offerten.length, ")")
+              , React.createElement('button', { onClick: ()=>setShowNOff(true), style: {background:"#6366f1",color:"#fff",border:"none",borderRadius:12,padding:"10px 18px",fontWeight:700,cursor:"pointer",fontSize:14},}, "+ Neue Offerte")
+            )
+            , !offerten.length&&React.createElement('div', { style: {textAlign:"center",padding:"60px 20px",color:"#94a3b8",fontSize:14},}
+              , React.createElement('div', { style: {fontSize:48,marginBottom:12},}, "📄")
+              , React.createElement('div', null, "Noch keine Offerten erstellt.")
+            )
+            , ["entwurf","versendet","angenommen","abgelehnt"].map(st=>{
+              const grp=offerten.filter(o=>o.status===st).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+              if(!grp.length)return null;
+              const stColors={entwurf:{c:"#6366f1",bg:"#eef2ff",l:"Entwurf"},versendet:{c:"#f59e0b",bg:"#fffbeb",l:"Versendet"},angenommen:{c:"#10b981",bg:"#ecfdf5",l:"Angenommen"},abgelehnt:{c:"#ef4444",bg:"#fee2e2",l:"Abgelehnt"}};
+              const sc=stColors[st];
+              return React.createElement('div', { key: st, style: {marginBottom:18},}
+                , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8,marginBottom:8},}
+                  , React.createElement('span', { style: {background:sc.bg,color:sc.c,border:`1px solid ${sc.c}30`,borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:700},}, sc.l)
+                  , React.createElement('span', { style: {fontSize:11,color:"#94a3b8"},}, grp.length, "×")
+                )
+                , grp.map(off=>{
+                  const c=customers.find(x=>x.id===off.customerId);
+                  return React.createElement('div', { key: off.id, onClick: ()=>setSelOff(off), className: "card-tap",
+                    style: {background:"#fff",border:"1.5px solid #e2e8f0",borderRadius:12,padding:"12px",marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8},}
+                    , React.createElement('div', null
+                      , React.createElement('div', { style: {fontWeight:700,color:"#0f172a",fontSize:14},}, "Offerte #" , off.offertNumber)
+                      , React.createElement('div', { style: {fontSize:12,color:"#64748b",marginTop:2},}, c?`${c.vorname} ${c.nachname}`:"Kein Kunde")
+                      , off.totalBetrag&&React.createElement('div', { style: {fontSize:13,fontWeight:800,color:"#0f172a",marginTop:2},}, "CHF " , off.totalBetrag)
+                    )
+                    , React.createElement('div', { style: {textAlign:"right"},}
+                      , React.createElement('div', { style: {fontSize:11,color:"#94a3b8"},}, new Date(off.createdAt).toLocaleDateString("de-CH"))
+                      , React.createElement('span', { style: {fontSize:18,color:"#cbd5e1"},}, "›")
+                    )
+                  );
+                })
+              );
+            })
+          )
+        )
+
+        /* AUFTRÄGE */
+        , tab==="auftraege"&&(
+          React.createElement('div', null
+            , React.createElement('div', { style: {fontWeight:900,fontSize:18,color:"#0f172a",marginBottom:14},}, "Aufträge (" , orders.length, ")")
+            , SO.filter(s=>s!=="abgeschlossen").map(s=>{
+              const grp=orders.filter(o=>o.status===s);
+              if(!grp.length)return null;
+              return(
+                React.createElement('div', { key: s, style: {marginBottom:18},}
+                  , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:8,marginBottom:8},}
+                    , React.createElement(Badge, { status: s,}), React.createElement('span', { style: {fontSize:11,color:"#94a3b8"},}, grp.length, "×")
+                  )
+                  , grp.map(o=>{
+                    const c=customers.find(x=>x.id===o.customerId);
+                    const ov=isOverdue(o);const dv=daysSince(o.statusChangedAt);
+                    return(
+                      React.createElement('div', { key: o.id, onClick: ()=>setSelO(o), className: "card-tap",
+                        style: {background:"#fff",border:`1.5px solid ${ov?"#fca5a5":"#e2e8f0"}`,borderRadius:12,padding:"12px",marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,minHeight:64},}
+                        , React.createElement('div', { style: {minWidth:0},}
+                          , ov&&React.createElement('div', { style: {fontSize:10,color:"#dc2626",fontWeight:700,marginBottom:2},}, "⚠️ Frist überschritten"  )
+                          , React.createElement('div', { style: {fontWeight:700,color:"#0f172a",fontSize:14},}, "#", o.orderNumber, " – "  , _optionalChain([c, 'optionalAccess', _23 => _23.vorname]), " " , _optionalChain([c, 'optionalAccess', _24 => _24.nachname]))
+                          , React.createElement('div', { style: {fontSize:11,color:"#64748b",marginTop:1},}, _optionalChain([c, 'optionalAccess', _25 => _25.kennzeichen]))
+                          , React.createElement('div', { style: {fontSize:11,color:"#94a3b8",marginTop:1},}, dv<1?"heute":`${dv}T`, " in Phase"  )
+                        )
+                        , React.createElement('span', { style: {fontSize:20,color:"#cbd5e1"},}, "›")
+                      )
+                    );
+                  })
+                )
+              );
+            })
+            , (()=>{
+              const done=orders.filter(o=>o.status==="abgeschlossen");
+              if(!done.length)return null;
+              return(
+                React.createElement('details', null
+                  , React.createElement('summary', { style: {cursor:"pointer",color:"#64748b",fontWeight:700,fontSize:13,padding:"10px 0",userSelect:"none",listStyle:"none",display:"flex",alignItems:"center",gap:6},}
+                    , React.createElement('span', null, "▶"), React.createElement('span', null, "Abgeschlossen (" , done.length, ")")
+                  )
+                  , React.createElement('div', { style: {marginTop:8},}
+                    , done.map(o=>{
+                      const c=customers.find(x=>x.id===o.customerId);
+                      return(
+                        React.createElement('div', { key: o.id, onClick: ()=>setSelO(o), className: "card-tap",
+                          style: {background:"#f8fafc",border:"1.5px solid #e2e8f0",borderRadius:10,padding:"10px 12px",marginBottom:6,cursor:"pointer",opacity:0.75,display:"flex",justifyContent:"space-between",alignItems:"center"},}
+                          , React.createElement('div', null
+                            , React.createElement('div', { style: {fontWeight:600,color:"#475569",fontSize:13},}, "#", o.orderNumber, " – "  , _optionalChain([c, 'optionalAccess', _26 => _26.vorname]), " " , _optionalChain([c, 'optionalAccess', _27 => _27.nachname]))
+                            , React.createElement('div', { style: {fontSize:11,color:"#94a3b8"},}, new Date(o.createdAt).toLocaleDateString("de-CH"))
+                          )
+                          , React.createElement('span', { style: {fontSize:18,color:"#94a3b8"},}, "›")
+                        )
+                      );
+                    })
+                  )
+                )
+              );
+            })()
+            , !orders.length&&React.createElement('p', { style: {color:"#94a3b8",textAlign:"center",padding:"40px 0",fontSize:14},}, "Noch keine Aufträge."  )
+          )
+        )
+
+        /* KUNDENKARTEI */
+        , tab==="kunden"&&(
+          React.createElement('div', null
+            , React.createElement('div', { style: {fontWeight:900,fontSize:18,color:"#0f172a",marginBottom:12},}, "Kundenkartei (" , customers.length, ")")
+            , React.createElement('input', { value: search, onChange: e=>setSearch(e.target.value), placeholder: "🔍 Name, Telefon oder Kennzeichen…"    , style: {...inp,marginBottom:10,borderRadius:12},})
+            , React.createElement('div', { className: "status-scroll", style: {marginBottom:14},}
+              , [["all","Alle"],["active","Aktive"],["inactive","Inaktive"]].map(([f,l])=>(
+                React.createElement('button', { key: f, onClick: ()=>setFilterK(f), style: {flexShrink:0,padding:"8px 16px",border:`1.5px solid ${filterK===f?"#6366f1":"#e2e8f0"}`,borderRadius:20,background:filterK===f?"#6366f1":"#fff",color:filterK===f?"#fff":"#64748b",fontWeight:700,fontSize:13,cursor:"pointer"},}, l)
+              ))
+            )
+            , !filteredC.length&&React.createElement('p', { style: {color:"#94a3b8",textAlign:"center",padding:"30px 0",fontSize:14},}, "Keine Kunden gefunden."  )
+            , filteredC.map(c=>{
+              const as=getActiveStatus(orders,c.id);
+              return(
+                React.createElement('div', { key: c.id, onClick: ()=>setSelC(c), className: "card-tap",
+                  style: {background:"#fff",border:"1.5px solid #e2e8f0",borderRadius:12,padding:"14px",marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,minHeight:64},}
+                  , React.createElement('div', { style: {minWidth:0},}
+                    , React.createElement('div', { style: {fontWeight:800,color:"#0f172a",fontSize:15},}, c.vorname, " " , c.nachname)
+                    , React.createElement('div', { style: {fontSize:12,color:"#64748b"},}, c.telefon)
+                    , React.createElement('div', { style: {fontSize:11,color:"#94a3b8",marginTop:1},}, "🚗 " , c.kennzeichen, c.marke?` · ${c.marke}`:"")
+                  )
+                  , React.createElement('div', { style: {display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6,flexShrink:0},}
+                    , as?React.createElement(Badge, { status: as, small: true,}):React.createElement('span', { style: {fontSize:10,color:"#94a3b8",background:"#f1f5f9",padding:"2px 8px",borderRadius:20,border:"1px solid #e2e8f0",whiteSpace:"nowrap"},}, "Inaktiv")
+                    , React.createElement('span', { style: {fontSize:18,color:"#cbd5e1"},}, "›")
+                  )
+                )
+              );
+            })
+          )
+        )
+      )
+
+      /* FAB */
+      , fabOpen&&React.createElement('div', { onClick: ()=>setFabOpen(false), style: {position:"fixed",inset:0,zIndex:49},})
+      , fabOpen&&(
+        React.createElement('div', { style: {position:"fixed",bottom:"calc(148px + env(safe-area-inset-bottom))",right:14,zIndex:51,display:"flex",flexDirection:"column",gap:10,alignItems:"flex-end"},}
+          , React.createElement('button', { onClick: ()=>{setShowNC(true);setFabOpen(false);}, style: {background:"#fff",border:"1.5px solid #e2e8f0",borderRadius:14,padding:"12px 18px",fontWeight:700,cursor:"pointer",fontSize:14,color:"#334155",boxShadow:"0 4px 16px rgba(0,0,0,0.12)",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:8},}
+            , React.createElement('span', { style: {fontSize:18},}, "👤"), " Neuer Kunde"
+          )
+          , React.createElement('button', { onClick: ()=>{setNewOCid(null);setShowNO(true);setFabOpen(false);}, style: {background:"#fff",border:"1.5px solid #e2e8f0",borderRadius:14,padding:"12px 18px",fontWeight:700,cursor:"pointer",fontSize:14,color:"#334155",boxShadow:"0 4px 16px rgba(0,0,0,0.12)",whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:8},}
+            , React.createElement('span', { style: {fontSize:18},}, "🔧"), " Neuer Auftrag"
+          )
+        )
+      )
+      , React.createElement('button', { className: "fab", onClick: ()=>setFabOpen(p=>!p), style: {bottom:"calc(72px + env(safe-area-inset-bottom))",transform:fabOpen?"rotate(45deg)":"rotate(0deg)"},}, "+")
+
+      /* Bottom Nav */
+      , React.createElement('div', { style: {position:"fixed",bottom:0,left:0,right:0,background:"#fff",borderTop:"1px solid #e2e8f0",display:"flex",zIndex:100,boxShadow:"0 -4px 16px rgba(0,0,0,0.06)",paddingBottom:"env(safe-area-inset-bottom)"},}
+        , navBtn("dashboard","🏠","Dashboard")
+        , navBtn("auftraege","🔧","Aufträge")
+        , navBtn("offerten","📄","Offerten")
+        , navBtn("kunden","👥","Kunden")
+      )
+
+      /* MODALS */
+      
+      , afterSave&&!showNO&&(()=>{
+        const c=customers.find(x=>x.id===afterSave);
+        return(
+          React.createElement(Modal, { title: "Kunde gespeichert ✓"  , onClose: ()=>setAfterSave(null),}
+            , React.createElement('div', { style: {textAlign:"center",paddingBottom:8},}
+              , React.createElement('div', { style: {fontSize:48,marginBottom:10},}, "✅")
+              , React.createElement('p', { style: {color:"#475569",marginBottom:20,fontSize:15},}, "Möchtest du direkt einen Auftrag für "      , React.createElement('strong', null, _optionalChain([c, 'optionalAccess', _28 => _28.vorname]), " " , _optionalChain([c, 'optionalAccess', _29 => _29.nachname])), " erstellen?" )
+            )
+            , React.createElement('button', { onClick: ()=>{setNewOCid(afterSave);setShowNO(true);}, style: {width:"100%",background:"#6366f1",color:"#fff",border:"none",borderRadius:12,padding:"15px",fontWeight:700,cursor:"pointer",fontSize:16,marginBottom:10},}, "+ Auftrag erstellen"  )
+            , React.createElement('button', { onClick: ()=>setAfterSave(null), style: {width:"100%",padding:"13px",border:"1.5px solid #e2e8f0",borderRadius:12,background:"#fff",cursor:"pointer",fontWeight:600,color:"#64748b",fontSize:15},}, "Später")
+          )
+        );
+      })()
+      , showNOff&&React.createElement(Modal, { title: "Neue Offerte", onClose: ()=>setShowNOff(false),}, React.createElement(OfferteForm, { customers: customers, onSave: addOfferte, onCancel: ()=>setShowNOff(false),}))
+      , selOff&&React.createElement(OfferteDetail, { offerte: selOff, customer: customers.find(c=>c.id===selOff.customerId), onClose: ()=>setSelOff(null), onUpdate: updateOfferte, onDelete: deleteOfferte,})
+      , showNO&&React.createElement(Modal, { title: "Neuer Auftrag" , onClose: ()=>{setShowNO(false);setNewOCid(null);},}, React.createElement(OrderForm, { customers: customers, customerId: newOCid, onSave: addOrder, onCancel: ()=>{setShowNO(false);setNewOCid(null);},}))
+      , selC&&!selO&&React.createElement(CustomerDetail, { customer: selC, orders: orders, onClose: ()=>setSelC(null), onEdit: ()=>setEditC(selC), onNewOrder: ()=>{setNewOCid(selC.id);setShowNO(true);setSelC(null);}, onOrderClick: o=>{setSelO(o);setSelC(null);},})
+      , editC&&React.createElement(Modal, { title: "Kunde bearbeiten" , onClose: ()=>setEditC(null),}, React.createElement(CustomerForm, { initial: editC, onSave: async data=>{await updateCustomer(editC.id,data);setEditC(null);}, onCancel: ()=>setEditC(null),}))
+      , selO&&React.createElement(OrderDetail, { order: selO, customer: customers.find(c=>c.id===selO.customerId), onClose: ()=>setSelO(null), onUpdate: updateOrder, onDelete: deleteOrder,})
+    )
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App, null));
+
+</script>
+</body>
+</html>
