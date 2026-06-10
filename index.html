@@ -35,15 +35,15 @@
   --fill3:     rgba(118,118,128,0.12);
   --fill4:     rgba(116,116,128,0.06);
 
-  /* Apple.com Surfaces */
+  /* Apple.com Surfaces – bright & airy */
   --bg:        #FFFFFF;
-  --bg2:       #F5F5F7;
-  --bg3:       #FBFBFD;
-  --grouped-bg:  #F5F5F7;
+  --bg2:       #F0F6FF;
+  --bg3:       #F8FAFF;
+  --grouped-bg:  #EFF5FF;
   --grouped-bg2: #FFFFFF;
 
-  --sep:       rgba(0,0,0,0.08);
-  --sep-opaque:#D2D2D7;
+  --sep:       rgba(0,80,200,0.07);
+  --sep-opaque:#C8D5E8;
 
   /* Apple Premium Shadows */
   --shadow-sm:  0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
@@ -163,7 +163,7 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 /* ── NAVIGATION BAR – Apple Glassmorphism ── */
 .nav-bar {
   position:sticky;top:0;z-index:200;
-  background:rgba(245,245,247,0.82);
+  background:rgba(240,246,255,0.88);
   -webkit-backdrop-filter:saturate(200%) blur(28px);
   backdrop-filter:saturate(200%) blur(28px);
   border-bottom:0.5px solid var(--sep);
@@ -185,10 +185,10 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 /* ── TAB BAR – Apple Premium ── */
 .tab-bar{
   position:fixed;bottom:0;left:0;right:0;z-index:200;
-  background:rgba(245,245,247,0.88);
+  background:rgba(240,246,255,0.92);
   -webkit-backdrop-filter:saturate(200%) blur(28px);
   backdrop-filter:saturate(200%) blur(28px);
-  border-top:0.5px solid var(--sep);
+  border-top:0.5px solid rgba(0,80,200,0.10);
   padding-bottom:env(safe-area-inset-bottom);
   display:flex;
 }
@@ -374,7 +374,7 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 /* ── FLOATING CONTEXT MENU – Apple Premium ── */
 .context-menu{
   position:fixed;
-  background:rgba(245,245,247,0.88);
+  background:rgba(240,246,255,0.92);
   -webkit-backdrop-filter:saturate(200%) blur(40px);
   backdrop-filter:saturate(200%) blur(40px);
   border-radius:var(--radius-lg);
@@ -483,11 +483,11 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
   filter:drop-shadow(0 4px 12px rgba(0,0,0,0.15));
 }
 .login-card{
-  background:var(--grouped-bg2);
+  background:rgba(255,255,255,0.96);
   border-radius:var(--radius-xl);
   padding:36px 32px;
-  box-shadow:var(--shadow-xl);
-  border:0.5px solid var(--sep);
+  box-shadow:var(--shadow-xl), 0 0 0 0.5px rgba(0,80,200,0.08);
+  border:0.5px solid rgba(0,80,200,0.10);
   width:100%;max-width:380px;
 }
 
@@ -623,14 +623,25 @@ function LoginPage({onLogin}){
     ,React.createElement('div',{className:"login-card"}
       ,React.createElement('div',{style:{textAlign:"center",marginBottom:32}}
         ,React.createElement('div',{style:{
-          width:72,height:72,borderRadius:16,
-          background:"linear-gradient(145deg,#0A84FF,#0071E3)",
+          width:80,height:80,borderRadius:22,
+          background:"linear-gradient(150deg,#FFFFFF 0%,#F0F4FF 100%)",
           display:"inline-flex",alignItems:"center",justifyContent:"center",
-          marginBottom:18,
-          boxShadow:"0 8px 24px rgba(0,113,227,0.35)",
+          marginBottom:20,
+          boxShadow:"0 4px 20px rgba(0,113,227,0.18), 0 1px 4px rgba(0,0,0,0.06), inset 0 0.5px 0 rgba(255,255,255,0.9)",
+          border:"0.5px solid rgba(0,113,227,0.12)",
         }}
-          ,React.createElement('svg',{width:36,height:36,viewBox:"0 0 40 40",fill:"none"}
-            ,React.createElement('path',{d:"M24 10a9 9 0 01-12.7 12.7L5 29a3.5 3.5 0 005 5l6.3-6.3A9 9 0 0129 15l-5 5 3 3 5-5z",fill:"white"})
+          ,React.createElement('svg',{width:44,height:44,viewBox:"0 0 44 44",fill:"none"}
+            ,React.createElement('rect',{x:4,y:18,width:36,height:14,rx:4,fill:"#0071E3",opacity:0.12})
+            ,React.createElement('path',{d:"M8 26h28v4a3 3 0 01-3 3H11a3 3 0 01-3-3v-4z",fill:"#0071E3"})
+            ,React.createElement('path',{d:"M10 26l4-9h16l4 9",stroke:"#0071E3",strokeWidth:1.8,strokeLinecap:"round",strokeLinejoin:"round",fill:"none"})
+            ,React.createElement('rect',{x:10,y:18,width:7,height:5,rx:1.5,fill:"#5AC8FA",opacity:0.85})
+            ,React.createElement('rect',{x:20,y:18,width:7,height:5,rx:1.5,fill:"#5AC8FA",opacity:0.85})
+            ,React.createElement('circle',{cx:13,cy:33,r:3.5,fill:"white",stroke:"#0071E3",strokeWidth:1.5})
+            ,React.createElement('circle',{cx:13,cy:33,r:1.5,fill:"#0071E3"})
+            ,React.createElement('circle',{cx:31,cy:33,r:3.5,fill:"white",stroke:"#0071E3",strokeWidth:1.5})
+            ,React.createElement('circle',{cx:31,cy:33,r:1.5,fill:"#0071E3"})
+            ,React.createElement('path',{d:"M6 26h32",stroke:"#0071E3",strokeWidth:0.5,opacity:0.3})
+            ,React.createElement('path',{d:"M28 12h6M28 14.5h4",stroke:"#0071E3",strokeWidth:1.8,strokeLinecap:"round",opacity:0.5})
           )
         )
         ,React.createElement('h1',{className:"sf-title1",style:{marginBottom:5,letterSpacing:"-0.5px"}},"GarageOS")
