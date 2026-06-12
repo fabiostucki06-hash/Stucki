@@ -11,11 +11,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin></script>
 <style>
-/* ── Apple Design System ── */
+/* ── Liquid Glass Design System ── */
 :root {
-  /* Apple HIG System Colors */
-  --blue:      #0071E3;
-  --blue-d:    #0077ED;
+  --blue:      #007AFF;
+  --blue-d:    #0060CC;
   --green:     #34C759;
   --orange:    #FF9500;
   --red:       #FF3B30;
@@ -24,7 +23,6 @@
   --yellow:    #FFCC00;
   --indigo:    #5856D6;
 
-  /* Apple.com Text Colors */
   --label:     #1D1D1F;
   --label2:    #6E6E73;
   --label3:    rgba(60,60,67,0.30);
@@ -35,21 +33,25 @@
   --fill3:     rgba(118,118,128,0.12);
   --fill4:     rgba(116,116,128,0.06);
 
-  /* Apple.com Surfaces */
   --bg:        #FFFFFF;
-  --bg2:       #F5F5F7;
+  --bg2:       #F0F4FF;
   --bg3:       #FBFBFD;
-  --grouped-bg:  #F5F5F7;
-  --grouped-bg2: #FFFFFF;
+  --grouped-bg:   #E6EDF8;
+  --grouped-bg2:  rgba(255,255,255,0.78);
 
   --sep:       rgba(0,0,0,0.08);
   --sep-opaque:#D2D2D7;
 
-  /* Apple Premium Shadows */
-  --shadow-sm:  0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md:  0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04);
-  --shadow-lg:  0 8px 32px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06);
-  --shadow-xl:  0 20px 60px rgba(0,0,0,0.14), 0 4px 16px rgba(0,0,0,0.08);
+  /* Liquid Glass tokens */
+  --glass-light: linear-gradient(180deg,rgba(255,255,255,0.84) 0%,rgba(255,255,255,0.56) 100%);
+  --glass-border: 0.5px solid rgba(255,255,255,0.62);
+  --glass-shine:  inset 0 1.5px 0 rgba(255,255,255,0.80);
+  --glass-blur:   saturate(180%) blur(22px);
+
+  --shadow-sm:  0 2px 8px rgba(0,0,0,0.07),0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md:  0 4px 20px rgba(0,0,0,0.10),0 1px 6px rgba(0,0,0,0.05);
+  --shadow-lg:  0 8px 36px rgba(0,0,0,0.13),0 2px 10px rgba(0,0,0,0.07);
+  --shadow-xl:  0 20px 60px rgba(0,0,0,0.16),0 4px 18px rgba(0,0,0,0.09);
 
   --sidebar-width: 260px;
   --radius-sm: 10px;
@@ -60,8 +62,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --blue:     #2997FF;
-    --blue-d:   #0071E3;
+    --blue:     #0A84FF;
+    --blue-d:   #007AFF;
     --green:    #30D158;
     --orange:   #FF9F0A;
     --red:      #FF453A;
@@ -83,16 +85,21 @@
     --bg:       #000000;
     --bg2:      #1C1C1E;
     --bg3:      #111111;
-    --grouped-bg:  #000000;
-    --grouped-bg2: #1C1C1E;
+    --grouped-bg:   #0B0D18;
+    --grouped-bg2:  rgba(28,32,50,0.80);
 
     --sep:       rgba(255,255,255,0.10);
     --sep-opaque:#38383A;
 
-    --shadow-sm:  0 1px 3px rgba(0,0,0,0.30), 0 1px 2px rgba(0,0,0,0.20);
-    --shadow-md:  0 4px 16px rgba(0,0,0,0.40), 0 1px 4px rgba(0,0,0,0.20);
-    --shadow-lg:  0 8px 32px rgba(0,0,0,0.50), 0 2px 8px rgba(0,0,0,0.30);
-    --shadow-xl:  0 20px 60px rgba(0,0,0,0.60), 0 4px 16px rgba(0,0,0,0.40);
+    --glass-light: linear-gradient(180deg,rgba(48,54,82,0.78) 0%,rgba(24,28,50,0.64) 100%);
+    --glass-border: 0.5px solid rgba(255,255,255,0.13);
+    --glass-shine:  inset 0 1.5px 0 rgba(255,255,255,0.13);
+    --glass-blur:   saturate(200%) blur(28px);
+
+    --shadow-sm:  0 2px 8px rgba(0,0,0,0.40),0 1px 2px rgba(0,0,0,0.28);
+    --shadow-md:  0 4px 20px rgba(0,0,0,0.55),0 1px 6px rgba(0,0,0,0.30);
+    --shadow-lg:  0 8px 36px rgba(0,0,0,0.65),0 2px 10px rgba(0,0,0,0.38);
+    --shadow-xl:  0 20px 60px rgba(0,0,0,0.75),0 4px 18px rgba(0,0,0,0.48);
   }
 }
 
@@ -101,6 +108,9 @@ html,body{height:100%;overscroll-behavior:none}
 body{
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Arial,sans-serif;
   background:var(--grouped-bg);
+  background-image:
+    radial-gradient(ellipse at 18% 8%,rgba(0,122,255,0.13) 0%,transparent 52%),
+    radial-gradient(ellipse at 82% 85%,rgba(88,86,214,0.10) 0%,transparent 52%);
   min-height:100vh;min-height:100dvh;
   -webkit-font-smoothing:antialiased;
   -moz-osx-font-smoothing:grayscale;
@@ -111,12 +121,11 @@ body{
 input,textarea,select{font-family:inherit;font-size:17px!important;color:var(--label)}
 button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:inherit}
 
-/* Apple-style scrollbar */
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-thumb{background:var(--sep-opaque);border-radius:10px}
 ::-webkit-scrollbar-track{background:transparent}
 
-/* ── TYPOGRAPHY – Apple Scale ── */
+/* ── TYPOGRAPHY ── */
 .sf-title1   {font-size:28px;font-weight:700;letter-spacing:-0.5px;line-height:1.21}
 .sf-title2   {font-size:22px;font-weight:700;letter-spacing:-0.3px;line-height:1.27}
 .sf-title3   {font-size:20px;font-weight:600;letter-spacing:-0.2px;line-height:1.3}
@@ -135,11 +144,14 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
   padding:20px 20px 8px;
 }
 .inset-grouped-list {
-  background:var(--grouped-bg2);
+  background:var(--glass-light);
+  -webkit-backdrop-filter:var(--glass-blur);
+  backdrop-filter:var(--glass-blur);
   border-radius:var(--radius-md);
+  border:var(--glass-border);
   overflow:hidden;
   margin-bottom:28px;
-  box-shadow:var(--shadow-sm);
+  box-shadow:var(--glass-shine),var(--shadow-sm);
 }
 .list-row {
   display:flex;align-items:center;gap:14px;
@@ -147,12 +159,14 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
   min-height:48px;
   border-bottom:0.5px solid var(--sep);
   cursor:pointer;
-  background:var(--grouped-bg2);
-  transition:background 0.12s ease;
+  background:transparent;
+  transition:background 0.18s ease,transform 0.22s cubic-bezier(0.34,1.56,0.64,1),box-shadow 0.18s ease;
   position:relative;
 }
+.list-row:hover{background:rgba(0,122,255,0.055);transform:translateX(3px);box-shadow:inset 3px 0 0 var(--blue);}
 .list-row:last-child{border-bottom:none}
-.list-row:active,.list-row.pressed{background:var(--fill4)}
+.list-row:last-child:hover{border-radius:0 0 var(--radius-md) var(--radius-md);}
+.list-row:active,.list-row.pressed{background:rgba(0,0,0,0.05);transform:translateX(1px);}
 .list-row-icon {
   width:32px;height:32px;border-radius:8px;
   display:flex;align-items:center;justify-content:center;
@@ -160,21 +174,26 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 }
 .list-chevron{color:var(--sep-opaque);font-size:14px;font-weight:700;margin-left:auto;flex-shrink:0;opacity:0.7}
 
-/* ── NAVIGATION BAR – Apple Glassmorphism ── */
+/* ── NAVIGATION BAR – Liquid Glass ── */
 .nav-bar {
   position:sticky;top:0;z-index:200;
-  background:rgba(245,245,247,0.82);
-  -webkit-backdrop-filter:saturate(200%) blur(28px);
-  backdrop-filter:saturate(200%) blur(28px);
-  border-bottom:0.5px solid var(--sep);
+  background:rgba(220,232,250,0.76);
+  -webkit-backdrop-filter:saturate(200%) blur(30px);
+  backdrop-filter:saturate(200%) blur(30px);
+  border-bottom:var(--glass-border);
+  box-shadow:var(--glass-shine),0 1px 0 rgba(0,0,0,0.06);
   padding-top:env(safe-area-inset-top);
 }
 @media (prefers-color-scheme:dark){
-  .nav-bar{background:rgba(0,0,0,0.82);border-bottom-color:rgba(255,255,255,0.08)}
+  .nav-bar{
+    background:rgba(8,10,22,0.82);
+    border-bottom:0.5px solid rgba(255,255,255,0.09);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.08),0 1px 0 rgba(0,0,0,0.35);
+  }
 }
 .nav-bar-inner{
-  height:48px;display:flex;align-items:center;
-  padding:0 20px;position:relative;
+  height:60px;display:flex;align-items:center;
+  padding:0 16px;position:relative;
   max-width:960px;margin:0 auto;
 }
 .nav-large-title{
@@ -182,18 +201,23 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
   max-width:960px;margin:0 auto;
 }
 
-/* ── TAB BAR – Apple Premium ── */
+/* ── TAB BAR – Liquid Glass ── */
 .tab-bar{
   position:fixed;bottom:0;left:0;right:0;z-index:200;
-  background:rgba(245,245,247,0.88);
-  -webkit-backdrop-filter:saturate(200%) blur(28px);
-  backdrop-filter:saturate(200%) blur(28px);
-  border-top:0.5px solid var(--sep);
+  background:rgba(220,232,250,0.84);
+  -webkit-backdrop-filter:saturate(200%) blur(30px);
+  backdrop-filter:saturate(200%) blur(30px);
+  border-top:var(--glass-border);
+  box-shadow:var(--glass-shine),0 -1px 0 rgba(0,0,0,0.06);
   padding-bottom:env(safe-area-inset-bottom);
   display:flex;
 }
 @media (prefers-color-scheme:dark){
-  .tab-bar{background:rgba(0,0,0,0.88);border-top-color:rgba(255,255,255,0.08)}
+  .tab-bar{
+    background:rgba(8,10,22,0.88);
+    border-top:0.5px solid rgba(255,255,255,0.09);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.08),0 -1px 0 rgba(0,0,0,0.40);
+  }
 }
 .tab-item{
   flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -204,42 +228,67 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .tab-icon{font-size:24px;line-height:1;width:26px;height:26px;display:flex;align-items:center;justify-content:center}
 .tab-label{font-size:10px;font-weight:500;letter-spacing:-0.1px;margin-top:2px}
 
-/* ── SF SYMBOLS (SVG) ── */
 .sf-symbol{display:inline-flex;align-items:center;justify-content:center}
 
-/* ── BUTTONS – Apple Premium Style ── */
+/* ── BUTTONS – Liquid Glass ── */
 .btn-system{
-  background:var(--blue);color:#fff;border:none;
+  background:linear-gradient(180deg,#3DABFF 0%,#007AFF 55%,#0060CC 100%);
+  color:#fff;border:0.5px solid rgba(255,255,255,0.22);
   border-radius:980px;padding:0 24px;height:52px;
   font-size:17px;font-weight:600;letter-spacing:-0.4px;
   cursor:pointer;width:100%;
   display:flex;align-items:center;justify-content:center;gap:8px;
   transition:all 0.18s cubic-bezier(0.25,0.46,0.45,0.94);
-  box-shadow:0 2px 8px rgba(0,113,227,0.30);
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,0.48),
+             0 4px 16px rgba(0,122,255,0.42),
+             0 1px 4px rgba(0,122,255,0.28);
 }
-.btn-system:hover{background:var(--blue-d);box-shadow:0 4px 16px rgba(0,113,227,0.35);transform:translateY(-1px)}
-.btn-system:active{opacity:0.82;transform:scale(0.98);box-shadow:none}
+.btn-system:hover{
+  background:linear-gradient(180deg,#52BAFF 0%,#1A8CFF 55%,#0070E0 100%);
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,0.52),
+             0 6px 22px rgba(0,122,255,0.52),
+             0 2px 8px rgba(0,122,255,0.32);
+  transform:translateY(-1px);
+}
+.btn-system:active{opacity:0.86;transform:scale(0.98);box-shadow:inset 0 1px 0 rgba(255,255,255,0.28),0 2px 6px rgba(0,122,255,0.28)}
 .btn-system:disabled{opacity:0.32;box-shadow:none;transform:none}
 .btn-system.btn-secondary{
-  background:var(--fill3);color:var(--blue);
-  box-shadow:none;
+  background:var(--glass-light);
+  color:var(--blue);
+  border:var(--glass-border);
+  box-shadow:var(--glass-shine),var(--shadow-sm);
 }
-.btn-system.btn-secondary:hover{background:var(--fill2);box-shadow:none;transform:none}
-.btn-system.btn-destructive{background:var(--fill3);color:var(--red);box-shadow:none}
-.btn-system.btn-destructive:hover{background:rgba(255,59,48,0.10);box-shadow:none;transform:none}
+.btn-system.btn-secondary:hover{
+  background:linear-gradient(180deg,rgba(255,255,255,0.92) 0%,rgba(255,255,255,0.68) 100%);
+  box-shadow:var(--glass-shine),var(--shadow-md);
+  transform:none;
+}
+.btn-system.btn-destructive{
+  background:var(--glass-light);
+  color:var(--red);
+  border:var(--glass-border);
+  box-shadow:var(--glass-shine),var(--shadow-sm);
+}
+.btn-system.btn-destructive:hover{background:linear-gradient(180deg,rgba(255,59,48,0.12) 0%,rgba(255,59,48,0.06) 100%);transform:none}
 .btn-system.btn-green{
-  background:var(--green);
-  box-shadow:0 2px 8px rgba(52,199,89,0.30);
+  background:linear-gradient(180deg,#4CD96E 0%,#34C759 55%,#22A045 100%);
+  border:0.5px solid rgba(255,255,255,0.22);
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,0.44),
+             0 4px 16px rgba(52,199,89,0.42),
+             0 1px 4px rgba(52,199,89,0.28);
 }
 .btn-tinted{
-  background:rgba(0,113,227,0.10);color:var(--blue);border:none;
+  background:linear-gradient(180deg,rgba(0,122,255,0.16) 0%,rgba(0,122,255,0.08) 100%);
+  color:var(--blue);
+  border:0.5px solid rgba(0,122,255,0.22);
   border-radius:980px;padding:0 20px;height:44px;
   font-size:17px;font-weight:600;letter-spacing:-0.4px;
   cursor:pointer;
-  transition:background 0.15s ease;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.55);
+  transition:all 0.15s ease;
 }
-.btn-tinted:hover{background:rgba(0,113,227,0.16)}
-.btn-tinted:active{background:rgba(0,113,227,0.22)}
+.btn-tinted:hover{background:linear-gradient(180deg,rgba(0,122,255,0.22) 0%,rgba(0,122,255,0.12) 100%)}
+.btn-tinted:active{opacity:0.80}
 .btn-plain{
   background:none;border:none;color:var(--blue);
   font-size:17px;font-weight:400;letter-spacing:-0.4px;
@@ -252,15 +301,15 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
   font-size:17px;font-weight:600;letter-spacing:-0.4px;cursor:pointer;
   padding:0 4px;min-width:44px;min-height:44px;
   display:flex;align-items:center;justify-content:center;
-  transition:opacity 0.12s;
+  transition:background 0.12s;
   border-radius:8px;
 }
-.bar-btn:hover{background:var(--fill4)}
+.bar-btn:hover{background:rgba(0,122,255,0.09)}
 .bar-btn:active{opacity:0.5}
 
-/* ── FORM INPUTS – Apple Refined ── */
+/* ── FORM INPUTS ── */
 .text-field{
-  background:var(--grouped-bg2);border:none;
+  background:transparent;border:none;
   border-bottom:0.5px solid var(--sep);
   width:100%;padding:13px 20px;
   font-size:17px;font-weight:400;letter-spacing:-0.4px;
@@ -270,35 +319,45 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .text-field::placeholder{color:var(--label3)}
 
 .text-field-standalone{
-  background:var(--grouped-bg2);border:none;
+  background:var(--glass-light);
+  -webkit-backdrop-filter:var(--glass-blur);
+  backdrop-filter:var(--glass-blur);
+  border:var(--glass-border);
   border-radius:var(--radius-md);
   width:100%;padding:13px 20px;
   font-size:17px;color:var(--label);outline:none;
   display:block;
-  box-shadow:var(--shadow-sm);
-  border:0.5px solid var(--sep);
+  box-shadow:var(--glass-shine),var(--shadow-sm);
 }
 .text-field-standalone::placeholder{color:var(--label3)}
 .text-field-standalone:focus{
   outline:none;
-  border-color:var(--blue);
-  box-shadow:0 0 0 3px rgba(0,113,227,0.18), var(--shadow-sm);
+  border-color:rgba(0,122,255,0.55);
+  box-shadow:var(--glass-shine),0 0 0 3px rgba(0,122,255,0.18),var(--shadow-sm);
 }
 
 .form-section{
-  background:var(--grouped-bg2);
+  background:var(--glass-light);
+  -webkit-backdrop-filter:var(--glass-blur);
+  backdrop-filter:var(--glass-blur);
   border-radius:var(--radius-md);
+  border:var(--glass-border);
   overflow:hidden;
   margin-bottom:24px;
-  box-shadow:var(--shadow-sm);
+  box-shadow:var(--glass-shine),var(--shadow-sm);
 }
 
-/* ── SEARCH BAR – Apple Style ── */
+/* ── SEARCH BAR ── */
 .search-bar-wrap{padding:10px 20px 6px}
 .search-bar{
   display:flex;align-items:center;gap:8px;
-  background:var(--fill3);border-radius:12px;
+  background:linear-gradient(180deg,rgba(255,255,255,0.72) 0%,rgba(255,255,255,0.50) 100%);
+  -webkit-backdrop-filter:blur(14px);
+  backdrop-filter:blur(14px);
+  border-radius:12px;
+  border:0.5px solid rgba(255,255,255,0.60);
   padding:9px 14px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.72);
 }
 .search-bar input{
   background:none;border:none;outline:none;flex:1;
@@ -307,20 +366,28 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .search-bar input::placeholder{color:var(--label2)}
 .search-icon{color:var(--label2);font-size:16px}
 
-/* ── CARDS & SURFACES – Premium Depth ── */
+/* ── CARDS & SURFACES – Liquid Glass ── */
 .card{
-  background:var(--grouped-bg2);border-radius:var(--radius-md);
+  background:var(--glass-light);
+  -webkit-backdrop-filter:var(--glass-blur);
+  backdrop-filter:var(--glass-blur);
+  border-radius:var(--radius-md);
+  border:var(--glass-border);
   overflow:hidden;margin-bottom:10px;
-  box-shadow:var(--shadow-sm);
+  box-shadow:var(--glass-shine),var(--shadow-sm);
 }
 .card-padded{padding:20px}
 .inset-card{
-  background:var(--grouped-bg2);border-radius:var(--radius-md);
+  background:var(--glass-light);
+  -webkit-backdrop-filter:var(--glass-blur);
+  backdrop-filter:var(--glass-blur);
+  border-radius:var(--radius-md);
+  border:var(--glass-border);
   padding:20px;margin-bottom:10px;
-  box-shadow:var(--shadow-sm);
+  box-shadow:var(--glass-shine),var(--shadow-sm);
 }
 
-/* ── BADGES – Apple Pill Style ── */
+/* ── BADGES ── */
 .badge{
   display:inline-flex;align-items:center;
   border-radius:980px;padding:4px 12px;
@@ -332,7 +399,7 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .status-aufnahme      {background:rgba(88,86,214,0.10);color:#5856D6}
 .status-offerte_versendet{background:rgba(255,149,0,0.10);color:#E07800}
 .status-offerte_bestaetigt{background:rgba(52,199,89,0.10);color:#248A3D}
-.status-teile_arbeit  {background:rgba(0,113,227,0.10);color:#0071E3}
+.status-teile_arbeit  {background:rgba(0,122,255,0.10);color:#007AFF}
 .status-zahlung_versendet{background:rgba(255,149,0,0.10);color:#E07800}
 .status-zahlung_erhalten{background:rgba(175,82,222,0.10);color:#9842C8}
 .status-abgeschlossen {background:rgba(110,110,115,0.10);color:var(--label2)}
@@ -341,7 +408,7 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
   .status-aufnahme{background:rgba(94,92,230,0.18);color:#7D7AFF}
   .status-offerte_versendet{background:rgba(255,159,10,0.18);color:#FF9F0A}
   .status-offerte_bestaetigt{background:rgba(48,209,88,0.18);color:#30D158}
-  .status-teile_arbeit{background:rgba(41,151,255,0.18);color:#2997FF}
+  .status-teile_arbeit{background:rgba(10,132,255,0.18);color:#0A84FF}
   .status-zahlung_versendet{background:rgba(255,159,10,0.18);color:#FF9F0A}
   .status-zahlung_erhalten{background:rgba(191,90,242,0.18);color:#BF5AF2}
   .status-abgeschlossen{background:rgba(120,120,128,0.18)}
@@ -351,40 +418,47 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .alert-banner{
   border-radius:var(--radius-sm);padding:14px 18px;margin-bottom:14px;
   display:flex;align-items:flex-start;gap:12px;
-  box-shadow:var(--shadow-sm);
+  -webkit-backdrop-filter:blur(14px);
+  backdrop-filter:blur(14px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.55),var(--shadow-sm);
 }
-.alert-warning{background:rgba(255,149,0,0.09);color:#C67000;border:0.5px solid rgba(255,149,0,0.20)}
-.alert-danger  {background:rgba(255,59,48,0.09);color:#CC2200;border:0.5px solid rgba(255,59,48,0.20)}
+.alert-warning{background:rgba(255,149,0,0.10);color:#C67000;border:0.5px solid rgba(255,149,0,0.22)}
+.alert-danger  {background:rgba(255,59,48,0.09);color:#CC2200;border:0.5px solid rgba(255,59,48,0.22)}
 @media(prefers-color-scheme:dark){
-  .alert-warning{color:#FF9F0A;border-color:rgba(255,159,10,0.25)}
-  .alert-danger{color:#FF453A;border-color:rgba(255,69,58,0.25)}
+  .alert-warning{color:#FF9F0A;border-color:rgba(255,159,10,0.28)}
+  .alert-danger{color:#FF453A;border-color:rgba(255,69,58,0.28)}
 }
 
-/* ── STAT CARDS – Apple Premium ── */
+/* ── STAT CARDS – Liquid Glass ── */
 .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
 .stat-card{
-  background:var(--grouped-bg2);border-radius:var(--radius-lg);
+  background:var(--glass-light);
+  -webkit-backdrop-filter:var(--glass-blur);
+  backdrop-filter:var(--glass-blur);
+  border-radius:var(--radius-lg);
+  border:var(--glass-border);
   padding:18px;overflow:hidden;position:relative;
-  box-shadow:var(--shadow-md);
+  box-shadow:var(--glass-shine),var(--shadow-md);
 }
 .stat-icon{font-size:30px;margin-bottom:8px}
 .stat-number{font-size:30px;font-weight:700;letter-spacing:-0.5px;line-height:1}
 .stat-label{font-size:13px;font-weight:500;color:var(--label2);margin-top:5px;letter-spacing:-0.1px}
 
-/* ── FLOATING CONTEXT MENU – Apple Premium ── */
+/* ── FLOATING CONTEXT MENU – Liquid Glass ── */
 .context-menu{
   position:fixed;
-  background:rgba(245,245,247,0.88);
-  -webkit-backdrop-filter:saturate(200%) blur(40px);
-  backdrop-filter:saturate(200%) blur(40px);
+  background:rgba(228,236,252,0.88);
+  -webkit-backdrop-filter:saturate(200%) blur(42px);
+  backdrop-filter:saturate(200%) blur(42px);
   border-radius:var(--radius-lg);
+  border:var(--glass-border);
   overflow:hidden;
   z-index:500;
   min-width:240px;
-  box-shadow:var(--shadow-xl), 0 0 0 0.5px var(--sep);
+  box-shadow:var(--glass-shine),var(--shadow-xl);
 }
 @media(prefers-color-scheme:dark){
-  .context-menu{background:rgba(30,30,32,0.92)}
+  .context-menu{background:rgba(24,28,52,0.92);border-color:rgba(255,255,255,0.12);}
 }
 .context-item{
   display:flex;align-items:center;justify-content:space-between;
@@ -396,23 +470,37 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
   transition:background 0.1s;
 }
 .context-item:last-child{border-bottom:none}
-.context-item:active{background:var(--fill3)}
+.context-item:active{background:rgba(0,0,0,0.06)}
 .context-item-icon{font-size:18px;color:var(--label2)}
 
-/* ── MODAL / SHEET – Apple Spring ── */
+/* ── MODAL / SHEET – Liquid Glass ── */
 .sheet-backdrop{
   position:fixed;inset:0;z-index:400;
-  background:rgba(0,0,0,0.36);
-  -webkit-backdrop-filter:blur(2px);
-  backdrop-filter:blur(2px);
+  background:rgba(0,0,0,0.30);
+  -webkit-backdrop-filter:blur(4px);
+  backdrop-filter:blur(4px);
 }
 .sheet-container{
   position:fixed;left:0;right:0;bottom:0;z-index:401;
-  background:var(--grouped-bg);
+  background:rgba(228,236,252,0.90);
+  -webkit-backdrop-filter:saturate(200%) blur(42px);
+  backdrop-filter:saturate(200%) blur(42px);
   border-radius:20px 20px 0 0;
+  border-top:var(--glass-border);
+  border-left:0.5px solid rgba(255,255,255,0.40);
+  border-right:0.5px solid rgba(255,255,255,0.40);
   max-height:96dvh;display:flex;flex-direction:column;
   padding-bottom:env(safe-area-inset-bottom);
-  box-shadow:0 -2px 40px rgba(0,0,0,0.12);
+  box-shadow:0 -4px 40px rgba(0,0,0,0.10),inset 0 1.5px 0 rgba(255,255,255,0.72);
+}
+@media(prefers-color-scheme:dark){
+  .sheet-container{
+    background:rgba(10,13,28,0.92);
+    border-top-color:rgba(255,255,255,0.12);
+    border-left-color:rgba(255,255,255,0.06);
+    border-right-color:rgba(255,255,255,0.06);
+    box-shadow:0 -4px 40px rgba(0,0,0,0.40),inset 0 1.5px 0 rgba(255,255,255,0.09);
+  }
 }
 .sheet-handle{
   width:40px;height:5px;background:var(--sep-opaque);
@@ -428,10 +516,10 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
   flex:1;padding:24px 20px;
 }
 
-/* ── SEGMENTED CONTROL – Apple HIG ── */
+/* ── SEGMENTED CONTROL – Liquid Glass ── */
 .seg-ctrl{
   display:inline-flex;
-  background:var(--fill3);
+  background:rgba(0,0,0,0.07);
   border-radius:10px;padding:3px;
   gap:0;
 }
@@ -444,15 +532,17 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
   padding:0 16px;white-space:nowrap;
 }
 .seg-item.active{
-  background:var(--grouped-bg2);color:var(--label);
-  box-shadow:0 2px 8px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.06);
+  background:linear-gradient(180deg,rgba(255,255,255,0.96) 0%,rgba(255,255,255,0.80) 100%);
+  color:var(--label);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.90),0 2px 8px rgba(0,0,0,0.12),0 1px 2px rgba(0,0,0,0.06);
+  border:0.5px solid rgba(255,255,255,0.72);
 }
 
 /* ── SCROLL AREA ── */
 .h-scroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .h-scroll::-webkit-scrollbar{display:none}
 
-/* ── ANIMATIONS – Apple Spring Curves ── */
+/* ── ANIMATIONS ── */
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes sheet-in{
   from{transform:translateY(100%);opacity:0.6}
@@ -477,18 +567,30 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
   display:inline-block;flex-shrink:0;
 }
 
-/* ── LOGIN PAGE – Apple Premium ── */
+/* ── LOGIN PAGE – Liquid Glass ── */
 .login-logo{
   font-size:48px;margin-bottom:8px;
   filter:drop-shadow(0 4px 12px rgba(0,0,0,0.15));
 }
 .login-card{
-  background:var(--grouped-bg2);
+  background:linear-gradient(162deg,rgba(255,255,255,0.88) 0%,rgba(255,255,255,0.62) 100%);
+  -webkit-backdrop-filter:saturate(180%) blur(32px);
+  backdrop-filter:saturate(180%) blur(32px);
   border-radius:var(--radius-xl);
+  border:var(--glass-border);
   padding:36px 32px;
-  box-shadow:var(--shadow-xl);
-  border:0.5px solid var(--sep);
+  box-shadow:var(--glass-shine),var(--shadow-xl);
   width:100%;max-width:380px;
+}
+@media(prefers-color-scheme:dark){
+  .login-card{
+    background:linear-gradient(162deg,rgba(36,42,72,0.90) 0%,rgba(16,20,44,0.82) 100%);
+  }
+}
+
+/* ── WERKSTATT LOGO ── */
+.werkstatt-logo{
+  max-height:60px;width:auto;object-fit:contain;display:block;
 }
 
 @media(max-width:640px){
@@ -544,7 +646,7 @@ const daysSince=d=>d?Math.floor((Date.now()-new Date(d).getTime())/86400000):0;
 const hoursSince=d=>d?Math.floor((Date.now()-new Date(d).getTime())/3600000):0;
 const isOverdue=o=>{
   if(o.status==="offerte_versendet"&&hoursSince(o.statusChangedAt)>48)return true;
-  if(o.status==="zahlung_versendet"){const f=o.zahlungsFrist?parseInt(o.zahlungsFrist):10;if(daysSince(o.statusChangedAt)>f)return true;}
+  if(o.status==="zahlung_versendet"){const f=o.zahlungsFrist?parseInt(o.zahlungsFrist):30;if(daysSince(o.statusChangedAt)>f)return true;}
   return false;
 };
 const needsAttention=o=>o.status!=="abgeschlossen"&&isOverdue(o);
@@ -754,12 +856,12 @@ function OfferteForm({customers,onSave,onCancel}){
   const[cid,setCid]=useState("");
   const[titel,setTitel]=useState("");
   const[tab,setTab]=useState("arbeit");
-  const[arbeit,setArbeit]=useState([{beschreibung:"",ze:"",stundenansatz:"",preis:"",zeKI:false,zeLoading:false,zeHint:""}]);
+  const[arbeit,setArbeit]=useState([{beschreibung:"",ze:"",stundenansatz:"80",preis:"",zeKI:false,zeLoading:false,zeHint:""}]);
   const[material,setMaterial]=useState([{beschreibung:"",menge:"1",stueckpreis:"",preis:""}]);
   const[notizen,setNotizen]=useState("");
   const[gueltigBis,setGueltigBis]=useState("");
   const selectedCustomer=customers.find(c=>c.id===cid)||null;
-  const addA=()=>setArbeit(a=>[...a,{beschreibung:"",ze:"",stundenansatz:"",preis:"",zeKI:false,zeLoading:false,zeHint:""}]);
+  const addA=()=>setArbeit(a=>[...a,{beschreibung:"",ze:"",stundenansatz:"80",preis:"",zeKI:false,zeLoading:false,zeHint:""}]);
   const remA=i=>setArbeit(a=>a.filter((_,j)=>j!==i));
   const updA=(i,k,v)=>setArbeit(a=>{
     const n=[...a];n[i]={...n[i],[k]:v};
@@ -869,7 +971,7 @@ function OfferteForm({customers,onSave,onCancel}){
               ,React.createElement('div',null
                 ,React.createElement('div',{style:{fontSize:12,color:"var(--label2)",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.04em"}},"CHF/h")
                 ,React.createElement('input',{type:"number",value:pos.stundenansatz,onChange:e=>updA(i,"stundenansatz",e.target.value),
-                  placeholder:"120",
+                  placeholder:"80",
                   style:{width:"100%",background:"var(--fill3)",border:"none",borderRadius:9,padding:"8px",fontSize:15,color:"var(--label)",outline:"none"}})
               )
               ,React.createElement('div',null
@@ -984,13 +1086,115 @@ function exportOfferteExcel(offerte,customer){
   set(3,r,"Offertentotal CHF",{font:fW(11),fill:fillB,border:bAll,alignment:al("right","center")});
   ws[addr(3,r)]={v:parseFloat(offerte.totalBetrag||0),t:"n",f:`SUM(D${firstDataRow}:D${lastDataRow})`,s:{font:fW(11),fill:fillB,border:bAll,alignment:al("right","center")}};
   num(4,r,parseFloat(offerte.totalBetrag||0),{font:fW(11),fill:fillB,border:bAll,alignment:al("center","center")});r++;
-  set(0,r,"",{});r++;["Fabio Stucki","Polenstrasse 245","5112 Thalheim AG"].forEach(l=>{set(0,r,l,{font:fN(9),alignment:al()});r++;});
+  set(0,r,"",{});r++;
+  set(0,r,"Zahlungsziel: 30 Tage netto",{font:fB(9,COL_BLUE),alignment:al()});r++;
+  ["Fabio Stucki","Polenstrasse 245","5112 Thalheim AG"].forEach(l=>{set(0,r,l,{font:fN(9),alignment:al()});r++;});
   if(offerte.notizen){set(0,r,"Notizen:",{font:fB(9,COL_BLUE),alignment:al()});r++;set(0,r,offerte.notizen,{font:fN(9),alignment:{...al(),wrapText:true}});r++;}
   ws["!merges"]=[{s:{r:0,c:0},e:{r:0,c:2}},{s:{r:3,c:0},e:{r:3,c:4}},{s:{r:headerRow,c:0},e:{r:headerRow,c:0}}];
   ws["!cols"]=[{wch:38},{wch:10},{wch:14},{wch:16},{wch:10}];
   ws["!ref"]=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:r+1,c:4}});
   XLSX.utils.book_append_sheet(wb,ws,"Offerte");
   XLSX.writeFile(wb,"Offerte_"+offerte.offertNumber+"_"+(customer?customer.nachname:"Kunde")+".xlsx");
+}
+
+/* ── AUFTRAG EXCEL EXPORT ── */
+function exportOrderExcel(order,customer){
+  const wb=XLSX.utils.book_new();const ws={};
+  const addr=(c,r)=>XLSX.utils.encode_cell({c,r});
+  const set=(c,r,v,s)=>{ws[addr(c,r)]={v,t:typeof v==="number"?"n":"s",s:s||{}};};
+  const num=(c,r,v,s)=>{ws[addr(c,r)]={v:isNaN(v)?0:v,t:"n",s:s||{}};};
+  const COL_DARK="1E1E2E",COL_BLUE="007AFF",COL_WHITE="FFFFFF",COL_LINE="BDC3C7",COL_GREY="EAEDED";
+  const fB=(sz,c)=>({bold:true,sz:sz||10,color:{rgb:c||COL_DARK},name:"Arial"});
+  const fN=(sz,c)=>({sz:sz||10,color:{rgb:c||COL_DARK},name:"Arial"});
+  const fW=(sz)=>({bold:true,sz:sz||10,color:{rgb:COL_WHITE},name:"Arial"});
+  const fillD={patternType:"solid",fgColor:{rgb:COL_DARK}};
+  const fillB={patternType:"solid",fgColor:{rgb:COL_BLUE}};
+  const fillG={patternType:"solid",fgColor:{rgb:COL_GREY}};
+  const bThin={style:"thin",color:{rgb:COL_LINE}};
+  const bAll={top:bThin,bottom:bThin,left:bThin,right:bThin};
+  const al=(h,v)=>({horizontal:h||"left",vertical:v||"center",wrapText:true});
+  const datum=new Date(order.createdAt||Date.now()).toLocaleDateString("de-CH");
+  const fahrzeug=customer?[customer.marke,customer.modell].filter(Boolean).join(" ")||"–":"–";
+  let r=0;
+  // Header
+  set(0,r,"Werkstattauftrag",{font:fW(14),fill:fillD,alignment:al("left","center")});
+  set(1,r,"",{fill:fillD});set(2,r,"",{fill:fillD});
+  set(3,r,"079 850 18 63",{font:fN(10,COL_WHITE),fill:fillD,alignment:al("right","center")});
+  set(4,r,"",{fill:fillD});r++;
+  set(0,r,"Auftragsnummer:",{font:fB(10,COL_BLUE),alignment:al()});
+  set(1,r,String(order.orderNumber||"–"),{font:fB(10),alignment:al()});
+  set(3,r,"Datum:",{font:fB(10),alignment:al("right")});
+  set(4,r,datum,{font:fN(10),alignment:al()});r++;
+  set(0,r,"",{});r++;
+  // Kundendaten
+  set(0,r,"Kundendaten",{font:fW(10),fill:fillB,alignment:al()});[1,2,3,4].forEach(c=>set(c,r,"",{fill:fillB}));r++;
+  [[" Kundenname:",customer?`${customer.vorname} ${customer.nachname}`:"–","Telefon:",customer?customer.telefon||"–":"–"],
+   ["E-Mail:",customer?customer.email||"–":"–","",""]].forEach(([la,va,lb,vb])=>{
+    set(0,r,la,{font:fB(9),fill:fillG,border:bAll,alignment:al()});
+    set(1,r,va,{font:fN(9),border:bAll,alignment:al()});
+    set(2,r,"",{border:bAll});
+    set(3,r,lb,{font:fB(9),fill:fillG,border:bAll,alignment:al()});
+    set(4,r,vb,{font:fN(9),border:bAll,alignment:al()});r++;
+  });
+  set(0,r,"",{});r++;
+  // Fahrzeugdaten
+  set(0,r,"Fahrzeugdaten",{font:fW(10),fill:fillB,alignment:al()});[1,2,3,4].forEach(c=>set(c,r,"",{fill:fillB}));r++;
+  [["Kennzeichen:",customer?customer.kennzeichen||"–":"–","Marke / Modell:",fahrzeug],
+   ["KM-Stand:",customer?String(customer.km||"–"):"–","Stundenansatz:","CHF 80.00/h"]].forEach(([la,va,lb,vb])=>{
+    set(0,r,la,{font:fB(9),fill:fillG,border:bAll,alignment:al()});
+    set(1,r,va,{font:fN(9),border:bAll,alignment:al()});
+    set(2,r,"",{border:bAll});
+    set(3,r,lb,{font:fB(9),fill:fillG,border:bAll,alignment:al()});
+    set(4,r,vb,{font:fN(9),border:bAll,alignment:al()});r++;
+  });
+  set(0,r,"",{});r++;
+  // Beanstandungen
+  if((order.beanstandungen||[]).length){
+    set(0,r,"Beanstandungen",{font:fW(10),fill:fillB,alignment:al()});[1,2,3,4].forEach(c=>set(c,r,"",{fill:fillB}));r++;
+    (order.beanstandungen||[]).forEach((b,i)=>{
+      const bg=i%2===0?"FFFFFF":"F8FAFF";
+      const cs={font:fN(9),fill:{patternType:"solid",fgColor:{rgb:bg}},border:bAll,alignment:al()};
+      set(0,r,`${i+1}.`,{...cs,alignment:al("center")});
+      set(1,r,b,cs);[2,3,4].forEach(c=>set(c,r,"",{...cs}));r++;
+    });
+    set(0,r,"",{});r++;
+  }
+  // Checkliste
+  if((order.offertItems||[]).length){
+    set(0,r,"Checkliste / Ausgeführte Arbeiten",{font:fW(10),fill:fillB,alignment:al()});[1,2,3,4].forEach(c=>set(c,r,"",{fill:fillB}));r++;
+    (order.offertItems||[]).forEach((item,i)=>{
+      const bg=i%2===0?"FFFFFF":"F8FAFF";
+      const cs={font:fN(9),fill:{patternType:"solid",fgColor:{rgb:bg}},border:bAll,alignment:al()};
+      set(0,r,item.checked?"✓":"○",{...cs,alignment:al("center")});
+      set(1,r,item.text||"",cs);[2,3,4].forEach(c=>set(c,r,"",{...cs}));r++;
+    });
+    set(0,r,"",{});r++;
+  }
+  // Beträge
+  set(0,r,"Betragsübersicht",{font:fW(10),fill:fillB,alignment:al()});[1,2,3,4].forEach(c=>set(c,r,"",{fill:fillB}));r++;
+  if(order.offertBetrag){
+    set(0,r,"Offertbetrag:",{font:fB(9),fill:fillG,border:bAll,alignment:al()});
+    set(1,r,"",{border:bAll});set(2,r,"",{border:bAll});
+    num(3,r,parseFloat(order.offertBetrag||0),{font:fN(9),border:bAll,alignment:al("right")});
+    set(4,r,"CHF",{font:fN(9),border:bAll,alignment:al("center")});r++;
+  }
+  if(order.rechnungsBetrag){
+    set(0,r,"Rechnungsbetrag:",{font:fB(9),fill:fillG,border:bAll,alignment:al()});
+    set(1,r,"",{border:bAll});set(2,r,"",{border:bAll});
+    num(3,r,parseFloat(order.rechnungsBetrag||0),{font:fW(10),fill:{patternType:"solid",fgColor:{rgb:COL_BLUE}},border:bAll,alignment:al("right")});
+    set(4,r,"CHF",{font:fW(10),fill:{patternType:"solid",fgColor:{rgb:COL_BLUE}},border:bAll,alignment:al("center")});r++;
+  }
+  set(0,r,"Zahlungsziel:",{font:fB(9),fill:fillG,border:bAll,alignment:al()});
+  set(1,r,"30 Tage netto",{font:fB(9,COL_BLUE),border:bAll,alignment:al()});
+  [2,3,4].forEach(c=>set(c,r,"",{border:bAll}));r++;
+  set(0,r,"",{});r++;
+  if(order.notizen){set(0,r,"Notizen:",{font:fB(9,COL_BLUE),alignment:al()});r++;set(0,r,order.notizen,{font:fN(9),alignment:{...al(),wrapText:true}});r++;set(0,r,"",{});r++;}
+  ["Fabio Stucki","Polenstrasse 245","5112 Thalheim AG"].forEach(l=>{set(0,r,l,{font:fN(9),alignment:al()});r++;});
+  ws["!merges"]=[{s:{r:0,c:0},e:{r:0,c:2}}];
+  ws["!cols"]=[{wch:28},{wch:28},{wch:14},{wch:16},{wch:10}];
+  ws["!ref"]=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:r+1,c:4}});
+  XLSX.utils.book_append_sheet(wb,ws,"Auftrag");
+  XLSX.writeFile(wb,"Auftrag_"+order.orderNumber+"_"+(customer?customer.nachname:"Kunde")+".xlsx");
 }
 
 /* ── OFFERTE DETAIL ── */
@@ -1029,7 +1233,11 @@ function OfferteDetail({offerte,customer,onClose,onUpdate,onDelete}){
         )
       )
     )
-    ,offerte.gueltigBis&&React.createElement('div',{className:"sf-subhead",style:{color:isExpired?"var(--red)":"var(--label2)",marginBottom:16}},`Gültig bis: ${new Date(offerte.gueltigBis).toLocaleDateString("de-CH")}${isExpired?" (abgelaufen)":""}`)
+    ,offerte.gueltigBis&&React.createElement('div',{className:"sf-subhead",style:{color:isExpired?"var(--red)":"var(--label2)",marginBottom:12}},`Gültig bis: ${new Date(offerte.gueltigBis).toLocaleDateString("de-CH")}${isExpired?" (abgelaufen)":""}`)
+    ,React.createElement('div',{style:{background:"rgba(52,199,89,0.09)",borderRadius:10,padding:"10px 14px",marginBottom:16,display:"flex",alignItems:"center",gap:8,border:"0.5px solid rgba(52,199,89,0.22)"}}
+      ,React.createElement('span',{style:{fontSize:16,color:"var(--green)"}},"✓")
+      ,React.createElement('span',{style:{fontSize:15,fontWeight:600,color:"var(--green)"}},"Zahlungsziel: 30 Tage netto")
+    )
     /* Positionen */
     ,React.createElement('p',{className:"section-header"},"Positionen")
     ,React.createElement('div',{className:"inset-grouped-list",style:{marginBottom:16}}
@@ -1121,7 +1329,7 @@ function OrderDetail({order,customer,onClose,onUpdate,onDelete}){
   const[newItem,setNewItem]=useState("");
   const[offB,setOffB]=useState(order.offertBetrag||"");
   const[recB,setRecB]=useState(order.rechnungsBetrag||"");
-  const[zahlungsFrist,setZahlungsFrist]=useState(order.zahlungsFrist||"");
+  const[zahlungsFrist,setZahlungsFrist]=useState(order.zahlungsFrist||"30");
   const[cv,setCv]=useState(_optionalChain([customer,'optionalAccess',x=>x.vorname])||"");
   const[cn,setCn]=useState(_optionalChain([customer,'optionalAccess',x=>x.nachname])||"");
   const[ct,setCt]=useState(_optionalChain([customer,'optionalAccess',x=>x.telefon])||"");
@@ -1283,7 +1491,7 @@ function OrderDetail({order,customer,onClose,onUpdate,onDelete}){
       ,React.createElement('p',{className:"section-header"},"Zahlungsfrist")
       ,React.createElement('div',{className:"form-section",style:{marginBottom:16}}
         ,React.createElement('div',{style:{padding:"11px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}
-          ,React.createElement('span',{style:{fontSize:16,color:"var(--label2)"}},"Tage (Standard: 10)")
+          ,React.createElement('span',{style:{fontSize:16,color:"var(--label2)"}},"Zahlungsziel (Tage, Standard: 30)")
           ,React.createElement('input',{type:"number",value:zahlungsFrist,onChange:e=>setZahlungsFrist(e.target.value),placeholder:"10",min:1,
             style:{background:"none",border:"none",outline:"none",fontSize:16,color:"var(--label)",textAlign:"right",width:60}})
         )
@@ -1298,6 +1506,11 @@ function OrderDetail({order,customer,onClose,onUpdate,onDelete}){
         )
       );
     })()
+    /* Zahlungsziel */
+    ,!edit&&React.createElement('div',{style:{background:"rgba(52,199,89,0.09)",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8,border:"0.5px solid rgba(52,199,89,0.22)"}}
+      ,React.createElement('span',{style:{fontSize:15,color:"var(--green)"}},"✓")
+      ,React.createElement('span',{style:{fontSize:15,fontWeight:600,color:"var(--green)"}},"Zahlungsziel: 30 Tage netto")
+    )
     /* Notizen */
     ,edit?React.createElement(React.Fragment,null
       ,React.createElement('p',{className:"section-header"},"Notizen")
@@ -1434,6 +1647,7 @@ function App(){
     const num=orderNum+1;
     const newO={id:`o_${Date.now()}`,orderNumber:num,status:"aufnahme",statusChangedAt:new Date().toISOString(),createdAt:new Date().toISOString(),...data};
     await syncOk(async()=>{await db.upsert("orders",{id:newO.id,data:newO},token);await db.setCounter(num,token);});
+    try{exportOrderExcel(newO,customers.find(c=>c.id===newO.customerId));}catch(e){console.warn("Excel-Export Fehler:",e);}
     setOrders(p=>[...p,newO]);setOrderNum(num);setShowNO(false);setNewOCid(null);setAfterSave(null);
   }
   async function updateOrder(upd,cp){
@@ -1445,6 +1659,7 @@ function App(){
     const num=offertNum+1;
     const newOff={id:`off_${Date.now()}`,offertNumber:num,status:"entwurf",createdAt:new Date().toISOString(),...data};
     await syncOk(()=>db.upsert("offerten",{id:newOff.id,data:newOff},token));
+    try{exportOfferteExcel(newOff,customers.find(c=>c.id===newOff.customerId));}catch(e){console.warn("Excel-Export Fehler:",e);}
     setOfferten(p=>[...p,newOff]);setOffertNum(num);setShowNOff(false);
   }
   async function updateOfferte(upd){
@@ -1483,12 +1698,13 @@ function App(){
     /* ── NAVIGATION BAR ── */
     ,React.createElement('div',{className:"nav-bar"}
       ,React.createElement('div',{className:"nav-bar-inner"}
-        ,React.createElement('div',{style:{display:"flex",alignItems:"center",gap:8}}
-          ,React.createElement('svg',{width:22,height:22,viewBox:"0 0 22 22",fill:"none"}
-            ,React.createElement('rect',{width:22,height:22,rx:5,fill:"var(--blue)"})
-            ,React.createElement('path',{d:"M16 8a5 5 0 01-6.9 6.9L5 19a1.7 1.7 0 002.4 2.4l4.1-4.1A5 5 0 0018 11l-3 3 2 2 3-3z",fill:"white",transform:"translate(-1,-2)scale(0.95)"})
-          )
-          ,React.createElement('span',{style:{fontWeight:600,fontSize:17,letterSpacing:"-0.41px"}},"GarageOS")
+        ,React.createElement('div',{style:{display:"flex",alignItems:"center",gap:10}}
+          ,React.createElement('img',{
+            src:"https://xpggpkmqwescbcrnnpod.supabase.co/storage/v1/object/public/logo/Gemini_Generated_Image_.png",
+            alt:"Werkstatt",
+            className:"werkstatt-logo",
+            style:{maxHeight:"48px",width:"auto",objectFit:"contain",filter:"drop-shadow(0 2px 8px rgba(0,0,0,0.18))"}
+          })
         )
         ,React.createElement('div',{style:{display:"flex",alignItems:"center",gap:12}}
           ,syncStatus==="saving"&&React.createElement('span',{style:{fontSize:13,color:"var(--label3)"}},"Sync…")
