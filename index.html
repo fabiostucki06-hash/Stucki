@@ -42,16 +42,16 @@
   --sep:       rgba(0,0,0,0.08);
   --sep-opaque:#D2D2D7;
 
-  /* Liquid Glass tokens */
-  --glass-light: linear-gradient(180deg,rgba(255,255,255,0.88) 0%,rgba(255,255,255,0.62) 100%);
-  --glass-border: 0.5px solid rgba(255,255,255,0.72);
-  --glass-shine:  inset 0 2px 0 rgba(255,255,255,0.90), inset 0 -1px 0 rgba(0,0,0,0.06);
-  --glass-blur:   saturate(200%) blur(26px);
+  /* Liquid Glass tokens – Apple Aqua */
+  --glass-light: rgba(255,255,255,0.70);
+  --glass-border: 1px solid rgba(255,255,255,0.50);
+  --glass-shine:  inset 0 1px 0 rgba(255,255,255,0.60), inset 0 -1px 2px rgba(0,0,0,0.08);
+  --glass-blur:   blur(12px);
 
-  --shadow-sm:  0 2px 8px rgba(0,0,0,0.07),0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md:  0 4px 20px rgba(0,0,0,0.10),0 1px 6px rgba(0,0,0,0.05);
-  --shadow-lg:  0 8px 36px rgba(0,0,0,0.13),0 2px 10px rgba(0,0,0,0.07);
-  --shadow-xl:  0 20px 60px rgba(0,0,0,0.16),0 4px 18px rgba(0,0,0,0.09);
+  --shadow-sm:  0 8px 32px 0 rgba(0,0,0,0.10),0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md:  0 8px 32px 0 rgba(0,0,0,0.14),0 2px 8px rgba(0,0,0,0.07);
+  --shadow-lg:  0 12px 40px 0 rgba(0,0,0,0.18),0 3px 12px rgba(0,0,0,0.09);
+  --shadow-xl:  0 24px 64px 0 rgba(0,0,0,0.22),0 6px 20px rgba(0,0,0,0.12);
 
   --sidebar-width: 260px;
   --radius-sm: 10px;
@@ -91,10 +91,10 @@
     --sep:       rgba(255,255,255,0.10);
     --sep-opaque:#38383A;
 
-    --glass-light: linear-gradient(180deg,rgba(48,54,82,0.78) 0%,rgba(24,28,50,0.64) 100%);
-    --glass-border: 0.5px solid rgba(255,255,255,0.13);
-    --glass-shine:  inset 0 1.5px 0 rgba(255,255,255,0.13);
-    --glass-blur:   saturate(200%) blur(28px);
+    --glass-light: rgba(32,38,62,0.78);
+    --glass-border: 1px solid rgba(255,255,255,0.14);
+    --glass-shine:  inset 0 1px 0 rgba(255,255,255,0.13), inset 0 -1px 2px rgba(0,0,0,0.30);
+    --glass-blur:   blur(12px);
 
     --shadow-sm:  0 2px 8px rgba(0,0,0,0.40),0 1px 2px rgba(0,0,0,0.28);
     --shadow-md:  0 4px 20px rgba(0,0,0,0.55),0 1px 6px rgba(0,0,0,0.30);
@@ -178,18 +178,18 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 /* ── NAVIGATION BAR – Liquid Glass ── */
 .nav-bar {
   position:sticky;top:0;z-index:200;
-  background:rgba(220,232,250,0.76);
-  -webkit-backdrop-filter:saturate(200%) blur(30px);
-  backdrop-filter:saturate(200%) blur(30px);
-  border-bottom:var(--glass-border);
-  box-shadow:var(--glass-shine),0 1px 0 rgba(0,0,0,0.06);
+  background:rgba(220,232,250,0.78);
+  -webkit-backdrop-filter:blur(12px);
+  backdrop-filter:blur(12px);
+  border-bottom:1px solid rgba(255,255,255,0.50);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.60),0 8px 32px 0 rgba(0,0,0,0.08);
   padding-top:env(safe-area-inset-top);
 }
 @media (prefers-color-scheme:dark){
   .nav-bar{
-    background:rgba(8,10,22,0.82);
-    border-bottom:0.5px solid rgba(255,255,255,0.09);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,0.08),0 1px 0 rgba(0,0,0,0.35);
+    background:rgba(8,10,22,0.84);
+    border-bottom:1px solid rgba(255,255,255,0.10);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.09),0 8px 32px 0 rgba(0,0,0,0.40);
   }
 }
 .nav-bar-inner{
@@ -206,18 +206,18 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .tab-bar{
   position:fixed;bottom:0;left:0;right:0;z-index:200;
   background:rgba(220,232,250,0.84);
-  -webkit-backdrop-filter:saturate(200%) blur(30px);
-  backdrop-filter:saturate(200%) blur(30px);
-  border-top:var(--glass-border);
-  box-shadow:var(--glass-shine),0 -1px 0 rgba(0,0,0,0.06);
+  -webkit-backdrop-filter:blur(12px);
+  backdrop-filter:blur(12px);
+  border-top:1px solid rgba(255,255,255,0.50);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.60),0 -8px 32px 0 rgba(0,0,0,0.08);
   padding-bottom:env(safe-area-inset-bottom);
   display:flex;
 }
 @media (prefers-color-scheme:dark){
   .tab-bar{
-    background:rgba(8,10,22,0.88);
-    border-top:0.5px solid rgba(255,255,255,0.09);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,0.08),0 -1px 0 rgba(0,0,0,0.40);
+    background:rgba(8,10,22,0.90);
+    border-top:1px solid rgba(255,255,255,0.10);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.09),0 -8px 32px 0 rgba(0,0,0,0.44);
   }
 }
 .tab-item{
@@ -231,38 +231,40 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 
 .sf-symbol{display:inline-flex;align-items:center;justify-content:center}
 
-/* ── BUTTONS – Liquid Glass ── */
+/* ── BUTTONS – Apple Aqua 3D ── */
 .btn-system{
-  background:linear-gradient(180deg,#52BCFF 0%,#1A90FF 28%,#007AFF 60%,#005AC9 100%);
-  color:#fff;border:0.5px solid rgba(255,255,255,0.28);
+  background:linear-gradient(to bottom,#54a4ff 0%,#007aff 50%,#0056b3 100%);
+  color:#fff;border:1px solid #004fb0;
   border-radius:980px;padding:0 24px;height:52px;
   font-size:17px;font-weight:600;letter-spacing:-0.4px;
   cursor:pointer;width:100%;
   display:flex;align-items:center;justify-content:center;gap:8px;
   transition:all 0.18s cubic-bezier(0.25,0.46,0.45,0.94);
-  box-shadow:inset 0 2px 0 rgba(255,255,255,0.62),
-             inset 0 -2px 0 rgba(0,0,0,0.14),
-             0 6px 22px rgba(0,122,255,0.50),
-             0 2px 6px rgba(0,122,255,0.30);
+  box-shadow:inset 0 1px 0px rgba(255,255,255,0.6),
+             inset 0 -1px 2px rgba(0,0,0,0.2),
+             0 4px 6px rgba(0,0,0,0.15);
+  text-shadow:0 -1px 0 rgba(0,0,0,0.3);
 }
 .btn-system:hover{
-  background:linear-gradient(180deg,#68C6FF 0%,#2E9EFF 28%,#1A8CFF 60%,#006FE0 100%);
-  box-shadow:inset 0 2px 0 rgba(255,255,255,0.68),
-             inset 0 -2px 0 rgba(0,0,0,0.16),
-             0 8px 28px rgba(0,122,255,0.58),
-             0 3px 10px rgba(0,122,255,0.34);
+  background:linear-gradient(to bottom,#68b8ff 0%,#1a90ff 50%,#0066cc 100%);
+  box-shadow:inset 0 1px 0px rgba(255,255,255,0.7),
+             inset 0 -1px 2px rgba(0,0,0,0.22),
+             0 6px 12px rgba(0,0,0,0.18);
   transform:translateY(-1px);
 }
-.btn-system:active{opacity:0.86;transform:scale(0.98);box-shadow:inset 0 1px 0 rgba(255,255,255,0.28),0 2px 6px rgba(0,122,255,0.28)}
+.btn-system:active{opacity:0.88;transform:scale(0.98);box-shadow:inset 0 1px 2px rgba(0,0,0,0.25),0 1px 3px rgba(0,0,0,0.10)}
 .btn-system:disabled{opacity:0.32;box-shadow:none;transform:none}
 .btn-system.btn-secondary{
   background:var(--glass-light);
   color:var(--blue);
   border:var(--glass-border);
   box-shadow:var(--glass-shine),var(--shadow-sm);
+  text-shadow:none;
+  -webkit-backdrop-filter:var(--glass-blur);
+  backdrop-filter:var(--glass-blur);
 }
 .btn-system.btn-secondary:hover{
-  background:linear-gradient(180deg,rgba(255,255,255,0.92) 0%,rgba(255,255,255,0.68) 100%);
+  background:rgba(255,255,255,0.88);
   box-shadow:var(--glass-shine),var(--shadow-md);
   transform:none;
 }
@@ -271,14 +273,18 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
   color:var(--red);
   border:var(--glass-border);
   box-shadow:var(--glass-shine),var(--shadow-sm);
+  text-shadow:none;
+  -webkit-backdrop-filter:var(--glass-blur);
+  backdrop-filter:var(--glass-blur);
 }
-.btn-system.btn-destructive:hover{background:linear-gradient(180deg,rgba(255,59,48,0.12) 0%,rgba(255,59,48,0.06) 100%);transform:none}
+.btn-system.btn-destructive:hover{background:rgba(255,59,48,0.10);transform:none}
 .btn-system.btn-green{
-  background:linear-gradient(180deg,#4CD96E 0%,#34C759 55%,#22A045 100%);
-  border:0.5px solid rgba(255,255,255,0.22);
-  box-shadow:inset 0 1.5px 0 rgba(255,255,255,0.44),
-             0 4px 16px rgba(52,199,89,0.42),
-             0 1px 4px rgba(52,199,89,0.28);
+  background:linear-gradient(to bottom,#4cd96e 0%,#34c759 50%,#22a045 100%);
+  border:1px solid #1a8035;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.55),
+             inset 0 -1px 2px rgba(0,0,0,0.18),
+             0 4px 6px rgba(0,0,0,0.15);
+  text-shadow:0 -1px 0 rgba(0,0,0,0.25);
 }
 .btn-tinted{
   background:linear-gradient(180deg,rgba(0,122,255,0.16) 0%,rgba(0,122,255,0.08) 100%);
@@ -450,18 +456,18 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 /* ── FLOATING CONTEXT MENU – Liquid Glass ── */
 .context-menu{
   position:fixed;
-  background:rgba(228,236,252,0.88);
-  -webkit-backdrop-filter:saturate(200%) blur(42px);
-  backdrop-filter:saturate(200%) blur(42px);
+  background:rgba(228,236,252,0.90);
+  -webkit-backdrop-filter:blur(12px);
+  backdrop-filter:blur(12px);
   border-radius:var(--radius-lg);
-  border:var(--glass-border);
+  border:1px solid rgba(255,255,255,0.50);
   overflow:hidden;
   z-index:500;
   min-width:240px;
-  box-shadow:var(--glass-shine),var(--shadow-xl);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.60),0 24px 64px 0 rgba(0,0,0,0.20),0 6px 20px rgba(0,0,0,0.12);
 }
 @media(prefers-color-scheme:dark){
-  .context-menu{background:rgba(24,28,52,0.92);border-color:rgba(255,255,255,0.12);}
+  .context-menu{background:rgba(24,28,52,0.94);border-color:rgba(255,255,255,0.13);}
 }
 .context-item{
   display:flex;align-items:center;justify-content:space-between;
@@ -486,23 +492,23 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .sheet-container{
   position:fixed;left:0;right:0;bottom:0;z-index:401;
   background:rgba(228,236,252,0.90);
-  -webkit-backdrop-filter:saturate(200%) blur(42px);
-  backdrop-filter:saturate(200%) blur(42px);
+  -webkit-backdrop-filter:blur(12px);
+  backdrop-filter:blur(12px);
   border-radius:20px 20px 0 0;
-  border-top:var(--glass-border);
-  border-left:0.5px solid rgba(255,255,255,0.40);
-  border-right:0.5px solid rgba(255,255,255,0.40);
+  border-top:1px solid rgba(255,255,255,0.50);
+  border-left:1px solid rgba(255,255,255,0.40);
+  border-right:1px solid rgba(255,255,255,0.40);
   max-height:96dvh;display:flex;flex-direction:column;
   padding-bottom:env(safe-area-inset-bottom);
-  box-shadow:0 -4px 40px rgba(0,0,0,0.10),inset 0 1.5px 0 rgba(255,255,255,0.72);
+  box-shadow:0 -8px 32px 0 rgba(0,0,0,0.12),inset 0 1px 0 rgba(255,255,255,0.60);
 }
 @media(prefers-color-scheme:dark){
   .sheet-container{
-    background:rgba(10,13,28,0.92);
+    background:rgba(10,13,28,0.94);
     border-top-color:rgba(255,255,255,0.12);
-    border-left-color:rgba(255,255,255,0.06);
-    border-right-color:rgba(255,255,255,0.06);
-    box-shadow:0 -4px 40px rgba(0,0,0,0.40),inset 0 1.5px 0 rgba(255,255,255,0.09);
+    border-left-color:rgba(255,255,255,0.07);
+    border-right-color:rgba(255,255,255,0.07);
+    box-shadow:0 -8px 32px 0 rgba(0,0,0,0.44),inset 0 1px 0 rgba(255,255,255,0.09);
   }
 }
 .sheet-handle{
@@ -935,9 +941,11 @@ function OfferteForm({customers,onSave,onCancel}){
     const mp=material.filter(p=>p.beschreibung.trim());
     if(!ap.length&&!mp.length)return alert("Mindestens eine Position eingeben.");
     setSaving(true);
-    await onSave({customerId:cid,titel,positionen:[...ap.map(p=>({...p,typ:"arbeit"})),...mp.map(p=>({...p,typ:"material"}))],notizen,gueltigBis,
-      totalBetrag:(totA+totM).toFixed(2),totalArbeit:totA.toFixed(2),totalMaterial:totM.toFixed(2),totalZE});
-    setSaving(false);
+    try{
+      await onSave({customerId:cid,titel,positionen:[...ap.map(p=>({...p,typ:"arbeit"})),...mp.map(p=>({...p,typ:"material"}))],notizen,gueltigBis,
+        totalBetrag:(totA+totM).toFixed(2),totalArbeit:totA.toFixed(2),totalMaterial:totM.toFixed(2),totalZE});
+    }catch(e){/* error shown by syncOk */}
+    finally{setSaving(false);}
   }
   const inp={display:"block",width:"100%",padding:"8px 0",background:"none",border:"none",outline:"none",fontSize:17,color:"var(--label)"};
   return React.createElement('div',null
@@ -1671,7 +1679,7 @@ function App(){
   async function syncOk(fn){
     setSyncStatus("saving");
     try{await fn();setSyncStatus("ok");setTimeout(()=>setSyncStatus("idle"),2200);}
-    catch(e){console.error(e);setSyncStatus("error");alert("Fehler beim Speichern!");}
+    catch(e){console.error(e);setSyncStatus("error");alert("Fehler beim Speichern: "+((e&&e.message)||"Unbekannter Fehler"));throw e;}
   }
   async function addCustomer(data){
     const id=`c_${Date.now()}`;const newC={id,...data,createdAt:new Date().toISOString()};
@@ -1697,8 +1705,10 @@ function App(){
   async function addOfferte(data){
     const num=offertNum+1;
     const newOff={id:`off_${Date.now()}`,offertNumber:num,status:"entwurf",createdAt:new Date().toISOString(),...data};
-    await syncOk(()=>db.upsert("offerten",{id:newOff.id,data:newOff},token));
-    setOfferten(p=>[...p,newOff]);setOffertNum(num);setShowNOff(false);
+    try{
+      await syncOk(()=>db.upsert("offerten",{id:newOff.id,data:newOff},token));
+      setOfferten(p=>[...p,newOff]);setOffertNum(num);setShowNOff(false);
+    }catch(e){/* syncOk already showed alert */}
   }
   async function updateOfferte(upd){
     await syncOk(()=>db.upsert("offerten",{id:upd.id,data:upd},token));
