@@ -43,10 +43,10 @@
   --sep-opaque:#D2D2D7;
 
   /* Liquid Glass tokens */
-  --glass-light: linear-gradient(180deg,rgba(255,255,255,0.84) 0%,rgba(255,255,255,0.56) 100%);
-  --glass-border: 0.5px solid rgba(255,255,255,0.62);
-  --glass-shine:  inset 0 1.5px 0 rgba(255,255,255,0.80);
-  --glass-blur:   saturate(180%) blur(22px);
+  --glass-light: linear-gradient(180deg,rgba(255,255,255,0.88) 0%,rgba(255,255,255,0.62) 100%);
+  --glass-border: 0.5px solid rgba(255,255,255,0.72);
+  --glass-shine:  inset 0 2px 0 rgba(255,255,255,0.90), inset 0 -1px 0 rgba(0,0,0,0.06);
+  --glass-blur:   saturate(200%) blur(26px);
 
   --shadow-sm:  0 2px 8px rgba(0,0,0,0.07),0 1px 2px rgba(0,0,0,0.04);
   --shadow-md:  0 4px 20px rgba(0,0,0,0.10),0 1px 6px rgba(0,0,0,0.05);
@@ -109,8 +109,9 @@ body{
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Arial,sans-serif;
   background:var(--grouped-bg);
   background-image:
-    radial-gradient(ellipse at 18% 8%,rgba(0,122,255,0.13) 0%,transparent 52%),
-    radial-gradient(ellipse at 82% 85%,rgba(88,86,214,0.10) 0%,transparent 52%);
+    radial-gradient(ellipse at 18% 8%,rgba(0,122,255,0.20) 0%,transparent 46%),
+    radial-gradient(ellipse at 82% 85%,rgba(88,86,214,0.15) 0%,transparent 46%),
+    radial-gradient(ellipse at 62% 32%,rgba(0,196,255,0.08) 0%,transparent 38%);
   min-height:100vh;min-height:100dvh;
   -webkit-font-smoothing:antialiased;
   -moz-osx-font-smoothing:grayscale;
@@ -232,22 +233,24 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 
 /* ── BUTTONS – Liquid Glass ── */
 .btn-system{
-  background:linear-gradient(180deg,#3DABFF 0%,#007AFF 55%,#0060CC 100%);
-  color:#fff;border:0.5px solid rgba(255,255,255,0.22);
+  background:linear-gradient(180deg,#52BCFF 0%,#1A90FF 28%,#007AFF 60%,#005AC9 100%);
+  color:#fff;border:0.5px solid rgba(255,255,255,0.28);
   border-radius:980px;padding:0 24px;height:52px;
   font-size:17px;font-weight:600;letter-spacing:-0.4px;
   cursor:pointer;width:100%;
   display:flex;align-items:center;justify-content:center;gap:8px;
   transition:all 0.18s cubic-bezier(0.25,0.46,0.45,0.94);
-  box-shadow:inset 0 1.5px 0 rgba(255,255,255,0.48),
-             0 4px 16px rgba(0,122,255,0.42),
-             0 1px 4px rgba(0,122,255,0.28);
+  box-shadow:inset 0 2px 0 rgba(255,255,255,0.62),
+             inset 0 -2px 0 rgba(0,0,0,0.14),
+             0 6px 22px rgba(0,122,255,0.50),
+             0 2px 6px rgba(0,122,255,0.30);
 }
 .btn-system:hover{
-  background:linear-gradient(180deg,#52BAFF 0%,#1A8CFF 55%,#0070E0 100%);
-  box-shadow:inset 0 1.5px 0 rgba(255,255,255,0.52),
-             0 6px 22px rgba(0,122,255,0.52),
-             0 2px 8px rgba(0,122,255,0.32);
+  background:linear-gradient(180deg,#68C6FF 0%,#2E9EFF 28%,#1A8CFF 60%,#006FE0 100%);
+  box-shadow:inset 0 2px 0 rgba(255,255,255,0.68),
+             inset 0 -2px 0 rgba(0,0,0,0.16),
+             0 8px 28px rgba(0,122,255,0.58),
+             0 3px 10px rgba(0,122,255,0.34);
   transform:translateY(-1px);
 }
 .btn-system:active{opacity:0.86;transform:scale(0.98);box-shadow:inset 0 1px 0 rgba(255,255,255,0.28),0 2px 6px rgba(0,122,255,0.28)}
@@ -597,6 +600,35 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
   .two-col{grid-template-columns:1fr!important}
   .login-card{border-radius:var(--radius-lg);padding:28px 24px}
 }
+
+/* ── CLOUD SYNC ICON ── */
+@keyframes cloud-sync{
+  0%,100%{transform:scale(1) translateY(0)}
+  50%{transform:scale(1.16) translateY(-2px)}
+}
+.cloud-idle{color:var(--label3);opacity:0.5;transition:color 1.4s ease,opacity 1.4s ease,transform 0.5s ease}
+.cloud-saving{color:var(--orange)!important;opacity:1!important;animation:cloud-sync 0.85s ease-in-out infinite;transition:none!important}
+.cloud-ok{color:var(--green)!important;opacity:1!important;transform:scale(1.22)!important;transition:none!important}
+.cloud-error{color:var(--red)!important;opacity:1!important}
+
+/* ── EXCEL ROW BUTTON ── */
+.excel-btn{
+  background:rgba(0,160,56,0.11);
+  border:0.5px solid rgba(0,160,56,0.24);
+  color:#007A2F;
+  border-radius:8px;width:34px;height:34px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;flex-shrink:0;
+  font-size:9.5px;font-weight:800;letter-spacing:0.03em;
+  transition:background 0.15s,transform 0.1s;
+  font-family:inherit;
+}
+.excel-btn:hover{background:rgba(0,160,56,0.20);transform:scale(1.06)}
+.excel-btn:active{opacity:0.65;transform:scale(0.96)}
+@media(prefers-color-scheme:dark){
+  .excel-btn{background:rgba(52,199,89,0.13);color:#30D158;border-color:rgba(52,199,89,0.25)}
+  .excel-btn:hover{background:rgba(52,199,89,0.22)}
+}
 </style>
 </head>
 <body>
@@ -683,6 +715,10 @@ const SFXmark=()=>React.createElement('svg',{width:12,height:12,viewBox:"0 0 12 
 );
 const SFCheckmark=()=>React.createElement('svg',{width:14,height:14,viewBox:"0 0 14 14",fill:"none"}
   ,React.createElement('path',{d:"M2 7l4 4 6-7",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"})
+);
+const SFCloud=()=>React.createElement('svg',{width:24,height:20,viewBox:"0 0 26 22",fill:"none"}
+  ,React.createElement('path',{d:"M7.5 18.5a6.5 6.5 0 01-.6-12.96A8.5 8.5 0 0120.5 10a5.5 5.5 0 010 8.5H7.5z",stroke:"currentColor",strokeWidth:1.7,strokeLinejoin:"round"})
+  ,React.createElement('path',{d:"M13 21v-7M11 16.5l2-2 2 2",stroke:"currentColor",strokeWidth:1.7,strokeLinecap:"round",strokeLinejoin:"round"})
 );
 
 /* ── SPINNER ── */
@@ -860,6 +896,7 @@ function OfferteForm({customers,onSave,onCancel}){
   const[material,setMaterial]=useState([{beschreibung:"",menge:"1",stueckpreis:"",preis:""}]);
   const[notizen,setNotizen]=useState("");
   const[gueltigBis,setGueltigBis]=useState("");
+  const[saving,setSaving]=useState(false);
   const selectedCustomer=customers.find(c=>c.id===cid)||null;
   const addA=()=>setArbeit(a=>[...a,{beschreibung:"",ze:"",stundenansatz:"80",preis:"",zeKI:false,zeLoading:false,zeHint:""}]);
   const remA=i=>setArbeit(a=>a.filter((_,j)=>j!==i));
@@ -892,13 +929,15 @@ function OfferteForm({customers,onSave,onCancel}){
   const totA=arbeit.reduce((s,p)=>s+(parseFloat(p.preis)||0),0);
   const totM=material.reduce((s,p)=>s+(parseFloat(p.preis)||0),0);
   const totZE=arbeit.reduce((s,p)=>s+(parseFloat(p.ze)||0),0);
-  function submit(){
+  async function submit(){
     if(!cid)return alert("Bitte Kunden wählen.");
     const ap=arbeit.filter(p=>p.beschreibung.trim());
     const mp=material.filter(p=>p.beschreibung.trim());
     if(!ap.length&&!mp.length)return alert("Mindestens eine Position eingeben.");
-    onSave({customerId:cid,titel,positionen:[...ap.map(p=>({...p,typ:"arbeit"})),...mp.map(p=>({...p,typ:"material"}))],notizen,gueltigBis,
+    setSaving(true);
+    await onSave({customerId:cid,titel,positionen:[...ap.map(p=>({...p,typ:"arbeit"})),...mp.map(p=>({...p,typ:"material"}))],notizen,gueltigBis,
       totalBetrag:(totA+totM).toFixed(2),totalArbeit:totA.toFixed(2),totalMaterial:totM.toFixed(2),totalZE});
+    setSaving(false);
   }
   const inp={display:"block",width:"100%",padding:"8px 0",background:"none",border:"none",outline:"none",fontSize:17,color:"var(--label)"};
   return React.createElement('div',null
@@ -1026,8 +1065,8 @@ function OfferteForm({customers,onSave,onCancel}){
       ,React.createElement('textarea',{value:notizen,onChange:e=>setNotizen(e.target.value),placeholder:"Interne Notizen…",rows:3,
         style:{display:"block",width:"100%",padding:"11px 16px",background:"none",border:"none",outline:"none",fontSize:17,color:"var(--label)",resize:"vertical"}})
     )
-    ,React.createElement('button',{onClick:submit,className:"btn-system",style:{marginBottom:12}},"Offerte erstellen")
-    ,React.createElement('button',{onClick:onCancel,className:"btn-system btn-secondary"},"Abbrechen")
+    ,React.createElement('button',{onClick:submit,disabled:saving,className:"btn-system",style:{marginBottom:12}},saving?React.createElement(Spinner,{size:20,color:"rgba(255,255,255,0.7)"}):"Offerte erstellen")
+    ,React.createElement('button',{onClick:onCancel,disabled:saving,className:"btn-system btn-secondary"},"Abbrechen")
   );
 }
 
@@ -1520,6 +1559,7 @@ function OrderDetail({order,customer,onClose,onUpdate,onDelete}){
       )
     ):notizen?React.createElement('div',{style:{background:"var(--fill3)",borderRadius:12,padding:"12px 14px",fontSize:15,color:"var(--label2)",marginBottom:16}},notizen):null
     /* Delete */
+    ,React.createElement('button',{onClick:()=>exportOrderExcel(order,customer),className:"btn-system btn-secondary",style:{marginBottom:12}},"↓  Excel herunterladen")
     ,React.createElement('button',{onClick:async()=>{if(window.confirm("Auftrag wirklich löschen?"))await onDelete(order.id);},
       className:"btn-system btn-destructive",style:{marginBottom:12}},"Auftrag löschen")
     ,React.createElement('div',{style:{fontSize:13,color:"var(--label3)",textAlign:"center",paddingBottom:8}},`Erstellt: ${new Date(order.createdAt).toLocaleDateString("de-CH")} · #${order.orderNumber}`)
@@ -1581,7 +1621,7 @@ function App(){
   const[orders,setOrders]=useState([]);
   const[orderNum,setOrderNum]=useState(0);
   const[loading,setLoading]=useState(true);
-  const[syncStatus,setSyncStatus]=useState("ok");
+  const[syncStatus,setSyncStatus]=useState("idle");
   const[showNC,setShowNC]=useState(false);
   const[showNO,setShowNO]=useState(false);
   const[newOCid,setNewOCid]=useState(null);
@@ -1630,7 +1670,7 @@ function App(){
   }
   async function syncOk(fn){
     setSyncStatus("saving");
-    try{await fn();setSyncStatus("ok");}
+    try{await fn();setSyncStatus("ok");setTimeout(()=>setSyncStatus("idle"),2200);}
     catch(e){console.error(e);setSyncStatus("error");alert("Fehler beim Speichern!");}
   }
   async function addCustomer(data){
@@ -1647,7 +1687,6 @@ function App(){
     const num=orderNum+1;
     const newO={id:`o_${Date.now()}`,orderNumber:num,status:"aufnahme",statusChangedAt:new Date().toISOString(),createdAt:new Date().toISOString(),...data};
     await syncOk(async()=>{await db.upsert("orders",{id:newO.id,data:newO},token);await db.setCounter(num,token);});
-    try{exportOrderExcel(newO,customers.find(c=>c.id===newO.customerId));}catch(e){console.warn("Excel-Export Fehler:",e);}
     setOrders(p=>[...p,newO]);setOrderNum(num);setShowNO(false);setNewOCid(null);setAfterSave(null);
   }
   async function updateOrder(upd,cp){
@@ -1659,7 +1698,6 @@ function App(){
     const num=offertNum+1;
     const newOff={id:`off_${Date.now()}`,offertNumber:num,status:"entwurf",createdAt:new Date().toISOString(),...data};
     await syncOk(()=>db.upsert("offerten",{id:newOff.id,data:newOff},token));
-    try{exportOfferteExcel(newOff,customers.find(c=>c.id===newOff.customerId));}catch(e){console.warn("Excel-Export Fehler:",e);}
     setOfferten(p=>[...p,newOff]);setOffertNum(num);setShowNOff(false);
   }
   async function updateOfferte(upd){
@@ -1687,6 +1725,9 @@ function App(){
     if(filterK==="active"&&!as)return false;
     if(filterK==="inactive"&&as)return false;
     return m;
+  }).sort((a,b)=>{
+    const na=`${a.nachname} ${a.vorname}`.toLowerCase(),nb=`${b.nachname} ${b.vorname}`.toLowerCase();
+    return na<nb?-1:na>nb?1:0;
   });
 
   if(loading)return React.createElement('div',{style:{minHeight:"100dvh",background:"var(--grouped-bg)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12}}
@@ -1707,7 +1748,11 @@ function App(){
           })
         )
         ,React.createElement('div',{style:{display:"flex",alignItems:"center",gap:12}}
-          ,syncStatus==="saving"&&React.createElement('span',{style:{fontSize:13,color:"var(--label3)"}},"Sync…")
+          ,React.createElement('div',{
+            className:`cloud-idle${syncStatus==="saving"?" cloud-saving":""}${syncStatus==="ok"?" cloud-ok":""}${syncStatus==="error"?" cloud-error":""}`,
+            title:syncStatus==="saving"?"Synchronisiert mit Cloud…":syncStatus==="ok"?"Gespeichert ✓":syncStatus==="error"?"Sync-Fehler":"Cloud-Sync",
+            style:{display:"flex",alignItems:"center",padding:"4px 6px",borderRadius:8,cursor:"default"}
+          },React.createElement(SFCloud))
           ,todos.length>0&&React.createElement('div',{style:{background:"var(--red)",color:"#fff",borderRadius:10,padding:"2px 8px",fontSize:13,fontWeight:600}},todos.length)
           ,React.createElement('button',{onClick:handleLogout,className:"btn-plain",style:{fontSize:15}},"Abmelden")
         )
@@ -1780,7 +1825,11 @@ function App(){
           ,React.createElement('div',{style:{fontSize:16,color:"var(--label2)"}},`Noch keine Offerten.`)
         )
         ,["entwurf","versendet","angenommen","abgelehnt"].map(st=>{
-          const grp=offerten.filter(o=>o.status===st).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+          const grp=offerten.filter(o=>o.status===st).sort((a,b)=>{
+            const ca=customers.find(x=>x.id===a.customerId),cb=customers.find(x=>x.id===b.customerId);
+            const na=ca?`${ca.nachname} ${ca.vorname}`.toLowerCase():"zzz",nb=cb?`${cb.nachname} ${cb.vorname}`.toLowerCase():"zzz";
+            return na<nb?-1:na>nb?1:new Date(b.createdAt)-new Date(a.createdAt);
+          });
           if(!grp.length)return null;
           const stL={entwurf:"Entwurf",versendet:"Versendet",angenommen:"Angenommen",abgelehnt:"Abgelehnt"};
           const stC={entwurf:"var(--label2)",versendet:"var(--orange)",angenommen:"var(--green)",abgelehnt:"var(--red)"};
@@ -1795,7 +1844,11 @@ function App(){
                     ,React.createElement('div',{style:{fontSize:13,color:"var(--label2)",marginTop:1}},c?`${c.vorname} ${c.nachname}`:"Kein Kunde")
                     ,off.totalBetrag&&React.createElement('div',{style:{fontSize:13,fontWeight:600,color:"var(--blue)",marginTop:1}},`CHF ${off.totalBetrag}`)
                   )
-                  ,React.createElement('div',{style:{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}
+                  ,React.createElement('button',{
+                    onClick:e=>{e.stopPropagation();exportOfferteExcel(off,c);},
+                    className:"excel-btn",title:"Excel herunterladen"
+                  },"XLS")
+                  ,React.createElement('div',{style:{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,marginLeft:4}}
                     ,React.createElement('div',{style:{fontSize:12,color:"var(--label3)"}},new Date(off.createdAt).toLocaleDateString("de-CH"))
                     ,React.createElement('span',{style:{color:"var(--label3)"}},React.createElement(SFChevron))
                   )
@@ -1810,7 +1863,11 @@ function App(){
       ,tab==="auftraege"&&React.createElement('div',{style:{padding:"16px 16px 0"}}
         ,React.createElement('h1',{className:"sf-title1",style:{marginBottom:12,paddingTop:8}},"Aufträge")
         ,SO.filter(s=>s!=="abgeschlossen").map(s=>{
-          const grp=orders.filter(o=>o.status===s);
+          const grp=orders.filter(o=>o.status===s).sort((a,b)=>{
+            const ca=customers.find(x=>x.id===a.customerId),cb=customers.find(x=>x.id===b.customerId);
+            const na=ca?`${ca.nachname} ${ca.vorname}`.toLowerCase():"zzz",nb=cb?`${cb.nachname} ${cb.vorname}`.toLowerCase():"zzz";
+            return na<nb?-1:na>nb?1:new Date(b.createdAt)-new Date(a.createdAt);
+          });
           if(!grp.length)return null;
           return React.createElement('div',{key:s}
             ,React.createElement('p',{className:"section-header",style:{paddingLeft:0}},`${SC[s].label} (${grp.length})`)
@@ -1823,14 +1880,22 @@ function App(){
                     ,React.createElement('div',{style:{fontWeight:600,fontSize:16}},`#${o.orderNumber} – ${_optionalChain([c,'optionalAccess',x=>x.vorname])||""} ${_optionalChain([c,'optionalAccess',x=>x.nachname])||""}`)
                     ,React.createElement('div',{style:{fontSize:13,color:"var(--label3)",marginTop:1}},`${_optionalChain([c,'optionalAccess',x=>x.kennzeichen])||""} · ${dv<1?"heute":`${dv}T`}`)
                   )
-                  ,React.createElement('span',{style:{color:"var(--label3)"}},React.createElement(SFChevron))
+                  ,React.createElement('button',{
+                    onClick:e=>{e.stopPropagation();exportOrderExcel(o,customers.find(x=>x.id===o.customerId));},
+                    className:"excel-btn",title:"Excel herunterladen"
+                  },"XLS")
+                  ,React.createElement('span',{style:{color:"var(--label3)",marginLeft:4}},React.createElement(SFChevron))
                 );
               })
             )
           );
         })
         ,(()=>{
-          const done=orders.filter(o=>o.status==="abgeschlossen");
+          const done=orders.filter(o=>o.status==="abgeschlossen").sort((a,b)=>{
+            const ca=customers.find(x=>x.id===a.customerId),cb=customers.find(x=>x.id===b.customerId);
+            const na=ca?`${ca.nachname} ${ca.vorname}`.toLowerCase():"zzz",nb=cb?`${cb.nachname} ${cb.vorname}`.toLowerCase():"zzz";
+            return na<nb?-1:na>nb?1:new Date(b.createdAt)-new Date(a.createdAt);
+          });
           if(!done.length)return null;
           return React.createElement('details',{style:{marginBottom:8}}
             ,React.createElement('summary',{style:{padding:"8px 0",cursor:"pointer",color:"var(--label2)",fontWeight:600,fontSize:15,listStyle:"none",userSelect:"none",display:"flex",alignItems:"center",gap:6}},
@@ -1843,6 +1908,10 @@ function App(){
                     ,React.createElement('div',{style:{fontWeight:500,fontSize:15}},`#${o.orderNumber} – ${_optionalChain([c,'optionalAccess',x=>x.vorname])||""} ${_optionalChain([c,'optionalAccess',x=>x.nachname])||""}`)
                     ,React.createElement('div',{style:{fontSize:12,color:"var(--label3)"}},new Date(o.createdAt).toLocaleDateString("de-CH"))
                   )
+                  ,React.createElement('button',{
+                    onClick:e=>{e.stopPropagation();exportOrderExcel(o,customers.find(x=>x.id===o.customerId));},
+                    className:"excel-btn",title:"Excel herunterladen"
+                  },"XLS")
                   ,React.createElement('span',{style:{color:"var(--label3)"}},React.createElement(SFChevron))
                 );
               })
