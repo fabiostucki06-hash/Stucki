@@ -1,4 +1,4 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="UTF-8"/>
@@ -28,10 +28,10 @@
   --label3:    rgba(60,60,67,0.30);
   --label4:    rgba(60,60,67,0.18);
 
-  --fill1:     rgba(120,120,128,0.20);
-  --fill2:     rgba(120,120,128,0.16);
-  --fill3:     rgba(118,118,128,0.12);
-  --fill4:     rgba(116,116,128,0.06);
+  --fill1:     rgba(255,255,255,0.65);
+  --fill2:     rgba(255,255,255,0.55);
+  --fill3:     rgba(255,255,255,0.45);
+  --fill4:     rgba(255,255,255,0.30);
 
   --bg:        #FFFFFF;
   --bg2:       #F0F4FF;
@@ -109,9 +109,11 @@ body{
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Arial,sans-serif;
   background:var(--grouped-bg);
   background-image:
-    radial-gradient(ellipse at 18% 8%,rgba(0,122,255,0.20) 0%,transparent 46%),
-    radial-gradient(ellipse at 82% 85%,rgba(88,86,214,0.15) 0%,transparent 46%),
-    radial-gradient(ellipse at 62% 32%,rgba(0,196,255,0.08) 0%,transparent 38%);
+    radial-gradient(ellipse at 18% 8%,rgba(0,122,255,0.42) 0%,transparent 46%),
+    radial-gradient(ellipse at 82% 85%,rgba(88,86,214,0.34) 0%,transparent 46%),
+    radial-gradient(ellipse at 55% 30%,rgba(0,196,255,0.26) 0%,transparent 40%),
+    radial-gradient(ellipse at 10% 70%,rgba(52,199,89,0.12) 0%,transparent 35%);
+  background-attachment:fixed;
   min-height:100vh;min-height:100dvh;
   -webkit-font-smoothing:antialiased;
   -moz-osx-font-smoothing:grayscale;
@@ -287,17 +289,55 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
   text-shadow:0 -1px 0 rgba(0,0,0,0.25);
 }
 .btn-tinted{
-  background:linear-gradient(180deg,rgba(0,122,255,0.16) 0%,rgba(0,122,255,0.08) 100%);
-  color:var(--blue);
-  border:0.5px solid rgba(0,122,255,0.22);
-  border-radius:980px;padding:0 20px;height:44px;
-  font-size:17px;font-weight:600;letter-spacing:-0.4px;
+  background:linear-gradient(to bottom,#54a4ff 0%,#007aff 50%,#0056b3 100%);
+  color:#fff;
+  border:1px solid #004fb0;
+  border-radius:980px;padding:0 20px;height:40px;
+  font-size:15px;font-weight:600;letter-spacing:-0.3px;
   cursor:pointer;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,0.55);
+  box-shadow:inset 0 1px 0px rgba(255,255,255,0.6),inset 0 -1px 2px rgba(0,0,0,0.2),0 3px 5px rgba(0,0,0,0.15);
+  text-shadow:0 -1px 0 rgba(0,0,0,0.3);
   transition:all 0.15s ease;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
 }
-.btn-tinted:hover{background:linear-gradient(180deg,rgba(0,122,255,0.22) 0%,rgba(0,122,255,0.12) 100%)}
-.btn-tinted:active{opacity:0.80}
+.btn-tinted:hover{background:linear-gradient(to bottom,#68b8ff 0%,#1a90ff 50%,#0066cc 100%);transform:translateY(-1px);box-shadow:inset 0 1px 0px rgba(255,255,255,0.7),inset 0 -1px 2px rgba(0,0,0,0.22),0 5px 10px rgba(0,0,0,0.18)}
+.btn-tinted:active{opacity:0.88;transform:scale(0.97)}
+
+/* ── PILL STATUS BUTTONS ── */
+.pill-btn{
+  flex-shrink:0;padding:7px 14px;border-radius:20px;
+  font-weight:600;font-size:13px;cursor:pointer;
+  transition:all 0.15s ease;border:none;
+}
+.pill-btn-active{
+  background:linear-gradient(to bottom,#54a4ff 0%,#007aff 50%,#0056b3 100%);
+  color:#fff;border:1px solid #004fb0;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.6),inset 0 -1px 2px rgba(0,0,0,0.2),0 3px 5px rgba(0,0,0,0.12);
+  text-shadow:0 -1px 0 rgba(0,0,0,0.3);
+}
+.pill-btn-inactive{
+  background:rgba(255,255,255,0.60);
+  -webkit-backdrop-filter:blur(12px);
+  backdrop-filter:blur(12px);
+  color:var(--label2);
+  border:1px solid rgba(255,255,255,0.50)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.60),0 2px 6px rgba(0,0,0,0.07);
+}
+.pill-btn-inactive:hover{background:rgba(255,255,255,0.80);color:var(--blue)}
+
+/* ── GLASS PANEL (inline container replacement) ── */
+.glass-panel{
+  background:rgba(255,255,255,0.70);
+  -webkit-backdrop-filter:blur(12px);
+  backdrop-filter:blur(12px);
+  border:1px solid rgba(255,255,255,0.50);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.60),0 8px 32px 0 rgba(0,0,0,0.10);
+  border-radius:12px;
+}
+@media(prefers-color-scheme:dark){
+  .pill-btn-inactive{background:rgba(40,48,80,0.68);color:var(--label2);border-color:rgba(255,255,255,0.10)!important}
+  .glass-panel{background:rgba(32,38,62,0.78);border-color:rgba(255,255,255,0.14)}
+}
 .btn-plain{
   background:none;border:none;color:var(--blue);
   font-size:17px;font-weight:400;letter-spacing:-0.4px;
@@ -360,13 +400,13 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .search-bar-wrap{padding:10px 20px 6px}
 .search-bar{
   display:flex;align-items:center;gap:8px;
-  background:linear-gradient(180deg,rgba(255,255,255,0.72) 0%,rgba(255,255,255,0.50) 100%);
-  -webkit-backdrop-filter:blur(14px);
-  backdrop-filter:blur(14px);
+  background:rgba(255,255,255,0.68);
+  -webkit-backdrop-filter:blur(12px);
+  backdrop-filter:blur(12px);
   border-radius:12px;
-  border:0.5px solid rgba(255,255,255,0.60);
+  border:1px solid rgba(255,255,255,0.50);
   padding:9px 14px;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,0.72);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.60),0 4px 12px rgba(0,0,0,0.08);
 }
 .search-bar input{
   background:none;border:none;outline:none;flex:1;
@@ -528,9 +568,12 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 /* ── SEGMENTED CONTROL – Liquid Glass ── */
 .seg-ctrl{
   display:inline-flex;
-  background:rgba(0,0,0,0.07);
-  border-radius:10px;padding:3px;
-  gap:0;
+  background:rgba(255,255,255,0.35);
+  -webkit-backdrop-filter:blur(12px);
+  backdrop-filter:blur(12px);
+  border:1px solid rgba(255,255,255,0.45);
+  border-radius:12px;padding:3px;gap:0;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.55),0 2px 8px rgba(0,0,0,0.07);
 }
 .seg-item{
   flex:1;height:34px;border:none;border-radius:8px;
@@ -541,10 +584,11 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
   padding:0 16px;white-space:nowrap;
 }
 .seg-item.active{
-  background:linear-gradient(180deg,rgba(255,255,255,0.96) 0%,rgba(255,255,255,0.80) 100%);
-  color:var(--label);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,0.90),0 2px 8px rgba(0,0,0,0.12),0 1px 2px rgba(0,0,0,0.06);
-  border:0.5px solid rgba(255,255,255,0.72);
+  background:linear-gradient(to bottom,#54a4ff 0%,#007aff 50%,#0056b3 100%);
+  color:#fff;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.60),inset 0 -1px 2px rgba(0,0,0,0.20),0 2px 6px rgba(0,0,0,0.14);
+  border:1px solid #004fb0;
+  text-shadow:0 -1px 0 rgba(0,0,0,0.25);
 }
 
 /* ── SCROLL AREA ── */
@@ -829,7 +873,7 @@ function Sheet({title,onClose,children,full,barLeft,barRight}){
 
 /* ── FORM FIELD ── */
 function FormRow({label,children}){
-  return React.createElement('div',{style:{padding:"11px 16px",borderBottom:"0.33px solid var(--sep)",background:"var(--grouped-bg2)"}}
+  return React.createElement('div',{style:{padding:"11px 16px",borderBottom:"0.33px solid var(--sep)",background:"rgba(255,255,255,0.55)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)"}}
     ,label&&React.createElement('div',{className:"sf-caption1",style:{color:"var(--label2)",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.04em"}},label)
     ,children
   );
@@ -971,7 +1015,7 @@ function OfferteForm({customers,onSave,onCancel}){
       ,[["Arbeit",`CHF ${totA.toFixed(2)}`,totZE?`${totZE} ZE`:null,"var(--blue)"],
         ["Material",`CHF ${totM.toFixed(2)}`,null,"var(--green)"],
         ["Total",`CHF ${(totA+totM).toFixed(2)}`,null,"var(--indigo)"]].map(([l,v,sub,c])=>
-        React.createElement('div',{key:l,style:{flex:1,background:"var(--grouped-bg2)",borderRadius:12,padding:"12px",textAlign:"center"}}
+        React.createElement('div',{key:l,className:"glass-panel",style:{flex:1,padding:"12px",textAlign:"center"}}
           ,React.createElement('div',{style:{fontSize:11,color:"var(--label2)",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.04em"}},l)
           ,React.createElement('div',{style:{fontSize:15,fontWeight:700,color:c}},v)
           ,sub&&React.createElement('div',{style:{fontSize:11,color:"var(--label3)"}},sub)
@@ -997,7 +1041,7 @@ function OfferteForm({customers,onSave,onCancel}){
                 placeholder:"Beschreibung der Arbeit…",
                 style:{flex:1,background:"var(--fill3)",border:"none",borderRadius:9,padding:"9px 12px",fontSize:16,color:"var(--label)",outline:"none"}})
               ,arbeit.length>1&&React.createElement('button',{onClick:()=>remA(i),
-                style:{background:"var(--fill3)",border:"none",borderRadius:9,width:38,height:38,color:"var(--red)",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}},
+                style:{background:"rgba(255,59,48,0.10)",border:"1px solid rgba(255,59,48,0.22)",borderRadius:9,width:38,height:38,color:"var(--red)",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}},
                 React.createElement(SFXmark))
             )
             ,React.createElement('div',{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,className:"two-col"}}
@@ -1029,7 +1073,7 @@ function OfferteForm({customers,onSave,onCancel}){
           )
         )
         ,React.createElement('button',{onClick:addA,
-          style:{width:"100%",background:"var(--fill3)",border:"1.5px dashed var(--label4)",borderRadius:12,padding:"11px",cursor:"pointer",color:"var(--blue)",fontWeight:600,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:6}},
+          style:{width:"100%",background:"rgba(255,255,255,0.50)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"1.5px dashed rgba(0,122,255,0.38)",borderRadius:12,padding:"11px",cursor:"pointer",color:"var(--blue)",fontWeight:600,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:6}},
           React.createElement(SFPlus,{size:16}),"Arbeitsposition")
       )
       /* Material */
@@ -1041,7 +1085,7 @@ function OfferteForm({customers,onSave,onCancel}){
                 placeholder:"Material / Ersatzteil…",
                 style:{flex:1,background:"var(--fill3)",border:"none",borderRadius:9,padding:"9px 12px",fontSize:16,color:"var(--label)",outline:"none"}})
               ,material.length>1&&React.createElement('button',{onClick:()=>remM(i),
-                style:{background:"var(--fill3)",border:"none",borderRadius:9,width:38,height:38,color:"var(--red)",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}},
+                style:{background:"rgba(255,59,48,0.10)",border:"1px solid rgba(255,59,48,0.22)",borderRadius:9,width:38,height:38,color:"var(--red)",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}},
                 React.createElement(SFXmark))
             )
             ,React.createElement('div',{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}
@@ -1063,7 +1107,7 @@ function OfferteForm({customers,onSave,onCancel}){
           )
         )
         ,React.createElement('button',{onClick:addM,
-          style:{width:"100%",background:"var(--fill3)",border:"1.5px dashed var(--label4)",borderRadius:12,padding:"11px",cursor:"pointer",color:"var(--green)",fontWeight:600,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:6}},
+          style:{width:"100%",background:"rgba(255,255,255,0.50)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"1.5px dashed rgba(52,199,89,0.40)",borderRadius:12,padding:"11px",cursor:"pointer",color:"var(--green)",fontWeight:600,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:6}},
           React.createElement(SFPlus,{size:16}),"Materialposition")
       )
     )
@@ -1252,7 +1296,7 @@ function OfferteDetail({offerte,customer,onClose,onUpdate,onDelete}){
   const isExpired=offerte.gueltigBis&&new Date(offerte.gueltigBis)<new Date();
   return React.createElement(Sheet,{title:`Offerte #${offerte.offertNumber}`,onClose,full:true}
     /* Header block */
-    ,React.createElement('div',{style:{background:"var(--grouped-bg2)",borderRadius:12,padding:"16px",marginBottom:16}}
+    ,React.createElement('div',{className:"glass-panel",style:{padding:"16px",marginBottom:16}}
       ,React.createElement('div',{style:{fontSize:13,color:"var(--label2)",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.04em"}},"Status")
       ,React.createElement('div',{style:{fontSize:24,fontWeight:700,color:sc.c,letterSpacing:"0.34px"}},sc.l)
       ,offerte.titel&&React.createElement('div',{style:{fontSize:15,color:"var(--label2)",marginTop:4}},offerte.titel)
@@ -1266,9 +1310,8 @@ function OfferteDetail({offerte,customer,onClose,onUpdate,onDelete}){
       ,Object.entries(stC).map(([s,sc])=>
         React.createElement('button',{key:s,onClick:async()=>{setSaving(true);await onUpdate({...offerte,status:s});setSaving(false);},
           disabled:saving,
-          style:{flexShrink:0,padding:"8px 16px",borderRadius:20,border:"none",
-            background:offerte.status===s?sc.c:offerte.status===s?"var(--fill2)":"var(--fill3)",
-            color:offerte.status===s?"#fff":sc.c,fontWeight:600,fontSize:15,cursor:"pointer",opacity:saving?0.5:1}},sc.l)
+          className:`pill-btn ${offerte.status===s?"pill-btn-active":"pill-btn-inactive"}`,
+          style:{opacity:saving?0.5:1}},sc.l)
       )
     )
     /* Customer */
@@ -1341,18 +1384,18 @@ function OrderForm({customers,customerId:preCid,onSave,onCancel,saving}){
     ,React.createElement('div',{style:{marginBottom:20}}
       ,bs.map((b,i)=>
         React.createElement('div',{key:i,style:{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}
-          ,React.createElement('div',{style:{flex:1,background:"var(--grouped-bg2)",borderRadius:12,padding:"11px 14px",display:"flex",alignItems:"center"}}
+          ,React.createElement('div',{style:{flex:1,background:"rgba(255,255,255,0.60)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"1px solid rgba(255,255,255,0.50)",borderRadius:12,padding:"11px 14px",display:"flex",alignItems:"center"}}
             ,React.createElement('input',{value:b,onChange:e=>updB(i,e.target.value),
               placeholder:`Beanstandung ${i+1}…`,
               style:{flex:1,background:"none",border:"none",outline:"none",fontSize:17,color:"var(--label)"}})
           )
           ,bs.length>1&&React.createElement('button',{onClick:()=>remB(i),
-            style:{background:"var(--grouped-bg2)",border:"none",borderRadius:12,width:44,height:44,color:"var(--red)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}},
+            style:{background:"rgba(255,59,48,0.12)",border:"1px solid rgba(255,59,48,0.22)",borderRadius:12,width:44,height:44,color:"var(--red)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}},
             React.createElement(SFXmark))
         )
       )
       ,React.createElement('button',{onClick:addB,
-        style:{width:"100%",background:"var(--fill3)",border:"1.5px dashed var(--label4)",borderRadius:12,padding:"11px",cursor:"pointer",color:"var(--blue)",fontWeight:600,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:6}},
+        style:{width:"100%",background:"rgba(255,255,255,0.50)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"1.5px dashed rgba(0,122,255,0.38)",borderRadius:12,padding:"11px",cursor:"pointer",color:"var(--blue)",fontWeight:600,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:6}},
         React.createElement(SFPlus,{size:16}),"Beanstandung hinzufügen")
     )
     ,React.createElement('p',{className:"section-header"},"Notizen")
@@ -1431,9 +1474,8 @@ function OrderDetail({order,customer,onClose,onUpdate,onDelete}){
     ,React.createElement('p',{className:"section-header"},"Status")
     ,React.createElement('div',{className:"h-scroll",style:{marginBottom:20}}
       ,SO.map(s=>React.createElement('button',{key:s,onClick:()=>saveStatus(s),disabled:saving,
-        style:{flexShrink:0,padding:"8px 14px",borderRadius:20,border:"none",
-          background:status===s?"var(--blue)":"var(--fill3)",
-          color:status===s?"#fff":"var(--label2)",fontWeight:600,fontSize:13,cursor:"pointer",opacity:saving?0.5:1}},SC[s].short))
+        className:`pill-btn ${status===s?"pill-btn-active":"pill-btn-inactive"}`,
+        style:{opacity:saving?0.5:1}},SC[s].short))
     )
     /* Customer */
     ,React.createElement('div',{className:"inset-grouped-list",style:{marginBottom:16}}
@@ -1462,10 +1504,10 @@ function OrderDetail({order,customer,onClose,onUpdate,onDelete}){
         ,bs.map((b,i)=>React.createElement('div',{key:i,style:{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}
           ,React.createElement('input',{value:b,onChange:e=>updB(i,e.target.value),placeholder:`Beanstandung ${i+1}`,style:{...inp2,flex:1}})
           ,bs.length>1&&React.createElement('button',{onClick:()=>remB(i),
-            style:{background:"var(--fill3)",border:"none",borderRadius:9,width:38,height:38,color:"var(--red)",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}},React.createElement(SFXmark))
+            style:{background:"rgba(255,59,48,0.10)",border:"1px solid rgba(255,59,48,0.22)",borderRadius:9,width:38,height:38,color:"var(--red)",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}},React.createElement(SFXmark))
         ))
         ,React.createElement('button',{onClick:addB,
-          style:{width:"100%",background:"var(--fill3)",border:"1.5px dashed var(--label4)",borderRadius:12,padding:"10px",cursor:"pointer",color:"var(--blue)",fontWeight:600,fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:6}},
+          style:{width:"100%",background:"rgba(255,255,255,0.50)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"1.5px dashed rgba(0,122,255,0.38)",borderRadius:12,padding:"10px",cursor:"pointer",color:"var(--blue)",fontWeight:600,fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:6}},
           React.createElement(SFPlus,{size:16}),"Hinzufügen")
       )
     ):(
@@ -1502,7 +1544,7 @@ function OrderDetail({order,customer,onClose,onUpdate,onDelete}){
             placeholder:"Neue Position…",
             style:{flex:1,background:"none",border:"none",outline:"none",fontSize:17,color:"var(--label)"}})
           ,React.createElement('button',{onClick:addItem,
-            style:{background:"var(--blue)",color:"#fff",border:"none",borderRadius:8,width:32,height:32,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}},
+            style:{background:"linear-gradient(to bottom,#54a4ff,#007aff)",color:"#fff",border:"1px solid #004fb0",borderRadius:8,width:32,height:32,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"inset 0 1px 0 rgba(255,255,255,0.5),0 2px 4px rgba(0,0,0,0.18)"}},
             React.createElement(SFPlus,{size:16}))
         )
       )
@@ -1524,11 +1566,11 @@ function OrderDetail({order,customer,onClose,onUpdate,onDelete}){
       )
     )
     ,!edit&&(offB||recB)&&React.createElement('div',{style:{display:"flex",gap:8,marginBottom:16}}
-      ,offB&&React.createElement('div',{style:{flex:1,background:"var(--grouped-bg2)",borderRadius:12,padding:"12px",textAlign:"center"}}
+      ,offB&&React.createElement('div',{className:"glass-panel",style:{flex:1,padding:"12px",textAlign:"center"}}
         ,React.createElement('div',{style:{fontSize:12,color:"var(--label2)",textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:4}},"Offerte")
         ,React.createElement('div',{style:{fontWeight:700,fontSize:18,color:"var(--label)"}},`CHF ${offB}`)
       )
-      ,recB&&React.createElement('div',{style:{flex:1,background:"var(--grouped-bg2)",borderRadius:12,padding:"12px",textAlign:"center"}}
+      ,recB&&React.createElement('div',{className:"glass-panel",style:{flex:1,padding:"12px",textAlign:"center"}}
         ,React.createElement('div',{style:{fontSize:12,color:"var(--label2)",textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:4}},"Rechnung")
         ,React.createElement('div',{style:{fontWeight:700,fontSize:18,color:"var(--blue)"}},`CHF ${recB}`)
       )
@@ -1580,12 +1622,14 @@ function CustomerDetail({customer,orders,onClose,onEdit,onNewOrder,onOrderClick}
   return React.createElement(Sheet,{title:"Kundenakte",onClose,full:true,
     barRight:React.createElement('button',{onClick:onEdit,className:"bar-btn"},"Bearbeiten")
   }
-    ,React.createElement('div',{style:{background:"var(--grouped-bg2)",borderRadius:12,padding:"16px",marginBottom:16}}
+    ,React.createElement('div',{className:"glass-panel",style:{padding:"16px",marginBottom:16}}
       ,React.createElement('div',{style:{display:"flex",alignItems:"center",gap:14,marginBottom:12}}
         ,React.createElement('div',{style:{width:52,height:52,borderRadius:26,
-          background:"rgba(99,102,241,0.15)",
+          background:"linear-gradient(to bottom,#54a4ff,#0056b3)",
           display:"flex",alignItems:"center",justifyContent:"center",
-          fontSize:20,fontWeight:700,color:"var(--indigo)",flexShrink:0}},
+          fontSize:20,fontWeight:700,color:"#fff",flexShrink:0,
+          boxShadow:"inset 0 1px 0 rgba(255,255,255,0.5),0 3px 8px rgba(0,86,179,0.35)",
+          textShadow:"0 -1px 0 rgba(0,0,0,0.3)"}},
           (customer.vorname[0]||"").toUpperCase()+(customer.nachname[0]||"").toUpperCase()
         )
         ,React.createElement('div',null
@@ -1594,7 +1638,7 @@ function CustomerDetail({customer,orders,onClose,onEdit,onNewOrder,onOrderClick}
           ,customer.email&&React.createElement('div',{className:"sf-footnote",style:{color:"var(--label3)"}},customer.email)
         )
       )
-      ,React.createElement('div',{style:{background:"var(--fill3)",borderRadius:10,padding:"10px 12px",display:"flex",alignItems:"center",gap:8}}
+      ,React.createElement('div',{style:{background:"rgba(255,255,255,0.50)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",border:"1px solid rgba(255,255,255,0.40)",borderRadius:10,padding:"10px 12px",display:"flex",alignItems:"center",gap:8}}
         ,React.createElement('span',{style:{fontSize:18}},"🚗")
         ,React.createElement('span',{style:{fontSize:15,fontWeight:500}},`${customer.marke||""} ${customer.modell||""} · ${customer.kennzeichen||""}`)
         ,customer.km&&React.createElement('span',{style:{fontSize:13,color:"var(--label2)",marginLeft:"auto"}},`${Number(customer.km).toLocaleString()} km`)
@@ -1807,11 +1851,11 @@ function App(){
             )
           )
           ,React.createElement('p',{className:"section-header",style:{paddingLeft:0}},`Aktive Aufträge (${activeOrders.length})`)
-          ,activeOrders.length===0?React.createElement('div',{style:{background:"var(--grouped-bg2)",borderRadius:12,padding:"24px",textAlign:"center",color:"var(--label3)",fontSize:15}},"Keine aktiven Aufträge.")
+          ,activeOrders.length===0?React.createElement('div',{className:"glass-panel",style:{padding:"24px",textAlign:"center",color:"var(--label3)",fontSize:15}},"Keine aktiven Aufträge.")
           :React.createElement('div',{className:"inset-grouped-list"}
             ,activeOrders.slice(0,8).map(o=>{
               const c=customers.find(x=>x.id===o.customerId);const dv=daysSince(o.statusChangedAt);
-              return React.createElement('div',{key:o.id,className:"list-row",onClick:()=>setSelO(o),style:{background:isOverdue(o)?"rgba(255,59,48,0.04)":"var(--grouped-bg2)"}}
+              return React.createElement('div',{key:o.id,className:"list-row",onClick:()=>setSelO(o),style:{background:isOverdue(o)?"rgba(255,59,48,0.06)":"transparent"}}
                 ,React.createElement('div',{style:{flex:1}}
                   ,React.createElement('div',{style:{fontWeight:600,fontSize:16}},`${_optionalChain([c,'optionalAccess',x=>x.vorname])||""} ${_optionalChain([c,'optionalAccess',x=>x.nachname])||""}`)
                   ,React.createElement('div',{style:{fontSize:13,color:"var(--label3)",marginTop:1}},`#${o.orderNumber} · ${dv<1?"heute":`${dv}T`}`)
@@ -1828,9 +1872,9 @@ function App(){
       ,tab==="offerten"&&React.createElement('div',{style:{padding:"16px 16px 0"}}
         ,React.createElement('div',{style:{display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:12}}
           ,React.createElement('h1',{className:"sf-title1",style:{paddingTop:8}},`Offerten`)
-          ,React.createElement('button',{onClick:()=>setShowNOff(true),className:"btn-tinted",style:{height:36,fontSize:15,padding:"0 14px"}},`+ Neue`)
+          ,React.createElement('button',{onClick:()=>setShowNOff(true),className:"btn-tinted"},`+ Neue`)
         )
-        ,!offerten.length&&React.createElement('div',{style:{background:"var(--grouped-bg2)",borderRadius:12,padding:"40px",textAlign:"center"}}
+        ,!offerten.length&&React.createElement('div',{className:"glass-panel",style:{padding:"40px",textAlign:"center"}}
           ,React.createElement('div',{style:{fontSize:40,marginBottom:12}},"📄")
           ,React.createElement('div',{style:{fontSize:16,color:"var(--label2)"}},`Noch keine Offerten.`)
         )
@@ -1884,7 +1928,7 @@ function App(){
             ,React.createElement('div',{className:"inset-grouped-list",style:{marginBottom:4}}
               ,grp.map((o,idx)=>{
                 const c=customers.find(x=>x.id===o.customerId);const ov=isOverdue(o);const dv=daysSince(o.statusChangedAt);
-                return React.createElement('div',{key:o.id,className:"list-row",onClick:()=>setSelO(o),style:{background:ov?"rgba(255,59,48,0.04)":"var(--grouped-bg2)"}}
+                return React.createElement('div',{key:o.id,className:"list-row",onClick:()=>setSelO(o),style:{background:ov?"rgba(255,59,48,0.06)":"transparent"}}
                   ,React.createElement('div',{style:{flex:1}}
                     ,ov&&React.createElement('div',{style:{fontSize:11,color:"var(--red)",fontWeight:600,marginBottom:2}},"Frist überschritten")
                     ,React.createElement('div',{style:{fontWeight:600,fontSize:16}},`#${o.orderNumber} – ${_optionalChain([c,'optionalAccess',x=>x.vorname])||""} ${_optionalChain([c,'optionalAccess',x=>x.nachname])||""}`)
@@ -1928,7 +1972,7 @@ function App(){
             )
           );
         })()
-        ,!orders.length&&React.createElement('div',{style:{background:"var(--grouped-bg2)",borderRadius:12,padding:"40px",textAlign:"center",color:"var(--label3)"}},"Noch keine Aufträge.")
+        ,!orders.length&&React.createElement('div',{className:"glass-panel",style:{padding:"40px",textAlign:"center",color:"var(--label3)"}},"Noch keine Aufträge.")
       )
 
       /* ── KUNDEN ── */
@@ -1949,15 +1993,17 @@ function App(){
               React.createElement('button',{key:f,className:"seg-item"+(filterK===f?" active":""),onClick:()=>setFilterK(f),style:{flex:1}},l)
             )
           )
-          ,!filteredC.length&&React.createElement('div',{style:{background:"var(--grouped-bg2)",borderRadius:12,padding:"32px",textAlign:"center",color:"var(--label3)"}},"Keine Kunden gefunden.")
+          ,!filteredC.length&&React.createElement('div',{className:"glass-panel",style:{padding:"32px",textAlign:"center",color:"var(--label3)"}},"Keine Kunden gefunden.")
           ,React.createElement('div',{className:"inset-grouped-list"}
             ,filteredC.map((c,idx)=>{
               const as=getActiveStatus(orders,c.id);
               return React.createElement('div',{key:c.id,className:"list-row",onClick:()=>setSelC(c)}
                 ,React.createElement('div',{style:{width:36,height:36,borderRadius:18,
-                  background:"rgba(0,122,255,0.10)",
+                  background:"linear-gradient(to bottom,#54a4ff,#007aff)",
+                  boxShadow:"inset 0 1px 0 rgba(255,255,255,0.5),0 2px 6px rgba(0,86,179,0.30)",
                   display:"flex",alignItems:"center",justifyContent:"center",
-                  fontSize:14,fontWeight:600,color:"var(--blue)",flexShrink:0}},
+                  fontSize:14,fontWeight:700,color:"#fff",flexShrink:0,
+                  textShadow:"0 -1px 0 rgba(0,0,0,0.25)"}},
                   (c.vorname[0]||"").toUpperCase()+(c.nachname[0]||"").toUpperCase()
                 )
                 ,React.createElement('div',{style:{flex:1,minWidth:0}}
@@ -2006,11 +2052,13 @@ function App(){
           ,React.createElement('button',{
             onClick:()=>setFabOpen(p=>!p),
             style:{
-              width:44,height:44,borderRadius:22,
-              background:"var(--blue)",color:"#fff",border:"none",
+              width:48,height:48,borderRadius:24,
+              background:"linear-gradient(to bottom,#54a4ff 0%,#007aff 50%,#0056b3 100%)",
+              color:"#fff",border:"1px solid #004fb0",
               cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
+              boxShadow:"inset 0 1px 0 rgba(255,255,255,0.6),inset 0 -1px 2px rgba(0,0,0,0.2),0 6px 14px rgba(0,0,0,0.22)",
               transform:fabOpen?"rotate(45deg)":"rotate(0)",
-              transition:"transform 0.22s cubic-bezier(.34,1.56,.64,1)"
+              transition:"transform 0.22s cubic-bezier(.34,1.56,.64,1),box-shadow 0.15s ease"
             }
           },React.createElement(SFPlus,{size:20}))
         );
