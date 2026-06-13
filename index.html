@@ -819,7 +819,7 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 </head>
 <body>
 <div class="bg">
-  <img src="https://xpggpkmqwescbcrnnpod.supabase.co/storage/v1/object/public/wallpaper/mac_wallpaper.png" alt="" style="object-position:center center">
+  <img src="https://xpggpkmqwescbcrnnpod.supabase.co/storage/v1/object/public/wallpaper/mac_wallpaper.png" alt="" style="object-position:center center" onerror="if(!this.dataset.fb){this.dataset.fb='1';this.src='mac_wallpaper.png';console.error('[Wallpaper] Supabase CDN unerreichbar – lokale Datei wird verwendet');}">
 </div>
 <svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
   <filter id="frosted" color-interpolation-filters="sRGB" primitiveUnits="objectBoundingBox">
@@ -853,9 +853,9 @@ const auth={
   async getUser(token){const r=await fetch(`${SUPA_URL}/auth/v1/user`,{headers:h(token)});return r.json();}
 };
 const db={
-  async get(table,token){const r=await fetch(`${SUPA_URL}/rest/v1/${table}?select=*`,{headers:h(token)});return r.json();},
-  async upsert(table,obj,token){const r=await fetch(`${SUPA_URL}/rest/v1/${table}`,{method:"POST",headers:{...h(token),"Prefer":"resolution=merge-duplicates"},body:JSON.stringify(obj)});if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.message||`HTTP ${r.status}`);}},
-  async delete(table,id,token){const r=await fetch(`${SUPA_URL}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`,{method:"DELETE",headers:h(token)});if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.message||`HTTP ${r.status}`);}},
+  async get(table,token){const r=await fetch(`${SUPA_URL}/rest/v1/${table}?select=*`,{headers:h(token)});const j=await r.json();if(!r.ok)console.error(`[Supabase] get("${table}") HTTP ${r.status}:`,JSON.stringify(j));return j;},
+  async upsert(table,obj,token){const r=await fetch(`${SUPA_URL}/rest/v1/${table}`,{method:"POST",headers:{...h(token),"Prefer":"resolution=merge-duplicates"},body:JSON.stringify(obj)});if(!r.ok){const e=await r.json().catch(()=>({}));console.error(`[Supabase] upsert("${table}") HTTP ${r.status}:`,JSON.stringify(e),'| Keys:',Object.keys(obj));throw new Error(e.message||e.hint||`HTTP ${r.status}${e.code?' ('+e.code+')':''}`);}},
+  async delete(table,id,token){const r=await fetch(`${SUPA_URL}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`,{method:"DELETE",headers:h(token)});if(!r.ok){const e=await r.json().catch(()=>({}));console.error(`[Supabase] delete("${table}", "${id}") HTTP ${r.status}:`,JSON.stringify(e));throw new Error(e.message||e.hint||`HTTP ${r.status}`);}},
   async getCounter(token){const r=await fetch(`${SUPA_URL}/rest/v1/counters?id=eq.orderNum&select=value`,{headers:h(token)});const d=await r.json();return _optionalChain([d,'access',x=>x[0],'optionalAccess',x=>x.value])||0;},
   async setCounter(val,token){await fetch(`${SUPA_URL}/rest/v1/counters?id=eq.orderNum`,{method:"PATCH",headers:h(token),body:JSON.stringify({value:val})});}
 };
@@ -2111,7 +2111,8 @@ function App(){
     if(!token||!authChecked)return;
     (async()=>{
       try{
-        const[cr,or,cnt,offr]=await Promise.all([db.get("customers",token),db.get("orders",token),db.getCounter(token),db.get("offerten",token).catch(()=>[])]);
+        const[cr,or,cnt,offr]=await Promise.all([db.get("customers",token),db.get("orders",token),db.getCounter(token),db.get("offerten",token).catch(e=>{console.error("[Supabase] get(offerten) fehlgeschlagen – Tabelle existiert möglicherweise nicht oder RLS blockiert:",e?.message||JSON.stringify(e));return[];})]);
+
         const parseRows=arr=>(Array.isArray(arr)?arr:[]).map(r=>r&&(r.data||(r.id?r:null))).filter(Boolean);
         setCustomers(parseRows(cr));
         setOrders(parseRows(or));
@@ -2178,18 +2179,21 @@ function App(){
     setOrders(p=>p.map(o=>o.id===upd.id?upd:o));setSelO(upd);
     if(cp)await updateCustomer(upd.customerId,cp);
   }
-  function addOfferte(data){
+  async function addOfferte(data){
     const num=offertNum+1;
     const newOff={id:`off_${Date.now()}`,offertNumber:num,status:"entwurf",createdAt:new Date().toISOString(),...data};
-    /* Optimistic update — UI responds instantly, sync happens in background */
+    console.log("[addOfferte] Speichere Offerte #"+num, newOff);
+    try{
+      await syncOk(()=>db.upsert("offerten",{id:newOff.id,data:newOff},token));
+    }catch(e){
+      console.error("[addOfferte] Supabase-Fehler:",e?.message,e);
+      return;
+    }
     setOfferten(p=>[...p,newOff]);
     setOffertNum(num);
     setShowNOff(false);
     setTab("offerten");
-    syncBackground(
-      ()=>db.upsert("offerten",{id:newOff.id,data:newOff},token),
-      `Offerte #${num} gespeichert`
-    );
+    showToast(`Offerte #${num} gespeichert`,"success");
   }
   async function updateOfferte(upd){
     await syncOk(()=>db.upsert("offerten",{id:upd.id,data:upd},token));
