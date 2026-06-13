@@ -1,0 +1,217 @@
+import { useState } from 'react';
+import { useApp } from './context/AppContext';
+import { ASSETS } from './lib/supabase';
+import { needsAttention } from './lib/utils';
+
+import Spinner from './components/ui/Spinner';
+import Sheet from './components/ui/Sheet';
+import LoginPage from './components/LoginPage';
+import NavBar from './components/NavBar';
+import TabBar from './components/TabBar';
+import Dashboard from './components/Dashboard';
+import { SFPerson, SFWrench, SFDoc } from './components/Icons';
+import CustomerList from './components/kunden/CustomerList';
+import CustomerForm from './components/kunden/CustomerForm';
+import CustomerDetail from './components/kunden/CustomerDetail';
+import OrderList from './components/auftraege/OrderList';
+import OrderForm from './components/auftraege/OrderForm';
+import OrderDetail from './components/auftraege/OrderDetail';
+import OfferteList from './components/offerten/OfferteList';
+import OfferteForm from './components/offerten/OfferteForm';
+import OfferteDetail from './components/offerten/OfferteDetail';
+import IPhoneHero from './components/IPhoneHero';
+
+import type { Customer, Order, Offerte, TabId } from './types';
+
+export default function App() {
+  const { customers, orders, offerten, syncStatus, token, authChecked, loading, handleLogin, handleLogout, addCustomer, updateCustomer, addOrder, updateOrder, deleteOrder, addOfferte, updateOfferte, deleteOfferte } = useApp();
+
+  const [tab, setTab] = useState<TabId>('dashboard');
+  const [fabOpen, setFabOpen] = useState(false);
+
+  const [showNC, setShowNC] = useState(false);
+  const [showNO, setShowNO] = useState(false);
+  const [showNOff, setShowNOff] = useState(false);
+  const [newOCid, setNewOCid] = useState<string | null>(null);
+  const [afterSave, setAfterSave] = useState<string | null>(null);
+
+  const [selC, setSelC] = useState<Customer | null>(null);
+  const [editC, setEditC] = useState<Customer | null>(null);
+  const [selO, setSelO] = useState<Order | null>(null);
+  const [selOff, setSelOff] = useState<Offerte | null>(null);
+
+  const todos = orders.filter(needsAttention);
+
+  if (!authChecked) {
+    return (
+      <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Spinner />
+      </div>
+    );
+  }
+
+  if (!token) return <LoginPage onLogin={handleLogin} />;
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+        <Spinner size={36} />
+        <span className="sf-subhead" style={{ fontSize: 15, color: 'var(--label2)' }}>Wird geladen…</span>
+      </div>
+    );
+  }
+
+  async function handleAddCustomer(data: Omit<Customer, 'id' | 'createdAt'>) {
+    const id = await addCustomer(data);
+    setShowNC(false); setAfterSave(id);
+  }
+
+  async function handleAddOrder(data: Pick<Order, 'customerId' | 'beanstandungen' | 'notizen'>) {
+    await addOrder(data);
+    setShowNO(false); setNewOCid(null);
+  }
+
+  async function handleUpdateOrder(upd: Order, cp: Partial<Customer> | null) {
+    await updateOrder(upd, cp); setSelO(upd);
+  }
+
+  async function handleDeleteOrder(id: string) {
+    await deleteOrder(id); setSelO(null);
+  }
+
+  async function handleAddOfferte(data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>) {
+    await addOfferte(data); setShowNOff(false); setTab('offerten');
+  }
+
+  async function handleUpdateOfferte(upd: Offerte) {
+    await updateOfferte(upd); setSelOff(upd);
+  }
+
+  async function handleDeleteOfferte(id: string) {
+    await deleteOfferte(id); setSelOff(null);
+  }
+
+  return (
+    <div style={{ minHeight: '100dvh', paddingBottom: 'calc(55px + env(safe-area-inset-bottom))' }}>
+      {/* Background */}
+      <div className="bg">
+        <img
+          src={ASSETS.wallpaper}
+          alt=""
+          style={{ objectPosition: 'center center' }}
+          onError={(e) => {
+            const img = e.currentTarget;
+            if (!img.dataset.fb) { img.dataset.fb = '1'; img.src = '/mac_wallpaper.png'; }
+          }}
+        />
+      </div>
+
+      <NavBar syncStatus={syncStatus} todosCount={todos.length} onLogout={handleLogout} />
+
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 0 8px' }}>
+        {tab === 'dashboard' && <Dashboard customers={customers} orders={orders} onOrderClick={setSelO} />}
+        {tab === 'auftraege' && <OrderList orders={orders} customers={customers} onOrderClick={setSelO} />}
+        {tab === 'offerten' && <OfferteList offerten={offerten} customers={customers} onOfferteClick={setSelOff} onNew={() => setShowNOff(true)} />}
+        {tab === 'kunden' && <CustomerList customers={customers} orders={orders} onCustomerClick={setSelC} />}
+        {tab === 'store' && <IPhoneHero />}
+      </div>
+
+      {/* FAB context menu backdrop */}
+      {fabOpen && <div onClick={() => setFabOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 498 }} />}
+      {fabOpen && (
+        <div className="context-menu" style={{ bottom: 'calc(68px + env(safe-area-inset-bottom))', right: 16 }}>
+          <button className="context-item" onClick={() => { setShowNC(true); setFabOpen(false); }}>
+            <span>Neuer Kunde</span><span className="context-item-icon"><SFPerson /></span>
+          </button>
+          <button className="context-item" onClick={() => { setNewOCid(null); setShowNO(true); setFabOpen(false); }}>
+            <span>Neuer Auftrag</span><span className="context-item-icon"><SFWrench /></span>
+          </button>
+          <button className="context-item" onClick={() => { setShowNOff(true); setFabOpen(false); }}>
+            <span>Neue Offerte</span><span className="context-item-icon"><SFDoc /></span>
+          </button>
+        </div>
+      )}
+
+      <TabBar activeTab={tab} onTabChange={setTab} fabOpen={fabOpen} onFabToggle={() => setFabOpen((p) => !p)} />
+
+      {/* ── Sheets ── */}
+      {afterSave && !showNO && (() => {
+        const c = customers.find((x) => x.id === afterSave);
+        return (
+          <Sheet title="Kunde gespeichert" onClose={() => setAfterSave(null)}>
+            <div style={{ textAlign: 'center', padding: '12px 0 24px' }}>
+              <div style={{ fontSize: 52, marginBottom: 12 }}>✅</div>
+              <p className="sf-body" style={{ color: 'var(--label2)', marginBottom: 24 }}>
+                Möchtest du direkt einen Auftrag für {c?.vorname ?? ''} {c?.nachname ?? ''} erstellen?
+              </p>
+            </div>
+            <button onClick={() => { setNewOCid(afterSave); setShowNO(true); }} className="btn-system" style={{ marginBottom: 12 }}>Auftrag erstellen</button>
+            <button onClick={() => setAfterSave(null)} className="btn-system btn-secondary">Später</button>
+          </Sheet>
+        );
+      })()}
+
+      {showNO && (
+        <Sheet title="Neuer Auftrag" onClose={() => { setShowNO(false); setNewOCid(null); }}
+          barRight={<button onClick={() => { setShowNO(false); setNewOCid(null); }} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
+          <OrderForm customers={customers} customerId={newOCid ?? undefined} onSave={handleAddOrder} onCancel={() => { setShowNO(false); setNewOCid(null); }} />
+        </Sheet>
+      )}
+
+      {showNC && (
+        <Sheet title="Neuer Kunde" onClose={() => setShowNC(false)}
+          barRight={<button onClick={() => setShowNC(false)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
+          <CustomerForm onSave={handleAddCustomer} onCancel={() => setShowNC(false)} />
+        </Sheet>
+      )}
+
+      {showNOff && (
+        <Sheet title="Neue Offerte" onClose={() => setShowNOff(false)} full
+          barRight={<button onClick={() => setShowNOff(false)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
+          <OfferteForm customers={customers} onSave={handleAddOfferte} onCancel={() => setShowNOff(false)} />
+        </Sheet>
+      )}
+
+      {selOff && (
+        <OfferteDetail
+          offerte={selOff}
+          customer={customers.find((c) => c.id === selOff.customerId)}
+          onClose={() => setSelOff(null)}
+          onUpdate={handleUpdateOfferte}
+          onDelete={handleDeleteOfferte}
+        />
+      )}
+
+      {selC && !selO && (
+        <CustomerDetail
+          customer={selC} orders={orders}
+          onClose={() => setSelC(null)}
+          onEdit={() => setEditC(selC)}
+          onNewOrder={() => { setNewOCid(selC.id); setShowNO(true); setSelC(null); }}
+          onOrderClick={(o) => { setSelO(o); setSelC(null); }}
+        />
+      )}
+
+      {editC && (
+        <Sheet title="Kunde bearbeiten" onClose={() => setEditC(null)}
+          barRight={<button onClick={() => setEditC(null)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
+          <CustomerForm
+            initial={editC}
+            onSave={async (data) => { await updateCustomer(editC.id, data); setEditC(null); }}
+            onCancel={() => setEditC(null)}
+          />
+        </Sheet>
+      )}
+
+      {selO && (
+        <OrderDetail
+          order={selO}
+          customer={customers.find((c) => c.id === selO.customerId)}
+          onClose={() => setSelO(null)}
+          onUpdate={handleUpdateOrder}
+          onDelete={handleDeleteOrder}
+        />
+      )}
+    </div>
+  );
+}
