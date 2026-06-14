@@ -1,4 +1,4 @@
-import { SFHouse, SFWrench, SFDoc, SFPerson, SFStore, SFPlus } from './Icons';
+import { SFHouse, SFWrench, SFDoc, SFPerson, SFPlus } from './Icons';
 import type { TabId } from '../types';
 
 interface TabBarProps {
@@ -13,7 +13,7 @@ const TABS: { id: TabId; icon: React.ReactNode; label: string }[] = [
   { id: 'auftraege',  icon: <SFWrench />, label: 'Aufträge'  },
   { id: 'offerten',   icon: <SFDoc />,    label: 'Offerten'  },
   { id: 'kunden',     icon: <SFPerson />, label: 'Kunden'    },
-  { id: 'store',      icon: <SFStore />,  label: 'Store'     },
+
 ];
 
 export default function TabBar({ activeTab, onTabChange, fabOpen, onFabToggle }: TabBarProps) {

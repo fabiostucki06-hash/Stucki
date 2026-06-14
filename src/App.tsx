@@ -19,7 +19,6 @@ import OrderDetail from './components/auftraege/OrderDetail';
 import OfferteList from './components/offerten/OfferteList';
 import OfferteForm from './components/offerten/OfferteForm';
 import OfferteDetail from './components/offerten/OfferteDetail';
-import IPhoneHero from './components/IPhoneHero';
 
 import type { Customer, Order, Offerte, TabId } from './types';
 
@@ -113,7 +112,7 @@ export default function App() {
         {tab === 'auftraege' && <OrderList orders={orders} customers={customers} onOrderClick={setSelO} />}
         {tab === 'offerten' && <OfferteList offerten={offerten} customers={customers} onOfferteClick={setSelOff} onNew={() => setShowNOff(true)} />}
         {tab === 'kunden' && <CustomerList customers={customers} orders={orders} onCustomerClick={setSelC} />}
-        {tab === 'store' && <IPhoneHero />}
+
       </div>
 
       {/* FAB context menu backdrop */}

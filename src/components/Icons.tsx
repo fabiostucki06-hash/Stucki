@@ -49,12 +49,6 @@ export const SFCheckmark = () => (
   </svg>
 );
 
-export const SFStore = () => (
-  <svg width={25} height={25} viewBox="0 0 25 25" fill="none">
-    <rect x={3} y={7} width={19} height={15} rx={2.5} stroke="currentColor" strokeWidth={1.5}/>
-    <path d="M7 7V6a5.5 5.5 0 0111 0v1" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round"/>
-  </svg>
-);
 
 export const SFCloud = () => (
   <svg width={24} height={20} viewBox="0 0 26 22" fill="none">
