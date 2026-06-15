@@ -51,7 +51,7 @@ export const storage = {
     const rootItems = await listBucket(bucket, '');
     console.log(`[storage] ${bucket} root items:`, rootItems);
 
-    const isRealFile = (f: StorageItem) => f.id != null && !f.name.endsWith('.emptyFolderPlaceholder');
+    const isRealFile = (f: StorageItem) => f.id != null && f.name.endsWith('.xlsx');
 
     // real files have a non-null id; folders have id === null
     let file = rootItems.find(isRealFile);
