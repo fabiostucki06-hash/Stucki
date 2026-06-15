@@ -305,7 +305,7 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .cf-input::placeholder,.cf-textarea::placeholder{color:var(--label3)}
 .cf-input[type=number]::-webkit-inner-spin-button,.cf-input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 .cf-input[type=number]{-moz-appearance:textfield}
-.cf-select{-webkit-appearance:none;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236E6E73' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:30px}
+.cf-select{-webkit-appearance:none;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg width%3D%2210%22 height%3D%226%22 viewBox%3D%220 0 10 6%22 fill%3D%22none%22 xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath d%3D%22M1 1l4 4 4-4%22 stroke%3D%22%236E6E73%22 stroke-width%3D%221.5%22 stroke-linecap%3D%22round%22 stroke-linejoin%3D%22round%22 fill%3D%22none%22%2F%3E%3C%2Fsvg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:30px}
 .cf-textarea{resize:vertical;min-height:68px;line-height:1.5}
 .cf-field{display:flex;flex-direction:column}
 .cf-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
