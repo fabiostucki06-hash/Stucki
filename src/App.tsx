@@ -213,6 +213,28 @@ export default function App() {
           onDelete={handleDeleteOrder}
         />
       )}
+
+      {/* Build timestamp — changes on every deploy */}
+      <div style={{
+        position: 'fixed',
+        bottom: 'calc(60px + env(safe-area-inset-bottom))',
+        left: 10,
+        background: 'rgba(255,255,255,0.15)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        border: '1px solid rgba(255,255,255,0.25)',
+        borderRadius: 7,
+        padding: '2px 7px',
+        fontSize: 10,
+        fontFamily: 'var(--font-system, system-ui)',
+        color: 'rgba(255,255,255,0.60)',
+        letterSpacing: '0.02em',
+        pointerEvents: 'none',
+        userSelect: 'none',
+        zIndex: 10,
+      }}>
+        {`Build: ${new Date(__BUILD_TIME__).toLocaleString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Zurich' })}`}
+      </div>
     </div>
   );
 }
