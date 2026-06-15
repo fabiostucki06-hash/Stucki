@@ -34,7 +34,7 @@ export const auth = {
 };
 
 export const storage = {
-  /** Lists the bucket, finds the first .xlsx file, and returns it as an ArrayBuffer. */
+  /** Lists the bucket and returns the first available file as an ArrayBuffer. */
   async fetchTemplate(bucket: string): Promise<ArrayBuffer> {
     const listRes = await fetch(`${SUPA_URL}/storage/v1/object/list/${bucket}`, {
       method: 'POST',
@@ -42,8 +42,8 @@ export const storage = {
       body: JSON.stringify({ prefix: '', limit: 100, offset: 0 }),
     });
     if (!listRes.ok) throw new Error(`Vorlage nicht gefunden (Bucket: "${bucket}", HTTP ${listRes.status})`);
-    const files: { name: string }[] = await listRes.json();
-    const file = files.find(f => /\.(xlsx|xls)$/i.test(f.name));
+    const files: { name: string; id?: string | null }[] = await listRes.json();
+    const file = files.find(f => f.id != null);
     if (!file) throw new Error(`Keine Excel-Vorlage in Bucket "${bucket}" gefunden`);
     const fileRes = await fetch(`${SUPA_URL}/storage/v1/object/public/${bucket}/${encodeURIComponent(file.name)}`);
     if (!fileRes.ok) throw new Error(`Vorlage "${file.name}" konnte nicht geladen werden (HTTP ${fileRes.status})`);
