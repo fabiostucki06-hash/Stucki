@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { auth } from '../lib/supabase';
+import { auth, ASSETS } from '../lib/supabase';
 import Spinner from './ui/Spinner';
 
 interface LoginPageProps {
@@ -34,6 +34,16 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
   return (
     <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 20px' }}>
+      <div className="bg">
+        <img
+          src={ASSETS.wallpaper}
+          alt=""
+          onError={(e) => {
+            const img = e.currentTarget;
+            if (!img.dataset.fb) { img.dataset.fb = '1'; img.src = '/mac_wallpaper.png'; }
+          }}
+        />
+      </div>
       <div className="login-card">
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <div style={{
