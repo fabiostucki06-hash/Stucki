@@ -1,14 +1,14 @@
 import { ASSETS } from '../lib/supabase';
-import { SFCloud } from './Icons';
+import { SFCloud, SFMenu } from './Icons';
 import type { SyncStatus } from '../types';
 
 interface NavBarProps {
   syncStatus: SyncStatus;
   todosCount: number;
-  onLogout: () => void;
+  onMenuToggle: () => void;
 }
 
-export default function NavBar({ syncStatus, todosCount, onLogout }: NavBarProps) {
+export default function NavBar({ syncStatus, todosCount, onMenuToggle }: NavBarProps) {
   const cloudClass = [
     'cloud-idle',
     syncStatus === 'saving' && 'cloud-saving',
@@ -24,7 +24,18 @@ export default function NavBar({ syncStatus, todosCount, onLogout }: NavBarProps
   return (
     <div className="nav-bar">
       <div className="nav-bar-inner">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {/* Hamburger */}
+        <button
+          onClick={onMenuToggle}
+          className="bar-btn"
+          style={{ color: 'var(--label)', marginRight: 8 }}
+          aria-label="Menü öffnen"
+        >
+          <SFMenu />
+        </button>
+
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center' }}>
           <img
             src={ASSETS.logo}
             alt="Werkstatt"
@@ -36,6 +47,8 @@ export default function NavBar({ syncStatus, todosCount, onLogout }: NavBarProps
             }}
           />
         </div>
+
+        {/* Right side: sync indicator + todo badge */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
           <div className={cloudClass} title={cloudTitle} style={{ display: 'flex', alignItems: 'center', padding: '4px 6px', borderRadius: 8, cursor: 'default' }}>
             <SFCloud />
@@ -45,7 +58,6 @@ export default function NavBar({ syncStatus, todosCount, onLogout }: NavBarProps
               {todosCount}
             </div>
           )}
-          <button onClick={onLogout} className="btn-plain" style={{ fontSize: 15 }}>Abmelden</button>
         </div>
       </div>
     </div>

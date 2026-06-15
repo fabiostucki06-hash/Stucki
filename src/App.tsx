@@ -8,6 +8,7 @@ import Sheet from './components/ui/Sheet';
 import LoginPage from './components/LoginPage';
 import NavBar from './components/NavBar';
 import TabBar from './components/TabBar';
+import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import { SFPerson, SFWrench, SFDoc } from './components/Icons';
 import CustomerList from './components/kunden/CustomerList';
@@ -28,6 +29,7 @@ export default function App() {
 
   const [tab, setTab] = useState<TabId>('dashboard');
   const [fabOpen, setFabOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [showNC, setShowNC] = useState(false);
   const [showNO, setShowNO] = useState(false);
@@ -106,7 +108,15 @@ export default function App() {
         />
       </div>
 
-      <NavBar syncStatus={syncStatus} todosCount={todos.length} onLogout={handleLogout} />
+      <NavBar syncStatus={syncStatus} todosCount={todos.length} onMenuToggle={() => setSidebarOpen((p) => !p)} />
+
+      <Sidebar
+        open={sidebarOpen}
+        activeTab={tab}
+        onTabChange={setTab}
+        onClose={() => setSidebarOpen(false)}
+        onLogout={handleLogout}
+      />
 
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 0 8px' }}>
         {tab === 'dashboard'   && <Dashboard customers={customers} orders={orders} onOrderClick={setSelO} />}
