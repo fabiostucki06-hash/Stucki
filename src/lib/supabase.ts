@@ -51,22 +51,25 @@ export const storage = {
     const rootItems = await listBucket(bucket, '');
     console.log(`[storage] ${bucket} root items:`, rootItems);
 
+    const isRealFile = (f: StorageItem) => f.id != null && !f.name.endsWith('.emptyFolderPlaceholder');
+
     // real files have a non-null id; folders have id === null
-    let file = rootItems.find(f => f.id != null);
+    let file = rootItems.find(isRealFile);
 
     // if nothing at root, check inside each subfolder
     if (!file) {
       for (const folder of rootItems.filter(f => f.id == null)) {
         const subItems = await listBucket(bucket, folder.name + '/');
         console.log(`[storage] ${bucket}/${folder.name} items:`, subItems);
-        file = subItems.find(f => f.id != null);
+        file = subItems.find(isRealFile);
         if (file) { file = { ...file, name: folder.name + '/' + file.name }; break; }
       }
     }
 
     if (!file) throw new Error(`Keine Excel-Vorlage in Bucket "${bucket}" gefunden`);
 
-    const fileRes = await fetch(`${SUPA_URL}/storage/v1/object/public/${bucket}/${encodeURIComponent(file.name)}`);
+    const encodedPath = file.name.split('/').map(encodeURIComponent).join('/');
+    const fileRes = await fetch(`${SUPA_URL}/storage/v1/object/public/${bucket}/${encodedPath}`);
     if (!fileRes.ok) throw new Error(`Vorlage "${file.name}" konnte nicht geladen werden (HTTP ${fileRes.status})`);
     return fileRes.arrayBuffer();
   },
