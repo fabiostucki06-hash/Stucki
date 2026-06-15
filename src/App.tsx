@@ -108,7 +108,7 @@ export default function App() {
         />
       </div>
 
-      <NavBar syncStatus={syncStatus} todosCount={todos.length} onMenuToggle={() => setSidebarOpen((p) => !p)} />
+      <NavBar syncStatus={syncStatus} todosCount={todos.length} onMenuToggle={() => setSidebarOpen((p) => !p)} onLogoClick={() => setTab('dashboard')} />
 
       <Sidebar
         open={sidebarOpen}

@@ -6,9 +6,10 @@ interface NavBarProps {
   syncStatus: SyncStatus;
   todosCount: number;
   onMenuToggle: () => void;
+  onLogoClick: () => void;
 }
 
-export default function NavBar({ syncStatus, todosCount, onMenuToggle }: NavBarProps) {
+export default function NavBar({ syncStatus, todosCount, onMenuToggle, onLogoClick }: NavBarProps) {
   const cloudClass = [
     'cloud-idle',
     syncStatus === 'saving' && 'cloud-saving',
@@ -35,7 +36,7 @@ export default function NavBar({ syncStatus, todosCount, onMenuToggle }: NavBarP
         </button>
 
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center' }}>
+        <button onClick={onLogoClick} style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
           <img
             src={ASSETS.logo}
             alt="Werkstatt"
@@ -46,7 +47,7 @@ export default function NavBar({ syncStatus, todosCount, onMenuToggle }: NavBarP
               if (!img.dataset.fb) { img.dataset.fb = '1'; img.src = '/icon_image.jpg'; }
             }}
           />
-        </div>
+        </button>
 
         {/* Right side: sync indicator + todo badge */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
