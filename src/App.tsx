@@ -40,7 +40,9 @@ export default function App() {
   const [selC, setSelC] = useState<Customer | null>(null);
   const [editC, setEditC] = useState<Customer | null>(null);
   const [selO, setSelO] = useState<Order | null>(null);
+  const [selOInEdit, setSelOInEdit] = useState(false);
   const [selOff, setSelOff] = useState<Offerte | null>(null);
+  const [editOff, setEditOff] = useState<Offerte | null>(null);
 
   const todos = orders.filter(needsAttention);
 
@@ -74,11 +76,11 @@ export default function App() {
   }
 
   async function handleUpdateOrder(upd: Order, cp: Partial<Customer> | null) {
-    await updateOrder(upd, cp); setSelO(upd);
+    await updateOrder(upd, cp); setSelO(upd); setSelOInEdit(false);
   }
 
   async function handleDeleteOrder(id: string) {
-    await deleteOrder(id); setSelO(null);
+    await deleteOrder(id); setSelO(null); setSelOInEdit(false);
   }
 
   async function handleAddOfferte(data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>) {
@@ -87,6 +89,14 @@ export default function App() {
 
   async function handleUpdateOfferte(upd: Offerte) {
     await updateOfferte(upd); setSelOff(upd);
+  }
+
+  async function handleSaveEditOfferte(data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>) {
+    if (!editOff) return;
+    const updated: Offerte = { ...editOff, ...data };
+    await updateOfferte(updated);
+    setEditOff(null);
+    setSelOff(updated);
   }
 
   async function handleDeleteOfferte(id: string) {
@@ -119,9 +129,9 @@ export default function App() {
       />
 
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 0 8px' }}>
-        {tab === 'dashboard'   && <Dashboard customers={customers} orders={orders} onOrderClick={setSelO} />}
-        {tab === 'auftraege'   && <OrderList orders={orders} customers={customers} onOrderClick={setSelO} />}
-        {tab === 'offerten'    && <OfferteList offerten={offerten} customers={customers} onOfferteClick={setSelOff} onNew={() => setShowNOff(true)} />}
+        {tab === 'dashboard'   && <Dashboard customers={customers} orders={orders} onOrderClick={(o) => { setSelOInEdit(false); setSelO(o); }} />}
+        {tab === 'auftraege'   && <OrderList orders={orders} customers={customers} onOrderClick={(o) => { setSelOInEdit(false); setSelO(o); }} onEditClick={(o) => { setSelOInEdit(true); setSelO(o); }} />}
+        {tab === 'offerten'    && <OfferteList offerten={offerten} customers={customers} onOfferteClick={setSelOff} onEdit={(off) => setEditOff(off)} onNew={() => setShowNOff(true)} />}
         {tab === 'kunden'      && <CustomerList customers={customers} orders={orders} onCustomerClick={setSelC} />}
         {tab === 'statistiken' && <StatistikDashboard orders={orders} offerten={offerten} customers={customers} />}
 
@@ -190,7 +200,15 @@ export default function App() {
           onClose={() => setSelOff(null)}
           onUpdate={handleUpdateOfferte}
           onDelete={handleDeleteOfferte}
+          onEdit={(off) => { setSelOff(null); setEditOff(off); }}
         />
+      )}
+
+      {editOff && (
+        <Sheet title={`Offerte #${editOff.offertNumber} bearbeiten`} onClose={() => setEditOff(null)} full
+          barRight={<button onClick={() => setEditOff(null)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
+          <OfferteForm customers={customers} initial={editOff} onSave={handleSaveEditOfferte} onCancel={() => setEditOff(null)} />
+        </Sheet>
       )}
 
       {selC && !selO && (
@@ -218,9 +236,10 @@ export default function App() {
         <OrderDetail
           order={selO}
           customer={customers.find((c) => c.id === selO.customerId)}
-          onClose={() => setSelO(null)}
+          onClose={() => { setSelO(null); setSelOInEdit(false); }}
           onUpdate={handleUpdateOrder}
           onDelete={handleDeleteOrder}
+          defaultEdit={selOInEdit}
         />
       )}
 

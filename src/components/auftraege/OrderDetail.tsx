@@ -14,10 +14,11 @@ interface OrderDetailProps {
   onClose: () => void;
   onUpdate: (upd: Order, cp: Partial<Customer> | null) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  defaultEdit?: boolean;
 }
 
-export default function OrderDetail({ order, customer, onClose, onUpdate, onDelete }: OrderDetailProps) {
-  const [edit, setEdit] = useState(false);
+export default function OrderDetail({ order, customer, onClose, onUpdate, onDelete, defaultEdit }: OrderDetailProps) {
+  const [edit, setEdit] = useState(defaultEdit ?? false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<OrderStatus>(order.status);
   const [bs, setBs] = useState(order.beanstandungen ?? ['']);

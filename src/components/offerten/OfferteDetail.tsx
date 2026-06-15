@@ -10,6 +10,7 @@ interface OfferteDetailProps {
   onClose: () => void;
   onUpdate: (upd: Offerte) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onEdit: (off: Offerte) => void;
 }
 
 type StatusMeta = { c: string; l: string };
@@ -20,13 +21,18 @@ const ST_META: Record<OfferteStatus, StatusMeta> = {
   abgelehnt:  { c: 'var(--red)',    l: 'Abgelehnt'  },
 };
 
-export default function OfferteDetail({ offerte, customer, onClose, onUpdate, onDelete }: OfferteDetailProps) {
+export default function OfferteDetail({ offerte, customer, onClose, onUpdate, onDelete, onEdit }: OfferteDetailProps) {
   const [saving, setSaving] = useState(false);
   const sc = ST_META[offerte.status] ?? ST_META.entwurf;
   const isExpired = offerte.gueltigBis && new Date(offerte.gueltigBis) < new Date();
 
   return (
-    <Sheet title={`Offerte #${offerte.offertNumber}`} onClose={onClose} full>
+    <Sheet
+      title={`Offerte #${offerte.offertNumber}`}
+      onClose={onClose}
+      full
+      barRight={<button onClick={() => onEdit(offerte)} className="bar-btn">Bearbeiten</button>}
+    >
       <div className="glass-panel" style={{ padding: 16, marginBottom: 16 }}>
         <div style={{ fontSize: 13, color: 'var(--label2)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Status</div>
         <div style={{ fontSize: 24, fontWeight: 700, color: sc.c, letterSpacing: '0.34px' }}>{sc.l}</div>

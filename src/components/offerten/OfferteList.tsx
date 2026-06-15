@@ -6,13 +6,14 @@ interface OfferteListProps {
   offerten: Offerte[];
   customers: Customer[];
   onOfferteClick: (o: Offerte) => void;
+  onEdit: (o: Offerte) => void;
   onNew: () => void;
 }
 
 const STATUS_LABELS: Record<OfferteStatus, string> = { entwurf: 'Entwurf', versendet: 'Versendet', angenommen: 'Angenommen', abgelehnt: 'Abgelehnt' };
 const STATUS_COLORS: Record<OfferteStatus, string> = { entwurf: 'var(--label2)', versendet: 'var(--orange)', angenommen: 'var(--green)', abgelehnt: 'var(--red)' };
 
-export default function OfferteList({ offerten, customers, onOfferteClick, onNew }: OfferteListProps) {
+export default function OfferteList({ offerten, customers, onOfferteClick, onEdit, onNew }: OfferteListProps) {
   const sortByName = (a: Offerte, b: Offerte) => {
     const ca = customers.find((x) => x.id === a.customerId);
     const cb = customers.find((x) => x.id === b.customerId);
@@ -52,6 +53,7 @@ export default function OfferteList({ offerten, customers, onOfferteClick, onNew
                       {off.totalBetrag && <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--blue)', marginTop: 1 }}>CHF {off.totalBetrag}</div>}
                     </div>
                     <button onClick={(e) => { e.stopPropagation(); exportOfferteExcel(off, c); }} className="excel-btn" title="Excel herunterladen">XLS</button>
+                    <button onClick={(e) => { e.stopPropagation(); onEdit(off); }} className="excel-btn" style={{ background: 'rgba(0,122,255,0.12)', color: 'var(--blue)', border: '1px solid rgba(0,122,255,0.25)' }} title="Bearbeiten">✎</button>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, marginLeft: 4 }}>
                       <div style={{ fontSize: 12, color: 'var(--label3)' }}>{new Date(off.createdAt).toLocaleDateString('de-CH')}</div>
                       <span style={{ color: 'var(--label3)' }}><SFChevron /></span>

@@ -4,7 +4,7 @@ import { showToast } from '../ui/Toast';
 import { SFPlus, SFXmark } from '../Icons';
 import type { Customer, ArbeitPosition, MaterialPosition, Offerte } from '../../types';
 
-type ArbeitRow  = ArbeitPosition  & { zeLoading: boolean; zeHint: string };
+type ArbeitRow   = ArbeitPosition  & { zeLoading: boolean; zeHint: string };
 type MaterialRow = MaterialPosition;
 type OfferteData = Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>;
 
@@ -13,14 +13,15 @@ interface OfferteFormProps {
   onSave: (data: OfferteData) => Promise<void> | void;
   onCancel: () => void;
   saving?: boolean;
+  initial?: Offerte;
 }
 
 function schaetzeZE(desc: string): string {
   const t = desc.toLowerCase();
   const rules: [RegExp, number][] = [
-    [/oelwechsel|ölwechsel/, 2],[/inspektion|service/, 6],[/bremsen|bremsbelag/, 4],
-    [/reifen|pneu/, 2],[/getriebe/, 10],[/kupplung/, 8],[/zahnriemen/, 8],
-    [/batterie/, 1],[/diagnose/, 1],[/klima/, 3],
+    [/oelwechsel|ölwechsel/, 2], [/inspektion|service/, 6], [/bremsen|bremsbelag/, 4],
+    [/reifen|pneu/, 2], [/getriebe/, 10], [/kupplung/, 8], [/zahnriemen/, 8],
+    [/batterie/, 1], [/diagnose/, 1], [/klima/, 3],
   ];
   for (const [re, ze] of rules) if (re.test(t)) return String(ze);
   return '1';
@@ -44,14 +45,20 @@ const newArbeit   = (): ArbeitRow   => ({ typ: 'arbeit',   beschreibung: '', ze:
 const newMaterial = (): MaterialRow => ({ typ: 'material', beschreibung: '', menge: '1', stueckpreis: '', preis: '' });
 const fCHF = (n: number) => 'CHF ' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, "'");
 
-export default function OfferteForm({ customers, onSave, onCancel }: OfferteFormProps) {
-  const [cid,       setCid]       = useState('');
-  const [titel,     setTitel]     = useState('');
-  const [tab,       setTab]       = useState<'arbeit' | 'material'>('arbeit');
-  const [arbeit,    setArbeit]    = useState<ArbeitRow[]>([newArbeit()]);
-  const [material,  setMaterial]  = useState<MaterialRow[]>([newMaterial()]);
-  const [notizen,   setNotizen]   = useState('');
-  const [gueltigBis, setGueltigBis] = useState('');
+export default function OfferteForm({ customers, onSave, onCancel, initial }: OfferteFormProps) {
+  const [cid,        setCid]        = useState(initial?.customerId ?? '');
+  const [titel,      setTitel]      = useState(initial?.titel ?? '');
+  const [tab,        setTab]        = useState<'arbeit' | 'material'>('arbeit');
+  const [arbeit,     setArbeit]     = useState<ArbeitRow[]>(() => {
+    const ap = (initial?.positionen ?? []).filter((p): p is ArbeitPosition => p.typ === 'arbeit');
+    return ap.length ? ap.map((p) => ({ ...p, zeLoading: false, zeHint: p.zeHint ?? '' })) : [newArbeit()];
+  });
+  const [material,   setMaterial]   = useState<MaterialRow[]>(() => {
+    const mp = (initial?.positionen ?? []).filter((p): p is MaterialPosition => p.typ === 'material');
+    return mp.length ? [...mp] : [newMaterial()];
+  });
+  const [notizen,    setNotizen]    = useState(initial?.notizen ?? '');
+  const [gueltigBis, setGueltigBis] = useState(initial?.gueltigBis ?? '');
 
   const selectedCustomer = customers.find((c) => c.id === cid) ?? null;
   const vehicleChips = selectedCustomer
@@ -119,249 +126,213 @@ export default function OfferteForm({ customers, onSave, onCancel }: OfferteForm
     });
   }
 
+  const hdrTxt: React.CSSProperties = { fontSize: 9, fontWeight: 700, color: 'var(--label3)', textTransform: 'uppercase', letterSpacing: '0.07em' };
+
   return (
     <div>
-      {/* ── Header: Kunde + Datum + Betreff ── */}
-      <div className="cf-section-title">Kunde &amp; Details</div>
-      <div className="cf-group">
-        <div className="cf-grid-21">
-          <div className="cf-field">
-            <label className="cf-label">Kunde *</label>
+
+      {/* ── Kunde & Details ── */}
+      <div className="mf-section">
+        <span className="mf-section-label">Kunde &amp; Details</span>
+        <div className="mf-row-2" style={{ marginBottom: 14 }}>
+          <div>
+            <label className="mf-label">Kunde *</label>
             <select
-              className="cf-select"
+              className="mf-select"
               value={cid}
               onChange={(e) => setCid(e.target.value)}
               style={{ color: cid ? 'var(--label)' : 'var(--label3)' }}
             >
-              <option value="">Kunde auswählen…</option>
+              <option value="">Auswählen…</option>
               {customers.map((c) => (
                 <option key={c.id} value={c.id}>{c.vorname} {c.nachname} – {c.kennzeichen}</option>
               ))}
             </select>
           </div>
-          <div className="cf-field">
-            <label className="cf-label">Gültig bis</label>
-            <input className="cf-input" type="date" value={gueltigBis} onChange={(e) => setGueltigBis(e.target.value)} />
+          <div>
+            <label className="mf-label">Gültig bis</label>
+            <input className="mf-input" type="date" value={gueltigBis} onChange={(e) => setGueltigBis(e.target.value)} />
           </div>
         </div>
 
         {vehicleChips.length > 0 && (
-          <div className="vehicle-chips-bar">
-            <span style={{ fontSize: 12 }}>🚗</span>
-            {vehicleChips.map((v, i) => <span key={i} className="vehicle-chip">{v}</span>)}
+          <div className="mf-chips">
+            <span style={{ fontSize: 11 }}>🚗</span>
+            {vehicleChips.map((v, i) => <span key={i} className="mf-chip">{v}</span>)}
           </div>
         )}
 
-        <div className="cf-field" style={{ marginTop: vehicleChips.length ? 8 : 10 }}>
-          <label className="cf-label">Betreff</label>
-          <input className="cf-input" value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="z.B. Inspektion, Reparatur…" />
+        <div style={{ marginTop: vehicleChips.length ? 12 : 0 }}>
+          <label className="mf-label">Betreff</label>
+          <input className="mf-input" value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="z.B. Inspektion, Reparatur…" />
         </div>
       </div>
 
-      {/* ── Totals bar ── */}
-      <div style={{ display: 'flex', gap: 7, marginBottom: 14 }}>
+      {/* ── Totals ── */}
+      <div className="mf-totals">
         {([
           ['Arbeit',   fCHF(totA),        totZE ? `${totZE} ZE` : null, 'var(--blue)'],
           ['Material', fCHF(totM),        null,                          'var(--green)'],
           ['Total',    fCHF(totA + totM), null,                          'var(--indigo)'],
         ] as [string, string, string | null, string][]).map(([l, v, sub, c]) => (
-          <div key={l} className="glass-panel" style={{ flex: 1, padding: '7px 6px', textAlign: 'center' }}>
-            <div style={{ fontSize: 9, color: 'var(--label2)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>{l}</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: c, letterSpacing: '-0.2px' }}>{v}</div>
-            {sub && <div style={{ fontSize: 10, color: 'var(--label3)', marginTop: 1 }}>{sub}</div>}
+          <div key={l} className="mf-total-pill">
+            <div className="mf-total-name">{l}</div>
+            <div className="mf-total-val" style={{ color: c }}>{v}</div>
+            {sub && <div className="mf-total-sub">{sub}</div>}
           </div>
         ))}
       </div>
 
-      {/* ── Positionen tab bar ── */}
-      <div className="cf-section-title">Positionen</div>
-      <div className="doc-tab-bar" style={{ marginBottom: 10 }}>
-        {(['arbeit', 'material'] as const).map((t) => (
-          <button key={t} className={`doc-tab${tab === t ? ' dt-active' : ''}`} onClick={() => setTab(t)} aria-pressed={tab === t}>
-            {t === 'arbeit' ? (
-              <><svg width={14} height={14} viewBox="0 0 15 15" fill="none" aria-hidden="true"><path d="M9.5 3.5a3.5 3.5 0 01-4.9 4.9L2 11a1.2 1.2 0 001.7 1.7L6.2 10A3.5 3.5 0 019.5 3.5zm.7-.7l-2 2 .8.8 2-2-.8-.8z" stroke="currentColor" strokeWidth={1.2} strokeLinejoin="round" strokeLinecap="round"/></svg>Arbeit</>
-            ) : (
-              <><svg width={14} height={14} viewBox="0 0 15 15" fill="none" aria-hidden="true"><rect x={2} y={4} width={11} height={9} rx={1.5} stroke="currentColor" strokeWidth={1.2}/><path d="M5 4V3a2 2 0 014 0v1" stroke="currentColor" strokeWidth={1.2} strokeLinecap="round"/></svg>Material</>
-            )}
-            <span className={`doc-tab-count${(t === 'arbeit' ? arbeit : material).filter((p) => p.beschreibung).length ? ' has-items' : ''}`}>
-              {(t === 'arbeit' ? arbeit : material).filter((p) => p.beschreibung).length}
-            </span>
-          </button>
-        ))}
+      {/* ── Positionen ── */}
+      <div className="mf-section">
+        <span className="mf-section-label">Positionen</span>
+
+        <div className="doc-tab-bar" style={{ marginBottom: 10 }}>
+          {(['arbeit', 'material'] as const).map((t) => (
+            <button key={t} className={`doc-tab${tab === t ? ' dt-active' : ''}`} onClick={() => setTab(t)} aria-pressed={tab === t}>
+              {t === 'arbeit' ? (
+                <><svg width={13} height={13} viewBox="0 0 15 15" fill="none" aria-hidden="true"><path d="M9.5 3.5a3.5 3.5 0 01-4.9 4.9L2 11a1.2 1.2 0 001.7 1.7L6.2 10A3.5 3.5 0 019.5 3.5zm.7-.7l-2 2 .8.8 2-2-.8-.8z" stroke="currentColor" strokeWidth={1.2} strokeLinejoin="round" strokeLinecap="round"/></svg>Arbeit</>
+              ) : (
+                <><svg width={13} height={13} viewBox="0 0 15 15" fill="none" aria-hidden="true"><rect x={2} y={4} width={11} height={9} rx={1.5} stroke="currentColor" strokeWidth={1.2}/><path d="M5 4V3a2 2 0 014 0v1" stroke="currentColor" strokeWidth={1.2} strokeLinecap="round"/></svg>Material</>
+              )}
+              <span className={`doc-tab-count${(t === 'arbeit' ? arbeit : material).filter((p) => p.beschreibung).length ? ' has-items' : ''}`}>
+                {(t === 'arbeit' ? arbeit : material).filter((p) => p.beschreibung).length}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Arbeit rows */}
+        {tab === 'arbeit' && (
+          <>
+            <div className="mf-pos-hdr">
+              <span style={{ width: 18, flexShrink: 0 }} />
+              <span style={{ ...hdrTxt, flex: 1 }}>Beschreibung</span>
+              <span style={{ ...hdrTxt, width: 42, textAlign: 'right' }}>ZE</span>
+              <span style={{ width: 28, flexShrink: 0 }} />
+              <span style={{ ...hdrTxt, width: 50, textAlign: 'right' }}>CHF/h</span>
+              <span style={{ ...hdrTxt, width: 68, textAlign: 'right' }}>Total</span>
+              <span style={{ width: 22, flexShrink: 0 }} />
+            </div>
+            {arbeit.map((pos, i) => (
+              <div key={i} className="mf-pos-row">
+                <span className="mf-pos-idx">{i + 1}</span>
+                <input
+                  className="mf-pos-desc"
+                  value={pos.beschreibung}
+                  onChange={(e) => updA(i, 'beschreibung', e.target.value)}
+                  placeholder="Arbeitsschritt…"
+                />
+                <input
+                  className="mf-pos-num"
+                  style={{ width: 42, color: pos.zeKI ? 'var(--teal)' : undefined, fontWeight: pos.zeKI ? 700 : undefined }}
+                  type="number"
+                  value={pos.ze}
+                  onChange={(e) => updA(i, 'ze', e.target.value)}
+                  placeholder="—"
+                  min={0}
+                  title={pos.zeHint || undefined}
+                />
+                <button
+                  className={`mf-pos-ki${pos.zeKI ? ' ki-active' : ''}`}
+                  style={{ width: 28 }}
+                  onClick={() => kiZE(i)}
+                  disabled={pos.zeLoading || !pos.beschreibung.trim()}
+                  title="KI-Schätzung anfordern"
+                >
+                  {pos.zeLoading ? <Spinner size={10} /> : '✦'}
+                </button>
+                <input
+                  className="mf-pos-num"
+                  style={{ width: 50 }}
+                  type="number"
+                  value={pos.stundenansatz}
+                  onChange={(e) => updA(i, 'stundenansatz', e.target.value)}
+                  placeholder="80"
+                />
+                <span className="mf-pos-total" style={{ color: 'var(--blue)', width: 68 }}>
+                  {pos.preis ? fCHF(parseFloat(pos.preis)) : '—'}
+                </span>
+                {arbeit.length > 1
+                  ? <button className="mf-pos-del" onClick={() => remA(i)}><SFXmark /></button>
+                  : <span style={{ width: 22 }} />
+                }
+              </div>
+            ))}
+            <button className="mf-add-pos" onClick={addA}><SFPlus size={12} /> Arbeitsposition</button>
+          </>
+        )}
+
+        {/* Material rows */}
+        {tab === 'material' && (
+          <>
+            <div className="mf-pos-hdr">
+              <span style={{ width: 18, flexShrink: 0 }} />
+              <span style={{ ...hdrTxt, flex: 1 }}>Beschreibung</span>
+              <span style={{ ...hdrTxt, width: 44, textAlign: 'right' }}>Menge</span>
+              <span style={{ ...hdrTxt, width: 64, textAlign: 'right' }}>Stk. CHF</span>
+              <span style={{ ...hdrTxt, width: 68, textAlign: 'right' }}>Total</span>
+              <span style={{ width: 22, flexShrink: 0 }} />
+            </div>
+            {material.map((pos, i) => (
+              <div key={i} className="mf-pos-row">
+                <span className="mf-pos-idx">{i + 1}</span>
+                <input
+                  className="mf-pos-desc"
+                  value={pos.beschreibung}
+                  onChange={(e) => updM(i, 'beschreibung', e.target.value)}
+                  placeholder="Ersatzteil / Material…"
+                />
+                <input
+                  className="mf-pos-num"
+                  style={{ width: 44 }}
+                  type="number"
+                  value={pos.menge}
+                  onChange={(e) => updM(i, 'menge', e.target.value)}
+                  min={1}
+                />
+                <input
+                  className="mf-pos-num"
+                  style={{ width: 64 }}
+                  type="number"
+                  value={pos.stueckpreis}
+                  onChange={(e) => updM(i, 'stueckpreis', e.target.value)}
+                  placeholder="0.00"
+                />
+                <span className="mf-pos-total" style={{ color: 'var(--green)', width: 68 }}>
+                  {pos.preis ? fCHF(parseFloat(pos.preis)) : '—'}
+                </span>
+                {material.length > 1
+                  ? <button className="mf-pos-del" onClick={() => remM(i)}><SFXmark /></button>
+                  : <span style={{ width: 22 }} />
+                }
+              </div>
+            ))}
+            <button className="mf-add-pos green" onClick={addM}><SFPlus size={12} /> Materialposition</button>
+          </>
+        )}
       </div>
 
-      {/* ── Arbeit table ── */}
-      {tab === 'arbeit' && (
-        <div className="pos-tbl-wrap">
-          <table className="pos-tbl">
-            <colgroup>
-              <col style={{ width: 28 }} />
-              <col />
-              <col style={{ width: 62 }} />
-              <col style={{ width: 32 }} />
-              <col style={{ width: 66 }} />
-              <col style={{ width: 90 }} />
-              <col style={{ width: 30 }} />
-            </colgroup>
-            <thead>
-              <tr>
-                <th></th>
-                <th>Beschreibung</th>
-                <th>ZE</th>
-                <th title="KI-Schätzung">✦</th>
-                <th>CHF/h</th>
-                <th style={{ textAlign: 'right' }}>Total</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {arbeit.map((pos, i) => (
-                <tr key={i}>
-                  <td><div className="pos-num-badge">{String(i + 1).padStart(2, '0')}</div></td>
-                  <td>
-                    <input
-                      className="pos-inp"
-                      value={pos.beschreibung}
-                      onChange={(e) => updA(i, 'beschreibung', e.target.value)}
-                      placeholder="Arbeitsschritt…"
-                    />
-                  </td>
-                  <td>
-                    <input
-                      className="pos-inp pos-inp-num"
-                      type="number"
-                      value={pos.ze}
-                      onChange={(e) => updA(i, 'ze', e.target.value)}
-                      placeholder="Auto"
-                      min={0}
-                      title={pos.zeHint || undefined}
-                      style={pos.zeKI ? { color: 'var(--teal)', fontWeight: 700 } : {}}
-                    />
-                  </td>
-                  <td>
-                    <button
-                      className={`pos-ki-btn${pos.zeKI ? ' ki-active' : ''}`}
-                      onClick={() => kiZE(i)}
-                      disabled={pos.zeLoading || !pos.beschreibung.trim()}
-                      title="KI-Schätzung anfordern"
-                    >
-                      {pos.zeLoading ? <Spinner size={11} /> : '✦'}
-                    </button>
-                  </td>
-                  <td>
-                    <input
-                      className="pos-inp pos-inp-num"
-                      type="number"
-                      value={pos.stundenansatz}
-                      onChange={(e) => updA(i, 'stundenansatz', e.target.value)}
-                      placeholder="80"
-                    />
-                  </td>
-                  <td className="pos-total-cell" style={{ color: 'var(--blue)' }}>
-                    {pos.preis ? fCHF(parseFloat(pos.preis)) : '—'}
-                  </td>
-                  <td>
-                    {arbeit.length > 1 && (
-                      <button className="pos-del-btn" onClick={() => remA(i)}><SFXmark /></button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <button className="cf-add-row cf-add-row-arbeit" onClick={addA}>
-            <SFPlus size={11} /> Arbeitsposition
-          </button>
-        </div>
-      )}
-
-      {/* ── Material table ── */}
-      {tab === 'material' && (
-        <div className="pos-tbl-wrap">
-          <table className="pos-tbl">
-            <colgroup>
-              <col style={{ width: 28 }} />
-              <col />
-              <col style={{ width: 62 }} />
-              <col style={{ width: 80 }} />
-              <col style={{ width: 90 }} />
-              <col style={{ width: 30 }} />
-            </colgroup>
-            <thead>
-              <tr>
-                <th></th>
-                <th>Beschreibung</th>
-                <th>Menge</th>
-                <th>Stk. CHF</th>
-                <th style={{ textAlign: 'right' }}>Total</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {material.map((pos, i) => (
-                <tr key={i}>
-                  <td><div className="pos-num-badge">{String(i + 1).padStart(2, '0')}</div></td>
-                  <td>
-                    <input
-                      className="pos-inp"
-                      value={pos.beschreibung}
-                      onChange={(e) => updM(i, 'beschreibung', e.target.value)}
-                      placeholder="Ersatzteil / Material…"
-                    />
-                  </td>
-                  <td>
-                    <input
-                      className="pos-inp pos-inp-num"
-                      type="number"
-                      value={pos.menge}
-                      onChange={(e) => updM(i, 'menge', e.target.value)}
-                      min={1}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      className="pos-inp pos-inp-num"
-                      type="number"
-                      value={pos.stueckpreis}
-                      onChange={(e) => updM(i, 'stueckpreis', e.target.value)}
-                      placeholder="0.00"
-                    />
-                  </td>
-                  <td className="pos-total-cell" style={{ color: 'var(--green)' }}>
-                    {pos.preis ? fCHF(parseFloat(pos.preis)) : '—'}
-                  </td>
-                  <td>
-                    {material.length > 1 && (
-                      <button className="pos-del-btn" onClick={() => remM(i)}><SFXmark /></button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <button className="cf-add-row cf-add-row-material" onClick={addM}>
-            <SFPlus size={11} /> Materialposition
-          </button>
-        </div>
-      )}
-
       {/* ── Notizen ── */}
-      <div className="cf-section-title">Notizen</div>
-      <div className="cf-group">
+      <div className="mf-section">
+        <span className="mf-section-label">Notizen</span>
         <textarea
-          className="cf-textarea"
+          className="mf-textarea"
           value={notizen}
           onChange={(e) => setNotizen(e.target.value)}
           placeholder="Interne Notizen zur Offerte…"
-          rows={2}
+          rows={3}
         />
       </div>
 
       {/* ── Actions ── */}
-      <div className="cf-actions">
-        <button className="cf-btn-cancel" onClick={onCancel}>Abbrechen</button>
-        <button className="cf-btn-save" onClick={submit}>Offerte erstellen</button>
+      <div className="mf-actions">
+        <button className="mf-btn-save" onClick={submit}>
+          {initial ? 'Änderungen speichern' : 'Offerte erstellen'}
+        </button>
+        <button className="mf-btn-cancel" onClick={onCancel}>Abbrechen</button>
       </div>
+
     </div>
   );
 }
