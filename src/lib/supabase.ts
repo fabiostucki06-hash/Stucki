@@ -49,7 +49,6 @@ export const storage = {
   /** Lists the bucket (and one level of subfolders) and returns the first file found. */
   async fetchTemplate(bucket: string): Promise<ArrayBuffer> {
     const rootItems = await listBucket(bucket, '');
-    console.log(`[storage] ${bucket} root items:`, rootItems);
 
     const isRealFile = (f: StorageItem) => f.id != null && f.name.endsWith('.xlsx');
 
@@ -60,7 +59,6 @@ export const storage = {
     if (!file) {
       for (const folder of rootItems.filter(f => f.id == null)) {
         const subItems = await listBucket(bucket, folder.name + '/');
-        console.log(`[storage] ${bucket}/${folder.name} items:`, subItems);
         file = subItems.find(isRealFile);
         if (file) { file = { ...file, name: folder.name + '/' + file.name }; break; }
       }
