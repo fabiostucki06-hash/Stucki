@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import Badge from '../ui/Badge';
-import { SFChevron } from '../Icons';
+import { SFChevron, SFXmark } from '../Icons';
 import { isOverdue, daysSince } from '../../lib/utils';
 import { SC, SO } from '../../constants/statuses';
 import { exportOrderExcel } from '../../lib/excel';
@@ -12,6 +13,17 @@ interface OrderListProps {
 }
 
 export default function OrderList({ orders, customers, onOrderClick }: OrderListProps) {
+  const [search, setSearch] = useState('');
+
+  const filtered = search.trim()
+    ? orders.filter((o) => {
+        const c = customers.find((x) => x.id === o.customerId);
+        const q = search.toLowerCase();
+        return [c?.vorname, c?.nachname, c?.kennzeichen, c?.marke, c?.modell, `#${o.orderNumber}`]
+          .some((v) => v?.toLowerCase().includes(q));
+      })
+    : orders;
+
   const sortByName = (a: Order, b: Order) => {
     const ca = customers.find((x) => x.id === a.customerId);
     const cb = customers.find((x) => x.id === b.customerId);
@@ -20,14 +32,31 @@ export default function OrderList({ orders, customers, onOrderClick }: OrderList
     return na < nb ? -1 : na > nb ? 1 : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   };
 
-  const done = orders.filter((o) => o.status === 'abgeschlossen').sort(sortByName);
+  const done = filtered.filter((o) => o.status === 'abgeschlossen').sort(sortByName);
 
   return (
     <div style={{ padding: '16px 16px 0' }}>
-      <h1 className="sf-title1" style={{ marginBottom: 12, paddingTop: 8 }}>Aufträge</h1>
+      <h1 className="sf-title1" style={{ marginBottom: 8, paddingTop: 8 }}>Aufträge</h1>
+
+      <div className="search-bar-wrap" style={{ padding: '8px 0 12px' }}>
+        <div className="search-bar">
+          <span className="search-icon">⌕</span>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Name, Kennzeichen, Modell…"
+            autoComplete="off"
+          />
+          {search && (
+            <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--label3)', padding: 0 }}>
+              <SFXmark />
+            </button>
+          )}
+        </div>
+      </div>
 
       {SO.filter((s) => s !== 'abgeschlossen').map((s) => {
-        const grp = orders.filter((o) => o.status === s).sort(sortByName);
+        const grp = filtered.filter((o) => o.status === s).sort(sortByName);
         if (!grp.length) return null;
         return (
           <div key={s}>
@@ -76,6 +105,9 @@ export default function OrderList({ orders, customers, onOrderClick }: OrderList
         </details>
       )}
 
+      {orders.length > 0 && filtered.length === 0 && (
+        <div className="glass-panel" style={{ padding: 40, textAlign: 'center', color: 'var(--label3)' }}>Keine Aufträge gefunden.</div>
+      )}
       {!orders.length && <div className="glass-panel" style={{ padding: 40, textAlign: 'center', color: 'var(--label3)' }}>Noch keine Aufträge.</div>}
     </div>
   );

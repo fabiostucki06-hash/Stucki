@@ -16,7 +16,7 @@ export default function CustomerList({ customers, orders, onCustomerClick }: Cus
 
   const filtered = customers.filter((c) => {
     const q = search.toLowerCase();
-    const match = !q || `${c.vorname} ${c.nachname} ${c.telefon} ${c.kennzeichen}`.toLowerCase().includes(q);
+    const match = !q || `${c.vorname} ${c.nachname} ${c.telefon} ${c.kennzeichen} ${c.marke ?? ''} ${c.modell ?? ''}`.toLowerCase().includes(q);
     const as = getActiveStatus(orders, c.id);
     if (filterK === 'active' && !as) return false;
     if (filterK === 'inactive' && as) return false;

@@ -35,10 +35,12 @@ export default function TabBar({ activeTab, onTabChange, fabOpen, onFabToggle }:
           onClick={onFabToggle}
           style={{
             width: 48, height: 48, borderRadius: 24,
-            background: 'linear-gradient(to bottom,rgba(84,164,255,0.95) 0%,rgba(0,122,255,0.95) 50%,rgba(0,86,179,0.95) 100%)',
-            color: '#fff', border: '1px solid #004fb0', cursor: 'pointer',
+            background: 'rgba(0,122,255,0.30)',
+            backdropFilter: 'blur(24px) saturate(200%)',
+            WebkitBackdropFilter: 'blur(24px) saturate(200%)',
+            color: '#fff', border: '1px solid rgba(140,200,255,0.40)', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: 'inset 0 1px 0px rgba(255,255,255,0.7),inset 0 -1px 2px rgba(0,0,0,0.15),0 6px 14px rgba(0,0,0,0.18)',
+            boxShadow: 'inset 0 1.5px 0 rgba(255,255,255,0.55),inset 0 -1px 2px rgba(0,20,80,0.12),0 6px 20px rgba(0,100,255,0.28)',
             transform: fabOpen ? 'rotate(45deg)' : 'rotate(0)',
             transition: 'transform 0.22s cubic-bezier(.34,1.56,.64,1)',
           }}
