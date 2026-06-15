@@ -59,7 +59,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           db.get('customers', token),
           db.get('orders', token),
           db.getCounter(token),
-          db.get('offerte', token).catch((e) => { console.error('[Supabase] get(offerte):', e); return []; }),
+          db.get('offerten', token).catch((e) => { console.error('[Supabase] get(offerten):', e); return []; }),
         ]);
         const parseRows = (arr: unknown[]) =>
           (Array.isArray(arr) ? arr : []).map((r: unknown) => {
@@ -128,19 +128,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const num = offertNum + 1;
     const newOff: Offerte = { id: `off_${Date.now()}`, offertNumber: num, status: 'entwurf', createdAt: new Date().toISOString(), ...data };
     try {
-      await syncOk(() => db.upsert('offerte', { id: newOff.id, data: newOff }, token!));
+      await syncOk(() => db.upsert('offerten', { id: newOff.id, data: newOff }, token!));
     } catch { return; }
     setOfferten((p) => [...p, newOff]); setOffertNum(num);
     showToast(`Offerte #${num} gespeichert`, 'success');
   }
 
   async function updateOfferte(upd: Offerte) {
-    await syncOk(() => db.upsert('offerte', { id: upd.id, data: upd }, token!));
+    await syncOk(() => db.upsert('offerten', { id: upd.id, data: upd }, token!));
     setOfferten((p) => p.map((o) => (o.id === upd.id ? upd : o)));
   }
 
   async function deleteOfferte(id: string) {
-    await syncOk(() => db.delete('offerte', id, token!));
+    await syncOk(() => db.delete('offerten', id, token!));
     setOfferten((p) => p.filter((o) => o.id !== id));
   }
 
