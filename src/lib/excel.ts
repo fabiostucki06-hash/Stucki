@@ -1,197 +1,173 @@
-import * as XLSX from 'xlsx';
-import type { Customer, Offerte, Order } from '../types';
+import ExcelJS from 'exceljs';
+import { storage } from './supabase';
+import type { ArbeitPosition, Customer, MaterialPosition, Offerte, Order } from '../types';
 
-export function exportOfferteExcel(offerte: Offerte, customer: Customer | undefined) {
-  const wb = XLSX.utils.book_new();
-  const ws: Record<string, unknown> = {};
-  const addr = (c: number, r: number) => XLSX.utils.encode_cell({ c, r });
-  type Style = Record<string, unknown>;
-  const set = (c: number, r: number, v: string | number, s: Style = {}) => {
-    ws[addr(c, r)] = { v, t: typeof v === 'number' ? 'n' : 's', s };
-  };
-  const num = (c: number, r: number, v: number, s: Style = {}) => {
-    ws[addr(c, r)] = { v: isNaN(v) ? 0 : v, t: 'n', s };
-  };
+// ── cell-text extraction ──────────────────────────────────────────────────────
 
-  const BLK = '000000', YEL = 'FFFF00';
-  const bThin = { style: 'thin', color: { rgb: BLK } };
-  const bAll = { top: bThin, bottom: bThin, left: bThin, right: bThin };
-  const fB = (sz = 10) => ({ bold: true, sz, name: 'Calibri', color: { rgb: BLK } });
-  const fN = (sz = 10) => ({ sz, name: 'Calibri', color: { rgb: BLK } });
-  const fillY = { patternType: 'solid', fgColor: { rgb: YEL } };
-  const alL = { horizontal: 'left', vertical: 'center' };
-  const alR = { horizontal: 'right', vertical: 'center' };
-  const alC = { horizontal: 'center', vertical: 'center' };
-
-  const datum = new Date(offerte.createdAt || Date.now()).toLocaleDateString('de-CH');
-  const fahrzeug = customer ? [customer.marke, customer.modell].filter(Boolean).join(' ') : '';
-  const positionen = offerte.positionen || [];
-  const totalB = parseFloat(offerte.totalBetrag || '0');
-  let r = 0;
-
-  set(0, r, 'Budget Offerte', { font: fB(14), alignment: alL });
-  set(4, r, 'Fabio Stucki', { font: fN(9), alignment: alR }); r++;
-  set(0, r, 'Offertennummer', { font: fB(), fill: fillY, border: bAll, alignment: alL });
-  set(1, r, String(offerte.offertNumber || '–'), { font: fB(), fill: fillY, border: bAll, alignment: alL });
-  set(2, r, '', { fill: fillY, border: bAll }); set(3, r, '', { fill: fillY, border: bAll });
-  set(4, r, 'Polenstrasse 245', { font: fN(9), alignment: alR }); r++;
-  set(4, r, '5112 Thalheim AG', { font: fN(9), alignment: alR }); r++;
-  set(4, r, '079 850 18 63', { font: fN(9), alignment: alR }); r++; r++;
-
-  const infoRows: [string, string][] = [
-    ['Fahrzeug', fahrzeug],
-    ['1. Inv.-Setzung', ''],
-    ['Kennzeichen', customer?.kennzeichen || ''],
-    ['Chassis-Nr.', ''],
-    ['Km Stand', String(customer?.km || '')],
-    ['Fahrzeugbesitzer', customer ? `${customer.vorname} ${customer.nachname}` : ''],
-  ];
-  infoRows.forEach(([l, v]) => {
-    set(0, r, l, { font: fN(), border: bAll, alignment: alL });
-    set(1, r, v, { font: fN(), border: bAll, alignment: alL });
-    [2, 3, 4].forEach((c) => set(c, r, '', { border: bAll })); r++;
-  });
-
-  set(0, r, 'Std.Satz:', { font: fN(), border: bAll, alignment: alL });
-  set(1, r, 'CHF', { font: fN(), border: bAll, alignment: alC });
-  set(2, r, '80.00', { font: fN(), border: bAll, alignment: alL });
-  [3, 4].forEach((c) => set(c, r, '', { border: bAll })); r++;
-
-  set(0, r, 'Bezeichnung', { font: fB(), border: bAll, alignment: alL });
-  set(1, r, 'Menge', { font: fB(), border: bAll, alignment: alC });
-  set(2, r, 'Stk.Preis', { font: fB(), border: bAll, alignment: alC });
-  set(3, r, 'Preis (CHF)', { font: fB(), border: bAll, alignment: alC });
-  set(4, r, 'ZE', { font: fB(), border: bAll, alignment: alC }); r++;
-
-  const MIN = 10;
-  positionen.forEach((pos) => {
-    const mat = pos.typ === 'material';
-    const rS = { font: fN(9), border: bAll, alignment: { horizontal: 'left', vertical: 'center', wrapText: true } };
-    set(0, r, pos.beschreibung || '', rS);
-    mat ? num(1, r, parseFloat((pos as { menge: string }).menge) || 1, { font: fN(9), border: bAll, alignment: alC })
-        : set(1, r, '', { font: fN(9), border: bAll, alignment: alC });
-    mat ? num(2, r, parseFloat((pos as { stueckpreis: string }).stueckpreis) || 0, { font: fN(9), border: bAll, alignment: alR })
-        : set(2, r, '', { font: fN(9), border: bAll, alignment: alR });
-    num(3, r, parseFloat(pos.preis) || 0, { font: fN(9), border: bAll, alignment: alR });
-    set(4, r, !mat && (pos as { ze: string }).ze ? String(parseFloat((pos as { ze: string }).ze)) : '', { font: fN(9), border: bAll, alignment: alC });
-    r++;
-  });
-  for (let i = positionen.length; i < MIN; i++) { [0, 1, 2, 3, 4].forEach((c) => set(c, r, '', { border: bAll })); r++; }
-
-  set(0, r, 'Summe', { font: fN(), border: bAll, alignment: alL });
-  [1, 2].forEach((c) => set(c, r, '', { border: bAll }));
-  set(3, r, 'CHF', { font: fN(), border: bAll, alignment: alL });
-  num(4, r, totalB, { font: fN(), border: bAll, alignment: alR }); r++;
-  [0, 1, 2].forEach((c) => set(c, r, '', { border: { top: bThin, bottom: bThin } }));
-  set(3, r, 'CHF', { font: fN(9), border: bAll, alignment: alL });
-  num(4, r, 0, { font: fN(9), border: bAll, alignment: alR }); r++;
-  set(0, r, 'Offertentotal', { font: fB(), border: bAll, alignment: alL });
-  [1, 2].forEach((c) => set(c, r, '', { border: bAll }));
-  set(3, r, 'CHF', { font: fB(), border: bAll, alignment: alL });
-  num(4, r, totalB, { font: fB(), border: bAll, alignment: alR }); r++; r++;
-
-  set(0, r, 'ZE basieren auf einer reibungslosen Reparatur', { font: fN(9), alignment: alL }); r++;
-  set(0, r, 'Kleinmaterial-Pauschale wird bei <100 ZE hinzugefügt', { font: fN(9), alignment: alL }); r++; r++; r++;
-  set(0, r, 'Datum', { font: fN(), alignment: alR });
-  set(1, r, datum, { font: fN(), fill: fillY, border: bAll, alignment: alL }); r++;
-  set(0, r, 'Ort', { font: fN(), alignment: alR });
-  set(1, r, 'Thalheim AG', { font: fN(), alignment: alL }); r++; r++;
-  set(0, r, 'Zahlungskontitionen bei', { font: fN(), alignment: alL });
-  set(2, r, '10 Tage netto', { font: fN(), alignment: alL }); r++;
-  set(0, r, 'Rechnungstellung', { font: fN(), alignment: alL });
-
-  ws['!merges'] = [{ s: { r: 1, c: 0 }, e: { r: 1, c: 3 } }];
-  ws['!cols'] = [{ wch: 34 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 10 }];
-  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: r + 1, c: 4 } });
-  XLSX.utils.book_append_sheet(wb, ws, 'Offerte');
-  XLSX.writeFile(wb, `Offerte_${offerte.offertNumber}_${customer?.nachname ?? 'Kunde'}.xlsx`);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getCellText(value: any): string {
+  if (value == null) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (value instanceof Date) return '';
+  if (typeof value === 'object') {
+    if (Array.isArray(value.richText)) return value.richText.map((r: { text: string }) => r.text).join('').trim();
+    if ('formula' in value || 'sharedFormula' in value) return String(value.result ?? '').trim();
+    if ('text' in value) return String(value.text).trim();
+  }
+  return '';
 }
 
-export function exportOrderExcel(order: Order, customer: Customer | undefined) {
-  const wb = XLSX.utils.book_new();
-  const ws: Record<string, unknown> = {};
-  const addr = (c: number, r: number) => XLSX.utils.encode_cell({ c, r });
-  type Style = Record<string, unknown>;
-  const set = (c: number, r: number, v: string | number, s: Style = {}) => {
-    ws[addr(c, r)] = { v, t: typeof v === 'number' ? 'n' : 's', s };
-  };
+// ── label-search helpers ──────────────────────────────────────────────────────
 
-  const BLK = '000000', YEL = 'FFFF00';
-  const bThin = { style: 'thin', color: { rgb: BLK } };
-  const bAll = { top: bThin, bottom: bThin, left: bThin, right: bThin };
-  const bB = { bottom: bThin }; const bT = { top: bThin };
-  const fB = (sz = 10) => ({ bold: true, sz, name: 'Calibri', color: { rgb: BLK } });
-  const fN = (sz = 10) => ({ sz, name: 'Calibri', color: { rgb: BLK } });
-  const fillY = { patternType: 'solid', fgColor: { rgb: YEL } };
-  const alL = { horizontal: 'left', vertical: 'center' };
-  const alR = { horizontal: 'right', vertical: 'center' };
-  const alC = { horizontal: 'center', vertical: 'center' };
+type XSheet = ExcelJS.Worksheet;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type XCell = any;
 
-  const datum = new Date(order.createdAt || Date.now()).toLocaleDateString('de-CH');
-  const fahrzeug = customer ? [customer.marke, customer.modell].filter(Boolean).join(' ') : '';
-  let r = 0;
-
-  set(0, r, 'Kundenauftrag', { font: fB(14), alignment: alL });
-  set(3, r, 'Fabio Stucki', { font: fN(9), alignment: alR }); r++;
-  set(0, r, 'Auftragsnummer', { font: fB(), fill: fillY, border: bAll, alignment: alL });
-  set(1, r, String(order.orderNumber || '–'), { font: fB(), fill: fillY, border: bAll, alignment: alL });
-  set(2, r, '', { fill: fillY, border: bAll });
-  set(3, r, 'Polenstrasse 245', { font: fN(9), alignment: alR }); r++;
-  set(3, r, '5112 Thalheim AG', { font: fN(9), alignment: alR }); r++;
-  set(3, r, '079 850 18 63', { font: fN(9), alignment: alR }); r++; r++;
-
-  const infoRows: [string, string][] = [
-    ['Fahrzeug', fahrzeug],
-    ['1. Inv.-Setzung', ''],
-    ['Kennzeichen', customer?.kennzeichen || ''],
-    ['Chassis-Nr.', ''],
-    ['Km Stand', String(customer?.km || '')],
-    ['Fahrzeugbesitzer', customer ? `${customer.vorname} ${customer.nachname}` : ''],
-  ];
-  infoRows.forEach(([l, v]) => {
-    set(0, r, l, { font: fN(), border: bAll, alignment: alL });
-    set(1, r, v, { font: fN(), border: bAll, alignment: alL });
-    [2, 3].forEach((c) => set(c, r, '', { border: bAll })); r++;
+/** Returns the cell immediately to the right of the first cell whose text equals `label`. */
+function rightOf(sheet: XSheet, label: string): XCell | null {
+  let result: XCell = null;
+  sheet.eachRow({ includeEmpty: false }, (row) => {
+    if (result) return;
+    row.eachCell({ includeEmpty: false }, (cell) => {
+      if (result) return;
+      if (getCellText(cell.value) === label) {
+        result = sheet.getCell(cell.row, (cell as XCell).col + 1);
+      }
+    });
   });
-  [0, 1, 2, 3].forEach((c) => set(c, r, '', { border: bAll })); r++;
-  set(0, r, 'Std.Satz:', { font: fN(), border: bAll, alignment: alL });
-  set(1, r, 'CHF', { font: fN(), border: bAll, alignment: alC });
-  set(2, r, '80.00', { font: fN(), border: bAll, alignment: alL });
-  set(3, r, '', { border: bAll }); r++;
+  return result;
+}
 
-  set(0, r, 'Arbeiten', { font: fN(), border: bAll, alignment: alL });
-  [1, 2].forEach((c) => set(c, r, '', { border: bAll }));
-  set(3, r, 'ZE', { font: fN(), border: bAll, alignment: alC }); r++;
+/** Sets a cell value without touching its style. */
+function write(cell: XCell | null, value: string | number | null) {
+  if (!cell || value === null) return;
+  cell.value = value;
+}
 
-  const workItems = [
-    ...(order.beanstandungen || []),
-    ...(order.offertItems || []).map((i) => i.text),
-  ].filter(Boolean);
-  const MIN = 10;
-  workItems.forEach((text) => {
-    set(0, r, text, { font: fN(9), border: bAll, alignment: { horizontal: 'left', vertical: 'center', wrapText: true } });
-    [1, 2, 3].forEach((c) => set(c, r, '', { border: bAll })); r++;
+const todayCH = () => new Date().toLocaleDateString('de-CH');
+
+// ── line-items table locator ───────────────────────────────────────────────────
+
+interface ColMap { bez: number; menge: number; stkPreis: number; preis: number; ze: number }
+interface TableInfo { headerRow: number; cols: ColMap }
+
+function findTable(sheet: XSheet, headerLabel: string): TableInfo | null {
+  let found: TableInfo | null = null;
+  sheet.eachRow({ includeEmpty: false }, (row) => {
+    if (found) return;
+    const map: Partial<ColMap> = {};
+    let isTarget = false;
+    row.eachCell({ includeEmpty: false }, (cell) => {
+      const t = getCellText(cell.value);
+      if (t === headerLabel)      { isTarget = true; map.bez = (cell as XCell).col; }
+      else if (t === 'Menge')     map.menge    = (cell as XCell).col;
+      else if (t === 'Stk.Preis') map.stkPreis = (cell as XCell).col;
+      else if (t === 'Preis (CHF)') map.preis  = (cell as XCell).col;
+      else if (t === 'ZE')        map.ze        = (cell as XCell).col;
+    });
+    if (isTarget) {
+      found = {
+        headerRow: row.number,
+        cols: { bez: map.bez ?? 1, menge: map.menge ?? 2, stkPreis: map.stkPreis ?? 3, preis: map.preis ?? 4, ze: map.ze ?? 5 },
+      };
+    }
   });
-  for (let i = workItems.length; i < MIN; i++) { [0, 1, 2, 3].forEach((c) => set(c, r, '', { border: bAll })); r++; }
+  return found;
+}
 
-  [0, 1, 2, 3].forEach((c) => set(c, r, '', { border: bB })); r++;
-  [0, 1, 2, 3].forEach((c) => set(c, r, '', { border: bT })); r++;
-  set(0, r, 'ZE-Total', { font: fB(), border: bAll, alignment: alL });
-  [1, 2, 3].forEach((c) => set(c, r, '', { border: bAll })); r++; r++;
-  set(0, r, 'ZE basieren auf einer reibungslosen Reparatur', { font: fN(9), alignment: alL }); r++; r++; r++;
-  set(0, r, 'Beginndatum', { font: fN(), alignment: alR });
-  set(1, r, datum, { font: fN(), fill: fillY, border: bAll, alignment: alL }); r++;
-  set(0, r, 'Fertigstelldatum', { font: fN(), alignment: alR });
-  set(1, r, '', { font: fN(), fill: fillY, border: bAll, alignment: alL }); r++;
-  set(0, r, 'Ort', { font: fN(), alignment: alR });
-  set(1, r, 'Thalheim AG', { font: fN(), alignment: alL }); r++; r++;
-  set(0, r, 'Zahlungskontitionen bei', { font: fN(), alignment: alL });
-  set(2, r, '10 Tage netto', { font: fN(), alignment: alL }); r++;
-  set(0, r, 'Rechnungstellung', { font: fN(), alignment: alL });
+// ── vehicle/customer block ────────────────────────────────────────────────────
 
-  ws['!merges'] = [{ s: { r: 1, c: 0 }, e: { r: 1, c: 2 } }];
-  ws['!cols'] = [{ wch: 40 }, { wch: 14 }, { wch: 12 }, { wch: 10 }];
-  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: r + 1, c: 3 } });
-  XLSX.utils.book_append_sheet(wb, ws, 'Auftrag');
-  XLSX.writeFile(wb, `Auftrag_${order.orderNumber}_${customer?.nachname ?? 'Kunde'}.xlsx`);
+function fillVehicleBlock(sheet: XSheet, customer: Customer | undefined) {
+  const fahrzeug = [customer?.marke, customer?.modell].filter(Boolean).join(' ');
+  write(rightOf(sheet, 'Fahrzeug'),         fahrzeug);
+  write(rightOf(sheet, '1. Inv.-Setzung'),  '');
+  write(rightOf(sheet, 'Kennzeichen'),      customer?.kennzeichen ?? '');
+  write(rightOf(sheet, 'Chassis-Nr.'),      '');
+  write(rightOf(sheet, 'Km Stand'),         customer?.km ?? '');
+  write(rightOf(sheet, 'Fahrzeugbesitzer'), customer ? `${customer.vorname} ${customer.nachname}` : '');
+}
+
+// ── browser download helper ───────────────────────────────────────────────────
+
+async function downloadWorkbook(wb: ExcelJS.Workbook, filename: string) {
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(blob),
+    download: filename,
+  });
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ── Offerte export ────────────────────────────────────────────────────────────
+
+export async function exportOfferteExcel(offerte: Offerte, customer: Customer | undefined) {
+  try {
+    const buffer = await storage.fetchTemplate('Offerte_Vorlage');
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buffer);
+    const sheet = wb.worksheets[0];
+
+    write(rightOf(sheet, 'Offertennummer'), offerte.offertNumber ?? '');
+    fillVehicleBlock(sheet, customer);
+
+    const positionen = offerte.positionen ?? [];
+    const table = findTable(sheet, 'Bezeichnung');
+    if (table) {
+      positionen.forEach((pos, i) => {
+        const row = sheet.getRow(table.headerRow + 1 + i);
+        row.getCell(table.cols.bez).value = pos.beschreibung ?? '';
+        if (pos.typ === 'material') {
+          const mp = pos as MaterialPosition;
+          row.getCell(table.cols.menge).value    = parseFloat(mp.menge) || '';
+          row.getCell(table.cols.stkPreis).value = parseFloat(mp.stueckpreis) || '';
+        }
+        row.getCell(table.cols.preis).value = parseFloat(pos.preis) || '';
+        if (pos.typ === 'arbeit') {
+          row.getCell(table.cols.ze).value = parseFloat((pos as ArbeitPosition).ze) || '';
+        }
+      });
+    }
+
+    write(rightOf(sheet, 'Datum'), todayCH());
+
+    await downloadWorkbook(wb, `Offerte_${offerte.offertNumber}_${customer?.nachname ?? 'Kunde'}.xlsx`);
+  } catch (err) {
+    alert(`Excel-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+// ── Auftrag export ─────────────────────────────────────────────────────────────
+
+export async function exportOrderExcel(order: Order, customer: Customer | undefined) {
+  try {
+    const buffer = await storage.fetchTemplate('Auftrag_Vorlage');
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buffer);
+    const sheet = wb.worksheets[0];
+
+    write(rightOf(sheet, 'Auftragsnummer'), order.orderNumber ?? '');
+    fillVehicleBlock(sheet, customer);
+
+    const workItems = [
+      ...(order.beanstandungen ?? []),
+      ...(order.offertItems ?? []).map(i => i.text),
+    ].filter(Boolean);
+
+    const table = findTable(sheet, 'Bezeichnung') ?? findTable(sheet, 'Arbeiten');
+    if (table) {
+      workItems.forEach((text, i) => {
+        const row = sheet.getRow(table.headerRow + 1 + i);
+        row.getCell(table.cols.bez).value = text;
+      });
+    }
+
+    write(rightOf(sheet, 'Datum'), todayCH());
+
+    await downloadWorkbook(wb, `Auftrag_${order.orderNumber}_${customer?.nachname ?? 'Kunde'}.xlsx`);
+  } catch (err) {
+    alert(`Excel-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);
+  }
 }
