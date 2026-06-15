@@ -76,6 +76,28 @@ function findTable(sheet: XSheet, headerLabel: string): TableInfo | null {
   return found;
 }
 
+// ── shared-formula fix ───────────────────────────────────────────────────────
+// ExcelJS clones shared formulas via { sharedFormula: 'masterAddr', result }
+// When we modify the sheet and re-serialize, the clone→master relationship can
+// be violated ("master must exist above and or left of clone").  Strip it out
+// by converting every clone to either a standalone formula (if a formula string
+// is available) or a plain value (using the cached result).
+function unshareFormulas(sheet: XSheet) {
+  sheet.eachRow({ includeEmpty: true }, (row) => {
+    row.eachCell({ includeEmpty: true }, (cell) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const v = cell.value as any;
+      if (v && typeof v === 'object' && 'sharedFormula' in v) {
+        if (v.formula) {
+          cell.value = { formula: v.formula, result: v.result };
+        } else {
+          cell.value = v.result ?? null;
+        }
+      }
+    });
+  });
+}
+
 // ── vehicle/customer block ────────────────────────────────────────────────────
 
 function fillVehicleBlock(sheet: XSheet, customer: Customer | undefined) {
@@ -109,6 +131,7 @@ export async function exportOfferteExcel(offerte: Offerte, customer: Customer | 
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(buffer);
     const sheet = wb.worksheets[0];
+    unshareFormulas(sheet);
 
     write(rightOf(sheet, 'Offertennummer'), offerte.offertNumber ?? '');
     fillVehicleBlock(sheet, customer);
@@ -147,6 +170,7 @@ export async function exportOrderExcel(order: Order, customer: Customer | undefi
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(buffer);
     const sheet = wb.worksheets[0];
+    unshareFormulas(sheet);
 
     write(rightOf(sheet, 'Auftragsnummer'), order.orderNumber ?? '');
     fillVehicleBlock(sheet, customer);
