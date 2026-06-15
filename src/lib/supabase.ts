@@ -33,18 +33,39 @@ export const auth = {
   },
 };
 
+type StorageItem = { name: string; id?: string | null };
+
+async function listBucket(bucket: string, prefix: string): Promise<StorageItem[]> {
+  const r = await fetch(`${SUPA_URL}/storage/v1/object/list/${bucket}`, {
+    method: 'POST',
+    headers: h(),
+    body: JSON.stringify({ prefix, limit: 100, offset: 0 }),
+  });
+  if (!r.ok) return [];
+  return r.json();
+}
+
 export const storage = {
-  /** Lists the bucket and returns the first available file as an ArrayBuffer. */
+  /** Lists the bucket (and one level of subfolders) and returns the first file found. */
   async fetchTemplate(bucket: string): Promise<ArrayBuffer> {
-    const listRes = await fetch(`${SUPA_URL}/storage/v1/object/list/${bucket}`, {
-      method: 'POST',
-      headers: h(),
-      body: JSON.stringify({ prefix: '', limit: 100, offset: 0 }),
-    });
-    if (!listRes.ok) throw new Error(`Vorlage nicht gefunden (Bucket: "${bucket}", HTTP ${listRes.status})`);
-    const files: { name: string; id?: string | null }[] = await listRes.json();
-    const file = files.find(f => f.id != null);
+    const rootItems = await listBucket(bucket, '');
+    console.log(`[storage] ${bucket} root items:`, rootItems);
+
+    // real files have a non-null id; folders have id === null
+    let file = rootItems.find(f => f.id != null);
+
+    // if nothing at root, check inside each subfolder
+    if (!file) {
+      for (const folder of rootItems.filter(f => f.id == null)) {
+        const subItems = await listBucket(bucket, folder.name + '/');
+        console.log(`[storage] ${bucket}/${folder.name} items:`, subItems);
+        file = subItems.find(f => f.id != null);
+        if (file) { file = { ...file, name: folder.name + '/' + file.name }; break; }
+      }
+    }
+
     if (!file) throw new Error(`Keine Excel-Vorlage in Bucket "${bucket}" gefunden`);
+
     const fileRes = await fetch(`${SUPA_URL}/storage/v1/object/public/${bucket}/${encodeURIComponent(file.name)}`);
     if (!fileRes.ok) throw new Error(`Vorlage "${file.name}" konnte nicht geladen werden (HTTP ${fileRes.status})`);
     return fileRes.arrayBuffer();
