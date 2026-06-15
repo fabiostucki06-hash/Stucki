@@ -79,5 +79,5 @@ export interface Offerte {
   totalZE?: number;
 }
 
-export type TabId = 'dashboard' | 'auftraege' | 'offerten' | 'kunden';
+export type TabId = 'dashboard' | 'auftraege' | 'offerten' | 'kunden' | 'statistiken';
 export type SyncStatus = 'idle' | 'saving' | 'ok' | 'error';

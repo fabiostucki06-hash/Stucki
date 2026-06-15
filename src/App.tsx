@@ -19,6 +19,7 @@ import OrderDetail from './components/auftraege/OrderDetail';
 import OfferteList from './components/offerten/OfferteList';
 import OfferteForm from './components/offerten/OfferteForm';
 import OfferteDetail from './components/offerten/OfferteDetail';
+import StatistikDashboard from './components/statistiken/StatistikDashboard';
 
 import type { Customer, Order, Offerte, TabId } from './types';
 
@@ -108,10 +109,11 @@ export default function App() {
       <NavBar syncStatus={syncStatus} todosCount={todos.length} onLogout={handleLogout} />
 
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 0 8px' }}>
-        {tab === 'dashboard' && <Dashboard customers={customers} orders={orders} onOrderClick={setSelO} />}
-        {tab === 'auftraege' && <OrderList orders={orders} customers={customers} onOrderClick={setSelO} />}
-        {tab === 'offerten' && <OfferteList offerten={offerten} customers={customers} onOfferteClick={setSelOff} onNew={() => setShowNOff(true)} />}
-        {tab === 'kunden' && <CustomerList customers={customers} orders={orders} onCustomerClick={setSelC} />}
+        {tab === 'dashboard'   && <Dashboard customers={customers} orders={orders} onOrderClick={setSelO} />}
+        {tab === 'auftraege'   && <OrderList orders={orders} customers={customers} onOrderClick={setSelO} />}
+        {tab === 'offerten'    && <OfferteList offerten={offerten} customers={customers} onOfferteClick={setSelOff} onNew={() => setShowNOff(true)} />}
+        {tab === 'kunden'      && <CustomerList customers={customers} orders={orders} onCustomerClick={setSelC} />}
+        {tab === 'statistiken' && <StatistikDashboard orders={orders} offerten={offerten} customers={customers} />}
 
       </div>
 

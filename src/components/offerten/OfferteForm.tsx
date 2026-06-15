@@ -38,6 +38,8 @@ async function schaetzeZEmitKI(beschreibung: string, fz: string): Promise<{ ze: 
 const newArbeit = (): ArbeitRow => ({ typ: 'arbeit', beschreibung: '', ze: '', stundenansatz: '80', preis: '', zeKI: false, zeLoading: false, zeHint: '' });
 const newMaterial = (): MaterialRow => ({ typ: 'material', beschreibung: '', menge: '1', stueckpreis: '', preis: '' });
 
+const fCHF = (n: number) => "CHF " + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, "'");
+
 export default function OfferteForm({ customers, onSave, onCancel }: OfferteFormProps) {
   const [cid, setCid] = useState('');
   const [titel, setTitel] = useState('');
@@ -98,39 +100,68 @@ export default function OfferteForm({ customers, onSave, onCancel }: OfferteForm
     onSave({ customerId: cid, titel, positionen: [...ap, ...mp], notizen, gueltigBis, totalBetrag: (totA + totM).toFixed(2), totalArbeit: totA.toFixed(2), totalMaterial: totM.toFixed(2), totalZE: totZE });
   }
 
-  const inp = { display: 'block', width: '100%', padding: '8px 0', background: 'none', border: 'none', outline: 'none', fontSize: 17, color: 'var(--label)' } as const;
-  const fieldStyle = { width: '100%', background: 'var(--fill3)', border: 'none', borderRadius: 9, padding: 8, fontSize: 15, color: 'var(--label)', outline: 'none' } as const;
+  const inp = { display: 'block', width: '100%', padding: 0, background: 'none', border: 'none', outline: 'none', fontSize: 16, color: 'var(--label)', letterSpacing: '-0.3px' } as const;
+  const fieldStyle = { width: '100%', background: 'var(--fill3)', border: 'none', borderRadius: 9, padding: '8px 10px', fontSize: 15, color: 'var(--label)', outline: 'none' } as const;
+  const miniLabel = { fontSize: 11, fontWeight: 600 as const, color: 'var(--label3)', textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginBottom: 5 };
+
+  const vehicleChips = selectedCustomer
+    ? [selectedCustomer.marke, selectedCustomer.modell, selectedCustomer.kennzeichen, selectedCustomer.km ? selectedCustomer.km + ' km' : ''].filter(Boolean)
+    : [];
 
   return (
     <div>
-      <p className="section-header">Kunde</p>
+      {/* ── Kundeninformationen ── */}
+      <p className="section-header">Kundeninformationen</p>
       <div className="form-section" style={{ marginBottom: 20 }}>
-        <div style={{ padding: '11px 16px', borderBottom: '0.33px solid var(--sep)' }}>
+        <div style={{ padding: '13px 16px', borderBottom: vehicleChips.length ? '0.33px solid var(--sep)' : undefined }}>
+          <div style={miniLabel}>Kunde</div>
           <select value={cid} onChange={(e) => setCid(e.target.value)} style={{ ...inp, color: cid ? 'var(--label)' : 'var(--label3)' }}>
             <option value="">Kunde auswählen…</option>
             {customers.map((c) => <option key={c.id} value={c.id}>{c.vorname} {c.nachname} – {c.kennzeichen}</option>)}
           </select>
         </div>
-        <div style={{ padding: '11px 16px', borderBottom: '0.33px solid var(--sep)' }}>
-          <input value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="Titel / Betreff" style={inp} />
-        </div>
-        <div style={{ padding: '11px 16px' }}>
-          <input type="date" value={gueltigBis} onChange={(e) => setGueltigBis(e.target.value)} style={inp} />
+        {vehicleChips.length > 0 && (
+          <div style={{ padding: '8px 14px 10px', display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: 13, marginRight: 2 }}>🚗</span>
+            {vehicleChips.map((v, i) => (
+              <span key={i} style={{ fontSize: 12, color: 'var(--blue)', background: 'rgba(0,122,255,0.09)', borderRadius: 6, padding: '2px 8px', fontWeight: 500, letterSpacing: '-0.1px' }}>{v}</span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Offerte-Details ── */}
+      <p className="section-header">Offerte-Details</p>
+      <div className="form-section" style={{ marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
+          <div style={{ padding: '13px 16px', borderRight: '0.33px solid var(--sep)' }}>
+            <div style={miniLabel}>Betreff</div>
+            <input value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="z.B. Inspektion, Reparatur…" style={inp} />
+          </div>
+          <div style={{ padding: '13px 16px' }}>
+            <div style={miniLabel}>Gültig bis</div>
+            <input type="date" value={gueltigBis} onChange={(e) => setGueltigBis(e.target.value)} style={{ ...inp, fontSize: 15 }} />
+          </div>
         </div>
       </div>
 
+      {/* ── Totals Bar ── */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        {[['Arbeit', `CHF ${totA.toFixed(2)}`, totZE ? `${totZE} ZE` : null, 'var(--blue)'],
-          ['Material', `CHF ${totM.toFixed(2)}`, null, 'var(--green)'],
-          ['Total', `CHF ${(totA + totM).toFixed(2)}`, null, 'var(--indigo)'],
-        ].map(([l, v, sub, c]) => (
-          <div key={String(l)} className="glass-panel" style={{ flex: 1, padding: 12, textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: 'var(--label2)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{l}</div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: String(c) }}>{v}</div>
-            {sub && <div style={{ fontSize: 11, color: 'var(--label3)' }}>{sub}</div>}
+        {([
+          ['Arbeit', fCHF(totA), totZE ? `${totZE} ZE` : null, 'var(--blue)'],
+          ['Material', fCHF(totM), null, 'var(--green)'],
+          ['Total', fCHF(totA + totM), null, 'var(--indigo)'],
+        ] as [string, string, string | null, string][]).map(([l, v, sub, c]) => (
+          <div key={l} className="glass-panel" style={{ flex: 1, padding: '10px 8px', textAlign: 'center' }}>
+            <div style={{ fontSize: 10, color: 'var(--label2)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>{l}</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: c, letterSpacing: '-0.3px' }}>{v}</div>
+            {sub && <div style={{ fontSize: 11, color: 'var(--label3)', marginTop: 2 }}>{sub}</div>}
           </div>
         ))}
       </div>
+
+      {/* ── Positionen ── */}
+      <p className="section-header">Positionen</p>
 
       <div className="doc-tab-bar">
         {(['arbeit', 'material'] as const).map((t) => (
@@ -151,34 +182,43 @@ export default function OfferteForm({ customers, onSave, onCancel }: OfferteForm
         {tab === 'arbeit' && (
           <div>
             {arbeit.map((pos, i) => (
-              <div key={i} className="card" style={{ marginBottom: 8, padding: 14 }}>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                  <input value={pos.beschreibung} onChange={(e) => updA(i, 'beschreibung', e.target.value)} placeholder="Beschreibung der Arbeit…" style={{ flex: 1, background: 'var(--fill3)', border: 'none', borderRadius: 9, padding: '9px 12px', fontSize: 16, color: 'var(--label)', outline: 'none' }} />
-                  {arbeit.length > 1 && <button onClick={() => remA(i)} style={{ background: 'rgba(255,59,48,0.10)', border: '1px solid rgba(255,59,48,0.22)', borderRadius: 9, width: 38, height: 38, color: 'var(--red)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><SFXmark /></button>}
+              <div key={i} className="card" style={{ marginBottom: 8, padding: 16 }}>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={miniLabel}>Beschreibung</div>
+                    <input value={pos.beschreibung} onChange={(e) => updA(i, 'beschreibung', e.target.value)} placeholder="Arbeitsschritt beschreiben…" style={{ width: '100%', background: 'var(--fill3)', border: 'none', borderRadius: 9, padding: '9px 12px', fontSize: 15, color: 'var(--label)', outline: 'none' }} />
+                  </div>
+                  {arbeit.length > 1 && (
+                    <button onClick={() => remA(i)} style={{ marginTop: 18, background: 'rgba(255,59,48,0.10)', border: '1px solid rgba(255,59,48,0.22)', borderRadius: 9, width: 36, height: 36, color: 'var(--red)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <SFXmark />
+                    </button>
+                  )}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                   <div>
-                    <div style={{ fontSize: 12, color: 'var(--label2)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{pos.zeKI ? 'KI-ZE' : 'ZE'}</div>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <input type="number" value={pos.ze} onChange={(e) => updA(i, 'ze', e.target.value)} placeholder="Auto" min={0} style={{ flex: 1, background: pos.zeKI ? 'rgba(50,173,230,0.10)' : 'var(--fill3)', border: 'none', borderRadius: 9, padding: 8, fontSize: 15, color: pos.zeKI ? 'var(--teal)' : 'var(--label)', outline: 'none', fontWeight: pos.zeKI ? 700 : 400 }} />
-                      <button onClick={() => kiZE(i)} disabled={pos.zeLoading || !pos.beschreibung.trim()} title="KI-Schätzung" style={{ width: 36, height: 36, background: pos.zeKI ? 'rgba(50,173,230,0.15)' : 'var(--fill2)', border: 'none', borderRadius: 9, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: (pos.zeLoading || !pos.beschreibung.trim()) ? 0.4 : 1, flexShrink: 0 }}>
-                        {pos.zeLoading ? <Spinner size={16} /> : <span style={{ fontSize: 15 }}>✦</span>}
+                    <div style={miniLabel}>{pos.zeKI ? '✦ KI-ZE' : 'ZE'}</div>
+                    <div style={{ display: 'flex', gap: 5 }}>
+                      <input type="number" value={pos.ze} onChange={(e) => updA(i, 'ze', e.target.value)} placeholder="Auto" min={0} style={{ flex: 1, background: pos.zeKI ? 'rgba(50,173,230,0.10)' : 'var(--fill3)', border: 'none', borderRadius: 9, padding: '8px 10px', fontSize: 15, color: pos.zeKI ? 'var(--teal)' : 'var(--label)', outline: 'none', fontWeight: pos.zeKI ? 700 : 400 }} />
+                      <button onClick={() => kiZE(i)} disabled={pos.zeLoading || !pos.beschreibung.trim()} title="KI-Schätzung" style={{ width: 35, height: 35, background: pos.zeKI ? 'rgba(50,173,230,0.15)' : 'var(--fill2)', border: 'none', borderRadius: 9, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: (pos.zeLoading || !pos.beschreibung.trim()) ? 0.4 : 1, flexShrink: 0 }}>
+                        {pos.zeLoading ? <Spinner size={15} /> : <span style={{ fontSize: 14 }}>✦</span>}
                       </button>
                     </div>
-                    {pos.zeHint && <div style={{ fontSize: 11, color: pos.zeKI ? 'var(--teal)' : 'var(--red)', marginTop: 3 }}>{pos.zeHint}</div>}
+                    {pos.zeHint && <div style={{ fontSize: 10, color: pos.zeKI ? 'var(--teal)' : 'var(--red)', marginTop: 3, lineHeight: 1.3 }}>{pos.zeHint}</div>}
                   </div>
                   <div>
-                    <div style={{ fontSize: 12, color: 'var(--label2)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>CHF/h</div>
+                    <div style={miniLabel}>CHF / h</div>
                     <input type="number" value={pos.stundenansatz} onChange={(e) => updA(i, 'stundenansatz', e.target.value)} placeholder="80" style={fieldStyle} />
                   </div>
                   <div>
-                    <div style={{ fontSize: 12, color: 'var(--label2)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total</div>
-                    <div style={{ background: 'rgba(0,122,255,0.08)', borderRadius: 9, padding: 8, fontSize: 15, fontWeight: 700, color: 'var(--blue)', height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{pos.preis ? parseFloat(pos.preis).toFixed(2) : '—'}</div>
+                    <div style={miniLabel}>Total</div>
+                    <div style={{ background: 'rgba(0,122,255,0.08)', borderRadius: 9, padding: '8px 10px', fontSize: 14, fontWeight: 700, color: 'var(--blue)', height: 35, display: 'flex', alignItems: 'center', justifyContent: 'center', letterSpacing: '-0.2px' }}>
+                      {pos.preis ? fCHF(parseFloat(pos.preis)) : '—'}
+                    </div>
                   </div>
                 </div>
               </div>
             ))}
-            <button onClick={addA} style={{ width: '100%', background: 'rgba(255,255,255,0.50)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1.5px dashed rgba(0,122,255,0.38)', borderRadius: 12, padding: 11, cursor: 'pointer', color: 'var(--blue)', fontWeight: 600, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <button onClick={addA} style={{ width: '100%', background: 'rgba(255,255,255,0.50)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1.5px dashed rgba(0,122,255,0.38)', borderRadius: 12, padding: 12, cursor: 'pointer', color: 'var(--blue)', fontWeight: 600, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               <SFPlus size={16} /> Arbeitsposition
             </button>
           </div>
@@ -186,41 +226,54 @@ export default function OfferteForm({ customers, onSave, onCancel }: OfferteForm
         {tab === 'material' && (
           <div>
             {material.map((pos, i) => (
-              <div key={i} className="card" style={{ marginBottom: 8, padding: 14 }}>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                  <input value={pos.beschreibung} onChange={(e) => updM(i, 'beschreibung', e.target.value)} placeholder="Material / Ersatzteil…" style={{ flex: 1, background: 'var(--fill3)', border: 'none', borderRadius: 9, padding: '9px 12px', fontSize: 16, color: 'var(--label)', outline: 'none' }} />
-                  {material.length > 1 && <button onClick={() => remM(i)} style={{ background: 'rgba(255,59,48,0.10)', border: '1px solid rgba(255,59,48,0.22)', borderRadius: 9, width: 38, height: 38, color: 'var(--red)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><SFXmark /></button>}
+              <div key={i} className="card" style={{ marginBottom: 8, padding: 16 }}>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={miniLabel}>Beschreibung</div>
+                    <input value={pos.beschreibung} onChange={(e) => updM(i, 'beschreibung', e.target.value)} placeholder="Ersatzteil / Material…" style={{ width: '100%', background: 'var(--fill3)', border: 'none', borderRadius: 9, padding: '9px 12px', fontSize: 15, color: 'var(--label)', outline: 'none' }} />
+                  </div>
+                  {material.length > 1 && (
+                    <button onClick={() => remM(i)} style={{ marginTop: 18, background: 'rgba(255,59,48,0.10)', border: '1px solid rgba(255,59,48,0.22)', borderRadius: 9, width: 36, height: 36, color: 'var(--red)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <SFXmark />
+                    </button>
+                  )}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                   <div>
-                    <div style={{ fontSize: 12, color: 'var(--label2)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Menge</div>
+                    <div style={miniLabel}>Menge</div>
                     <input type="number" value={pos.menge} onChange={(e) => updM(i, 'menge', e.target.value)} min={1} style={fieldStyle} />
                   </div>
                   <div>
-                    <div style={{ fontSize: 12, color: 'var(--label2)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Stk. CHF</div>
+                    <div style={miniLabel}>Stk. CHF</div>
                     <input type="number" value={pos.stueckpreis} onChange={(e) => updM(i, 'stueckpreis', e.target.value)} placeholder="0.00" style={fieldStyle} />
                   </div>
                   <div>
-                    <div style={{ fontSize: 12, color: 'var(--label2)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total</div>
-                    <div style={{ background: 'rgba(52,199,89,0.10)', borderRadius: 9, padding: 8, fontSize: 15, fontWeight: 700, color: 'var(--green)', height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{pos.preis ? parseFloat(pos.preis).toFixed(2) : '—'}</div>
+                    <div style={miniLabel}>Total</div>
+                    <div style={{ background: 'rgba(52,199,89,0.10)', borderRadius: 9, padding: '8px 10px', fontSize: 14, fontWeight: 700, color: 'var(--green)', height: 35, display: 'flex', alignItems: 'center', justifyContent: 'center', letterSpacing: '-0.2px' }}>
+                      {pos.preis ? fCHF(parseFloat(pos.preis)) : '—'}
+                    </div>
                   </div>
                 </div>
               </div>
             ))}
-            <button onClick={addM} style={{ width: '100%', background: 'rgba(255,255,255,0.50)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1.5px dashed rgba(52,199,89,0.40)', borderRadius: 12, padding: 11, cursor: 'pointer', color: 'var(--green)', fontWeight: 600, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <button onClick={addM} style={{ width: '100%', background: 'rgba(255,255,255,0.50)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1.5px dashed rgba(52,199,89,0.40)', borderRadius: 12, padding: 12, cursor: 'pointer', color: 'var(--green)', fontWeight: 600, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               <SFPlus size={16} /> Materialposition
             </button>
           </div>
         )}
       </div>
 
+      {/* ── Notizen ── */}
       <p className="section-header">Notizen</p>
-      <div className="form-section" style={{ marginBottom: 20 }}>
-        <textarea value={notizen} onChange={(e) => setNotizen(e.target.value)} placeholder="Interne Notizen…" rows={3} style={{ display: 'block', width: '100%', padding: '11px 16px', background: 'none', border: 'none', outline: 'none', fontSize: 17, color: 'var(--label)', resize: 'vertical' }} />
+      <div className="form-section" style={{ marginBottom: 24 }}>
+        <textarea value={notizen} onChange={(e) => setNotizen(e.target.value)} placeholder="Interne Notizen zur Offerte…" rows={3} style={{ display: 'block', width: '100%', padding: '13px 16px', background: 'none', border: 'none', outline: 'none', fontSize: 16, color: 'var(--label)', resize: 'vertical', letterSpacing: '-0.3px' }} />
       </div>
 
-      <button onClick={submit} className="btn-system" style={{ marginBottom: 12 }}>Offerte erstellen</button>
-      <button onClick={onCancel} className="btn-system btn-secondary">Abbrechen</button>
+      {/* ── Actions ── */}
+      <div style={{ borderTop: '0.33px solid var(--sep)', paddingTop: 20 }}>
+        <button onClick={submit} className="btn-system" style={{ marginBottom: 10 }}>Offerte erstellen</button>
+        <button onClick={onCancel} className="btn-system btn-secondary">Abbrechen</button>
+      </div>
     </div>
   );
 }

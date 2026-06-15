@@ -50,6 +50,14 @@ export const SFCheckmark = () => (
 );
 
 
+export const SFChart = () => (
+  <svg width={25} height={25} viewBox="0 0 25 25" fill="none">
+    <rect x={3} y={14} width={4.5} height={8} rx={1} stroke="currentColor" strokeWidth={1.5}/>
+    <rect x={10.25} y={8} width={4.5} height={14} rx={1} stroke="currentColor" strokeWidth={1.5}/>
+    <rect x={17.5} y={3} width={4.5} height={19} rx={1} stroke="currentColor" strokeWidth={1.5}/>
+  </svg>
+);
+
 export const SFCloud = () => (
   <svg width={24} height={20} viewBox="0 0 26 22" fill="none">
     <path d="M7.5 18.5a6.5 6.5 0 01-.6-12.96A8.5 8.5 0 0120.5 10a5.5 5.5 0 010 8.5H7.5z" stroke="currentColor" strokeWidth={1.7} strokeLinejoin="round"/>
