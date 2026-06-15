@@ -46,16 +46,15 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       </div>
       <div className="login-card">
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{
-            width: 72, height: 72, borderRadius: 16,
-            background: 'linear-gradient(145deg,#0A84FF,#0071E3)',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            marginBottom: 18, boxShadow: '0 8px 24px rgba(0,113,227,0.35)',
-          }}>
-            <svg width={36} height={36} viewBox="0 0 40 40" fill="none">
-              <path d="M24 10a9 9 0 01-12.7 12.7L5 29a3.5 3.5 0 005 5l6.3-6.3A9 9 0 0129 15l-5 5 3 3 5-5z" fill="white"/>
-            </svg>
-          </div>
+          <img
+            src={ASSETS.logo}
+            alt="GarageOS"
+            style={{ height: 80, width: 'auto', objectFit: 'contain', marginBottom: 18, filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.22))' }}
+            onError={(e) => {
+              const img = e.currentTarget;
+              if (!img.dataset.fb) { img.dataset.fb = '1'; img.src = '/icon_image.jpg'; }
+            }}
+          />
           <h1 className="sf-title1" style={{ marginBottom: 5 }}>GarageOS</h1>
           <p className="sf-callout" style={{ color: 'var(--label2)' }}>Werkstatt Management</p>
         </div>
