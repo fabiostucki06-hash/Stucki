@@ -1,7 +1,9 @@
-import { SFDoc, SFPerson, SFChart, SFXmark } from './Icons';
+import { SFHouse, SFWrench, SFDoc, SFPerson, SFChart, SFXmark } from './Icons';
 import type { TabId } from '../types';
 
 const SIDEBAR_ITEMS: { id: TabId; icon: React.ReactNode; label: string }[] = [
+  { id: 'dashboard',   icon: <SFHouse />,  label: 'Home'      },
+  { id: 'auftraege',   icon: <SFWrench />, label: 'Aufträge'  },
   { id: 'offerten',    icon: <SFDoc />,    label: 'Offerten'  },
   { id: 'kunden',      icon: <SFPerson />, label: 'Kunden'    },
   { id: 'statistiken', icon: <SFChart />,  label: 'Statistik' },
