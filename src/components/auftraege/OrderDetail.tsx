@@ -25,7 +25,7 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
   const [notizen, setNotizen] = useState(order.notizen ?? '');
   const [items] = useState<OrderItem[]>(order.offertItems ?? []);
   const offB = order.offertBetrag ?? '';
-  const recB = order.rechnungsBetrag ?? '';
+  const [recB, setRecB] = useState(order.rechnungsBetrag ?? '');
   const [zahlungsFrist, setZahlungsFrist] = useState(order.zahlungsFrist ?? '30');
   const [cv, setCv] = useState(customer?.vorname ?? '');
   const [cn, setCn] = useState(customer?.nachname ?? '');
@@ -145,13 +145,54 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
       )}
 
 
-      {!edit && (offB || recB) && (
-        <div className="glass-panel" style={{ padding: 14, textAlign: 'center', marginBottom: 16 }}>
-          <div style={{ fontSize: 12, color: 'var(--label2)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
-            {recB ? 'Rechnung' : 'Offerte'}
+      <p className="section-header">Rechnung</p>
+      {edit ? (
+        <div className="form-section" style={{ marginBottom: 20 }}>
+          <div style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--label3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>Rechnungsbetrag</div>
+              <div style={{ fontSize: 13, color: 'var(--label3)' }}>Gesamtbetrag in CHF</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--label2)' }}>CHF</span>
+              <input
+                type="number"
+                value={recB}
+                onChange={(e) => setRecB(e.target.value)}
+                placeholder="0.00"
+                min={0}
+                step="0.05"
+                style={{ background: 'none', border: 'none', outline: 'none', fontSize: 22, fontWeight: 700, color: 'var(--blue)', textAlign: 'right', width: 120, letterSpacing: '-0.4px', fontFamily: 'inherit' }}
+              />
+            </div>
           </div>
-          <div style={{ fontWeight: 700, fontSize: 22, color: recB ? 'var(--blue)' : 'var(--label)' }}>
-            CHF {recB || offB}
+        </div>
+      ) : (
+        <div style={{
+          background: 'rgba(255,255,255,0.45)',
+          backdropFilter: 'blur(20px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+          border: '1px solid rgba(255,255,255,0.60)',
+          borderRadius: 16,
+          padding: '20px 22px',
+          marginBottom: 20,
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.70), 0 8px 32px 0 rgba(0,0,0,0.08)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--label3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Total Rechnung</div>
+            <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: '-0.5px', color: recB ? 'var(--blue)' : 'var(--label3)' }}>
+              {recB ? `CHF ${recB}` : '–'}
+            </div>
+          </div>
+          <div style={{
+            width: 48, height: 48, borderRadius: 12,
+            background: recB ? 'rgba(0,122,255,0.10)' : 'rgba(0,0,0,0.04)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0,
+          }}>
+            🧾
           </div>
         </div>
       )}
