@@ -65,6 +65,13 @@ export const SFCloud = () => (
   </svg>
 );
 
+export const SFReceipt = () => (
+  <svg width={25} height={25} viewBox="0 0 25 25" fill="none">
+    <path d="M5 2h15v19l-2.5-2L15 21l-2.5-2L10 21l-2.5-2L5 21V2z" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round"/>
+    <path d="M8.5 8h8M8.5 11.5h8M8.5 15h5" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round"/>
+  </svg>
+);
+
 export const SFMenu = () => (
   <svg width={22} height={22} viewBox="0 0 22 22" fill="none">
     <path d="M3 6h16M3 11h16M3 16h16" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round"/>

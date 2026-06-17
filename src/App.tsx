@@ -21,6 +21,7 @@ import OfferteList from './components/offerten/OfferteList';
 import OfferteForm from './components/offerten/OfferteForm';
 import OfferteDetail from './components/offerten/OfferteDetail';
 import StatistikDashboard from './components/statistiken/StatistikDashboard';
+import RechnungenList from './components/rechnungen/RechnungenList';
 
 import type { Customer, Order, Offerte, TabId } from './types';
 
@@ -132,6 +133,7 @@ export default function App() {
         {tab === 'dashboard'   && <Dashboard customers={customers} orders={orders} onOrderClick={(o) => { setSelOInEdit(false); setSelO(o); }} />}
         {tab === 'auftraege'   && <OrderList orders={orders} customers={customers} onOrderClick={(o) => { setSelOInEdit(false); setSelO(o); }} onEditClick={(o) => { setSelOInEdit(true); setSelO(o); }} />}
         {tab === 'offerten'    && <OfferteList offerten={offerten} customers={customers} onOfferteClick={setSelOff} onEdit={(off) => setEditOff(off)} onNew={() => setShowNOff(true)} />}
+        {tab === 'rechnungen'  && <RechnungenList orders={orders} customers={customers} onOrderClick={(o) => { setSelOInEdit(false); setSelO(o); }} />}
         {tab === 'kunden'      && <CustomerList customers={customers} orders={orders} onCustomerClick={setSelC} />}
         {tab === 'statistiken' && <StatistikDashboard orders={orders} offerten={offerten} customers={customers} />}
 
