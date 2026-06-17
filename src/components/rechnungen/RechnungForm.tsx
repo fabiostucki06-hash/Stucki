@@ -97,9 +97,9 @@ export default function RechnungForm({ customers, offerten, onSave, onCancel, in
       .filter((p): p is ArbeitPosition => p.typ === 'arbeit')
       .map((p) => {
         const ze = parseFloat(p.ze) || 0;
-        const sa = parseFloat(p.stundenansatz) || 0;
+        const sa = parseFloat(p.stundenansatz || '80') || 80;
         const preis = p.preis || (ze && sa ? ((ze / 100) * sa).toFixed(2) : '');
-        return { ...p, preis, zeLoading: false, zeHint: p.zeHint ?? '' };
+        return { ...p, stundenansatz: String(sa), preis, zeLoading: false, zeHint: p.zeHint ?? '' };
       });
 
     const materialRows: MaterialRow[] = positions
@@ -113,6 +113,10 @@ export default function RechnungForm({ customers, offerten, onSave, onCancel, in
 
     setArbeit(arbeitRows.length ? arbeitRows : [newArbeit()]);
     setMaterial(materialRows.length ? materialRows : [newMaterial()]);
+
+    // Switch to the tab that has imported content so the user sees it immediately
+    if (arbeitRows.length > 0) setTab('arbeit');
+    else if (materialRows.length > 0) setTab('material');
   }
 
   /* ── Zahlungsfrist change ── */
@@ -206,11 +210,19 @@ export default function RechnungForm({ customers, offerten, onSave, onCancel, in
             );
           })}
         </select>
-        {selectedOfferteId && (
-          <div style={{ marginTop: 6, fontSize: 11, color: 'var(--label3)' }}>
-            Kunde und alle Positionen wurden aus der Offerte übernommen.
-          </div>
-        )}
+        {selectedOfferteId && (() => {
+          const off = offerten.find((o) => o.id === selectedOfferteId);
+          const pos = off?.positionen ?? [];
+          const aCount = pos.filter((p) => p.typ === 'arbeit').length;
+          const mCount = pos.filter((p) => p.typ === 'material').length;
+          return (
+            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--label3)' }}>
+              {aCount + mCount > 0
+                ? `${aCount} Arbeit${aCount !== 1 ? 's' : ''}position${aCount !== 1 ? 'en' : ''} und ${mCount} Materialposition${mCount !== 1 ? 'en' : ''} übernommen.`
+                : 'Kunde übernommen — Offerte enthält keine Positionen.'}
+            </div>
+          );
+        })()}
       </div>
 
       {/* ── Kunde & Details ── */}
