@@ -10,7 +10,7 @@ import NavBar from './components/NavBar';
 import TabBar from './components/TabBar';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
-import { SFPerson, SFWrench, SFDoc } from './components/Icons';
+import { SFPerson, SFWrench, SFDoc, SFReceipt } from './components/Icons';
 import CustomerList from './components/kunden/CustomerList';
 import CustomerForm from './components/kunden/CustomerForm';
 import CustomerDetail from './components/kunden/CustomerDetail';
@@ -22,6 +22,7 @@ import OfferteForm from './components/offerten/OfferteForm';
 import OfferteDetail from './components/offerten/OfferteDetail';
 import StatistikDashboard from './components/statistiken/StatistikDashboard';
 import RechnungenList from './components/rechnungen/RechnungenList';
+import RechnungForm from './components/rechnungen/RechnungForm';
 
 import type { Customer, Order, Offerte, TabId } from './types';
 
@@ -35,6 +36,7 @@ export default function App() {
   const [showNC, setShowNC] = useState(false);
   const [showNO, setShowNO] = useState(false);
   const [showNOff, setShowNOff] = useState(false);
+  const [showNR, setShowNR] = useState(false);
   const [newOCid, setNewOCid] = useState<string | null>(null);
   const [afterSave, setAfterSave] = useState<string | null>(null);
 
@@ -104,6 +106,21 @@ export default function App() {
     await deleteOfferte(id); setSelOff(null);
   }
 
+  async function handleCreateRechnung(orderId: string, betrag: string, zahlungsFrist: string) {
+    const order = orders.find((o) => o.id === orderId);
+    if (!order) return;
+    const upd: Order = {
+      ...order,
+      rechnungsBetrag: betrag,
+      zahlungsFrist,
+      status: 'zahlung_versendet',
+      statusChangedAt: new Date().toISOString(),
+    };
+    await updateOrder(upd, null);
+    setShowNR(false);
+    setTab('rechnungen');
+  }
+
   return (
     <div style={{ minHeight: '100dvh', paddingBottom: 'calc(55px + env(safe-area-inset-bottom))' }}>
       {/* Background */}
@@ -152,6 +169,9 @@ export default function App() {
           <button className="context-item" onClick={() => { setShowNOff(true); setFabOpen(false); }}>
             <span>Neue Offerte</span><span className="context-item-icon"><SFDoc /></span>
           </button>
+          <button className="context-item" onClick={() => { setShowNR(true); setFabOpen(false); }}>
+            <span>Neue Rechnung</span><span className="context-item-icon"><SFReceipt /></span>
+          </button>
         </div>
       )}
 
@@ -192,6 +212,13 @@ export default function App() {
         <Sheet title="Neue Offerte" onClose={() => setShowNOff(false)} full
           barRight={<button onClick={() => setShowNOff(false)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
           <OfferteForm customers={customers} onSave={handleAddOfferte} onCancel={() => setShowNOff(false)} />
+        </Sheet>
+      )}
+
+      {showNR && (
+        <Sheet title="Neue Rechnung" onClose={() => setShowNR(false)}
+          barRight={<button onClick={() => setShowNR(false)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
+          <RechnungForm orders={orders} customers={customers} onSave={handleCreateRechnung} onCancel={() => setShowNR(false)} />
         </Sheet>
       )}
 
