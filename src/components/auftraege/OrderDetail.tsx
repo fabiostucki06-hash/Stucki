@@ -24,8 +24,8 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
   const [bs, setBs] = useState(order.beanstandungen ?? ['']);
   const [notizen, setNotizen] = useState(order.notizen ?? '');
   const [items] = useState<OrderItem[]>(order.offertItems ?? []);
-  const [offB, setOffB] = useState(order.offertBetrag ?? '');
-  const [recB, setRecB] = useState(order.rechnungsBetrag ?? '');
+  const offB = order.offertBetrag ?? '';
+  const recB = order.rechnungsBetrag ?? '';
   const [zahlungsFrist, setZahlungsFrist] = useState(order.zahlungsFrist ?? '30');
   const [cv, setCv] = useState(customer?.vorname ?? '');
   const [cn, setCn] = useState(customer?.nachname ?? '');
@@ -144,21 +144,6 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
         </div>
       )}
 
-      {edit && (
-        <>
-          <p className="section-header">Beträge</p>
-          <div className="form-section" style={{ marginBottom: 16 }}>
-            <div style={{ padding: '11px 16px', borderBottom: '0.33px solid var(--sep)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 16, color: 'var(--label2)' }}>Offerte CHF</span>
-              <input type="number" value={offB} onChange={(e) => setOffB(e.target.value)} placeholder="0.00" style={{ background: 'none', border: 'none', outline: 'none', fontSize: 16, color: 'var(--label)', textAlign: 'right', width: 100 }} />
-            </div>
-            <div style={{ padding: '11px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 16, color: 'var(--label2)' }}>Rechnung CHF</span>
-              <input type="number" value={recB} onChange={(e) => setRecB(e.target.value)} placeholder="0.00" style={{ background: 'none', border: 'none', outline: 'none', fontSize: 16, color: 'var(--label)', textAlign: 'right', width: 100 }} />
-            </div>
-          </div>
-        </>
-      )}
 
       {!edit && (offB || recB) && (
         <div className="glass-panel" style={{ padding: 14, textAlign: 'center', marginBottom: 16 }}>
