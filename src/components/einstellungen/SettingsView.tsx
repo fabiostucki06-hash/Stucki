@@ -1,4 +1,4 @@
-import { ASSETS } from '../../lib/supabase';
+import { ASSETS, bustCache } from '../../lib/supabase';
 import { SFCheckmark } from '../Icons';
 
 const WALLPAPERS = [
@@ -82,7 +82,7 @@ export default function SettingsView({ currentWallpaper, onWallpaperChange }: Se
                 aria-pressed={active}
               >
                 <img
-                  src={wp.url}
+                  src={bustCache(wp.url)}
                   alt={wp.label}
                   style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                 />

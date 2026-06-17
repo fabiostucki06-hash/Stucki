@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useApp } from './context/AppContext';
-import { ASSETS } from './lib/supabase';
+import { ASSETS, bustCache } from './lib/supabase';
 import { needsAttention } from './lib/utils';
 
 import Spinner from './components/ui/Spinner';
@@ -145,7 +145,7 @@ export default function App() {
       {/* Background */}
       <div className="bg">
         <img
-          src={wallpaper}
+          src={bustCache(wallpaper)}
           alt=""
           onError={(e) => {
             const img = e.currentTarget;

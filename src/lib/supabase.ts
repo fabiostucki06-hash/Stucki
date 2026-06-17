@@ -3,6 +3,9 @@ export const SUPA_URL = 'https://xpggpkmqwescbcrnnpod.supabase.co';
 const SUPA_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhwZ2dwa21xd2VzY2Jjcm5ucG9kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NjIxMjIsImV4cCI6MjA5NjEzODEyMn0.egPJ4OYOegRKIBV6PHUz_VfRib8g7sVIcNNy_7bFxjg';
 
+const SESSION_TS = Date.now();
+export const bustCache = (url: string) => `${url}?t=${SESSION_TS}`;
+
 export const ASSETS = {
   wallpaper:  `${SUPA_URL}/storage/v1/object/public/wallpaper/mac_wallpaper.png`,
   wallpaper1: `${SUPA_URL}/storage/v1/object/public/wallpaper/mac_wallpaper_1.png`,
