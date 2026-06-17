@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useApp } from './context/AppContext';
-import { ASSETS, bustCache } from './lib/supabase';
+import { ASSETS } from './lib/supabase';
 import { needsAttention } from './lib/utils';
 
 import Spinner from './components/ui/Spinner';
@@ -45,6 +45,23 @@ export default function App() {
   const [wallpaper, setWallpaper] = useState<string>(
     () => localStorage.getItem('garage_wallpaper') || ASSETS.wallpaper
   );
+  const [bgSrc, setBgSrc] = useState(wallpaper);
+  const prevBlobRef = useRef<string>('');
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(wallpaper, { cache: 'no-cache' })
+      .then(r => r.blob())
+      .then(blob => {
+        if (cancelled) return;
+        const url = URL.createObjectURL(blob);
+        if (prevBlobRef.current) URL.revokeObjectURL(prevBlobRef.current);
+        prevBlobRef.current = url;
+        setBgSrc(url);
+      })
+      .catch(() => { if (!cancelled) setBgSrc(wallpaper); });
+    return () => { cancelled = true; };
+  }, [wallpaper]);
 
   function handleWallpaperChange(url: string) {
     setWallpaper(url);
@@ -145,7 +162,7 @@ export default function App() {
       {/* Background */}
       <div className="bg">
         <img
-          src={bustCache(wallpaper)}
+          src={bgSrc}
           alt=""
           onError={(e) => {
             const img = e.currentTarget;

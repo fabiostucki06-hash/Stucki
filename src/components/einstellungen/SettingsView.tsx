@@ -1,4 +1,5 @@
-import { ASSETS, bustCache } from '../../lib/supabase';
+import { useState, useEffect } from 'react';
+import { ASSETS } from '../../lib/supabase';
 import { SFCheckmark } from '../Icons';
 
 const WALLPAPERS = [
@@ -12,6 +13,23 @@ interface SettingsViewProps {
 }
 
 export default function SettingsView({ currentWallpaper, onWallpaperChange }: SettingsViewProps) {
+  const [thumbs, setThumbs] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const blobs: string[] = [];
+    WALLPAPERS.forEach(({ id, url }) => {
+      fetch(url, { cache: 'no-cache' })
+        .then(r => r.blob())
+        .then(blob => {
+          const blobUrl = URL.createObjectURL(blob);
+          blobs.push(blobUrl);
+          setThumbs(prev => ({ ...prev, [id]: blobUrl }));
+        })
+        .catch(() => {});
+    });
+    return () => blobs.forEach(URL.revokeObjectURL);
+  }, []);
+
   return (
     <div style={{ padding: '16px 16px 32px' }}>
       <h1 style={{
@@ -82,7 +100,7 @@ export default function SettingsView({ currentWallpaper, onWallpaperChange }: Se
                 aria-pressed={active}
               >
                 <img
-                  src={bustCache(wp.url)}
+                  src={thumbs[wp.id] ?? wp.url}
                   alt={wp.label}
                   style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                 />
