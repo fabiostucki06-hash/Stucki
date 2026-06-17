@@ -99,5 +99,5 @@ export interface Rechnung {
   totalZE?: number;
 }
 
-export type TabId = 'dashboard' | 'auftraege' | 'offerten' | 'rechnungen' | 'kunden' | 'statistiken';
+export type TabId = 'dashboard' | 'auftraege' | 'offerten' | 'rechnungen' | 'kunden' | 'statistiken' | 'einstellungen';
 export type SyncStatus = 'idle' | 'saving' | 'ok' | 'error';

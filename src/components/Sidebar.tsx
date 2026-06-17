@@ -1,4 +1,4 @@
-import { SFHouse, SFWrench, SFDoc, SFReceipt, SFPerson, SFChart, SFXmark } from './Icons';
+import { SFHouse, SFWrench, SFDoc, SFReceipt, SFPerson, SFChart, SFXmark, SFGear } from './Icons';
 import type { TabId } from '../types';
 
 const SIDEBAR_ITEMS: { id: TabId; icon: React.ReactNode; label: string }[] = [
@@ -7,7 +7,8 @@ const SIDEBAR_ITEMS: { id: TabId; icon: React.ReactNode; label: string }[] = [
   { id: 'offerten',    icon: <SFDoc />,     label: 'Offerten'   },
   { id: 'rechnungen', icon: <SFReceipt />, label: 'Rechnungen' },
   { id: 'kunden',     icon: <SFPerson />,  label: 'Kunden'     },
-  { id: 'statistiken', icon: <SFChart />,  label: 'Statistik' },
+  { id: 'statistiken',   icon: <SFChart />,  label: 'Statistik'     },
+  { id: 'einstellungen', icon: <SFGear />,  label: 'Einstellungen' },
 ];
 
 interface SidebarProps {

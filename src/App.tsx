@@ -21,6 +21,7 @@ import OfferteList from './components/offerten/OfferteList';
 import OfferteForm from './components/offerten/OfferteForm';
 import OfferteDetail from './components/offerten/OfferteDetail';
 import StatistikDashboard from './components/statistiken/StatistikDashboard';
+import SettingsView from './components/einstellungen/SettingsView';
 import RechnungenList from './components/rechnungen/RechnungenList';
 import RechnungForm from './components/rechnungen/RechnungForm';
 import RechnungDetail from './components/rechnungen/RechnungDetail';
@@ -41,6 +42,14 @@ export default function App() {
   const [tab, setTab] = useState<TabId>('dashboard');
   const [fabOpen, setFabOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [wallpaper, setWallpaper] = useState<string>(
+    () => localStorage.getItem('garage_wallpaper') || ASSETS.wallpaper
+  );
+
+  function handleWallpaperChange(url: string) {
+    setWallpaper(url);
+    localStorage.setItem('garage_wallpaper', url);
+  }
 
   const [showNC,   setShowNC]   = useState(false);
   const [showNO,   setShowNO]   = useState(false);
@@ -136,7 +145,7 @@ export default function App() {
       {/* Background */}
       <div className="bg">
         <img
-          src={ASSETS.wallpaper}
+          src={wallpaper}
           alt=""
           onError={(e) => {
             const img = e.currentTarget;
@@ -161,7 +170,8 @@ export default function App() {
         {tab === 'offerten'    && <OfferteList offerten={offerten} customers={customers} onOfferteClick={setSelOff} onEdit={(off) => setEditOff(off)} onNew={() => setShowNOff(true)} />}
         {tab === 'rechnungen'  && <RechnungenList rechnungen={rechnungen} customers={customers} onRechnungClick={setSelR} onEdit={(r) => setEditR(r)} onNew={() => setShowNR(true)} />}
         {tab === 'kunden'      && <CustomerList customers={customers} orders={orders} onCustomerClick={setSelC} />}
-        {tab === 'statistiken' && <StatistikDashboard orders={orders} offerten={offerten} customers={customers} />}
+        {tab === 'statistiken'   && <StatistikDashboard orders={orders} offerten={offerten} customers={customers} />}
+        {tab === 'einstellungen' && <SettingsView currentWallpaper={wallpaper} onWallpaperChange={handleWallpaperChange} />}
       </div>
 
       {/* FAB context menu backdrop */}

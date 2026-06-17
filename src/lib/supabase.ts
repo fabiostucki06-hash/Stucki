@@ -5,6 +5,8 @@ const SUPA_KEY =
 
 export const ASSETS = {
   wallpaper:  `${SUPA_URL}/storage/v1/object/public/wallpaper/mac_wallpaper.png`,
+  wallpaper1: `${SUPA_URL}/storage/v1/object/public/wallpaper/mac_wallpaper_1.png`,
+  wallpaper2: `${SUPA_URL}/storage/v1/object/public/wallpaper/mac_wallpaper_2.png`,
   logo:       `${SUPA_URL}/storage/v1/object/public/logo/Gemini_Generated_Image_.png`,
   iconImage:  `${SUPA_URL}/storage/v1/object/public/assets/icon_image.jpg`,
 };

@@ -77,3 +77,10 @@ export const SFMenu = () => (
     <path d="M3 6h16M3 11h16M3 16h16" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round"/>
   </svg>
 );
+
+export const SFGear = () => (
+  <svg width={25} height={25} viewBox="0 0 25 25" fill="none">
+    <circle cx={12.5} cy={12.5} r={3} stroke="currentColor" strokeWidth={1.5}/>
+    <path d="M10.5 3.5h4l.4 2.2c.6.2 1.1.5 1.6.9l2.1-.8 2 3.5-1.7 1.4a6.5 6.5 0 010 1.9l1.7 1.4-2 3.5-2.1-.8c-.5.4-1 .7-1.6.9l-.4 2.2h-4l-.4-2.2a6.5 6.5 0 01-1.6-.9l-2.1.8-2-3.5 1.7-1.4a6.5 6.5 0 010-1.9l-1.7-1.4 2-3.5 2.1.8c.5-.4 1-.7 1.6-.9l.4-2.2z" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round"/>
+  </svg>
+);
