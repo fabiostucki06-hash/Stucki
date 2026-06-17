@@ -96,7 +96,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
     setSelectedOfferteId(off.id);
   }
 
-  /* ── Auftrag selection: auto-fill customer, dates, and positions from offerte ── */
+  /* ── Auftrag selection: auto-fill customer, dates, positions from offerte + beanstandungen ── */
   function onAuftragSelect(orderId: string) {
     setAuftragId(orderId);
     setSelectedOfferteId('');
@@ -108,10 +108,38 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
     setZahlungsFrist(zf);
     setFaelligAm(calcFaelligAm(zf));
     if (!initial?.titel) setTitel(`Auftrag #${order.orderNumber}`);
+
+    // Positions from latest related Offerte
+    let arbeitRows: ArbeitRow[] = [];
+    let materialRows: MaterialRow[] = [];
     const related = offerten.filter((off) => off.customerId === order.customerId);
-    if (!related.length) return;
-    const latest = [...related].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-    importFromOfferte(latest);
+    if (related.length) {
+      const latest = [...related].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+      const positions = latest.positionen ?? [];
+      arbeitRows = positions
+        .filter((p): p is ArbeitPosition => p.typ === 'arbeit')
+        .map((p) => ({ ...p, zeLoading: false, zeHint: p.zeHint ?? '' }));
+      materialRows = positions.filter((p): p is MaterialPosition => p.typ === 'material');
+      setSelectedOfferteId(latest.id);
+    }
+
+    // Beanstandungen → additional Arbeitspositionen
+    const beanstandungRows: ArbeitRow[] = (order.beanstandungen ?? [])
+      .filter((b) => b.trim())
+      .map((b) => {
+        const ze = schaetzeZE(b);
+        const sa = '80';
+        return {
+          typ: 'arbeit', beschreibung: b, ze,
+          stundenansatz: sa,
+          preis: ze ? ((parseFloat(ze) / 100) * parseFloat(sa)).toFixed(2) : '',
+          zeKI: false, zeLoading: false, zeHint: '',
+        };
+      });
+
+    const allArbeit = [...arbeitRows, ...beanstandungRows];
+    setArbeit(allArbeit.length ? allArbeit : [newArbeit()]);
+    setMaterial(materialRows.length ? materialRows : [newMaterial()]);
   }
 
   /* ── Zahlungsfrist change ── */
@@ -225,7 +253,10 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
         )}
         {auftragId && (
           <div style={{ marginTop: 6, fontSize: 11, color: 'var(--label3)' }}>
-            Kunde, Positionen und Zahlungsfrist wurden aus dem Auftrag übernommen.
+            {(() => {
+              const bCount = (selectedOrder?.beanstandungen ?? []).filter((b) => b.trim()).length;
+              return `Kunde, Positionen und Zahlungsfrist wurden aus dem Auftrag übernommen.${bCount ? ` ${bCount} Beanstandung${bCount !== 1 ? 'en' : ''} als Arbeitsposition${bCount !== 1 ? 'en' : ''} übernommen.` : ''}`;
+            })()}
           </div>
         )}
       </div>
