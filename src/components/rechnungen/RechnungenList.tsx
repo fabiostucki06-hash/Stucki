@@ -1,109 +1,103 @@
-import type { Customer, Order } from '../../types';
+import { SFChevron } from '../Icons';
+import { exportRechnungExcel } from '../../lib/excel';
+import type { Customer, Rechnung, RechnungStatus } from '../../types';
 
 interface RechnungenListProps {
-  orders: Order[];
+  rechnungen: Rechnung[];
   customers: Customer[];
-  onOrderClick: (order: Order) => void;
+  onRechnungClick: (r: Rechnung) => void;
+  onEdit: (r: Rechnung) => void;
+  onNew: () => void;
 }
 
-export default function RechnungenList({ orders, customers, onOrderClick }: RechnungenListProps) {
-  const rechnungen = orders
-    .filter((o) => o.rechnungsBetrag)
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+const STATUS_LABELS: Record<RechnungStatus, string> = {
+  entwurf:   'Entwurf',
+  versendet: 'Versendet',
+  bezahlt:   'Bezahlt',
+  storniert: 'Storniert',
+};
+const STATUS_COLORS: Record<RechnungStatus, string> = {
+  entwurf:   'var(--label2)',
+  versendet: 'var(--orange)',
+  bezahlt:   'var(--green)',
+  storniert: 'var(--red)',
+};
 
-  const total = rechnungen.reduce((sum, o) => sum + parseFloat(o.rechnungsBetrag ?? '0'), 0);
+export default function RechnungenList({ rechnungen, customers, onRechnungClick, onEdit, onNew }: RechnungenListProps) {
+  const sortByName = (a: Rechnung, b: Rechnung) => {
+    const ca = customers.find((x) => x.id === a.customerId);
+    const cb = customers.find((x) => x.id === b.customerId);
+    const na = ca ? `${ca.nachname} ${ca.vorname}`.toLowerCase() : 'zzz';
+    const nb = cb ? `${cb.nachname} ${cb.vorname}`.toLowerCase() : 'zzz';
+    return na < nb ? -1 : na > nb ? 1 : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  };
 
   return (
-    <div>
-      <div className="nav-large-title">
-        <h1 className="sf-title1">Rechnungen</h1>
+    <div style={{ padding: '16px 16px 0' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 12 }}>
+        <h1 className="sf-title1" style={{ paddingTop: 8 }}>Rechnungen</h1>
+        <button onClick={onNew} className="btn-tinted">+ Neue</button>
       </div>
 
-      {rechnungen.length === 0 ? (
-        <div style={{ padding: '60px 20px', textAlign: 'center' }}>
-          <div style={{ fontSize: 48, marginBottom: 14 }}>🧾</div>
-          <div className="sf-headline" style={{ marginBottom: 6 }}>Keine Rechnungen</div>
-          <div className="sf-subhead" style={{ color: 'var(--label2)', lineHeight: 1.5 }}>
-            Sobald ein Auftrag einen Rechnungsbetrag<br />hat, erscheint er hier.
-          </div>
-        </div>
-      ) : (
-        <div style={{ padding: '0 16px' }}>
-
-          {/* Summary card */}
-          <div style={{
-            background: 'rgba(255,255,255,0.45)',
-            backdropFilter: 'blur(20px) saturate(180%)',
-            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-            border: '1px solid rgba(255,255,255,0.60)',
-            borderRadius: 16,
-            padding: '18px 22px',
-            marginBottom: 20,
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.70), 0 8px 32px 0 rgba(0,0,0,0.08)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--label3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5 }}>
-                Gesamtumsatz
-              </div>
-              <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.5px', color: 'var(--blue)' }}>
-                CHF {total.toFixed(2)}
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--label3)', marginTop: 3 }}>
-                {rechnungen.length} {rechnungen.length === 1 ? 'Rechnung' : 'Rechnungen'}
-              </div>
-            </div>
-            <div style={{
-              width: 52, height: 52, borderRadius: 14,
-              background: 'rgba(0,122,255,0.10)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 24, flexShrink: 0,
-            }}>
-              🧾
-            </div>
-          </div>
-
-          {/* List */}
-          <div className="inset-grouped-list" style={{ marginBottom: 16 }}>
-            {rechnungen.map((order) => {
-              const customer = customers.find((c) => c.id === order.customerId);
-              return (
-                <button key={order.id} className="list-row" onClick={() => onOrderClick(order)}>
-                  <div style={{
-                    width: 36, height: 36, borderRadius: 9,
-                    background: 'rgba(0,122,255,0.09)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 17, flexShrink: 0,
-                  }}>
-                    🧾
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="sf-headline" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {customer?.vorname ?? ''} {customer?.nachname ?? ''}
-                    </div>
-                    <div className="sf-footnote" style={{ color: 'var(--label2)', marginTop: 1 }}>
-                      Auftrag #{order.orderNumber}
-                      {customer?.kennzeichen ? ` · ${customer.kennzeichen}` : ''}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--blue)', letterSpacing: '-0.3px' }}>
-                      CHF {order.rechnungsBetrag}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--label3)', marginTop: 2 }}>
-                      {new Date(order.createdAt).toLocaleDateString('de-CH')}
-                    </div>
-                  </div>
-                  <span className="list-chevron">›</span>
-                </button>
-              );
-            })}
-          </div>
-
+      {!rechnungen.length && (
+        <div className="glass-panel" style={{ padding: 40, textAlign: 'center' }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🧾</div>
+          <div style={{ fontSize: 16, color: 'var(--label2)' }}>Noch keine Rechnungen.</div>
         </div>
       )}
+
+      {(['entwurf', 'versendet', 'bezahlt', 'storniert'] as RechnungStatus[]).map((st) => {
+        const grp = rechnungen.filter((r) => r.status === st).sort(sortByName);
+        if (!grp.length) return null;
+        return (
+          <div key={st}>
+            <p className="section-header" style={{ paddingLeft: 0, color: STATUS_COLORS[st] }}>
+              {STATUS_LABELS[st]} ({grp.length})
+            </p>
+            <div className="inset-grouped-list" style={{ marginBottom: 4 }}>
+              {grp.map((rec) => {
+                const c = customers.find((x) => x.id === rec.customerId);
+                return (
+                  <div key={rec.id} className="list-row" onClick={() => onRechnungClick(rec)}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: 16 }}>Rechnung #{rec.rechnungNumber}</div>
+                      <div style={{ fontSize: 13, color: 'var(--label2)', marginTop: 1 }}>
+                        {c ? `${c.vorname} ${c.nachname}` : 'Kein Kunde'}
+                      </div>
+                      {rec.totalBetrag && (
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--blue)', marginTop: 1 }}>
+                          CHF {rec.totalBetrag}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); exportRechnungExcel(rec, c); }}
+                      className="excel-btn"
+                      title="Excel herunterladen"
+                    >
+                      XLS
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onEdit(rec); }}
+                      className="excel-btn"
+                      style={{ background: 'rgba(0,122,255,0.12)', color: 'var(--blue)', border: '1px solid rgba(0,122,255,0.25)' }}
+                      title="Bearbeiten"
+                    >
+                      ✎
+                    </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, marginLeft: 4 }}>
+                      <div style={{ fontSize: 12, color: 'var(--label3)' }}>
+                        {new Date(rec.createdAt).toLocaleDateString('de-CH')}
+                      </div>
+                      <span style={{ color: 'var(--label3)' }}><SFChevron /></span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

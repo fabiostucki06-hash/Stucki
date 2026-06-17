@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs';
 import { storage } from './supabase';
-import type { ArbeitPosition, Customer, MaterialPosition, Offerte, Order } from '../types';
+import type { ArbeitPosition, Customer, MaterialPosition, Offerte, Order, Rechnung } from '../types';
 
 // ── cell-text extraction ──────────────────────────────────────────────────────
 
@@ -191,6 +191,47 @@ export async function exportOrderExcel(order: Order, customer: Customer | undefi
     write(rightOf(sheet, 'Datum'), todayCH());
 
     await downloadWorkbook(wb, `Auftrag_${order.orderNumber}_${customer?.nachname ?? 'Kunde'}.xlsx`);
+  } catch (err) {
+    alert(`Excel-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+// ── Rechnung export ───────────────────────────────────────────────────────────
+// Template file: Vorlage_Rechnung.xlsx  –  stored in Supabase bucket "Rechnung_Vorlage"
+
+export async function exportRechnungExcel(rechnung: Rechnung, customer: Customer | undefined) {
+  try {
+    const buffer = await storage.fetchTemplate('Rechnung_Vorlage');
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buffer);
+    const sheet = wb.worksheets[0];
+    unshareFormulas(sheet);
+
+    write(rightOf(sheet, 'Rechnungsnummer'), rechnung.rechnungNumber ?? '');
+    fillVehicleBlock(sheet, customer);
+
+    const positionen = rechnung.positionen ?? [];
+    const table = findTable(sheet, 'Bezeichnung');
+    if (table) {
+      positionen.forEach((pos, i) => {
+        const row = sheet.getRow(table.headerRow + 1 + i);
+        row.getCell(table.cols.bez).value = pos.beschreibung ?? '';
+        if (pos.typ === 'material') {
+          const mp = pos as MaterialPosition;
+          row.getCell(table.cols.menge).value    = parseFloat(mp.menge) || '';
+          row.getCell(table.cols.stkPreis).value = parseFloat(mp.stueckpreis) || '';
+        }
+        row.getCell(table.cols.preis).value = parseFloat(pos.preis) || '';
+        if (pos.typ === 'arbeit') {
+          row.getCell(table.cols.ze).value = parseFloat((pos as ArbeitPosition).ze) || '';
+        }
+      });
+    }
+
+    write(rightOf(sheet, 'Datum'), todayCH());
+    if (rechnung.faelligAm) write(rightOf(sheet, 'Zahlbar bis'), new Date(rechnung.faelligAm).toLocaleDateString('de-CH'));
+
+    await downloadWorkbook(wb, `Rechnung_${rechnung.rechnungNumber}_${customer?.nachname ?? 'Kunde'}.xlsx`);
   } catch (err) {
     alert(`Excel-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);
   }

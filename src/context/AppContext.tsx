@@ -1,14 +1,16 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { auth, db } from '../lib/supabase';
 import { showToast } from '../components/ui/Toast';
-import type { Customer, Order, Offerte, SyncStatus } from '../types';
+import type { Customer, Order, Offerte, Rechnung, SyncStatus } from '../types';
 
 interface AppContextValue {
   customers: Customer[];
   orders: Order[];
   offerten: Offerte[];
+  rechnungen: Rechnung[];
   orderNum: number;
   offertNum: number;
+  rechnungNum: number;
   loading: boolean;
   syncStatus: SyncStatus;
   token: string | null;
@@ -22,6 +24,9 @@ interface AppContextValue {
   addOfferte: (data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>) => Promise<void>;
   updateOfferte: (upd: Offerte) => Promise<void>;
   deleteOfferte: (id: string) => Promise<void>;
+  addRechnung: (data: Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>) => Promise<void>;
+  updateRechnung: (upd: Rechnung) => Promise<void>;
+  deleteRechnung: (id: string) => Promise<void>;
   handleLogin: (token: string, email: string) => void;
   handleLogout: () => Promise<void>;
 }
@@ -35,8 +40,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [offerten, setOfferten] = useState<Offerte[]>([]);
+  const [rechnungen, setRechnungen] = useState<Rechnung[]>([]);
   const [orderNum, setOrderNum] = useState(0);
   const [offertNum, setOffertNum] = useState(0);
+  const [rechnungNum, setRechnungNum] = useState(0);
   const [loading, setLoading] = useState(true);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
 
@@ -55,17 +62,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!token || !authChecked) return;
     (async () => {
       try {
-        const [cr, or, cnt, offr] = await Promise.all([
+        const [cr, or, cnt, offr, rechr] = await Promise.all([
           db.get('customers', token),
           db.get('orders', token),
           db.getCounter(token),
           db.get('offerten', token).catch((e) => { console.error('[Supabase] get(offerten):', e); return []; }),
+          db.get('rechnungen', token).catch((e) => { console.error('[Supabase] get(rechnungen):', e); return []; }),
         ]);
         const parseRows = (arr: unknown[]) =>
           (Array.isArray(arr) ? arr : []).map((r: unknown) => {
             if (!r || typeof r !== 'object') return null;
             const row = r as Record<string, unknown>;
-            return (row.data as Customer | Order | Offerte) ?? (row.id ? r : null);
+            return (row.data as Customer | Order | Offerte | Rechnung) ?? (row.id ? r : null);
           }).filter(Boolean);
         setCustomers(parseRows(cr) as Customer[]);
         setOrders(parseRows(or) as Order[]);
@@ -73,6 +81,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const offs = parseRows(offr) as Offerte[];
         setOfferten(offs);
         if (offs.length) setOffertNum(Math.max(...offs.map((o) => o.offertNumber ?? 0)));
+        const rechns = parseRows(rechr) as Rechnung[];
+        setRechnungen(rechns);
+        if (rechns.length) setRechnungNum(Math.max(...rechns.map((r) => r.rechnungNumber ?? 0)));
       } catch (e) { console.error(e); }
       setLoading(false);
     })();
@@ -144,6 +155,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setOfferten((p) => p.filter((o) => o.id !== id));
   }
 
+  async function addRechnung(data: Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>) {
+    const num = rechnungNum + 1;
+    const newR: Rechnung = { id: `r_${Date.now()}`, rechnungNumber: num, status: 'entwurf', createdAt: new Date().toISOString(), ...data };
+    try {
+      await syncOk(() => db.upsert('rechnungen', { id: newR.id, data: newR }, token!));
+    } catch { return; }
+    setRechnungen((p) => [...p, newR]); setRechnungNum(num);
+    showToast(`Rechnung #${num} gespeichert`, 'success');
+  }
+
+  async function updateRechnung(upd: Rechnung) {
+    await syncOk(() => db.upsert('rechnungen', { id: upd.id, data: upd }, token!));
+    setRechnungen((p) => p.map((r) => (r.id === upd.id ? upd : r)));
+  }
+
+  async function deleteRechnung(id: string) {
+    await syncOk(() => db.delete('rechnungen', id, token!));
+    setRechnungen((p) => p.filter((r) => r.id !== id));
+  }
+
   function handleLogin(t: string, e: string) {
     setToken(t); setUserEmail(e); setLoading(true);
   }
@@ -156,7 +187,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AppContext.Provider value={{ customers, orders, offerten, orderNum, offertNum, loading, syncStatus, token, userEmail, authChecked, addCustomer, updateCustomer, addOrder, updateOrder, deleteOrder, addOfferte, updateOfferte, deleteOfferte, handleLogin, handleLogout }}>
+    <AppContext.Provider value={{ customers, orders, offerten, rechnungen, orderNum, offertNum, rechnungNum, loading, syncStatus, token, userEmail, authChecked, addCustomer, updateCustomer, addOrder, updateOrder, deleteOrder, addOfferte, updateOfferte, deleteOfferte, addRechnung, updateRechnung, deleteRechnung, handleLogin, handleLogout }}>
       {children}
     </AppContext.Provider>
   );

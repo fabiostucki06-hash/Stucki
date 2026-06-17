@@ -79,5 +79,24 @@ export interface Offerte {
   totalZE?: number;
 }
 
+export type RechnungStatus = 'entwurf' | 'versendet' | 'bezahlt' | 'storniert';
+
+export interface Rechnung {
+  id: string;
+  rechnungNumber: number;
+  customerId: string;
+  status: RechnungStatus;
+  createdAt: string;
+  titel?: string;
+  positionen?: Position[];
+  notizen?: string;
+  zahlungsFrist?: string;
+  faelligAm?: string;
+  totalBetrag?: string;
+  totalArbeit?: string;
+  totalMaterial?: string;
+  totalZE?: number;
+}
+
 export type TabId = 'dashboard' | 'auftraege' | 'offerten' | 'rechnungen' | 'kunden' | 'statistiken';
 export type SyncStatus = 'idle' | 'saving' | 'ok' | 'error';

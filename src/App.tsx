@@ -23,29 +23,40 @@ import OfferteDetail from './components/offerten/OfferteDetail';
 import StatistikDashboard from './components/statistiken/StatistikDashboard';
 import RechnungenList from './components/rechnungen/RechnungenList';
 import RechnungForm from './components/rechnungen/RechnungForm';
+import RechnungDetail from './components/rechnungen/RechnungDetail';
 
-import type { Customer, Order, Offerte, TabId } from './types';
+import type { Customer, Order, Offerte, Rechnung, TabId } from './types';
 
 export default function App() {
-  const { customers, orders, offerten, syncStatus, token, authChecked, loading, handleLogin, handleLogout, addCustomer, updateCustomer, addOrder, updateOrder, deleteOrder, addOfferte, updateOfferte, deleteOfferte } = useApp();
+  const {
+    customers, orders, offerten, rechnungen,
+    syncStatus, token, authChecked, loading,
+    handleLogin, handleLogout,
+    addCustomer, updateCustomer,
+    addOrder, updateOrder, deleteOrder,
+    addOfferte, updateOfferte, deleteOfferte,
+    addRechnung, updateRechnung, deleteRechnung,
+  } = useApp();
 
   const [tab, setTab] = useState<TabId>('dashboard');
   const [fabOpen, setFabOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const [showNC, setShowNC] = useState(false);
-  const [showNO, setShowNO] = useState(false);
+  const [showNC,   setShowNC]   = useState(false);
+  const [showNO,   setShowNO]   = useState(false);
   const [showNOff, setShowNOff] = useState(false);
-  const [showNR, setShowNR] = useState(false);
-  const [newOCid, setNewOCid] = useState<string | null>(null);
+  const [showNR,   setShowNR]   = useState(false);
+  const [newOCid,  setNewOCid]  = useState<string | null>(null);
   const [afterSave, setAfterSave] = useState<string | null>(null);
 
-  const [selC, setSelC] = useState<Customer | null>(null);
-  const [editC, setEditC] = useState<Customer | null>(null);
-  const [selO, setSelO] = useState<Order | null>(null);
+  const [selC,     setSelC]     = useState<Customer | null>(null);
+  const [editC,    setEditC]    = useState<Customer | null>(null);
+  const [selO,     setSelO]     = useState<Order | null>(null);
   const [selOInEdit, setSelOInEdit] = useState(false);
-  const [selOff, setSelOff] = useState<Offerte | null>(null);
-  const [editOff, setEditOff] = useState<Offerte | null>(null);
+  const [selOff,   setSelOff]   = useState<Offerte | null>(null);
+  const [editOff,  setEditOff]  = useState<Offerte | null>(null);
+  const [selR,     setSelR]     = useState<Rechnung | null>(null);
+  const [editR,    setEditR]    = useState<Rechnung | null>(null);
 
   const todos = orders.filter(needsAttention);
 
@@ -68,57 +79,56 @@ export default function App() {
     );
   }
 
+  /* ── Customer handlers ── */
   async function handleAddCustomer(data: Omit<Customer, 'id' | 'createdAt'>) {
     const id = await addCustomer(data);
     setShowNC(false); setAfterSave(id);
   }
 
+  /* ── Order handlers ── */
   async function handleAddOrder(data: Pick<Order, 'customerId' | 'beanstandungen' | 'notizen'>) {
     await addOrder(data);
     setShowNO(false); setNewOCid(null);
   }
-
   async function handleUpdateOrder(upd: Order, cp: Partial<Customer> | null) {
     await updateOrder(upd, cp); setSelO(upd); setSelOInEdit(false);
   }
-
   async function handleDeleteOrder(id: string) {
     await deleteOrder(id); setSelO(null); setSelOInEdit(false);
   }
 
+  /* ── Offerte handlers ── */
   async function handleAddOfferte(data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>) {
     await addOfferte(data); setShowNOff(false); setTab('offerten');
   }
-
   async function handleUpdateOfferte(upd: Offerte) {
     await updateOfferte(upd); setSelOff(upd);
   }
-
   async function handleSaveEditOfferte(data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>) {
     if (!editOff) return;
     const updated: Offerte = { ...editOff, ...data };
     await updateOfferte(updated);
-    setEditOff(null);
-    setSelOff(updated);
+    setEditOff(null); setSelOff(updated);
   }
-
   async function handleDeleteOfferte(id: string) {
     await deleteOfferte(id); setSelOff(null);
   }
 
-  async function handleCreateRechnung(orderId: string, betrag: string, zahlungsFrist: string) {
-    const order = orders.find((o) => o.id === orderId);
-    if (!order) return;
-    const upd: Order = {
-      ...order,
-      rechnungsBetrag: betrag,
-      zahlungsFrist,
-      status: 'zahlung_versendet',
-      statusChangedAt: new Date().toISOString(),
-    };
-    await updateOrder(upd, null);
-    setShowNR(false);
-    setTab('rechnungen');
+  /* ── Rechnung handlers ── */
+  async function handleAddRechnung(data: Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>) {
+    await addRechnung(data); setShowNR(false); setTab('rechnungen');
+  }
+  async function handleUpdateRechnung(upd: Rechnung) {
+    await updateRechnung(upd); setSelR(upd);
+  }
+  async function handleSaveEditRechnung(data: Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>) {
+    if (!editR) return;
+    const updated: Rechnung = { ...editR, ...data };
+    await updateRechnung(updated);
+    setEditR(null); setSelR(updated);
+  }
+  async function handleDeleteRechnung(id: string) {
+    await deleteRechnung(id); setSelR(null);
   }
 
   return (
@@ -128,7 +138,6 @@ export default function App() {
         <img
           src={ASSETS.wallpaper}
           alt=""
-
           onError={(e) => {
             const img = e.currentTarget;
             if (!img.dataset.fb) { img.dataset.fb = '1'; img.src = '/mac_wallpaper.png'; }
@@ -150,10 +159,9 @@ export default function App() {
         {tab === 'dashboard'   && <Dashboard customers={customers} orders={orders} onOrderClick={(o) => { setSelOInEdit(false); setSelO(o); }} />}
         {tab === 'auftraege'   && <OrderList orders={orders} customers={customers} onOrderClick={(o) => { setSelOInEdit(false); setSelO(o); }} onEditClick={(o) => { setSelOInEdit(true); setSelO(o); }} />}
         {tab === 'offerten'    && <OfferteList offerten={offerten} customers={customers} onOfferteClick={setSelOff} onEdit={(off) => setEditOff(off)} onNew={() => setShowNOff(true)} />}
-        {tab === 'rechnungen'  && <RechnungenList orders={orders} customers={customers} onOrderClick={(o) => { setSelOInEdit(false); setSelO(o); }} />}
+        {tab === 'rechnungen'  && <RechnungenList rechnungen={rechnungen} customers={customers} onRechnungClick={setSelR} onEdit={(r) => setEditR(r)} onNew={() => setShowNR(true)} />}
         {tab === 'kunden'      && <CustomerList customers={customers} orders={orders} onCustomerClick={setSelC} />}
         {tab === 'statistiken' && <StatistikDashboard orders={orders} offerten={offerten} customers={customers} />}
-
       </div>
 
       {/* FAB context menu backdrop */}
@@ -216,9 +224,9 @@ export default function App() {
       )}
 
       {showNR && (
-        <Sheet title="Neue Rechnung" onClose={() => setShowNR(false)}
+        <Sheet title="Neue Rechnung" onClose={() => setShowNR(false)} full
           barRight={<button onClick={() => setShowNR(false)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
-          <RechnungForm orders={orders} customers={customers} onSave={handleCreateRechnung} onCancel={() => setShowNR(false)} />
+          <RechnungForm customers={customers} onSave={handleAddRechnung} onCancel={() => setShowNR(false)} />
         </Sheet>
       )}
 
@@ -237,6 +245,24 @@ export default function App() {
         <Sheet title={`Offerte #${editOff.offertNumber} bearbeiten`} onClose={() => setEditOff(null)} full
           barRight={<button onClick={() => setEditOff(null)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
           <OfferteForm customers={customers} initial={editOff} onSave={handleSaveEditOfferte} onCancel={() => setEditOff(null)} />
+        </Sheet>
+      )}
+
+      {selR && (
+        <RechnungDetail
+          rechnung={selR}
+          customer={customers.find((c) => c.id === selR.customerId)}
+          onClose={() => setSelR(null)}
+          onUpdate={handleUpdateRechnung}
+          onDelete={handleDeleteRechnung}
+          onEdit={(r) => { setSelR(null); setEditR(r); }}
+        />
+      )}
+
+      {editR && (
+        <Sheet title={`Rechnung #${editR.rechnungNumber} bearbeiten`} onClose={() => setEditR(null)} full
+          barRight={<button onClick={() => setEditR(null)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
+          <RechnungForm customers={customers} initial={editR} onSave={handleSaveEditRechnung} onCancel={() => setEditR(null)} />
         </Sheet>
       )}
 
@@ -272,7 +298,7 @@ export default function App() {
         />
       )}
 
-      {/* Build timestamp — changes on every deploy */}
+      {/* Build timestamp */}
       <div style={{
         position: 'fixed',
         bottom: 'calc(60px + env(safe-area-inset-bottom))',
