@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
 import { SFPlus, SFXmark } from '../Icons';
-import type { Customer, Order, ArbeitPosition, MaterialPosition, Rechnung } from '../../types';
+import type { Customer, Order, Offerte, ArbeitPosition, MaterialPosition, Rechnung } from '../../types';
 
 type ArbeitRow   = ArbeitPosition  & { zeLoading: boolean; zeHint: string };
 type MaterialRow = MaterialPosition;
@@ -11,6 +11,7 @@ type RechnungData = Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'created
 interface RechnungFormProps {
   customers: Customer[];
   orders: Order[];
+  offerten: Offerte[];
   onSave: (data: RechnungData) => Promise<void> | void;
   onCancel: () => void;
   saving?: boolean;
@@ -54,7 +55,7 @@ function calcFaelligAm(days: string): string {
   return d.toISOString().split('T')[0];
 }
 
-export default function RechnungForm({ customers, orders, onSave, onCancel, initial }: RechnungFormProps) {
+export default function RechnungForm({ customers, orders, offerten, onSave, onCancel, initial }: RechnungFormProps) {
   const [auftragId,    setAuftragId]    = useState(initial?.auftragId ?? '');
   const [cid,          setCid]          = useState(initial?.customerId ?? '');
   const [titel,        setTitel]        = useState(initial?.titel ?? '');
@@ -72,6 +73,7 @@ export default function RechnungForm({ customers, orders, onSave, onCancel, init
   const [faelligAm,    setFaelligAm]    = useState(
     () => initial?.faelligAm ?? calcFaelligAm(initial?.zahlungsFrist ?? '30')
   );
+  const [selectedOfferteId, setSelectedOfferteId] = useState('');
 
   const selectedCustomer = customers.find((c) => c.id === cid) ?? null;
   const vehicleChips = selectedCustomer
@@ -79,9 +81,25 @@ export default function RechnungForm({ customers, orders, onSave, onCancel, init
        selectedCustomer.km ? selectedCustomer.km + ' km' : ''].filter(Boolean)
     : [];
 
-  /* ── Auftrag selection ── */
+  const selectedOrder = orders.find((o) => o.id === auftragId) ?? null;
+  const customerOfferten = selectedOrder
+    ? offerten.filter((off) => off.customerId === selectedOrder.customerId)
+    : [];
+
+  /* ── Import positions from an Offerte ── */
+  function importFromOfferte(off: Offerte) {
+    const positions = off.positionen ?? [];
+    const ap = positions.filter((p): p is ArbeitPosition => p.typ === 'arbeit');
+    const mp = positions.filter((p): p is MaterialPosition => p.typ === 'material');
+    setArbeit(ap.length ? ap.map((p) => ({ ...p, zeLoading: false, zeHint: p.zeHint ?? '' })) : [newArbeit()]);
+    setMaterial(mp.length ? mp : [newMaterial()]);
+    setSelectedOfferteId(off.id);
+  }
+
+  /* ── Auftrag selection: auto-fill customer, dates, and positions from offerte ── */
   function onAuftragSelect(orderId: string) {
     setAuftragId(orderId);
+    setSelectedOfferteId('');
     if (!orderId) return;
     const order = orders.find((o) => o.id === orderId);
     if (!order) return;
@@ -89,11 +107,11 @@ export default function RechnungForm({ customers, orders, onSave, onCancel, init
     const zf = order.zahlungsFrist ?? '30';
     setZahlungsFrist(zf);
     setFaelligAm(calcFaelligAm(zf));
-    const checkedItems = (order.offertItems ?? []).filter((i) => i.checked);
-    if (checkedItems.length > 0) {
-      setArbeit(checkedItems.map((item) => ({ ...newArbeit(), beschreibung: item.text })));
-    }
     if (!initial?.titel) setTitel(`Auftrag #${order.orderNumber}`);
+    const related = offerten.filter((off) => off.customerId === order.customerId);
+    if (!related.length) return;
+    const latest = [...related].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+    importFromOfferte(latest);
   }
 
   /* ── Zahlungsfrist change ── */
@@ -187,6 +205,24 @@ export default function RechnungForm({ customers, orders, onSave, onCancel, init
             );
           })}
         </select>
+        {customerOfferten.length > 1 && (
+          <select
+            className="mf-select"
+            style={{ marginTop: 8, color: selectedOfferteId ? 'var(--label)' : 'var(--label3)' }}
+            value={selectedOfferteId}
+            onChange={(e) => {
+              const off = offerten.find((o) => o.id === e.target.value);
+              if (off) importFromOfferte(off);
+            }}
+          >
+            <option value="">Offerte auswählen…</option>
+            {customerOfferten.map((off) => (
+              <option key={off.id} value={off.id}>
+                Offerte #{off.offertNumber}{off.titel ? ` – ${off.titel}` : ''} · CHF {parseFloat(off.totalBetrag || '0').toFixed(2)}
+              </option>
+            ))}
+          </select>
+        )}
         {auftragId && (
           <div style={{ marginTop: 6, fontSize: 11, color: 'var(--label3)' }}>
             Kunde, Positionen und Zahlungsfrist wurden aus dem Auftrag übernommen.

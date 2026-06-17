@@ -226,7 +226,7 @@ export default function App() {
       {showNR && (
         <Sheet title="Neue Rechnung" onClose={() => setShowNR(false)} full
           barRight={<button onClick={() => setShowNR(false)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
-          <RechnungForm customers={customers} orders={orders} onSave={handleAddRechnung} onCancel={() => setShowNR(false)} />
+          <RechnungForm customers={customers} orders={orders} offerten={offerten} onSave={handleAddRechnung} onCancel={() => setShowNR(false)} />
         </Sheet>
       )}
 
@@ -262,7 +262,7 @@ export default function App() {
       {editR && (
         <Sheet title={`Rechnung #${editR.rechnungNumber} bearbeiten`} onClose={() => setEditR(null)} full
           barRight={<button onClick={() => setEditR(null)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
-          <RechnungForm customers={customers} orders={orders} initial={editR} onSave={handleSaveEditRechnung} onCancel={() => setEditR(null)} />
+          <RechnungForm customers={customers} orders={orders} offerten={offerten} initial={editR} onSave={handleSaveEditRechnung} onCancel={() => setEditR(null)} />
         </Sheet>
       )}
 

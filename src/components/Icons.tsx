@@ -58,17 +58,17 @@ export const SFChart = () => (
   </svg>
 );
 
+export const SFReceipt = () => (
+  <svg width={25} height={25} viewBox="0 0 25 25" fill="none">
+    <path d="M5 3.5h15v18l-2.5-2-2.5 2-2.5-2-2.5 2-2.5-2-2.5 2V3.5z" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round"/>
+    <path d="M9 9h7M9 13h5M9 17h3" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round"/>
+  </svg>
+);
+
 export const SFCloud = () => (
   <svg width={24} height={20} viewBox="0 0 26 22" fill="none">
     <path d="M7.5 18.5a6.5 6.5 0 01-.6-12.96A8.5 8.5 0 0120.5 10a5.5 5.5 0 010 8.5H7.5z" stroke="currentColor" strokeWidth={1.7} strokeLinejoin="round"/>
     <path d="M13 21v-7M11 16.5l2-2 2 2" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-);
-
-export const SFReceipt = () => (
-  <svg width={25} height={25} viewBox="0 0 25 25" fill="none">
-    <path d="M5 2h15v19l-2.5-2L15 21l-2.5-2L10 21l-2.5-2L5 21V2z" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round"/>
-    <path d="M8.5 8h8M8.5 11.5h8M8.5 15h5" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round"/>
   </svg>
 );
 
