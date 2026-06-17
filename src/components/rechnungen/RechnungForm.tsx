@@ -92,10 +92,27 @@ export default function RechnungForm({ customers, offerten, onSave, onCancel, in
     if (!initial?.titel) setTitel(off.titel ?? `Offerte #${off.offertNumber}`);
 
     const positions = off.positionen ?? [];
-    const ap = positions.filter((p): p is ArbeitPosition => p.typ === 'arbeit');
-    const mp = positions.filter((p): p is MaterialPosition => p.typ === 'material');
-    setArbeit(ap.length ? ap.map((p) => ({ ...p, zeLoading: false, zeHint: p.zeHint ?? '' })) : [newArbeit()]);
-    setMaterial(mp.length ? mp : [newMaterial()]);
+
+    const arbeitRows: ArbeitRow[] = positions
+      .filter((p): p is ArbeitPosition => p.typ === 'arbeit')
+      .map((p) => {
+        const ze = parseFloat(p.ze) || 0;
+        const sa = parseFloat(p.stundenansatz) || 0;
+        const preis = ze && sa ? ((ze / 100) * sa).toFixed(2) : (p.preis || '');
+        return { ...p, preis, zeLoading: false, zeHint: p.zeHint ?? '' };
+      });
+
+    const materialRows: MaterialRow[] = positions
+      .filter((p): p is MaterialPosition => p.typ === 'material')
+      .map((p) => {
+        const mg = parseFloat(p.menge) || 1;
+        const sp = parseFloat(p.stueckpreis) || 0;
+        const preis = sp ? (sp * mg).toFixed(2) : (p.preis || '');
+        return { ...p, preis };
+      });
+
+    setArbeit(arbeitRows.length ? arbeitRows : [newArbeit()]);
+    setMaterial(materialRows.length ? materialRows : [newMaterial()]);
   }
 
   /* ── Zahlungsfrist change ── */
