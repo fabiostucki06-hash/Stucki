@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Sheet from '../ui/Sheet';
 import Badge from '../ui/Badge';
 import Spinner from '../ui/Spinner';
-import { SFPlus, SFXmark, SFCheckmark } from '../Icons';
+import { SFPlus, SFXmark } from '../Icons';
 import { isOverdue, daysSince, hoursSince } from '../../lib/utils';
 import { SC, SO } from '../../constants/statuses';
 import { exportOrderExcel } from '../../lib/excel';
@@ -23,8 +23,7 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
   const [status, setStatus] = useState<OrderStatus>(order.status);
   const [bs, setBs] = useState(order.beanstandungen ?? ['']);
   const [notizen, setNotizen] = useState(order.notizen ?? '');
-  const [items, setItems] = useState<OrderItem[]>(order.offertItems ?? []);
-  const [newItem, setNewItem] = useState('');
+  const [items] = useState<OrderItem[]>(order.offertItems ?? []);
   const [offB, setOffB] = useState(order.offertBetrag ?? '');
   const [recB, setRecB] = useState(order.rechnungsBetrag ?? '');
   const [zahlungsFrist, setZahlungsFrist] = useState(order.zahlungsFrist ?? '30');
@@ -38,14 +37,10 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
 
   const ov = isOverdue({ ...order, status });
   const d = daysSince(order.statusChangedAt); const hh = hoursSince(order.statusChangedAt);
-  const showOffert = ['offerte_bestaetigt', 'teile_arbeit', 'zahlung_versendet', 'zahlung_erhalten', 'abgeschlossen'].includes(status);
 
   const addB = () => setBs((p) => [...p, '']);
   const updB = (i: number, v: string) => setBs((p) => { const n = [...p]; n[i] = v; return n; });
   const remB = (i: number) => setBs((p) => p.filter((_, j) => j !== i));
-  const addItem = () => { if (newItem.trim()) { setItems((p) => [...p, { text: newItem.trim(), checked: false }]); setNewItem(''); } };
-  const togItem = (i: number) => setItems((p) => p.map((x, j) => j === i ? { ...x, checked: !x.checked } : x));
-  const remItem = (i: number) => setItems((p) => p.filter((_, j) => j !== i));
 
   async function save() {
     setSaving(true);
@@ -149,32 +144,6 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
         </div>
       )}
 
-      {showOffert && (
-        <>
-          <p className="section-header">Checkliste</p>
-          <div className="inset-grouped-list" style={{ marginBottom: 16 }}>
-            {items.map((item, i) => (
-              <label key={i} className="list-row" style={{ cursor: 'pointer' }}>
-                <div style={{ width: 22, height: 22, borderRadius: 11, background: item.checked ? 'var(--blue)' : 'none', border: `1.5px solid ${item.checked ? 'var(--blue)' : 'var(--label3)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background 0.15s' }}>
-                  {item.checked && <SFCheckmark />}
-                </div>
-                <input type="checkbox" checked={item.checked} onChange={() => togItem(i)} style={{ display: 'none' }} />
-                <span style={{ flex: 1, fontSize: 16, color: item.checked ? 'var(--label3)' : 'var(--label)', textDecoration: item.checked ? 'line-through' : 'none' }}>{item.text}</span>
-                <button onClick={(e) => { e.preventDefault(); remItem(i); }} style={{ background: 'none', border: 'none', color: 'var(--label3)', cursor: 'pointer', padding: '0 4px', display: 'flex', alignItems: 'center' }}>
-                  <SFXmark />
-                </button>
-              </label>
-            ))}
-            <div style={{ padding: '8px 16px', display: 'flex', gap: 8 }}>
-              <input value={newItem} onChange={(e) => setNewItem(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addItem()} placeholder="Neue Position…" style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: 17, color: 'var(--label)' }} />
-              <button onClick={addItem} style={{ background: 'linear-gradient(to bottom,rgba(84,164,255,0.95) 0%,rgba(0,122,255,0.95) 50%,rgba(0,86,179,0.95) 100%)', color: '#fff', border: '1px solid #004fb0', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'inset 0 1px 0px rgba(255,255,255,0.7),inset 0 -1px 2px rgba(0,0,0,0.15)', fontWeight: 'bold' }}>
-                <SFPlus size={16} />
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-
       {edit && (
         <>
           <p className="section-header">Beträge</p>
@@ -192,9 +161,13 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
       )}
 
       {!edit && (offB || recB) && (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          {offB && <div className="glass-panel" style={{ flex: 1, padding: 12, textAlign: 'center' }}><div style={{ fontSize: 12, color: 'var(--label2)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Offerte</div><div style={{ fontWeight: 700, fontSize: 18, color: 'var(--label)' }}>CHF {offB}</div></div>}
-          {recB && <div className="glass-panel" style={{ flex: 1, padding: 12, textAlign: 'center' }}><div style={{ fontSize: 12, color: 'var(--label2)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Rechnung</div><div style={{ fontWeight: 700, fontSize: 18, color: 'var(--blue)' }}>CHF {recB}</div></div>}
+        <div className="glass-panel" style={{ padding: 14, textAlign: 'center', marginBottom: 16 }}>
+          <div style={{ fontSize: 12, color: 'var(--label2)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+            {recB ? 'Rechnung' : 'Offerte'}
+          </div>
+          <div style={{ fontWeight: 700, fontSize: 22, color: recB ? 'var(--blue)' : 'var(--label)' }}>
+            CHF {recB || offB}
+          </div>
         </div>
       )}
 
@@ -221,8 +194,6 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
           </div>
         );
       })()}
-
-      {!edit && <div style={{ background: 'rgba(52,199,89,0.09)', borderRadius: 10, padding: '10px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8, border: '0.5px solid rgba(52,199,89,0.22)' }}><span style={{ fontSize: 15, color: 'var(--green)' }}>✓</span><span style={{ fontSize: 15, fontWeight: 600, color: 'var(--green)' }}>Zahlungsziel: 30 Tage netto</span></div>}
 
       {edit ? (
         <>
