@@ -98,7 +98,7 @@ export default function RechnungForm({ customers, offerten, onSave, onCancel, in
       .map((p) => {
         const ze = parseFloat(p.ze) || 0;
         const sa = parseFloat(p.stundenansatz) || 0;
-        const preis = ze && sa ? ((ze / 100) * sa).toFixed(2) : (p.preis || '');
+        const preis = p.preis || (ze && sa ? ((ze / 100) * sa).toFixed(2) : '');
         return { ...p, preis, zeLoading: false, zeHint: p.zeHint ?? '' };
       });
 
@@ -107,7 +107,7 @@ export default function RechnungForm({ customers, offerten, onSave, onCancel, in
       .map((p) => {
         const mg = parseFloat(p.menge) || 1;
         const sp = parseFloat(p.stueckpreis) || 0;
-        const preis = sp ? (sp * mg).toFixed(2) : (p.preis || '');
+        const preis = p.preis || (sp ? (sp * mg).toFixed(2) : '');
         return { ...p, preis };
       });
 
