@@ -229,7 +229,13 @@ export async function exportRechnungExcel(rechnung: Rechnung, customer: Customer
     }
 
     write(rightOf(sheet, 'Datum'), todayCH());
-    if (rechnung.faelligAm) write(rightOf(sheet, 'Zahlbar bis'), new Date(rechnung.faelligAm).toLocaleDateString('de-CH'));
+    if (rechnung.zahlungsFrist) write(rightOf(sheet, 'Zahlungsfrist'), `${rechnung.zahlungsFrist} Tage`);
+    const faelligDate = rechnung.faelligAm
+      ? new Date(rechnung.faelligAm)
+      : rechnung.zahlungsFrist
+        ? (() => { const d = new Date(); d.setDate(d.getDate() + parseInt(rechnung.zahlungsFrist)); return d; })()
+        : null;
+    if (faelligDate) write(rightOf(sheet, 'Zahlbar bis'), faelligDate.toLocaleDateString('de-CH'));
 
     await downloadWorkbook(wb, `Rechnung_${rechnung.rechnungNumber}_${customer?.nachname ?? 'Kunde'}.xlsx`);
   } catch (err) {

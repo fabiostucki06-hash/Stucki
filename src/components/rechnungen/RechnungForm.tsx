@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
 import { SFPlus, SFXmark } from '../Icons';
-import type { Customer, ArbeitPosition, MaterialPosition, Rechnung } from '../../types';
+import type { Customer, Order, ArbeitPosition, MaterialPosition, Rechnung } from '../../types';
 
 type ArbeitRow   = ArbeitPosition  & { zeLoading: boolean; zeHint: string };
 type MaterialRow = MaterialPosition;
@@ -10,6 +10,7 @@ type RechnungData = Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'created
 
 interface RechnungFormProps {
   customers: Customer[];
+  orders: Order[];
   onSave: (data: RechnungData) => Promise<void> | void;
   onCancel: () => void;
   saving?: boolean;
@@ -45,7 +46,16 @@ const newArbeit   = (): ArbeitRow   => ({ typ: 'arbeit',   beschreibung: '', ze:
 const newMaterial = (): MaterialRow => ({ typ: 'material', beschreibung: '', menge: '1', stueckpreis: '', preis: '' });
 const fCHF = (n: number) => 'CHF ' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, "'");
 
-export default function RechnungForm({ customers, onSave, onCancel, initial }: RechnungFormProps) {
+function calcFaelligAm(days: string): string {
+  const n = parseInt(days);
+  if (isNaN(n) || n <= 0) return '';
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().split('T')[0];
+}
+
+export default function RechnungForm({ customers, orders, onSave, onCancel, initial }: RechnungFormProps) {
+  const [auftragId,    setAuftragId]    = useState(initial?.auftragId ?? '');
   const [cid,          setCid]          = useState(initial?.customerId ?? '');
   const [titel,        setTitel]        = useState(initial?.titel ?? '');
   const [tab,          setTab]          = useState<'arbeit' | 'material'>('arbeit');
@@ -59,13 +69,38 @@ export default function RechnungForm({ customers, onSave, onCancel, initial }: R
   });
   const [notizen,      setNotizen]      = useState(initial?.notizen ?? '');
   const [zahlungsFrist, setZahlungsFrist] = useState(initial?.zahlungsFrist ?? '30');
-  const [faelligAm,    setFaelligAm]    = useState(initial?.faelligAm ?? '');
+  const [faelligAm,    setFaelligAm]    = useState(
+    () => initial?.faelligAm ?? calcFaelligAm(initial?.zahlungsFrist ?? '30')
+  );
 
   const selectedCustomer = customers.find((c) => c.id === cid) ?? null;
   const vehicleChips = selectedCustomer
     ? [selectedCustomer.marke, selectedCustomer.modell, selectedCustomer.kennzeichen,
        selectedCustomer.km ? selectedCustomer.km + ' km' : ''].filter(Boolean)
     : [];
+
+  /* ── Auftrag selection ── */
+  function onAuftragSelect(orderId: string) {
+    setAuftragId(orderId);
+    if (!orderId) return;
+    const order = orders.find((o) => o.id === orderId);
+    if (!order) return;
+    setCid(order.customerId);
+    const zf = order.zahlungsFrist ?? '30';
+    setZahlungsFrist(zf);
+    setFaelligAm(calcFaelligAm(zf));
+    const checkedItems = (order.offertItems ?? []).filter((i) => i.checked);
+    if (checkedItems.length > 0) {
+      setArbeit(checkedItems.map((item) => ({ ...newArbeit(), beschreibung: item.text })));
+    }
+    if (!initial?.titel) setTitel(`Auftrag #${order.orderNumber}`);
+  }
+
+  /* ── Zahlungsfrist change ── */
+  function handleZahlungsFristChange(val: string) {
+    setZahlungsFrist(val);
+    setFaelligAm(calcFaelligAm(val));
+  }
 
   /* ── Arbeit mutations ── */
   const addA = () => setArbeit((a) => [...a, newArbeit()]);
@@ -121,7 +156,8 @@ export default function RechnungForm({ customers, onSave, onCancel, initial }: R
     const mp = material.filter((p) => p.beschreibung.trim());
     if (!ap.length && !mp.length) { showToast('Mindestens eine Position eingeben', 'error'); return; }
     onSave({
-      customerId: cid, titel, positionen: [...ap, ...mp], notizen, zahlungsFrist, faelligAm,
+      customerId: cid, auftragId: auftragId || undefined, titel, positionen: [...ap, ...mp], notizen,
+      zahlungsFrist, faelligAm,
       totalBetrag: (totA + totM).toFixed(2), totalArbeit: totA.toFixed(2),
       totalMaterial: totM.toFixed(2), totalZE: totZE,
     });
@@ -131,6 +167,32 @@ export default function RechnungForm({ customers, onSave, onCancel, initial }: R
 
   return (
     <div>
+
+      {/* ── Aus Auftrag befüllen ── */}
+      <div className="mf-section">
+        <span className="mf-section-label">Aus Auftrag befüllen (optional)</span>
+        <select
+          className="mf-select"
+          value={auftragId}
+          onChange={(e) => onAuftragSelect(e.target.value)}
+          style={{ color: auftragId ? 'var(--label)' : 'var(--label3)' }}
+        >
+          <option value="">Auftrag auswählen…</option>
+          {orders.map((o) => {
+            const c = customers.find((cu) => cu.id === o.customerId);
+            return (
+              <option key={o.id} value={o.id}>
+                Auftrag #{o.orderNumber} – {c ? `${c.vorname} ${c.nachname}` : '?'}
+              </option>
+            );
+          })}
+        </select>
+        {auftragId && (
+          <div style={{ marginTop: 6, fontSize: 11, color: 'var(--label3)' }}>
+            Kunde, Positionen und Zahlungsfrist wurden aus dem Auftrag übernommen.
+          </div>
+        )}
+      </div>
 
       {/* ── Kunde & Details ── */}
       <div className="mf-section">
@@ -170,7 +232,15 @@ export default function RechnungForm({ customers, onSave, onCancel, initial }: R
 
         <div style={{ marginTop: 12 }}>
           <label className="mf-label">Zahlungsfrist (Tage)</label>
-          <input className="mf-input" type="number" value={zahlungsFrist} onChange={(e) => setZahlungsFrist(e.target.value)} placeholder="30" min={1} style={{ width: 80 }} />
+          <input
+            className="mf-input"
+            type="number"
+            value={zahlungsFrist}
+            onChange={(e) => handleZahlungsFristChange(e.target.value)}
+            placeholder="30"
+            min={1}
+            style={{ width: 80 }}
+          />
         </div>
       </div>
 

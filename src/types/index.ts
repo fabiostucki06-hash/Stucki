@@ -85,6 +85,7 @@ export interface Rechnung {
   id: string;
   rechnungNumber: number;
   customerId: string;
+  auftragId?: string;
   status: RechnungStatus;
   createdAt: string;
   titel?: string;
