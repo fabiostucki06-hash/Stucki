@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Sheet from '../ui/Sheet';
 import Spinner from '../ui/Spinner';
-import { exportRechnungExcel } from '../../lib/excel';
+import { exportRechnungPDF } from '../../lib/pdf-rechnung';
 import type { Customer, Rechnung, RechnungStatus } from '../../types';
 
 interface RechnungDetailProps {
@@ -115,8 +115,8 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
         </div>
       )}
 
-      <button onClick={() => exportRechnungExcel(rechnung, customer)} className="btn-system btn-green" style={{ marginBottom: 12 }}>
-        Excel exportieren
+      <button onClick={() => exportRechnungPDF(rechnung, customer)} className="btn-system btn-green" style={{ marginBottom: 12 }}>
+        PDF exportieren
       </button>
       <button
         onClick={async () => { if (window.confirm('Rechnung löschen?')) await onDelete(rechnung.id); }}

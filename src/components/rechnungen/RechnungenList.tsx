@@ -1,5 +1,5 @@
 import { SFChevron } from '../Icons';
-import { exportRechnungExcel } from '../../lib/excel';
+import { exportRechnungPDF } from '../../lib/pdf-rechnung';
 import type { Customer, Rechnung, RechnungStatus } from '../../types';
 
 interface RechnungenListProps {
@@ -71,11 +71,11 @@ export default function RechnungenList({ rechnungen, customers, onRechnungClick,
                       )}
                     </div>
                     <button
-                      onClick={(e) => { e.stopPropagation(); exportRechnungExcel(rec, c); }}
+                      onClick={(e) => { e.stopPropagation(); exportRechnungPDF(rec, c); }}
                       className="excel-btn"
-                      title="Excel herunterladen"
+                      title="PDF herunterladen"
                     >
-                      XLS
+                      PDF
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); onEdit(rec); }}
