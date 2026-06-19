@@ -6,7 +6,7 @@ import { SFPlus, SFXmark } from '../Icons';
 import { isOverdue, daysSince, hoursSince } from '../../lib/utils';
 import { SC, SO } from '../../constants/statuses';
 import { exportOrderExcel } from '../../lib/excel';
-import type { Customer, Order, OrderItem, OrderStatus } from '../../types';
+import type { ArbeitPosition, Customer, MaterialPosition, Order, OrderItem, OrderStatus } from '../../types';
 
 interface OrderDetailProps {
   order: Order;
@@ -144,6 +144,41 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
         </div>
       )}
 
+
+      {/* ── Positionen (copied from Offerte) ── */}
+      {(order.positionen ?? []).length > 0 && (
+        <>
+          <p className="section-header">Positionen</p>
+          <div className="inset-grouped-list" style={{ marginBottom: 16 }}>
+            {(order.positionen ?? []).map((pos, i) => {
+              const ap = pos.typ === 'arbeit'   ? (pos as ArbeitPosition)   : null;
+              const mp = pos.typ === 'material' ? (pos as MaterialPosition) : null;
+              return (
+                <div key={i} className="list-row" style={{ cursor: 'default' }}>
+                  <div style={{ flex: 1 }}>
+                    <div className="sf-subhead">{pos.beschreibung}</div>
+                    <div style={{ fontSize: 11, color: 'var(--label3)', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      {ap
+                        ? `Arbeit${ap.ze ? ` · ${ap.ze} ZE` : ''}${ap.stundenansatz ? ` · CHF ${ap.stundenansatz}/Std` : ''}`
+                        : `Material${mp?.menge ? ` · ${mp.menge}×` : ''}${mp?.stueckpreis ? ` · CHF ${mp.stueckpreis}/Stk` : ''}`
+                      }
+                    </div>
+                  </div>
+                  <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--label)', flexShrink: 0 }}>
+                    CHF {parseFloat(pos.preis || '0').toFixed(2)}
+                  </div>
+                </div>
+              );
+            })}
+            <div className="list-row" style={{ cursor: 'default', background: 'rgba(0,122,255,0.06)' }}>
+              <div className="sf-headline" style={{ flex: 1 }}>Total Positionen</div>
+              <div style={{ fontWeight: 700, fontSize: 20, color: 'var(--blue)' }}>
+                CHF {(order.positionen ?? []).reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0).toFixed(2)}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       <p className="section-header">Rechnung</p>
       {edit ? (
