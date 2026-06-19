@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
 import { SFPlus, SFXmark } from '../Icons';
-import type { Customer, Offerte, ArbeitPosition, MaterialPosition, Rechnung } from '../../types';
+import type { Customer, Order, Offerte, ArbeitPosition, MaterialPosition, Rechnung } from '../../types';
 
 type ArbeitRow   = ArbeitPosition  & { zeLoading: boolean; zeHint: string };
 type MaterialRow = MaterialPosition;
@@ -10,6 +10,7 @@ type RechnungData = Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'created
 
 interface RechnungFormProps {
   customers: Customer[];
+  orders: Order[];
   offerten: Offerte[];
   onSave: (data: RechnungData) => Promise<void> | void;
   onCancel: () => void;
@@ -54,7 +55,8 @@ function calcFaelligAm(days: string): string {
   return d.toISOString().split('T')[0];
 }
 
-export default function RechnungForm({ customers, offerten, onSave, onCancel, initial }: RechnungFormProps) {
+export default function RechnungForm({ customers, orders, offerten, onSave, onCancel, initial }: RechnungFormProps) {
+  const [selectedAuftragId, setSelectedAuftragId] = useState(initial?.auftragId ?? '');
   const [selectedOfferteId, setSelectedOfferteId] = useState('');
   const [cid,          setCid]          = useState(initial?.customerId ?? '');
   const [titel,        setTitel]        = useState(initial?.titel ?? '');
@@ -79,11 +81,50 @@ export default function RechnungForm({ customers, offerten, onSave, onCancel, in
        selectedCustomer.km ? selectedCustomer.km + ' km' : ''].filter(Boolean)
     : [];
 
+  const sortedAuftraege = [...orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   const sortedOfferten = [...offerten].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  /* ── Select an Auftrag: pre-fill customer and all positions ── */
+  function onAuftragSelect(auftragId: string) {
+    setSelectedAuftragId(auftragId);
+    setSelectedOfferteId('');
+    if (!auftragId) return;
+    const auftrag = orders.find((o) => o.id === auftragId);
+    if (!auftrag) return;
+
+    setCid(auftrag.customerId);
+
+    const positions = auftrag.positionen ?? [];
+
+    const arbeitRows: ArbeitRow[] = positions
+      .filter((p): p is ArbeitPosition => p.typ === 'arbeit')
+      .map((p) => {
+        const ze = parseFloat(p.ze) || 0;
+        const sa = parseFloat(p.stundenansatz || '80') || 80;
+        const preis = p.preis || (ze && sa ? ((ze / 100) * sa).toFixed(2) : '');
+        return { ...p, stundenansatz: String(sa), preis, zeLoading: false, zeHint: p.zeHint ?? '' };
+      });
+
+    const materialRows: MaterialRow[] = positions
+      .filter((p): p is MaterialPosition => p.typ === 'material')
+      .map((p) => {
+        const mg = parseFloat(p.menge) || 1;
+        const sp = parseFloat(p.stueckpreis) || 0;
+        const preis = p.preis || (sp ? (sp * mg).toFixed(2) : '');
+        return { ...p, preis };
+      });
+
+    setArbeit(arbeitRows.length ? arbeitRows : [newArbeit()]);
+    setMaterial(materialRows.length ? materialRows : [newMaterial()]);
+
+    if (arbeitRows.length > 0) setTab('arbeit');
+    else if (materialRows.length > 0) setTab('material');
+  }
 
   /* ── Select an Offerte: pre-fill customer, titel, and all positions ── */
   function onOfferteSelect(offerteId: string) {
     setSelectedOfferteId(offerteId);
+    setSelectedAuftragId('');
     if (!offerteId) return;
     const off = offerten.find((o) => o.id === offerteId);
     if (!off) return;
@@ -183,6 +224,7 @@ export default function RechnungForm({ customers, offerten, onSave, onCancel, in
       zahlungsFrist, faelligAm,
       totalBetrag: (totA + totM).toFixed(2), totalArbeit: totA.toFixed(2),
       totalMaterial: totM.toFixed(2), totalZE: totZE,
+      auftragId: selectedAuftragId || undefined,
     });
   }
 
@@ -190,6 +232,41 @@ export default function RechnungForm({ customers, offerten, onSave, onCancel, in
 
   return (
     <div>
+
+      {/* ── Aus Auftrag befüllen ── */}
+      <div className="mf-section">
+        <span className="mf-section-label">Aus Auftrag befüllen</span>
+        <select
+          className="mf-select"
+          value={selectedAuftragId}
+          onChange={(e) => onAuftragSelect(e.target.value)}
+          style={{ color: selectedAuftragId ? 'var(--label)' : 'var(--label3)' }}
+        >
+          <option value="">Auftrag auswählen…</option>
+          {sortedAuftraege.map((o) => {
+            const c = customers.find((cu) => cu.id === o.customerId);
+            const hasPos = (o.positionen ?? []).length > 0;
+            return (
+              <option key={o.id} value={o.id}>
+                Auftrag #{o.orderNumber}{hasPos ? '' : ' (keine Pos.)'} · {c ? `${c.vorname} ${c.nachname}` : '?'}
+              </option>
+            );
+          })}
+        </select>
+        {selectedAuftragId && (() => {
+          const o = orders.find((x) => x.id === selectedAuftragId);
+          const pos = o?.positionen ?? [];
+          const aCount = pos.filter((p) => p.typ === 'arbeit').length;
+          const mCount = pos.filter((p) => p.typ === 'material').length;
+          return (
+            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--label3)' }}>
+              {aCount + mCount > 0
+                ? `${aCount} Arbeit${aCount !== 1 ? 's' : ''}position${aCount !== 1 ? 'en' : ''} und ${mCount} Materialposition${mCount !== 1 ? 'en' : ''} übernommen.`
+                : 'Kunde übernommen — Auftrag enthält keine Positionen.'}
+            </div>
+          );
+        })()}
+      </div>
 
       {/* ── Aus Offerte befüllen ── */}
       <div className="mf-section">

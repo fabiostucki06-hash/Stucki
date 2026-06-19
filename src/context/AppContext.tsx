@@ -18,7 +18,7 @@ interface AppContextValue {
   authChecked: boolean;
   addCustomer: (data: Omit<Customer, 'id' | 'createdAt'>) => Promise<string>;
   updateCustomer: (id: string, data: Partial<Customer>) => Promise<void>;
-  addOrder: (data: Pick<Order, 'customerId' | 'beanstandungen' | 'notizen'>) => Promise<void>;
+  addOrder: (data: Pick<Order, 'customerId' | 'beanstandungen' | 'notizen' | 'positionen' | 'offertId'>) => Promise<void>;
   updateOrder: (upd: Order, cp: Partial<Customer> | null) => Promise<void>;
   deleteOrder: (id: string) => Promise<void>;
   addOfferte: (data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>) => Promise<void>;
@@ -117,7 +117,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setCustomers((p) => p.map((c) => (c.id === id ? updated : c)));
   }
 
-  async function addOrder(data: Pick<Order, 'customerId' | 'beanstandungen' | 'notizen'>) {
+  async function addOrder(data: Pick<Order, 'customerId' | 'beanstandungen' | 'notizen' | 'positionen' | 'offertId'>) {
     const num = orderNum + 1;
     const newO: Order = { id: `o_${Date.now()}`, orderNumber: num, status: 'aufnahme', statusChangedAt: new Date().toISOString(), createdAt: new Date().toISOString(), ...data };
     await syncOk(async () => { await db.upsert('orders', { id: newO.id, data: newO }, token!); await db.setCounter(num, token!); });

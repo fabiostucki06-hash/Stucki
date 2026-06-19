@@ -38,6 +38,8 @@ export interface Order {
   offertBetrag?: string;
   rechnungsBetrag?: string;
   zahlungsFrist?: string;
+  offertId?: string;
+  positionen?: Position[];
 }
 
 export type OfferteStatus = 'entwurf' | 'versendet' | 'angenommen' | 'abgelehnt';

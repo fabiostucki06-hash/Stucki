@@ -11,6 +11,7 @@ interface OfferteDetailProps {
   onUpdate: (upd: Offerte) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onEdit: (off: Offerte) => void;
+  onCreateAuftrag?: (offerte: Offerte, acceptedIndices: number[]) => Promise<void>;
 }
 
 type StatusMeta = { c: string; l: string };
@@ -21,10 +22,37 @@ const ST_META: Record<OfferteStatus, StatusMeta> = {
   abgelehnt:  { c: 'var(--red)',    l: 'Abgelehnt'  },
 };
 
-export default function OfferteDetail({ offerte, customer, onClose, onUpdate, onDelete, onEdit }: OfferteDetailProps) {
+export default function OfferteDetail({ offerte, customer, onClose, onUpdate, onDelete, onEdit, onCreateAuftrag }: OfferteDetailProps) {
   const [saving, setSaving] = useState(false);
+  const [creatingAuftrag, setCreatingAuftrag] = useState(false);
+  const positions = offerte.positionen ?? [];
+  const [posAccepted, setPosAccepted] = useState<boolean[]>(() => positions.map(() => true));
+
   const sc = ST_META[offerte.status] ?? ST_META.entwurf;
   const isExpired = offerte.gueltigBis && new Date(offerte.gueltigBis) < new Date();
+
+  const acceptedCount = posAccepted.filter(Boolean).length;
+
+  const acceptedArbeit = positions.filter((p, i) => posAccepted[i] && p.typ === 'arbeit')
+    .reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
+  const acceptedMaterial = positions.filter((p, i) => posAccepted[i] && p.typ === 'material')
+    .reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
+  const acceptedTotal = acceptedArbeit + acceptedMaterial;
+
+  function togglePos(i: number, val: boolean) {
+    setPosAccepted((prev) => { const n = [...prev]; n[i] = val; return n; });
+  }
+
+  async function handleCreateAuftrag() {
+    if (!onCreateAuftrag || acceptedCount === 0) return;
+    setCreatingAuftrag(true);
+    try {
+      const acceptedIndices = posAccepted.map((v, i) => v ? i : -1).filter((i) => i >= 0);
+      await onCreateAuftrag(offerte, acceptedIndices);
+    } finally {
+      setCreatingAuftrag(false);
+    }
+  }
 
   return (
     <Sheet
@@ -82,23 +110,99 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
         <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--green)' }}>Zahlungsziel: 30 Tage netto</span>
       </div>
 
+      {/* ── Positionen mit Accept/Reject ── */}
       <p className="section-header">Positionen</p>
-      <div className="inset-grouped-list" style={{ marginBottom: 16 }}>
-        {(offerte.positionen ?? []).map((pos, i) => (
-          <div key={i} className="list-row" style={{ cursor: 'default' }}>
-            <div style={{ flex: 1 }}>
-              <div className="sf-subhead">{pos.beschreibung}</div>
+      <div className="inset-grouped-list" style={{ marginBottom: 8 }}>
+        {positions.map((pos, i) => {
+          const accepted = posAccepted[i] ?? true;
+          return (
+            <div
+              key={i}
+              className="list-row"
+              style={{
+                cursor: 'default',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                gap: 8,
+                opacity: accepted ? 1 : 0.45,
+                transition: 'opacity 0.15s',
+              }}
+            >
+              <div style={{ display: 'flex', width: '100%', alignItems: 'flex-start', gap: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <div className="sf-subhead">{pos.beschreibung}</div>
+                  <div style={{ fontSize: 11, color: 'var(--label3)', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    {pos.typ === 'arbeit' ? 'Arbeit' : 'Material'}
+                  </div>
+                </div>
+                <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--label)', flexShrink: 0 }}>
+                  CHF {(parseFloat(pos.preis || '0')).toFixed(2)}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  onClick={() => togglePos(i, true)}
+                  style={{
+                    fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 100, cursor: 'pointer',
+                    background: accepted ? 'rgba(52,199,89,0.15)' : 'var(--fill3)',
+                    color: accepted ? 'var(--green)' : 'var(--label3)',
+                    border: accepted ? '1px solid rgba(52,199,89,0.3)' : '1px solid rgba(0,0,0,0.08)',
+                    transition: 'all 0.12s',
+                  }}
+                >✓ Angenommen</button>
+                <button
+                  onClick={() => togglePos(i, false)}
+                  style={{
+                    fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 100, cursor: 'pointer',
+                    background: !accepted ? 'rgba(255,59,48,0.12)' : 'var(--fill3)',
+                    color: !accepted ? 'var(--red)' : 'var(--label3)',
+                    border: !accepted ? '1px solid rgba(255,59,48,0.25)' : '1px solid rgba(0,0,0,0.08)',
+                    transition: 'all 0.12s',
+                  }}
+                >✕ Abgelehnt</button>
+              </div>
             </div>
-            <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--label)' }}>
-              CHF {(parseFloat(pos.preis || '0')).toFixed(2)}
+          );
+        })}
+
+        {/* Accepted subtotal */}
+        {positions.length > 0 && (
+          <div className="list-row" style={{ cursor: 'default', background: 'rgba(0,122,255,0.06)', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+            <div style={{ display: 'flex', width: '100%', alignItems: 'center' }}>
+              <div className="sf-headline" style={{ flex: 1 }}>
+                Total Angenommen
+                <span style={{ fontWeight: 400, fontSize: 13, color: 'var(--label3)', marginLeft: 6 }}>
+                  ({acceptedCount}/{positions.length})
+                </span>
+              </div>
+              <div style={{ fontWeight: 700, fontSize: 20, color: 'var(--blue)' }}>
+                CHF {acceptedTotal.toFixed(2)}
+              </div>
             </div>
           </div>
-        ))}
-        <div className="list-row" style={{ cursor: 'default', background: 'rgba(0,122,255,0.06)' }}>
-          <div className="sf-headline">Total</div>
-          <div style={{ fontWeight: 700, fontSize: 20, color: 'var(--blue)' }}>CHF {parseFloat(offerte.totalBetrag || '0').toFixed(2)}</div>
-        </div>
+        )}
       </div>
+
+      {/* ── Auftrag erstellen ── */}
+      {onCreateAuftrag && positions.length > 0 && (
+        <button
+          onClick={handleCreateAuftrag}
+          disabled={creatingAuftrag || acceptedCount === 0}
+          className="btn-system"
+          style={{
+            marginBottom: 12,
+            background: acceptedCount > 0
+              ? 'linear-gradient(to bottom, #54a4ff 0%, #007aff 50%, #0056b3 100%)'
+              : undefined,
+            opacity: acceptedCount === 0 ? 0.4 : 1,
+          }}
+        >
+          {creatingAuftrag
+            ? <><Spinner size={13} />&nbsp; Wird erstellt…</>
+            : `Auftrag erstellen (${acceptedCount} Position${acceptedCount !== 1 ? 'en' : ''})`
+          }
+        </button>
+      )}
 
       {offerte.notizen && <div style={{ background: 'var(--fill3)', borderRadius: 12, padding: '12px 14px', fontSize: 15, color: 'var(--label2)', marginBottom: 16 }}>{offerte.notizen}</div>}
 

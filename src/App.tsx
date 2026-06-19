@@ -139,6 +139,21 @@ export default function App() {
   async function handleDeleteOfferte(id: string) {
     await deleteOfferte(id); setSelOff(null);
   }
+  async function handleCreateAuftragFromOfferte(offerte: Offerte, acceptedIndices: number[]) {
+    const positions = (offerte.positionen ?? []).filter((_, i) => acceptedIndices.includes(i));
+    const label = offerte.titel
+      ? `Offerte #${offerte.offertNumber}: ${offerte.titel}`
+      : `Offerte #${offerte.offertNumber}`;
+    await addOrder({
+      customerId: offerte.customerId,
+      beanstandungen: [label],
+      notizen: offerte.notizen,
+      positionen: positions,
+      offertId: offerte.id,
+    });
+    setSelOff(null);
+    setTab('auftraege');
+  }
 
   /* ── Rechnung handlers ── */
   async function handleAddRechnung(data: Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>) {
@@ -253,7 +268,7 @@ export default function App() {
       {showNR && (
         <Sheet title="Neue Rechnung" onClose={() => setShowNR(false)} full
           barRight={<button onClick={() => setShowNR(false)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
-          <RechnungForm customers={customers} offerten={offerten} onSave={handleAddRechnung} onCancel={() => setShowNR(false)} />
+          <RechnungForm customers={customers} orders={orders} offerten={offerten} onSave={handleAddRechnung} onCancel={() => setShowNR(false)} />
         </Sheet>
       )}
 
@@ -265,6 +280,7 @@ export default function App() {
           onUpdate={handleUpdateOfferte}
           onDelete={handleDeleteOfferte}
           onEdit={(off) => { setSelOff(null); setEditOff(off); }}
+          onCreateAuftrag={handleCreateAuftragFromOfferte}
         />
       )}
 
@@ -289,7 +305,7 @@ export default function App() {
       {editR && (
         <Sheet title={`Rechnung #${editR.rechnungNumber} bearbeiten`} onClose={() => setEditR(null)} full
           barRight={<button onClick={() => setEditR(null)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
-          <RechnungForm customers={customers} offerten={offerten} initial={editR} onSave={handleSaveEditRechnung} onCancel={() => setEditR(null)} />
+          <RechnungForm customers={customers} orders={orders} offerten={offerten} initial={editR} onSave={handleSaveEditRechnung} onCancel={() => setEditR(null)} />
         </Sheet>
       )}
 
