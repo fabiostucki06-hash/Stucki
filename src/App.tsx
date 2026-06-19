@@ -26,7 +26,7 @@ import RechnungenList from './components/rechnungen/RechnungenList';
 import RechnungForm from './components/rechnungen/RechnungForm';
 import RechnungDetail from './components/rechnungen/RechnungDetail';
 
-import type { Customer, Order, Offerte, Rechnung, TabId } from './types';
+import type { ArbeitPosition, Customer, Order, Offerte, Rechnung, TabId } from './types';
 
 export default function App() {
   const {
@@ -140,19 +140,55 @@ export default function App() {
     await deleteOfferte(id); setSelOff(null);
   }
   async function handleCreateAuftragFromOfferte(offerte: Offerte, acceptedIndices: number[]) {
+    // Copy every accepted position individually — no grouping or merging
     const positions = (offerte.positionen ?? []).filter((_, i) => acceptedIndices.includes(i));
-    const label = offerte.titel
+    const offerteLabel = offerte.titel
       ? `Offerte #${offerte.offertNumber}: ${offerte.titel}`
       : `Offerte #${offerte.offertNumber}`;
+    // Each accepted arbeit description becomes its own beanstandung entry
+    const arbeitBeans = positions
+      .filter((p) => p.typ === 'arbeit')
+      .map((p) => p.beschreibung)
+      .filter(Boolean);
     await addOrder({
       customerId: offerte.customerId,
-      beanstandungen: [label],
+      beanstandungen: [offerteLabel, ...arbeitBeans],
       notizen: offerte.notizen,
       positionen: positions,
       offertId: offerte.id,
     });
     setSelOff(null);
     setTab('auftraege');
+  }
+
+  async function handleCreateRechnungFromOfferte(offerte: Offerte, acceptedIndices: number[]) {
+    // Copy every accepted position individually — no grouping or merging
+    const positions = (offerte.positionen ?? []).filter((_, i) => acceptedIndices.includes(i));
+    const totalArbeit = positions
+      .filter((p) => p.typ === 'arbeit')
+      .reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
+    const totalMaterial = positions
+      .filter((p) => p.typ === 'material')
+      .reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
+    const totalZE = positions
+      .filter((p) => p.typ === 'arbeit')
+      .reduce((s, p) => s + (parseFloat((p as ArbeitPosition).ze || '0') || 0), 0);
+    const faelligDate = new Date();
+    faelligDate.setDate(faelligDate.getDate() + 30);
+    await addRechnung({
+      customerId: offerte.customerId,
+      titel: offerte.titel,
+      positionen: positions,
+      notizen: offerte.notizen,
+      zahlungsFrist: '30',
+      faelligAm: faelligDate.toISOString(),
+      totalBetrag: (totalArbeit + totalMaterial).toFixed(2),
+      totalArbeit: totalArbeit.toFixed(2),
+      totalMaterial: totalMaterial.toFixed(2),
+      totalZE,
+    });
+    setSelOff(null);
+    setTab('rechnungen');
   }
 
   /* ── Rechnung handlers ── */
@@ -281,6 +317,7 @@ export default function App() {
           onDelete={handleDeleteOfferte}
           onEdit={(off) => { setSelOff(null); setEditOff(off); }}
           onCreateAuftrag={handleCreateAuftragFromOfferte}
+          onCreateRechnung={handleCreateRechnungFromOfferte}
         />
       )}
 

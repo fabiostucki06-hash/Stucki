@@ -12,6 +12,7 @@ interface OfferteDetailProps {
   onDelete: (id: string) => Promise<void>;
   onEdit: (off: Offerte) => void;
   onCreateAuftrag?: (offerte: Offerte, acceptedIndices: number[]) => Promise<void>;
+  onCreateRechnung?: (offerte: Offerte, acceptedIndices: number[]) => Promise<void>;
 }
 
 type StatusMeta = { c: string; l: string };
@@ -22,9 +23,10 @@ const ST_META: Record<OfferteStatus, StatusMeta> = {
   abgelehnt:  { c: 'var(--red)',    l: 'Abgelehnt'  },
 };
 
-export default function OfferteDetail({ offerte, customer, onClose, onUpdate, onDelete, onEdit, onCreateAuftrag }: OfferteDetailProps) {
+export default function OfferteDetail({ offerte, customer, onClose, onUpdate, onDelete, onEdit, onCreateAuftrag, onCreateRechnung }: OfferteDetailProps) {
   const [saving, setSaving] = useState(false);
   const [creatingAuftrag, setCreatingAuftrag] = useState(false);
+  const [creatingRechnung, setCreatingRechnung] = useState(false);
   const positions = offerte.positionen ?? [];
   const [posAccepted, setPosAccepted] = useState<boolean[]>(() => positions.map(() => true));
 
@@ -43,14 +45,27 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
     setPosAccepted((prev) => { const n = [...prev]; n[i] = val; return n; });
   }
 
+  function getAcceptedIndices() {
+    return posAccepted.map((v, i) => (v ? i : -1)).filter((i) => i >= 0);
+  }
+
   async function handleCreateAuftrag() {
     if (!onCreateAuftrag || acceptedCount === 0) return;
     setCreatingAuftrag(true);
     try {
-      const acceptedIndices = posAccepted.map((v, i) => v ? i : -1).filter((i) => i >= 0);
-      await onCreateAuftrag(offerte, acceptedIndices);
+      await onCreateAuftrag(offerte, getAcceptedIndices());
     } finally {
       setCreatingAuftrag(false);
+    }
+  }
+
+  async function handleCreateRechnung() {
+    if (!onCreateRechnung || acceptedCount === 0) return;
+    setCreatingRechnung(true);
+    try {
+      await onCreateRechnung(offerte, getAcceptedIndices());
+    } finally {
+      setCreatingRechnung(false);
     }
   }
 
@@ -183,25 +198,45 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
         )}
       </div>
 
-      {/* ── Auftrag erstellen ── */}
-      {onCreateAuftrag && positions.length > 0 && (
-        <button
-          onClick={handleCreateAuftrag}
-          disabled={creatingAuftrag || acceptedCount === 0}
-          className="btn-system"
-          style={{
-            marginBottom: 12,
-            background: acceptedCount > 0
-              ? 'linear-gradient(to bottom, #54a4ff 0%, #007aff 50%, #0056b3 100%)'
-              : undefined,
-            opacity: acceptedCount === 0 ? 0.4 : 1,
-          }}
-        >
-          {creatingAuftrag
-            ? <><Spinner size={13} />&nbsp; Wird erstellt…</>
-            : `Auftrag erstellen (${acceptedCount} Position${acceptedCount !== 1 ? 'en' : ''})`
-          }
-        </button>
+      {/* ── Aktionen: Auftrag / Rechnung erstellen ── */}
+      {positions.length > 0 && (
+        <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+          {onCreateAuftrag && (
+            <button
+              onClick={handleCreateAuftrag}
+              disabled={creatingAuftrag || creatingRechnung || acceptedCount === 0}
+              className="btn-system"
+              style={{
+                flex: 1,
+                background: acceptedCount > 0
+                  ? 'linear-gradient(to bottom, #54a4ff 0%, #007aff 50%, #0056b3 100%)'
+                  : undefined,
+                opacity: acceptedCount === 0 ? 0.4 : 1,
+              }}
+            >
+              {creatingAuftrag
+                ? <><Spinner size={13} />&nbsp; Wird erstellt…</>
+                : `Auftrag erstellen (${acceptedCount})`
+              }
+            </button>
+          )}
+          {onCreateRechnung && (
+            <button
+              onClick={handleCreateRechnung}
+              disabled={creatingAuftrag || creatingRechnung || acceptedCount === 0}
+              className="btn-system btn-green"
+              style={{
+                flex: 1,
+                opacity: acceptedCount === 0 ? 0.4 : 1,
+              }}
+            >
+              {creatingRechnung
+                ? <><Spinner size={13} />&nbsp; Wird erstellt…</>
+                : `Rechnung erstellen (${acceptedCount})`
+              }
+            </button>
+          )}
+        </div>
       )}
 
       {offerte.notizen && <div style={{ background: 'var(--fill3)', borderRadius: 12, padding: '12px 14px', fontSize: 15, color: 'var(--label2)', marginBottom: 16 }}>{offerte.notizen}</div>}
