@@ -1,206 +1,148 @@
 import React from 'react';
-import {
-  Document,
-  Page,
-  Text,
-  View,
-  StyleSheet,
-  pdf,
-} from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer';
 import type { ArbeitPosition, Customer, MaterialPosition, Rechnung } from '../types';
 
-const BLUE = '#007AFF';
-const DARK = '#1C1C1E';
-const GRAY = '#6E6E73';
-const LIGHT = '#F2F2F7';
-const BORDER = '#D1D1D6';
+// ── Company constants (match template) ───────────────────────────────────────
+const CO_NAME  = 'Fabio Stucki';
+const CO_ADDR  = 'Polenstrasse 245';
+const CO_CITY  = '5112 Thalheim AG';
+const CO_PHONE = '079 850 18 63';
+const CO_LOC   = 'Thalheim AG';
+const STD_SATZ = '80.00';
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const todayCH = () => new Date().toLocaleDateString('de-CH');
+const fN = (v?: string | number) => parseFloat(String(v ?? '0')) || 0;
+const chf = (n: number) => n === 0 ? 'CHF –' : `CHF ${n.toFixed(2)}`;
+
+// ── Styles ────────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   page: {
     fontFamily: 'Helvetica',
     fontSize: 9,
-    color: DARK,
-    paddingTop: 40,
-    paddingBottom: 60,
-    paddingHorizontal: 45,
+    color: '#000',
+    paddingTop: 35,
+    paddingBottom: 40,
+    paddingHorizontal: 40,
   },
 
-  // ── Header ────────────────────────────────────────────────────────────────
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 22,
-  },
-  garageName: {
-    fontSize: 20,
-    fontFamily: 'Helvetica-Bold',
-  },
-  garageTagline: {
-    fontSize: 8.5,
-    color: GRAY,
-    marginTop: 2,
-  },
-  rechnungLabel: {
-    fontSize: 22,
-    fontFamily: 'Helvetica-Bold',
-    color: BLUE,
-    letterSpacing: 1.5,
+  // Header outside the box
+  hdr:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  hdrLeft:  {},
+  docTitle: { fontSize: 13, fontFamily: 'Helvetica-Bold' },
+  numRow:   { flexDirection: 'row', marginTop: 3 },
+  numLbl:   { fontSize: 9, width: 90 },
+  numVal:   { fontSize: 9 },
+  hdrRight: { alignItems: 'flex-end' },
+  coLine:   { fontSize: 8.5 },
+
+  // Outer border box
+  box: {
+    borderWidth: 0.5,
+    borderColor: '#000',
+    borderStyle: 'solid',
+    padding: 10,
   },
 
-  // ── Meta block ────────────────────────────────────────────────────────────
-  meta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 18,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-    borderBottomStyle: 'solid',
-  },
-  metaRow: {
-    flexDirection: 'row',
-    marginBottom: 4,
-  },
-  metaLbl: { fontSize: 7.5, color: GRAY, width: 82 },
-  metaVal: { fontSize: 8.5, fontFamily: 'Helvetica-Bold', flex: 1 },
-  sectionCaption: {
-    fontSize: 7,
-    color: GRAY,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: 7,
-  },
+  // Vehicle block
+  vRow: { flexDirection: 'row', marginBottom: 2 },
+  vLbl: { fontSize: 9, width: 100 },
+  vVal: { fontSize: 9, flex: 1 },
 
-  // ── Invoice number badge ──────────────────────────────────────────────────
-  badge: {
-    backgroundColor: BLUE,
-    borderRadius: 6,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  badgeCaption: { fontSize: 7, color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', marginBottom: 2 },
-  badgeNumber: { fontSize: 16, fontFamily: 'Helvetica-Bold', color: '#FFFFFF' },
-
-  // ── Positions table ───────────────────────────────────────────────────────
-  tableHead: {
+  // Std.Satz row
+  stdRow: {
     flexDirection: 'row',
-    backgroundColor: BLUE,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRadius: 4,
-    marginBottom: 1,
-  },
-  thCell: { fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: '#FFFFFF' },
-  tableRow: {
-    flexDirection: 'row',
-    paddingVertical: 5,
-    paddingHorizontal: 8,
+    borderTopWidth: 0.5,
+    borderTopColor: '#000',
+    borderTopStyle: 'solid',
     borderBottomWidth: 0.5,
-    borderBottomColor: BORDER,
+    borderBottomColor: '#000',
     borderBottomStyle: 'solid',
+    paddingVertical: 3,
+    marginTop: 8,
   },
-  tableRowAlt: { backgroundColor: LIGHT },
-  tdCell: { fontSize: 8.5, color: DARK },
-  tdBold: { fontFamily: 'Helvetica-Bold' },
+  stdLbl: { fontSize: 9, width: 50 },
+  stdCHF: { fontSize: 9, width: 30 },
+  stdVal: { fontSize: 9 },
 
-  // ── Column widths ─────────────────────────────────────────────────────────
-  cBez:      { flex: 1 },
-  cMenge:    { width: 42, textAlign: 'right' },
-  cStkPrz:   { width: 54, textAlign: 'right' },
-  cZE:       { width: 32, textAlign: 'right' },
-  cPreis:    { width: 64, textAlign: 'right' },
+  // Table
+  tHead: {
+    flexDirection: 'row',
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#000',
+    borderBottomStyle: 'solid',
+    paddingVertical: 3,
+  },
+  th: { fontSize: 9 },
+  tRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 0.25,
+    borderBottomColor: '#999',
+    borderBottomStyle: 'solid',
+    paddingVertical: 3,
+    minHeight: 15,
+  },
+  td: { fontSize: 9 },
 
-  // ── Totals ────────────────────────────────────────────────────────────────
-  totalsWrap: { alignItems: 'flex-end', marginTop: 6, marginBottom: 20 },
-  totalRow: { flexDirection: 'row', width: 200, paddingVertical: 3 },
-  totalLbl: { flex: 1, fontSize: 8.5, color: GRAY },
-  totalVal: { width: 80, fontSize: 8.5, textAlign: 'right' },
+  // Columns
+  cBez:   { flex: 1 },
+  cMenge: { width: 40, textAlign: 'right' },
+  cStkP:  { width: 52, textAlign: 'right' },
+  cPreis: { width: 62, textAlign: 'right' },
+  cZE:    { width: 52, textAlign: 'right' },
+
+  // Totals
+  sumRow: {
+    flexDirection: 'row',
+    borderTopWidth: 0.5,
+    borderTopColor: '#000',
+    borderTopStyle: 'solid',
+    paddingVertical: 3,
+  },
+  subRow: { flexDirection: 'row', paddingVertical: 2 },
   grandRow: {
     flexDirection: 'row',
-    width: 200,
-    paddingVertical: 7,
-    marginTop: 4,
-    borderTopWidth: 1.5,
-    borderTopColor: BLUE,
-    borderTopStyle: 'solid',
-  },
-  grandLbl: { flex: 1, fontSize: 12, fontFamily: 'Helvetica-Bold' },
-  grandVal: { width: 80, fontSize: 12, fontFamily: 'Helvetica-Bold', textAlign: 'right', color: BLUE },
-
-  // ── Payment ───────────────────────────────────────────────────────────────
-  payBox: {
-    backgroundColor: LIGHT,
-    borderRadius: 6,
-    padding: 12,
-    marginBottom: 14,
-  },
-  payRow: { flexDirection: 'row', marginBottom: 4 },
-  payLbl: { fontSize: 8.5, color: GRAY, width: 90 },
-  payVal: { fontSize: 8.5, fontFamily: 'Helvetica-Bold', flex: 1 },
-
-  // ── Notes ─────────────────────────────────────────────────────────────────
-  notesBox: {
-    borderLeftWidth: 3,
-    borderLeftColor: '#FF9500',
-    borderLeftStyle: 'solid',
-    paddingLeft: 10,
-    paddingVertical: 8,
-    paddingRight: 8,
-    marginBottom: 14,
-    backgroundColor: '#FFFBF0',
-    borderRadius: 4,
-  },
-  notesCaption: { fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: '#FF9500', textTransform: 'uppercase', marginBottom: 4 },
-  notesText: { fontSize: 8.5, color: GRAY },
-
-  // ── Footer ────────────────────────────────────────────────────────────────
-  footer: {
-    position: 'absolute',
-    bottom: 22,
-    left: 45,
-    right: 45,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     borderTopWidth: 0.5,
-    borderTopColor: BORDER,
+    borderTopColor: '#000',
     borderTopStyle: 'solid',
-    paddingTop: 6,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#000',
+    borderBottomStyle: 'solid',
+    paddingVertical: 3,
   },
-  footerTxt: { fontSize: 7, color: GRAY },
+  grandLbl: { flex: 1, fontFamily: 'Helvetica-Bold', fontSize: 9 },
+  grandVal: { fontFamily: 'Helvetica-Bold', fontSize: 9, width: 52, textAlign: 'right' },
+
+  // Notes
+  notesWrap: { marginTop: 12 },
+  noteLine:  { fontSize: 9, marginBottom: 2 },
+
+  // Date / location (centered)
+  dateSection: { alignItems: 'center', marginTop: 16 },
+  datePair:    { flexDirection: 'row', marginBottom: 3 },
+  dateLbl:     { fontSize: 9, width: 72, textAlign: 'right' },
+  dateVal:     { fontSize: 9, width: 130, paddingLeft: 8, fontFamily: 'Helvetica-Bold' },
+
+  // Payment terms
+  payRow: { flexDirection: 'row', marginTop: 14 },
+  payLbl: { fontSize: 9 },
+  paySub: { fontSize: 9 },
+  payVal: { fontSize: 9, fontFamily: 'Helvetica-Bold', paddingLeft: 10 },
 });
 
-// ── Helper sub-components ─────────────────────────────────────────────────────
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={s.metaRow}>
-      <Text style={s.metaLbl}>{label}</Text>
-      <Text style={s.metaVal}>{value}</Text>
-    </View>
-  );
-}
-
-function RowRight({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={{ flexDirection: 'row', marginBottom: 4, justifyContent: 'flex-end' }}>
-      <Text style={{ fontSize: 8, color: GRAY, marginRight: 5 }}>{label}:</Text>
-      <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold' }}>{value}</Text>
-    </View>
-  );
-}
-
-// ── Main PDF component ────────────────────────────────────────────────────────
+// ── Component ─────────────────────────────────────────────────────────────────
 
 interface Props { rechnung: Rechnung; customer: Customer | undefined }
 
-const InvoicePDF: React.FC<Props> = ({ rechnung, customer }) => {
-  const positionen = rechnung.positionen ?? [];
-  const todayCH   = new Date().toLocaleDateString('de-CH');
-  const vehicle   = [customer?.marke, customer?.modell].filter(Boolean).join(' ') || '—';
-  const owner     = customer ? `${customer.vorname} ${customer.nachname}` : '—';
+const RechnungPDF: React.FC<Props> = ({ rechnung, customer }) => {
+  const pos         = rechnung.positionen ?? [];
+  const vehicle     = [customer?.marke, customer?.modell].filter(Boolean).join(' ');
+  const owner       = customer ? `${customer.vorname} ${customer.nachname}` : '';
+  const totalMat    = fN(rechnung.totalMaterial);
+  const totalArb    = fN(rechnung.totalArbeit);
+  const totalBetrag = fN(rechnung.totalBetrag);
+  const totalZE     = fN(rechnung.totalZE);
+  const date        = todayCH();
 
   const faelligCH = rechnung.faelligAm
     ? new Date(rechnung.faelligAm).toLocaleDateString('de-CH')
@@ -210,139 +152,136 @@ const InvoicePDF: React.FC<Props> = ({ rechnung, customer }) => {
           d.setDate(d.getDate() + parseInt(rechnung.zahlungsFrist!));
           return d.toLocaleDateString('de-CH');
         })()
-      : null;
+      : '';
 
-  const fCHF = (n: number) => `CHF ${n.toFixed(2)}`;
-  const fN   = (s?: string) => parseFloat(s || '0');
-
-  const totalArbeit   = fN(rechnung.totalArbeit);
-  const totalMaterial = fN(rechnung.totalMaterial);
-  const totalBetrag   = fN(rechnung.totalBetrag);
+  const payTage = rechnung.zahlungsFrist ? `${rechnung.zahlungsFrist} Tage netto` : '10 Tage netto';
 
   return (
     <Document>
       <Page size="A4" style={s.page}>
 
-        {/* ── HEADER ── */}
-        <View style={s.header}>
-          <View>
-            <Text style={s.garageName}>GarageOS</Text>
-            <Text style={s.garageTagline}>Werkstatt &amp; Service</Text>
-          </View>
-          <Text style={s.rechnungLabel}>RECHNUNG</Text>
-        </View>
-
-        {/* ── META BLOCK ── */}
-        <View style={s.meta}>
-          {/* Left: customer / vehicle */}
-          <View style={{ flex: 1, paddingRight: 20 }}>
-            <Text style={s.sectionCaption}>Rechnungsempfänger / Fahrzeugdaten</Text>
-            <Row label="Fahrzeugbesitzer" value={owner} />
-            {customer?.telefon && <Row label="Telefon" value={customer.telefon} />}
-            {customer?.email   && <Row label="E-Mail"  value={customer.email}   />}
-            <Row label="Fahrzeug"    value={vehicle} />
-            {customer?.kennzeichen && <Row label="Kennzeichen" value={customer.kennzeichen} />}
-            {customer?.km          && <Row label="Km-Stand"    value={`${customer.km} km`} />}
-          </View>
-
-          {/* Right: invoice badge + details */}
-          <View style={{ width: 170 }}>
-            <View style={s.badge}>
-              <Text style={s.badgeCaption}>Rechnungsnummer</Text>
-              <Text style={s.badgeNumber}>#{rechnung.rechnungNumber}</Text>
+        {/* ── HEADER ────────────────────────────────────────────────────── */}
+        <View style={s.hdr}>
+          <View style={s.hdrLeft}>
+            <Text style={s.docTitle}>Rechnung</Text>
+            <View style={s.numRow}>
+              <Text style={s.numLbl}>Rechnungsnummer</Text>
+              <Text style={s.numVal}>{rechnung.rechnungNumber}</Text>
             </View>
-            <RowRight label="Datum"        value={todayCH} />
-            {faelligCH          && <RowRight label="Zahlbar bis"    value={faelligCH} />}
-            {rechnung.zahlungsFrist && <RowRight label="Zahlungsfrist" value={`${rechnung.zahlungsFrist} Tage netto`} />}
-            {rechnung.titel     && <RowRight label="Titel"          value={rechnung.titel} />}
+          </View>
+          <View style={s.hdrRight}>
+            <Text style={s.coLine}>{CO_NAME}</Text>
+            <Text style={s.coLine}>{CO_ADDR}</Text>
+            <Text style={s.coLine}>{CO_CITY}</Text>
+            <Text style={s.coLine}>{CO_PHONE}</Text>
           </View>
         </View>
 
-        {/* ── POSITIONS TABLE ── */}
-        <View style={s.tableHead}>
-          <Text style={[s.thCell, s.cBez]}>Bezeichnung</Text>
-          <Text style={[s.thCell, s.cMenge]}>Menge</Text>
-          <Text style={[s.thCell, s.cStkPrz]}>Stk.Preis</Text>
-          <Text style={[s.thCell, s.cZE]}>ZE</Text>
-          <Text style={[s.thCell, s.cPreis]}>Preis (CHF)</Text>
-        </View>
+        {/* ── MAIN BORDER BOX ───────────────────────────────────────────── */}
+        <View style={s.box}>
 
-        {positionen.map((pos, i) => {
-          const mp = pos.typ === 'material' ? (pos as MaterialPosition) : null;
-          const ap = pos.typ === 'arbeit'   ? (pos as ArbeitPosition)   : null;
-          return (
-            <View key={i} style={[s.tableRow, i % 2 === 1 ? s.tableRowAlt : {}]}>
-              <Text style={[s.tdCell, s.cBez]}>{pos.beschreibung || '—'}</Text>
-              <Text style={[s.tdCell, s.cMenge]}>
-                {mp ? (parseFloat(mp.menge || '0') || '—') : '—'}
-              </Text>
-              <Text style={[s.tdCell, s.cStkPrz]}>
-                {mp ? parseFloat(mp.stueckpreis || '0').toFixed(2) : '—'}
-              </Text>
-              <Text style={[s.tdCell, s.cZE]}>
-                {ap ? (ap.ze || '—') : '—'}
-              </Text>
-              <Text style={[s.tdCell, s.tdBold, s.cPreis]}>
-                {parseFloat(pos.preis || '0').toFixed(2)}
-              </Text>
-            </View>
-          );
-        })}
+          {/* Vehicle block */}
+          <View style={s.vRow}><Text style={s.vLbl}>Fahrzeug</Text><Text style={s.vVal}>{vehicle}</Text></View>
+          <View style={s.vRow}><Text style={s.vLbl}>1. Inv.-Setzung</Text><Text style={s.vVal}></Text></View>
+          <View style={s.vRow}><Text style={s.vLbl}>Kennzeichen</Text><Text style={s.vVal}>{customer?.kennzeichen ?? ''}</Text></View>
+          <View style={s.vRow}><Text style={s.vLbl}>Chassis-Nr.</Text><Text style={s.vVal}></Text></View>
+          <View style={s.vRow}><Text style={s.vLbl}>Km Stand</Text><Text style={s.vVal}>{customer?.km ?? ''}</Text></View>
+          <View style={s.vRow}><Text style={s.vLbl}>Fahrzeugbesitzer</Text><Text style={s.vVal}>{owner}</Text></View>
 
-        {/* ── TOTALS ── */}
-        <View style={s.totalsWrap}>
-          {totalArbeit > 0 && (
-            <View style={s.totalRow}>
-              <Text style={s.totalLbl}>Arbeitskosten</Text>
-              <Text style={s.totalVal}>{fCHF(totalArbeit)}</Text>
-            </View>
-          )}
-          {totalMaterial > 0 && (
-            <View style={s.totalRow}>
-              <Text style={s.totalLbl}>Materialkosten</Text>
-              <Text style={s.totalVal}>{fCHF(totalMaterial)}</Text>
-            </View>
-          )}
+          {/* Std.Satz row */}
+          <View style={s.stdRow}>
+            <Text style={s.stdLbl}>Std.Satz:</Text>
+            <Text style={s.stdCHF}>CHF</Text>
+            <Text style={s.stdVal}>{STD_SATZ}</Text>
+          </View>
+
+          {/* Table header */}
+          <View style={s.tHead}>
+            <Text style={[s.th, s.cBez]}>Bezeichnung</Text>
+            <Text style={[s.th, s.cMenge]}>Menge</Text>
+            <Text style={[s.th, s.cStkP]}>Stk.Preis</Text>
+            <Text style={[s.th, s.cPreis]}>Preis (CHF)</Text>
+            <Text style={[s.th, s.cZE]}>ZE</Text>
+          </View>
+
+          {/* Position rows */}
+          {pos.map((p, i) => {
+            const mp = p.typ === 'material' ? (p as MaterialPosition) : null;
+            const ap = p.typ === 'arbeit'   ? (p as ArbeitPosition)   : null;
+            return (
+              <View key={i} style={s.tRow}>
+                <Text style={[s.td, s.cBez]}>{p.beschreibung}</Text>
+                <Text style={[s.td, s.cMenge]}>{mp ? (parseFloat(mp.menge || '0') || '') : ''}</Text>
+                <Text style={[s.td, s.cStkP]}>{mp ? (parseFloat(mp.stueckpreis || '0') || '') : ''}</Text>
+                <Text style={[s.td, s.cPreis]}>{fN(p.preis) ? fN(p.preis).toFixed(2) : ''}</Text>
+                <Text style={[s.td, s.cZE]}>{ap ? (ap.ze || '') : ''}</Text>
+              </View>
+            );
+          })}
+
+          {/* Summe row — Materialkosten in Preis col, Arbeitskosten in ZE col */}
+          <View style={s.sumRow}>
+            <Text style={[s.td, s.cBez]}>Summe</Text>
+            <Text style={[s.td, s.cMenge]}></Text>
+            <Text style={[s.td, s.cStkP]}></Text>
+            <Text style={[s.td, s.cPreis]}>{chf(totalMat)}</Text>
+            <Text style={[s.td, s.cZE]}>{chf(totalArb)}</Text>
+          </View>
+
+          {/* Sub-row: ZE count */}
+          <View style={s.subRow}>
+            <Text style={[s.td, s.cBez]}></Text>
+            <Text style={[s.td, s.cMenge]}></Text>
+            <Text style={[s.td, s.cStkP]}></Text>
+            <Text style={[s.td, s.cPreis]}></Text>
+            <Text style={[s.td, s.cZE]}>{totalZE > 0 ? `${totalZE} ZE` : ''}</Text>
+          </View>
+
+          {/* Rechnungstotal (bold) */}
           <View style={s.grandRow}>
-            <Text style={s.grandLbl}>Total</Text>
-            <Text style={s.grandVal}>{fCHF(totalBetrag)}</Text>
+            <Text style={s.grandLbl}>Rechnungstotal</Text>
+            <View style={{ flexDirection: 'row' }}>
+              <Text style={{ ...s.td, width: 40 + 52 + 62, textAlign: 'right' }}></Text>
+              <Text style={s.grandVal}>{chf(totalBetrag)}</Text>
+            </View>
           </View>
-        </View>
 
-        {/* ── PAYMENT TERMS ── */}
-        {(rechnung.zahlungsFrist || faelligCH) && (
-          <View style={s.payBox}>
-            <Text style={[s.sectionCaption, { marginBottom: 6 }]}>Zahlungskonditionen</Text>
-            {rechnung.zahlungsFrist && (
-              <View style={s.payRow}>
-                <Text style={s.payLbl}>Zahlungsfrist</Text>
-                <Text style={s.payVal}>{rechnung.zahlungsFrist} Tage netto</Text>
+          {/* Notes */}
+          <View style={s.notesWrap}>
+            <Text style={s.noteLine}>ZE basieren auf einer reibungslosen Reparatur</Text>
+            {rechnung.notizen
+              ? <Text style={[s.noteLine, { marginTop: 4 }]}>{rechnung.notizen}</Text>
+              : null}
+          </View>
+
+          {/* Date / Location + payment due */}
+          <View style={s.dateSection}>
+            <View style={s.datePair}>
+              <Text style={s.dateLbl}>Datum</Text>
+              <Text style={s.dateVal}>{date}</Text>
+            </View>
+            {faelligCH ? (
+              <View style={s.datePair}>
+                <Text style={s.dateLbl}>Zahlbar bis</Text>
+                <Text style={s.dateVal}>{faelligCH}</Text>
               </View>
-            )}
-            {faelligCH && (
-              <View style={s.payRow}>
-                <Text style={s.payLbl}>Zahlbar bis</Text>
-                <Text style={s.payVal}>{faelligCH}</Text>
-              </View>
-            )}
+            ) : null}
+            <View style={s.datePair}>
+              <Text style={s.dateLbl}>Ort</Text>
+              <Text style={s.dateVal}>{CO_LOC}</Text>
+            </View>
           </View>
-        )}
 
-        {/* ── NOTES ── */}
-        {rechnung.notizen && (
-          <View style={s.notesBox}>
-            <Text style={s.notesCaption}>Notizen</Text>
-            <Text style={s.notesText}>{rechnung.notizen}</Text>
+          {/* Payment terms */}
+          <View style={s.payRow}>
+            <View>
+              <Text style={s.payLbl}>Zahlungskonditionen bei</Text>
+              <Text style={s.paySub}>Rechnungstellung</Text>
+            </View>
+            <Text style={s.payVal}>{payTage}</Text>
           </View>
-        )}
 
-        {/* ── FOOTER (fixed on every page) ── */}
-        <View style={s.footer} fixed>
-          <Text style={s.footerTxt}>GarageOS · Werkstatt &amp; Service</Text>
-          <Text style={s.footerTxt}>Rechnung #{rechnung.rechnungNumber} · {todayCH}</Text>
-          <Text style={s.footerTxt} render={({ pageNumber, totalPages }) => `Seite ${pageNumber} / ${totalPages}`} />
         </View>
-
       </Page>
     </Document>
   );
@@ -352,7 +291,7 @@ const InvoicePDF: React.FC<Props> = ({ rechnung, customer }) => {
 
 export async function exportRechnungPDF(rechnung: Rechnung, customer: Customer | undefined) {
   try {
-    const blob = await pdf(<InvoicePDF rechnung={rechnung} customer={customer} />).toBlob();
+    const blob = await pdf(<RechnungPDF rechnung={rechnung} customer={customer} />).toBlob();
     const url  = URL.createObjectURL(blob);
     const a    = Object.assign(document.createElement('a'), {
       href:     url,
