@@ -220,7 +220,7 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .cloud-ok{color:var(--green)!important;opacity:1!important;transform:scale(1.22)!important;transition:none!important}
 .cloud-error{color:var(--red)!important;opacity:1!important}
 
-/* ── EXCEL BUTTON ── */
+/* ── ICON BUTTON (PDF / edit actions in list rows) ── */
 .excel-btn{background:rgba(0,160,56,0.11);border:0.5px solid rgba(0,160,56,0.24);color:#007A2F;border-radius:8px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:9.5px;font-weight:800;letter-spacing:0.03em;transition:background 0.15s,transform 0.1s;font-family:inherit}
 .excel-btn:hover{background:rgba(0,160,56,0.20);transform:scale(1.06)}
 .excel-btn:active{opacity:0.65;transform:scale(0.96)}

@@ -5,7 +5,7 @@ import Spinner from '../ui/Spinner';
 import { SFPlus, SFXmark } from '../Icons';
 import { isOverdue, daysSince, hoursSince } from '../../lib/utils';
 import { SC, SO } from '../../constants/statuses';
-import { exportOrderExcel } from '../../lib/excel';
+import { exportOrderPDF } from '../../lib/pdf-auftrag';
 import type { ArbeitPosition, Customer, MaterialPosition, Order, OrderItem, OrderStatus } from '../../types';
 
 interface OrderDetailProps {
@@ -267,7 +267,7 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
         <div style={{ background: 'var(--fill3)', borderRadius: 12, padding: '12px 14px', fontSize: 15, color: 'var(--label2)', marginBottom: 16 }}>{notizen}</div>
       ) : null}
 
-      <button onClick={() => exportOrderExcel(order, customer)} className="btn-system btn-secondary" style={{ marginBottom: 12 }}>↓  Excel herunterladen</button>
+      <button onClick={() => exportOrderPDF(order, customer)} className="btn-system btn-secondary" style={{ marginBottom: 12 }}>↓  PDF herunterladen</button>
       <button onClick={async () => { if (window.confirm('Auftrag wirklich löschen?')) await onDelete(order.id); }} className="btn-system btn-destructive" style={{ marginBottom: 12 }}>Auftrag löschen</button>
       <div style={{ fontSize: 13, color: 'var(--label3)', textAlign: 'center', paddingBottom: 8 }}>Erstellt: {new Date(order.createdAt).toLocaleDateString('de-CH')} · #{order.orderNumber}</div>
     </Sheet>

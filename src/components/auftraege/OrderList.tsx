@@ -3,7 +3,7 @@ import Badge from '../ui/Badge';
 import { SFChevron, SFXmark } from '../Icons';
 import { isOverdue, daysSince } from '../../lib/utils';
 import { SC, SO } from '../../constants/statuses';
-import { exportOrderExcel } from '../../lib/excel';
+import { exportOrderPDF } from '../../lib/pdf-auftrag';
 import type { Customer, Order } from '../../types';
 
 interface OrderListProps {
@@ -73,7 +73,7 @@ export default function OrderList({ orders, customers, onOrderClick, onEditClick
                       <div style={{ fontWeight: 600, fontSize: 16 }}>#{o.orderNumber} – {c?.vorname ?? ''} {c?.nachname ?? ''}</div>
                       <div style={{ fontSize: 13, color: 'var(--label3)', marginTop: 1 }}>{c?.kennzeichen ?? ''} · {dv < 1 ? 'heute' : `${dv}T`}</div>
                     </div>
-                    <button onClick={(e) => { e.stopPropagation(); exportOrderExcel(o, c); }} className="excel-btn" title="Excel herunterladen">XLS</button>
+                    <button onClick={(e) => { e.stopPropagation(); exportOrderPDF(o, c); }} className="excel-btn" title="PDF herunterladen">PDF</button>
                     <button onClick={(e) => { e.stopPropagation(); onEditClick(o); }} className="excel-btn" style={{ background: 'rgba(0,122,255,0.12)', color: 'var(--blue)', border: '1px solid rgba(0,122,255,0.25)' }} title="Bearbeiten">✎</button>
                     <span style={{ color: 'var(--label3)', marginLeft: 4 }}><SFChevron /></span>
                   </div>
@@ -98,7 +98,7 @@ export default function OrderList({ orders, customers, onOrderClick, onEditClick
                     <div style={{ fontWeight: 500, fontSize: 15 }}>#{o.orderNumber} – {c?.vorname ?? ''} {c?.nachname ?? ''}</div>
                     <div style={{ fontSize: 12, color: 'var(--label3)' }}>{new Date(o.createdAt).toLocaleDateString('de-CH')}</div>
                   </div>
-                  <button onClick={(e) => { e.stopPropagation(); exportOrderExcel(o, c); }} className="excel-btn" title="Excel herunterladen">XLS</button>
+                  <button onClick={(e) => { e.stopPropagation(); exportOrderPDF(o, c); }} className="excel-btn" title="PDF herunterladen">PDF</button>
                   <button onClick={(e) => { e.stopPropagation(); onEditClick(o); }} className="excel-btn" style={{ background: 'rgba(0,122,255,0.12)', color: 'var(--blue)', border: '1px solid rgba(0,122,255,0.25)' }} title="Bearbeiten">✎</button>
                   <span style={{ color: 'var(--label3)' }}><SFChevron /></span>
                 </div>

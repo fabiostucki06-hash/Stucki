@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Sheet from '../ui/Sheet';
 import Spinner from '../ui/Spinner';
-import { exportOfferteExcel } from '../../lib/excel';
+import { exportOffertePDF } from '../../lib/pdf-offerte';
 import type { Customer, Offerte, OfferteStatus } from '../../types';
 
 interface OfferteDetailProps {
@@ -241,7 +241,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
 
       {offerte.notizen && <div style={{ background: 'var(--fill3)', borderRadius: 12, padding: '12px 14px', fontSize: 15, color: 'var(--label2)', marginBottom: 16 }}>{offerte.notizen}</div>}
 
-      <button onClick={() => exportOfferteExcel(offerte, customer)} className="btn-system btn-green" style={{ marginBottom: 12 }}>Excel exportieren</button>
+      <button onClick={() => exportOffertePDF(offerte, customer)} className="btn-system btn-green" style={{ marginBottom: 12 }}>PDF exportieren</button>
       <button onClick={async () => { if (window.confirm('Offerte löschen?')) await onDelete(offerte.id); }} className="btn-system btn-destructive">Offerte löschen</button>
       <div style={{ marginTop: 16, fontSize: 13, color: 'var(--label3)', textAlign: 'center' }}>Erstellt: {new Date(offerte.createdAt).toLocaleDateString('de-CH')} · Offerte #{offerte.offertNumber}</div>
     </Sheet>
