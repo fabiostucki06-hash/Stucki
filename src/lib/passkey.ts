@@ -22,17 +22,21 @@ export function clearPasskey(): void {
   localStorage.removeItem(CRED_EMAIL_KEY);
 }
 
-function randomBytes(n: number): Uint8Array {
-  return crypto.getRandomValues(new Uint8Array(n));
+function randomBytes(n: number): ArrayBuffer {
+  return crypto.getRandomValues(new Uint8Array(n)).buffer as ArrayBuffer;
 }
 
-function base64urlToUint8Array(b64url: string): Uint8Array {
+function base64urlToArrayBuffer(b64url: string): ArrayBuffer {
   const base64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
   const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=');
   const binary = atob(padded);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
+  return bytes.buffer as ArrayBuffer;
+}
+
+function strToBuffer(s: string): ArrayBuffer {
+  return new TextEncoder().encode(s).buffer as ArrayBuffer;
 }
 
 export async function registerPasskey(email: string): Promise<boolean> {
@@ -43,7 +47,7 @@ export async function registerPasskey(email: string): Promise<boolean> {
         challenge: randomBytes(32),
         rp: { name: 'GarageOS', id: window.location.hostname },
         user: {
-          id: new TextEncoder().encode(email),
+          id: strToBuffer(email),
           name: email,
           displayName: 'GarageOS',
         },
@@ -78,7 +82,7 @@ export async function authenticateWithPasskey(): Promise<boolean> {
     const assertion = (await navigator.credentials.get({
       publicKey: {
         challenge: randomBytes(32),
-        allowCredentials: [{ id: base64urlToUint8Array(credId), type: 'public-key' }],
+        allowCredentials: [{ id: base64urlToArrayBuffer(credId), type: 'public-key' }],
         userVerification: 'required',
         timeout: 60000,
       },
