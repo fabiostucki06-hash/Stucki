@@ -33,6 +33,14 @@ export const auth = {
     const r = await fetch(`${SUPA_URL}/auth/v1/user`, { headers: h(token) });
     return r.json();
   },
+  async refresh(refreshToken: string) {
+    const r = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: h(),
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    return r.json();
+  },
 };
 
 

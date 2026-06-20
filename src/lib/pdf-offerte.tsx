@@ -240,7 +240,7 @@ const OffertePDF: React.FC<Props> = ({ offerte, customer }) => {
           {/* Notes */}
           <View style={s.notesWrap}>
             <Text style={s.noteLine}>ZE basieren auf einer reibungslosen Reparatur</Text>
-            <Text style={s.noteLine}>Kleinmaterial-Pauschale wird bei &lt;100 ZE hinzugefügt</Text>
+            <Text style={s.noteLine}>Kleinteil Pauschale CHF 10.00 wird ab 100 ZE automatisch berechnet</Text>
             {offerte.notizen ? <Text style={[s.noteLine, { marginTop: 4 }]}>{offerte.notizen}</Text> : null}
           </View>
 

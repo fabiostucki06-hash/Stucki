@@ -54,7 +54,9 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
     return ap.length ? ap.map((p) => ({ ...p, zeLoading: false, zeHint: p.zeHint ?? '' })) : [newArbeit()];
   });
   const [material,   setMaterial]   = useState<MaterialRow[]>(() => {
-    const mp = (initial?.positionen ?? []).filter((p): p is MaterialPosition => p.typ === 'material');
+    const mp = (initial?.positionen ?? [])
+      .filter((p): p is MaterialPosition => p.typ === 'material')
+      .filter((p) => p.beschreibung !== 'Kleinteil Pauschale');
     return mp.length ? [...mp] : [newMaterial()];
   });
   const [notizen,    setNotizen]    = useState(initial?.notizen ?? '');
@@ -114,15 +116,22 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
   const totM  = material.reduce((s, p) => s + (parseFloat(p.preis) || 0), 0);
   const totZE = arbeit.reduce((s, p) => s + (parseFloat(p.ze) || 0), 0);
 
+  const kleinteilActive = totZE > 100;
+  const kleinteilBetrag = kleinteilActive ? 10 : 0;
+  const totMeff = totM + kleinteilBetrag;
+
   function submit() {
     if (!cid) { showToast('Bitte einen Kunden auswählen', 'error'); return; }
     const ap = arbeit.filter((p) => p.beschreibung.trim());
     const mp = material.filter((p) => p.beschreibung.trim());
     if (!ap.length && !mp.length) { showToast('Mindestens eine Position eingeben', 'error'); return; }
+    const autoPauschale: MaterialPosition[] = kleinteilActive
+      ? [{ typ: 'material', beschreibung: 'Kleinteil Pauschale', menge: '1', stueckpreis: '10', preis: '10.00' }]
+      : [];
     onSave({
-      customerId: cid, titel, positionen: [...ap, ...mp], notizen, gueltigBis,
-      totalBetrag: (totA + totM).toFixed(2), totalArbeit: totA.toFixed(2),
-      totalMaterial: totM.toFixed(2), totalZE: totZE,
+      customerId: cid, titel, positionen: [...ap, ...mp, ...autoPauschale], notizen, gueltigBis,
+      totalBetrag: (totA + totMeff).toFixed(2), totalArbeit: totA.toFixed(2),
+      totalMaterial: totMeff.toFixed(2), totalZE: totZE,
     });
   }
 
@@ -171,17 +180,25 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
       {/* ── Totals ── */}
       <div className="mf-totals">
         {([
-          ['Arbeit',   fCHF(totA),        totZE ? `${totZE} ZE` : null, 'var(--blue)'],
-          ['Material', fCHF(totM),        null,                          'var(--green)'],
-          ['Total',    fCHF(totA + totM), null,                          'var(--indigo)'],
+          ['Arbeit',   fCHF(totA),     totZE ? `${totZE} ZE` : null,                'var(--blue)'],
+          ['Material', fCHF(totMeff),  kleinteilActive ? '+Kleinteil' : null,         'var(--green)'],
+          ['Total',    fCHF(totA + totMeff), null,                                   'var(--indigo)'],
         ] as [string, string, string | null, string][]).map(([l, v, sub, c]) => (
           <div key={l} className="mf-total-pill">
             <div className="mf-total-name">{l}</div>
             <div className="mf-total-val" style={{ color: c }}>{v}</div>
-            {sub && <div className="mf-total-sub">{sub}</div>}
+            {sub && <div className="mf-total-sub" style={{ color: l === 'Material' && kleinteilActive ? 'var(--blue)' : undefined }}>{sub}</div>}
           </div>
         ))}
       </div>
+
+      {kleinteilActive && (
+        <div style={{ marginTop: -12, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', background: 'rgba(0,122,255,0.07)', borderRadius: 10, border: '1px solid rgba(0,122,255,0.15)' }}>
+          <span style={{ fontSize: 14 }}>✦</span>
+          <span className="sf-subhead" style={{ color: 'var(--blue)', flex: 1 }}>Kleinteil Pauschale automatisch aktiv (&gt;100 ZE)</span>
+          <span className="sf-subhead" style={{ color: 'var(--blue)', fontWeight: 700 }}>+CHF 10.00</span>
+        </div>
+      )}
 
       {/* ── Positionen ── */}
       <div className="mf-section">
@@ -308,6 +325,16 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
                 }
               </div>
             ))}
+            {kleinteilActive && (
+              <div className="mf-pos-row" style={{ background: 'rgba(0,122,255,0.06)', borderRadius: 8, marginTop: 4 }}>
+                <span className="mf-pos-idx" style={{ color: 'var(--blue)' }}>✦</span>
+                <span style={{ flex: 1, fontSize: 13, color: 'var(--blue)', fontWeight: 600, padding: '0 6px' }}>Kleinteil Pauschale (auto)</span>
+                <span style={{ width: 44, textAlign: 'right', fontSize: 12, color: 'var(--label3)', paddingRight: 4 }}>1</span>
+                <span style={{ width: 64, textAlign: 'right', fontSize: 12, color: 'var(--blue)', paddingRight: 4 }}>10.00</span>
+                <span className="mf-pos-total" style={{ color: 'var(--blue)', width: 68 }}>CHF 10.00</span>
+                <span style={{ width: 22 }} />
+              </div>
+            )}
             <button className="mf-add-pos green" onClick={addM}><SFPlus size={12} /> Materialposition</button>
           </>
         )}
