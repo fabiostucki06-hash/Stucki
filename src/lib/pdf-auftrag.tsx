@@ -248,7 +248,7 @@ const AuftragPDF: React.FC<Props> = ({ order, customer }) => {
           {/* Payment terms */}
           <View style={s.payRow}>
             <View>
-              <Text style={s.payLbl}>Zahlungskonditionen bei</Text>
+              <Text style={s.payLbl}>Zahlungskontitionen bei</Text>
               <Text style={s.paySub}>Rechnungstellung</Text>
             </View>
             <Text style={s.payVal}>10 Tage netto</Text>

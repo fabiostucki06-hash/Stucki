@@ -2,13 +2,13 @@ import React from 'react';
 import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer';
 import type { ArbeitPosition, Customer, MaterialPosition, Offerte } from '../types';
 
-// ── Company constants (match template) ───────────────────────────────────────
-const CO_NAME    = 'Fabio Stucki';
-const CO_ADDR    = 'Polenstrasse 245';
-const CO_CITY    = '5112 Thalheim AG';
-const CO_PHONE   = '079 850 18 63';
-const CO_LOC     = 'Thalheim AG';
-const STD_SATZ   = '80.00';
+// ── Company constants ─────────────────────────────────────────────────────────
+const CO_NAME  = 'Fabio Stucki';
+const CO_ADDR  = 'Polenstrasse 245';
+const CO_CITY  = '5112 Thalheim AG';
+const CO_PHONE = '079 850 18 63';
+const CO_LOC   = 'Thalheim AG';
+const STD_SATZ = '80.00';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const todayCH = () => new Date().toLocaleDateString('de-CH');
@@ -26,17 +26,17 @@ const s = StyleSheet.create({
     paddingHorizontal: 40,
   },
 
-  // Header outside the box
-  hdr: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  hdrLeft: {},
+  // Header (outside box)
+  hdr:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  hdrLeft:  {},
   docTitle: { fontSize: 13, fontFamily: 'Helvetica-Bold' },
-  numRow: { flexDirection: 'row', marginTop: 3 },
-  numLbl: { fontSize: 9, width: 90 },
-  numVal: { fontSize: 9 },
+  numRow:   { flexDirection: 'row', marginTop: 3 },
+  numLbl:   { fontSize: 9, width: 90 },
+  numVal:   { fontSize: 9 },
   hdrRight: { alignItems: 'flex-end' },
-  coLine: { fontSize: 8.5 },
+  coLine:   { fontSize: 8.5 },
 
-  // Outer border box — all content lives here
+  // Outer border box
   box: {
     borderWidth: 0.5,
     borderColor: '#000',
@@ -93,7 +93,7 @@ const s = StyleSheet.create({
   cPreis: { width: 62, textAlign: 'right' },
   cZE:    { width: 52, textAlign: 'right' },
 
-  // Totals block
+  // Summe row (top border)
   sumRow: {
     flexDirection: 'row',
     borderTopWidth: 0.5,
@@ -101,7 +101,10 @@ const s = StyleSheet.create({
     borderTopStyle: 'solid',
     paddingVertical: 3,
   },
+  // Sub-row below Summe (Kleinteil Pauschale line)
   subRow: { flexDirection: 'row', paddingVertical: 2 },
+
+  // Offertentotal (bold, double border)
   grandRow: {
     flexDirection: 'row',
     borderTopWidth: 0.5,
@@ -138,14 +141,23 @@ const s = StyleSheet.create({
 interface Props { offerte: Offerte; customer: Customer | undefined }
 
 const OffertePDF: React.FC<Props> = ({ offerte, customer }) => {
-  const pos          = offerte.positionen ?? [];
+  const allPos       = offerte.positionen ?? [];
   const vehicle      = [customer?.marke, customer?.modell].filter(Boolean).join(' ');
   const owner        = customer ? `${customer.vorname} ${customer.nachname}` : '';
-  const totalMat     = fN(offerte.totalMaterial);
   const totalArb     = fN(offerte.totalArbeit);
   const totalBetrag  = fN(offerte.totalBetrag);
-  const totalZE      = fN(offerte.totalZE);
   const date         = todayCH();
+
+  // Separate Kleinteil Pauschale from regular positions
+  const kleinteilPos  = allPos.find(
+    (p): p is MaterialPosition =>
+      p.typ === 'material' && p.beschreibung === 'Kleinteil Pauschale',
+  );
+  const kleinteilAmt  = fN(kleinteilPos?.preis);
+  const filteredPos   = allPos.filter(
+    (p) => !(p.typ === 'material' && (p as MaterialPosition).beschreibung === 'Kleinteil Pauschale'),
+  );
+  const pureMatTotal  = fN(offerte.totalMaterial) - kleinteilAmt;
 
   return (
     <Document>
@@ -195,8 +207,8 @@ const OffertePDF: React.FC<Props> = ({ offerte, customer }) => {
             <Text style={[s.th, s.cZE]}>ZE</Text>
           </View>
 
-          {/* Position rows */}
-          {pos.map((p, i) => {
+          {/* Position rows (Kleinteil Pauschale excluded — shown in sub-row) */}
+          {filteredPos.map((p, i) => {
             const mp = p.typ === 'material' ? (p as MaterialPosition) : null;
             const ap = p.typ === 'arbeit'   ? (p as ArbeitPosition)   : null;
             return (
@@ -210,25 +222,25 @@ const OffertePDF: React.FC<Props> = ({ offerte, customer }) => {
             );
           })}
 
-          {/* Summe row — Materialkosten in Preis col, Arbeitskosten in ZE col */}
+          {/* Summe row — pure material in Preis col, Arbeitskosten in ZE col */}
           <View style={s.sumRow}>
             <Text style={[s.td, s.cBez]}>Summe</Text>
             <Text style={[s.td, s.cMenge]}></Text>
             <Text style={[s.td, s.cStkP]}></Text>
-            <Text style={[s.td, s.cPreis]}>{chf(totalMat)}</Text>
+            <Text style={[s.td, s.cPreis]}>{chf(pureMatTotal)}</Text>
             <Text style={[s.td, s.cZE]}>{chf(totalArb)}</Text>
           </View>
 
-          {/* Sub-row (ZE × Std.Satz, or Kleinmaterial placeholder) */}
+          {/* Sub-row — Kleinmaterial Pauschale amount in ZE col */}
           <View style={s.subRow}>
             <Text style={[s.td, s.cBez]}></Text>
             <Text style={[s.td, s.cMenge]}></Text>
             <Text style={[s.td, s.cStkP]}></Text>
             <Text style={[s.td, s.cPreis]}></Text>
-            <Text style={[s.td, s.cZE]}>{totalZE > 0 ? `${totalZE} ZE` : ''}</Text>
+            <Text style={[s.td, s.cZE]}>{chf(kleinteilAmt)}</Text>
           </View>
 
-          {/* Offertentotal row (bold) */}
+          {/* Offertentotal row (bold, double border) */}
           <View style={s.grandRow}>
             <Text style={s.grandLbl}>Offertentotal</Text>
             <View style={{ flexDirection: 'row' }}>
@@ -240,7 +252,7 @@ const OffertePDF: React.FC<Props> = ({ offerte, customer }) => {
           {/* Notes */}
           <View style={s.notesWrap}>
             <Text style={s.noteLine}>ZE basieren auf einer reibungslosen Reparatur</Text>
-            <Text style={s.noteLine}>Kleinteil Pauschale CHF 10.00 wird ab 100 ZE automatisch berechnet</Text>
+            <Text style={s.noteLine}>Kleinmaterial-Pauschale wird bei &lt;100 ZE hinzugefügt</Text>
             {offerte.notizen ? <Text style={[s.noteLine, { marginTop: 4 }]}>{offerte.notizen}</Text> : null}
           </View>
 
@@ -259,7 +271,7 @@ const OffertePDF: React.FC<Props> = ({ offerte, customer }) => {
           {/* Payment terms */}
           <View style={s.payRow}>
             <View style={s.payLblWrap}>
-              <Text style={s.payLbl}>Zahlungskonditionen bei</Text>
+              <Text style={s.payLbl}>Zahlungskontitionen bei</Text>
               <Text style={s.paySub}>Rechnungstellung</Text>
             </View>
             <Text style={s.payVal}>10 Tage netto</Text>

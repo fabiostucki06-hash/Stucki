@@ -2,7 +2,7 @@ import React from 'react';
 import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer';
 import type { ArbeitPosition, Customer, MaterialPosition, Rechnung } from '../types';
 
-// ── Company constants (match template) ───────────────────────────────────────
+// ── Company constants ─────────────────────────────────────────────────────────
 const CO_NAME  = 'Fabio Stucki';
 const CO_ADDR  = 'Polenstrasse 245';
 const CO_CITY  = '5112 Thalheim AG';
@@ -26,7 +26,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 40,
   },
 
-  // Header outside the box
+  // Header (outside box)
   hdr:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   hdrLeft:  {},
   docTitle: { fontSize: 13, fontFamily: 'Helvetica-Bold' },
@@ -91,7 +91,7 @@ const s = StyleSheet.create({
   cPreis: { width: 62, textAlign: 'right' },
   cZE:    { width: 52, textAlign: 'right' },
 
-  // Totals
+  // Summe row (top border)
   sumRow: {
     flexDirection: 'row',
     borderTopWidth: 0.5,
@@ -99,7 +99,10 @@ const s = StyleSheet.create({
     borderTopStyle: 'solid',
     paddingVertical: 3,
   },
+  // Sub-row (Kleinteil Pauschale line)
   subRow: { flexDirection: 'row', paddingVertical: 2 },
+
+  // Rechnungstotal (bold, double border)
   grandRow: {
     flexDirection: 'row',
     borderTopWidth: 0.5,
@@ -135,14 +138,23 @@ const s = StyleSheet.create({
 interface Props { rechnung: Rechnung; customer: Customer | undefined }
 
 const RechnungPDF: React.FC<Props> = ({ rechnung, customer }) => {
-  const pos         = rechnung.positionen ?? [];
+  const allPos      = rechnung.positionen ?? [];
   const vehicle     = [customer?.marke, customer?.modell].filter(Boolean).join(' ');
   const owner       = customer ? `${customer.vorname} ${customer.nachname}` : '';
-  const totalMat    = fN(rechnung.totalMaterial);
   const totalArb    = fN(rechnung.totalArbeit);
   const totalBetrag = fN(rechnung.totalBetrag);
-  const totalZE     = fN(rechnung.totalZE);
   const date        = todayCH();
+
+  // Separate Kleinteil Pauschale from regular positions
+  const kleinteilPos = allPos.find(
+    (p): p is MaterialPosition =>
+      p.typ === 'material' && p.beschreibung === 'Kleinteil Pauschale',
+  );
+  const kleinteilAmt = fN(kleinteilPos?.preis);
+  const filteredPos  = allPos.filter(
+    (p) => !(p.typ === 'material' && (p as MaterialPosition).beschreibung === 'Kleinteil Pauschale'),
+  );
+  const pureMatTotal = fN(rechnung.totalMaterial) - kleinteilAmt;
 
   const faelligCH = rechnung.faelligAm
     ? new Date(rechnung.faelligAm).toLocaleDateString('de-CH')
@@ -204,8 +216,8 @@ const RechnungPDF: React.FC<Props> = ({ rechnung, customer }) => {
             <Text style={[s.th, s.cZE]}>ZE</Text>
           </View>
 
-          {/* Position rows */}
-          {pos.map((p, i) => {
+          {/* Position rows (Kleinteil Pauschale excluded — shown in sub-row) */}
+          {filteredPos.map((p, i) => {
             const mp = p.typ === 'material' ? (p as MaterialPosition) : null;
             const ap = p.typ === 'arbeit'   ? (p as ArbeitPosition)   : null;
             return (
@@ -219,25 +231,25 @@ const RechnungPDF: React.FC<Props> = ({ rechnung, customer }) => {
             );
           })}
 
-          {/* Summe row — Materialkosten in Preis col, Arbeitskosten in ZE col */}
+          {/* Summe row — pure material in Preis col, Arbeitskosten in ZE col */}
           <View style={s.sumRow}>
             <Text style={[s.td, s.cBez]}>Summe</Text>
             <Text style={[s.td, s.cMenge]}></Text>
             <Text style={[s.td, s.cStkP]}></Text>
-            <Text style={[s.td, s.cPreis]}>{chf(totalMat)}</Text>
+            <Text style={[s.td, s.cPreis]}>{chf(pureMatTotal)}</Text>
             <Text style={[s.td, s.cZE]}>{chf(totalArb)}</Text>
           </View>
 
-          {/* Sub-row: ZE count */}
+          {/* Sub-row — Kleinmaterial Pauschale amount in ZE col */}
           <View style={s.subRow}>
             <Text style={[s.td, s.cBez]}></Text>
             <Text style={[s.td, s.cMenge]}></Text>
             <Text style={[s.td, s.cStkP]}></Text>
             <Text style={[s.td, s.cPreis]}></Text>
-            <Text style={[s.td, s.cZE]}>{totalZE > 0 ? `${totalZE} ZE` : ''}</Text>
+            <Text style={[s.td, s.cZE]}>{chf(kleinteilAmt)}</Text>
           </View>
 
-          {/* Rechnungstotal (bold) */}
+          {/* Rechnungstotal (bold, double border) */}
           <View style={s.grandRow}>
             <Text style={s.grandLbl}>Rechnungstotal</Text>
             <View style={{ flexDirection: 'row' }}>
@@ -249,12 +261,13 @@ const RechnungPDF: React.FC<Props> = ({ rechnung, customer }) => {
           {/* Notes */}
           <View style={s.notesWrap}>
             <Text style={s.noteLine}>ZE basieren auf einer reibungslosen Reparatur</Text>
+            <Text style={s.noteLine}>Kleinmaterial-Pauschale wird bei &lt;100 ZE hinzugefügt</Text>
             {rechnung.notizen
               ? <Text style={[s.noteLine, { marginTop: 4 }]}>{rechnung.notizen}</Text>
               : null}
           </View>
 
-          {/* Date / Location + payment due */}
+          {/* Date / Location */}
           <View style={s.dateSection}>
             <View style={s.datePair}>
               <Text style={s.dateLbl}>Datum</Text>
@@ -275,7 +288,7 @@ const RechnungPDF: React.FC<Props> = ({ rechnung, customer }) => {
           {/* Payment terms */}
           <View style={s.payRow}>
             <View>
-              <Text style={s.payLbl}>Zahlungskonditionen bei</Text>
+              <Text style={s.payLbl}>Zahlungskontitionen bei</Text>
               <Text style={s.paySub}>Rechnungstellung</Text>
             </View>
             <Text style={s.payVal}>{payTage}</Text>
