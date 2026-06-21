@@ -1,7 +1,8 @@
-import React from 'react';
-import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer';
+// Uses jsPDF coordinate-based drawing — no @react-pdf/renderer
+import { jsPDF } from 'jspdf';
 import type { ArbeitPosition, Customer, MaterialPosition, Rechnung } from '../types';
 
+// ── Company ───────────────────────────────────────────────────────────────────
 const CO_NAME  = 'Fabio Stucki';
 const CO_ADDR  = 'Polenstrasse 245';
 const CO_CITY  = '5112 Thalheim AG';
@@ -9,126 +10,52 @@ const CO_PHONE = '079 850 18 63';
 const CO_LOC   = 'Thalheim AG';
 const STD_SATZ = '80.00';
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
 const todayCH = () => new Date().toLocaleDateString('de-CH');
 const fN = (v?: string | number) => parseFloat(String(v ?? '0')) || 0;
 const chf = (n: number) => n === 0 ? 'CHF –' : `CHF ${n.toFixed(2)}`;
 
-// A4 inner: 495pt. Excel col proportions C:D:E:F:G = 144:108:69:90:75 (≈486 total, scale to 495)
-// Scaled: cBez≈149, cMenge=110, cStkP=70, cPreis=92, cZE=74
-const COL_MENGE  = 110;
-const COL_STKP   = 70;
-const COL_PREIS  = 92;
-const COL_ZE     = 74;
-const COL_SPACER = COL_MENGE + COL_STKP + COL_PREIS; // 272
-const COL_BEZ_W  = 149;
+// ── Layout (mm, A4 = 210 × 297) ──────────────────────────────────────────────
+const PW = 210;
+const ML = 14;
+const BPX = 3;
+const TL = ML + BPX;      // 17
+const TR = PW - ML - BPX; // 193
+const TW = TR - TL;       // 176
 
-const s = StyleSheet.create({
-  page: {
-    fontFamily: 'Helvetica',
-    fontSize: 9,
-    color: '#000',
-    paddingTop: 35,
-    paddingBottom: 40,
-    paddingHorizontal: 40,
-  },
+// Excel Rechnung wch: C:D:E:F:G = 23.17:17.17:10.67:14.17:11.67 (Σ=76.85)
+const P = 76.85;
+const wBez = Math.round(TW * 23.17 / P); // 53
+const wMen = Math.round(TW * 17.17 / P); // 39
+const wStk = Math.round(TW * 10.67 / P); // 24
+const wPre = Math.round(TW * 14.17 / P); // 32
+const wZE  = TW - wBez - wMen - wStk - wPre; // 28
 
-  hdr:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  docTitle: { fontSize: 13, fontFamily: 'Helvetica-Bold' },
-  numRow:   { flexDirection: 'row', marginTop: 3 },
-  numLbl:   { fontSize: 9, width: 96 },
-  numVal:   { fontSize: 9 },
-  hdrRight: { alignItems: 'flex-end' },
-  coLine:   { fontSize: 8.5 },
+const rMen = TL + wBez + wMen;
+const rStk = rMen + wStk;
+const rPre = rStk + wPre;
+const rZE  = TR;
 
-  box: {
-    borderWidth: 0.5,
-    borderColor: '#000',
-    borderStyle: 'solid',
-    padding: 10,
-  },
+function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined) {
+  const n   = fN;
+  const PAD = 1;
 
-  vRow: { flexDirection: 'row', marginBottom: 2 },
-  vLbl: { fontSize: 9, width: COL_BEZ_W },
-  vVal: { fontSize: 9, flex: 1 },
+  const vehicle = [customer?.marke, customer?.modell].filter(Boolean).join(' ');
+  const owner   = customer ? `${customer.vorname} ${customer.nachname}` : '';
+  const date    = todayCH();
 
-  stdRow: {
-    flexDirection: 'row',
-    borderTopWidth: 0.5, borderTopColor: '#000', borderTopStyle: 'solid',
-    borderBottomWidth: 0.5, borderBottomColor: '#000', borderBottomStyle: 'solid',
-    paddingVertical: 3,
-    marginTop: 8,
-  },
-  stdLbl: { fontSize: 9, width: COL_BEZ_W },
-  stdVal: { fontSize: 9 },
-
-  tHead: {
-    flexDirection: 'row',
-    borderBottomWidth: 0.5, borderBottomColor: '#000', borderBottomStyle: 'solid',
-    paddingVertical: 6,
-  },
-  th: { fontSize: 9, fontFamily: 'Helvetica-Bold' },
-  tRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 0.25, borderBottomColor: '#aaa', borderBottomStyle: 'solid',
-    minHeight: 15,
-    paddingVertical: 3,
-  },
-  td: { fontSize: 9 },
-
-  cBez:   { flex: 1 },
-  cMenge: { width: COL_MENGE, textAlign: 'right' },
-  cStkP:  { width: COL_STKP,  textAlign: 'right' },
-  cPreis: { width: COL_PREIS, textAlign: 'right' },
-  cZE:    { width: COL_ZE,    textAlign: 'right' },
-
-  sumRow: {
-    flexDirection: 'row',
-    borderTopWidth: 0.5, borderTopColor: '#000', borderTopStyle: 'solid',
-    paddingVertical: 3,
-  },
-  subRow: { flexDirection: 'row', paddingVertical: 2 },
-  grandRow: {
-    flexDirection: 'row',
-    borderTopWidth: 0.5, borderTopColor: '#000', borderTopStyle: 'solid',
-    borderBottomWidth: 0.5, borderBottomColor: '#000', borderBottomStyle: 'solid',
-    paddingVertical: 3,
-  },
-  grandLbl: { flex: 1, fontFamily: 'Helvetica-Bold', fontSize: 9 },
-  grandVal: { fontFamily: 'Helvetica-Bold', fontSize: 9, width: COL_ZE, textAlign: 'right' },
-
-  notesWrap: { marginTop: 14 },
-  noteLine:  { fontSize: 9, marginBottom: 2 },
-
-  dateSection: { marginTop: 40 },
-  datePair:    { flexDirection: 'row', marginBottom: 4 },
-  dateLbl:     { fontSize: 9, width: COL_BEZ_W },
-  dateVal:     { fontSize: 9, flex: 1, fontFamily: 'Helvetica-Bold', paddingLeft: 8 },
-
-  payRow: { flexDirection: 'row', marginTop: 28, alignItems: 'flex-start' },
-  payLbl: { fontSize: 9 },
-  paySub: { fontSize: 9 },
-  payVal: { fontSize: 9, fontFamily: 'Helvetica-Bold', paddingLeft: 12 },
-});
-
-interface Props { rechnung: Rechnung; customer: Customer | undefined }
-
-const RechnungPDF: React.FC<Props> = ({ rechnung, customer }) => {
-  const allPos      = rechnung.positionen ?? [];
-  const vehicle     = [customer?.marke, customer?.modell].filter(Boolean).join(' ');
-  const owner       = customer ? `${customer.vorname} ${customer.nachname}` : '';
-  const totalArb    = fN(rechnung.totalArbeit);
-  const totalBetrag = fN(rechnung.totalBetrag);
-  const date        = todayCH();
-
+  const allPos       = rechnung.positionen ?? [];
   const kleinteilPos = allPos.find(
     (p): p is MaterialPosition =>
       p.typ === 'material' && p.beschreibung === 'Kleinteil Pauschale',
   );
-  const kleinteilAmt = fN(kleinteilPos?.preis);
+  const kleinteilAmt = n(kleinteilPos?.preis);
   const filteredPos  = allPos.filter(
     p => !(p.typ === 'material' && (p as MaterialPosition).beschreibung === 'Kleinteil Pauschale'),
   );
-  const pureMatTotal = fN(rechnung.totalMaterial) - kleinteilAmt;
+  const pureMatTotal = n(rechnung.totalMaterial) - kleinteilAmt;
+  const totalArb     = n(rechnung.totalArbeit);
+  const totalBetrag  = n(rechnung.totalBetrag);
 
   const faelligCH = rechnung.faelligAm
     ? new Date(rechnung.faelligAm).toLocaleDateString('de-CH')
@@ -137,133 +64,156 @@ const RechnungPDF: React.FC<Props> = ({ rechnung, customer }) => {
       : '';
   const payTage = rechnung.zahlungsFrist ? `${rechnung.zahlungsFrist} Tage netto` : '10 Tage netto';
 
-  return (
-    <Document>
-      <Page size="A4" style={s.page}>
+  const norm = () => doc.setFont('helvetica', 'normal');
+  const bold = () => doc.setFont('helvetica', 'bold');
+  const fs   = (s: number) => doc.setFontSize(s);
+  const hLine = (y: number, lw = 0.25) => { doc.setLineWidth(lw); doc.line(ML, y, PW - ML, y); };
+  const tL = (t: string, x: number, y: number) => doc.text(String(t), x, y);
+  const tR = (t: string, x: number, y: number) => doc.text(String(t), x, y, { align: 'right' });
 
-        <View style={s.hdr}>
-          <View>
-            <Text style={s.docTitle}>Rechnung</Text>
-            <View style={s.numRow}>
-              <Text style={s.numLbl}>Rechnungsnummer</Text>
-              <Text style={s.numVal}>{rechnung.rechnungNumber}</Text>
-            </View>
-          </View>
-          <View style={s.hdrRight}>
-            <Text style={s.coLine}>{CO_NAME}</Text>
-            <Text style={s.coLine}>{CO_ADDR}</Text>
-            <Text style={s.coLine}>{CO_CITY}</Text>
-            <Text style={s.coLine}>{CO_PHONE}</Text>
-          </View>
-        </View>
+  let y = 14;
 
-        <View style={s.box}>
+  // ── HEADER ────────────────────────────────────────────────────────────────
+  bold(); fs(14);
+  tL('Rechnung', ML, y + 5);
 
-          <View style={s.vRow}><Text style={s.vLbl}>Fahrzeug</Text><Text style={s.vVal}>{vehicle}</Text></View>
-          <View style={s.vRow}><Text style={s.vLbl}>1. Inv.-Setzung</Text><Text style={s.vVal}></Text></View>
-          <View style={s.vRow}><Text style={s.vLbl}>Kennzeichen</Text><Text style={s.vVal}>{customer?.kennzeichen ?? ''}</Text></View>
-          <View style={s.vRow}><Text style={s.vLbl}>Chassis-Nr.</Text><Text style={s.vVal}></Text></View>
-          <View style={s.vRow}><Text style={s.vLbl}>Km Stand</Text><Text style={s.vVal}>{customer?.km ?? ''}</Text></View>
-          <View style={s.vRow}><Text style={s.vLbl}>Fahrzeugbesitzer</Text><Text style={s.vVal}>{owner}</Text></View>
+  norm(); fs(9);
+  tL('Rechnungsnummer', ML, y + 11);
+  tL(rechnung.rechnungNumber ?? '', ML + 38, y + 11);
 
-          <View style={s.stdRow}>
-            <Text style={s.stdLbl}>Std.Satz:</Text>
-            <Text style={s.stdVal}>CHF {STD_SATZ}</Text>
-          </View>
+  tR(CO_NAME,  PW - ML, y + 4);
+  tR(CO_ADDR,  PW - ML, y + 8.5);
+  tR(CO_CITY,  PW - ML, y + 13);
+  tR(CO_PHONE, PW - ML, y + 17.5);
 
-          <View style={s.tHead}>
-            <Text style={[s.th, s.cBez]}>Bezeichnung</Text>
-            <Text style={[s.th, s.cMenge]}>Menge</Text>
-            <Text style={[s.th, s.cStkP]}>Stk.Preis</Text>
-            <Text style={[s.th, s.cPreis]}>Preis (CHF)</Text>
-            <Text style={[s.th, s.cZE]}>ZE</Text>
-          </View>
+  y += 20;
+  const boxTop = y;
+  y += 2.5;
 
-          <View style={{ minHeight: 225 }}>
-            {filteredPos.map((p, i) => {
-              const mp = p.typ === 'material' ? (p as MaterialPosition) : null;
-              const ap = p.typ === 'arbeit'   ? (p as ArbeitPosition)   : null;
-              return (
-                <View key={i} style={s.tRow}>
-                  <Text style={[s.td, s.cBez]}>{p.beschreibung}</Text>
-                  <Text style={[s.td, s.cMenge]}>{mp ? (parseFloat(mp.menge || '0') || '') : ''}</Text>
-                  <Text style={[s.td, s.cStkP]}>{mp ? (parseFloat(mp.stueckpreis || '0') || '') : ''}</Text>
-                  <Text style={[s.td, s.cPreis]}>{fN(p.preis) ? fN(p.preis).toFixed(2) : ''}</Text>
-                  <Text style={[s.td, s.cZE]}>{ap ? (ap.ze || '') : ''}</Text>
-                </View>
-              );
-            })}
-          </View>
+  // ── VEHICLE BLOCK ─────────────────────────────────────────────────────────
+  const RH = 4.5;
+  const vRows: [string, string][] = [
+    ['Fahrzeug', vehicle],
+    ['1. Inv.-Setzung', ''],
+    ['Kennzeichen', customer?.kennzeichen ?? ''],
+    ['Chassis-Nr.', ''],
+    ['Km Stand', customer?.km ?? ''],
+    ['Fahrzeugbesitzer', owner],
+  ];
+  norm(); fs(9);
+  for (const [lbl, val] of vRows) {
+    tL(lbl, TL + PAD, y + RH * 0.65);
+    tL(val, TL + wBez + PAD, y + RH * 0.65);
+    y += RH;
+  }
 
-          <View style={s.sumRow}>
-            <Text style={[s.td, s.cBez]}>Summe</Text>
-            <Text style={[s.td, s.cMenge]}></Text>
-            <Text style={[s.td, s.cStkP]}></Text>
-            <Text style={[s.td, s.cPreis]}>{chf(pureMatTotal)}</Text>
-            <Text style={[s.td, s.cZE]}>{chf(totalArb)}</Text>
-          </View>
+  // ── STD.SATZ ROW ──────────────────────────────────────────────────────────
+  const RH_S = 6;
+  hLine(y);
+  norm(); fs(9);
+  tL('Std.Satz:', TL + PAD, y + RH_S * 0.62);
+  tL('CHF ' + STD_SATZ, TL + wBez + PAD, y + RH_S * 0.62);
+  y += RH_S;
+  hLine(y);
 
-          <View style={s.subRow}>
-            <Text style={[s.td, s.cBez]}></Text>
-            <Text style={[s.td, s.cMenge]}></Text>
-            <Text style={[s.td, s.cStkP]}></Text>
-            <Text style={[s.td, s.cPreis]}></Text>
-            <Text style={[s.td, s.cZE]}>{chf(kleinteilAmt)}</Text>
-          </View>
+  // ── TABLE HEADER ──────────────────────────────────────────────────────────
+  const RH_H = 6.5;
+  const thY = y + RH_H * 0.65;
+  bold(); fs(9);
+  tL('Bezeichnung', TL + PAD,   thY);
+  tR('Menge',       rMen - PAD, thY);
+  tR('Stk.Preis',   rStk - PAD, thY);
+  tR('Preis (CHF)', rPre - PAD, thY);
+  tR('ZE',          rZE - PAD,  thY);
+  y += RH_H;
+  hLine(y);
 
-          <View style={s.grandRow}>
-            <Text style={s.grandLbl}>Rechnungstotal</Text>
-            <Text style={{ ...s.td, width: COL_SPACER }}></Text>
-            <Text style={s.grandVal}>{chf(totalBetrag)}</Text>
-          </View>
+  // ── POSITION ROWS ─────────────────────────────────────────────────────────
+  const posY0 = y;
+  norm(); fs(9);
+  for (const p of filteredPos) {
+    const mp = p.typ === 'material' ? (p as MaterialPosition) : null;
+    const ap = p.typ === 'arbeit'   ? (p as ArbeitPosition)   : null;
+    const bY = y + RH * 0.65;
 
-          <View style={s.notesWrap}>
-            <Text style={s.noteLine}>ZE basieren auf einer reibungslosen Reparatur</Text>
-            <Text style={s.noteLine}>Kleinmaterial-Pauschale wird bei &lt;100 ZE hinzugefügt</Text>
-            {rechnung.notizen ? <Text style={[s.noteLine, { marginTop: 4 }]}>{rechnung.notizen}</Text> : null}
-          </View>
+    tL(p.beschreibung, TL + PAD, bY);
+    if (mp && n(mp.menge))       tR(String(parseFloat(mp.menge!)), rMen - PAD, bY);
+    if (mp && n(mp.stueckpreis)) tR(parseFloat(mp.stueckpreis!).toFixed(2), rStk - PAD, bY);
+    if (n(p.preis))              tR(n(p.preis).toFixed(2), rPre - PAD, bY);
+    if (ap?.ze)                  tR(String(ap.ze), rZE - PAD, bY);
 
-          <View style={s.dateSection}>
-            <View style={s.datePair}>
-              <Text style={s.dateLbl}>Datum</Text>
-              <Text style={s.dateVal}>{date}</Text>
-            </View>
-            {faelligCH ? (
-              <View style={s.datePair}>
-                <Text style={s.dateLbl}>Zahlbar bis</Text>
-                <Text style={s.dateVal}>{faelligCH}</Text>
-              </View>
-            ) : null}
-            <View style={s.datePair}>
-              <Text style={s.dateLbl}>Ort</Text>
-              <Text style={s.dateVal}>{CO_LOC}</Text>
-            </View>
-          </View>
+    doc.setLineWidth(0.1);
+    doc.line(ML, y + RH, PW - ML, y + RH);
+    y += RH;
+  }
+  if (y - posY0 < 15 * RH) y = posY0 + 15 * RH;
 
-          <View style={s.payRow}>
-            <View>
-              <Text style={s.payLbl}>Zahlungskontitionen bei</Text>
-              <Text style={s.paySub}>Rechnungstellung</Text>
-            </View>
-            <Text style={s.payVal}>{payTage}</Text>
-          </View>
+  // ── SUMME ─────────────────────────────────────────────────────────────────
+  hLine(y);
+  const sumY = y + RH * 0.65;
+  norm(); fs(9);
+  tL('Summe', TL + PAD, sumY);
+  tR(chf(pureMatTotal), rPre - PAD, sumY);
+  tR(chf(totalArb),      rZE - PAD,  sumY);
+  y += RH;
 
-        </View>
-      </Page>
-    </Document>
-  );
-};
+  // ── SUB-ROW ───────────────────────────────────────────────────────────────
+  const RH_sub = 4;
+  tR(chf(kleinteilAmt), rZE - PAD, y + RH_sub * 0.65);
+  y += RH_sub;
+
+  // ── RECHNUNGSTOTAL ────────────────────────────────────────────────────────
+  const RH_T = 6;
+  hLine(y);
+  const totY = y + RH_T * 0.62;
+  bold(); fs(9);
+  tL('Rechnungstotal', TL + PAD, totY);
+  tR(chf(totalBetrag), rZE - PAD, totY);
+  y += RH_T;
+  hLine(y);
+  norm();
+
+  // ── NOTES ─────────────────────────────────────────────────────────────────
+  y += 5;
+  fs(9);
+  tL('ZE basieren auf einer reibungslosen Reparatur', TL + PAD, y);
+  y += 4.5;
+  tL('Kleinmaterial-Pauschale wird bei <100 ZE hinzugefügt', TL + PAD, y);
+  if (rechnung.notizen) { y += 4.5; tL(rechnung.notizen, TL + PAD, y); }
+
+  // ── DATES ─────────────────────────────────────────────────────────────────
+  y += 13;
+  norm(); fs(9);
+  tL('Datum', TL + PAD, y);
+  bold(); tL(date, TL + wBez + PAD, y); norm();
+  if (faelligCH) {
+    y += RH;
+    tL('Zahlbar bis', TL + PAD, y);
+    bold(); tL(faelligCH, TL + wBez + PAD, y); norm();
+  }
+  y += RH;
+  tL('Ort', TL + PAD, y);
+  bold(); tL(CO_LOC, TL + wBez + PAD, y); norm();
+
+  // ── PAYMENT ───────────────────────────────────────────────────────────────
+  y += 11;
+  fs(9);
+  tL('Zahlungskontitionen bei', TL + PAD, y);
+  bold(); tL(payTage, TL + wBez + PAD, y); norm();
+  y += RH;
+  tL('Rechnungstellung', TL + PAD, y);
+
+  // ── BOX ───────────────────────────────────────────────────────────────────
+  const boxBottom = y + 4;
+  doc.setLineWidth(0.3);
+  doc.rect(ML, boxTop, PW - 2 * ML, boxBottom - boxTop, 'S');
+}
 
 export async function exportRechnungPDF(rechnung: Rechnung, customer: Customer | undefined) {
   try {
-    const blob = await pdf(<RechnungPDF rechnung={rechnung} customer={customer} />).toBlob();
-    const url  = URL.createObjectURL(blob);
-    const a    = Object.assign(document.createElement('a'), {
-      href: url,
-      download: `Rechnung_${rechnung.rechnungNumber}_${customer?.nachname ?? 'Kunde'}.pdf`,
-    });
-    a.click();
-    URL.revokeObjectURL(url);
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    drawDoc(doc, rechnung, customer);
+    doc.save(`Rechnung_${rechnung.rechnungNumber}_${customer?.nachname ?? 'Kunde'}.pdf`);
   } catch (err) {
     alert(`PDF-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);
   }

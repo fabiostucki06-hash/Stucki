@@ -1,7 +1,8 @@
-import React from 'react';
-import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer';
+// Uses jsPDF coordinate-based drawing — no @react-pdf/renderer
+import { jsPDF } from 'jspdf';
 import type { ArbeitPosition, Customer, Order } from '../types';
 
+// ── Company ───────────────────────────────────────────────────────────────────
 const CO_NAME  = 'Fabio Stucki';
 const CO_ADDR  = 'Polenstrasse 245';
 const CO_CITY  = '5112 Thalheim AG';
@@ -9,225 +10,172 @@ const CO_PHONE = '079 850 18 63';
 const CO_LOC   = 'Thalheim AG';
 const STD_SATZ = '80.00';
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
 const dateCH = (iso?: string) => iso ? new Date(iso).toLocaleDateString('de-CH') : '';
-const fN     = (v?: string | number) => parseFloat(String(v ?? '0')) || 0;
+const fN = (v?: string | number) => parseFloat(String(v ?? '0')) || 0;
 
-// A4 inner: 495pt. Excel Auftrag: Arbeiten = cols C+D+E (177+132+80=389px), ZE = col F (100px)
-// Proportion: Arbeiten=79.6%, ZE=20.4%  → cZE=100, cArbeiten=flex:1(≈395)
-const COL_ZE    = 100;
-// Label column (col C only) width for vehicle / date alignment
-const COL_LBL   = 120;
+// ── Layout (mm, A4 = 210 × 297) ──────────────────────────────────────────────
+const PW = 210;
+const ML = 14;
+const BPX = 3;
+const TL = ML + BPX;      // 17
+const TR = PW - ML - BPX; // 193
+const TW = TR - TL;       // 176
 
-const s = StyleSheet.create({
-  page: {
-    fontFamily: 'Helvetica',
-    fontSize: 9,
-    color: '#000',
-    paddingTop: 35,
-    paddingBottom: 40,
-    paddingHorizontal: 40,
-  },
+// Excel Auftrag: Arbeiten = cols C+D+E (wch 24.57+18.14+10.71=53.42),
+//                ZE = col F (wch 13.57).  Total = 66.99
+const wArb = Math.round(TW * 53.42 / 66.99); // 140
+const wZE  = TW - wArb;                        // 36
 
-  hdr:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  docTitle: { fontSize: 13, fontFamily: 'Helvetica-Bold' },
-  numRow:   { flexDirection: 'row', marginTop: 3 },
-  numLbl:   { fontSize: 9, width: 96 },
-  numVal:   { fontSize: 9 },
-  hdrRight: { alignItems: 'flex-end' },
-  coLine:   { fontSize: 8.5 },
+const rZE = TR; // right edge of ZE column
 
-  box: {
-    borderWidth: 0.5,
-    borderColor: '#000',
-    borderStyle: 'solid',
-    padding: 10,
-  },
+function drawDoc(doc: jsPDF, order: Order, customer: Customer | undefined) {
+  const PAD = 1;
 
-  vRow: { flexDirection: 'row', marginBottom: 2 },
-  vLbl: { fontSize: 9, width: COL_LBL },
-  vVal: { fontSize: 9, flex: 1 },
-
-  stdRow: {
-    flexDirection: 'row',
-    borderTopWidth: 0.5, borderTopColor: '#000', borderTopStyle: 'solid',
-    borderBottomWidth: 0.5, borderBottomColor: '#000', borderBottomStyle: 'solid',
-    paddingVertical: 3,
-    marginTop: 8,
-  },
-  stdLbl: { fontSize: 9, width: COL_LBL },
-  stdVal: { fontSize: 9 },
-
-  // 2-column table: Arbeiten (flex:1) | ZE (100pt)
-  tHead: {
-    flexDirection: 'row',
-    borderBottomWidth: 0.5, borderBottomColor: '#000', borderBottomStyle: 'solid',
-    paddingVertical: 6,
-  },
-  th: { fontSize: 9, fontFamily: 'Helvetica-Bold' },
-  tRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 0.25, borderBottomColor: '#aaa', borderBottomStyle: 'solid',
-    minHeight: 15,
-    paddingVertical: 3,
-  },
-  td: { fontSize: 9 },
-
-  cArbeiten: { flex: 1 },
-  cZE:       { width: COL_ZE, textAlign: 'right' },
-
-  zeBlankRow: {
-    flexDirection: 'row',
-    borderTopWidth: 0.5, borderTopColor: '#000', borderTopStyle: 'solid',
-    paddingVertical: 3,
-  },
-  zeTotalRow: {
-    flexDirection: 'row',
-    borderTopWidth: 0.5, borderTopColor: '#000', borderTopStyle: 'solid',
-    borderBottomWidth: 0.5, borderBottomColor: '#000', borderBottomStyle: 'solid',
-    paddingVertical: 3,
-  },
-  zeTotalLbl: { flex: 1, fontFamily: 'Helvetica-Bold', fontSize: 9 },
-  zeTotalVal: { fontFamily: 'Helvetica-Bold', fontSize: 9, width: COL_ZE, textAlign: 'right' },
-
-  notesWrap: { marginTop: 14 },
-  noteLine:  { fontSize: 9, marginBottom: 2 },
-
-  // Dates — left-aligned, label column = COL_LBL
-  dateSection: { marginTop: 40 },
-  datePair:    { flexDirection: 'row', marginBottom: 4 },
-  dateLbl:     { fontSize: 9, width: COL_LBL },
-  dateVal:     { fontSize: 9, flex: 1, fontFamily: 'Helvetica-Bold', paddingLeft: 8 },
-
-  payRow: { flexDirection: 'row', marginTop: 42, alignItems: 'flex-start' },
-  payLbl: { fontSize: 9 },
-  paySub: { fontSize: 9 },
-  payVal: { fontSize: 9, fontFamily: 'Helvetica-Bold', paddingLeft: 12 },
-});
-
-interface Props { order: Order; customer: Customer | undefined }
-
-const AuftragPDF: React.FC<Props> = ({ order, customer }) => {
   const vehicle = [customer?.marke, customer?.modell].filter(Boolean).join(' ');
   const owner   = customer ? `${customer.vorname} ${customer.nachname}` : '';
 
-  const bItems = (order.beanstandungen ?? []).filter(Boolean);
-  const oItems = (order.offertItems ?? []).map(i => i.text).filter(Boolean);
-  const aPos   = (order.positionen ?? []).filter(p => p.typ === 'arbeit') as ArbeitPosition[];
+  const bItems  = (order.beanstandungen ?? []).filter(Boolean);
+  const oItems  = (order.offertItems ?? []).map(i => i.text).filter(Boolean);
+  const aPos    = (order.positionen ?? []).filter(p => p.typ === 'arbeit') as ArbeitPosition[];
   const hasPosi = aPos.length > 0;
 
-  interface WorkRow { text: string; ze: string }
-  const allRows: WorkRow[] = hasPosi
+  const allRows: { text: string; ze: string }[] = hasPosi
     ? [...bItems.map(t => ({ text: t, ze: '' })), ...aPos.map(p => ({ text: p.beschreibung, ze: p.ze || '' }))]
     : [...bItems.map(t => ({ text: t, ze: '' })), ...oItems.map(t => ({ text: t, ze: '' }))];
 
-  const zeTotal     = aPos.reduce((sum, p) => sum + fN(p.ze), 0);
+  const zeTotal     = aPos.reduce((s, p) => s + fN(p.ze), 0);
   const beginDatum  = dateCH(order.createdAt);
   const fertigDatum = order.status === 'abgeschlossen' ? dateCH(order.statusChangedAt) : '';
 
-  return (
-    <Document>
-      <Page size="A4" style={s.page}>
+  const norm = () => doc.setFont('helvetica', 'normal');
+  const bold = () => doc.setFont('helvetica', 'bold');
+  const fs   = (s: number) => doc.setFontSize(s);
+  const hLine = (y: number, lw = 0.25) => { doc.setLineWidth(lw); doc.line(ML, y, PW - ML, y); };
+  const tL = (t: string, x: number, y: number) => doc.text(String(t), x, y);
+  const tR = (t: string, x: number, y: number) => doc.text(String(t), x, y, { align: 'right' });
 
-        <View style={s.hdr}>
-          <View>
-            <Text style={s.docTitle}>Kundenauftrag</Text>
-            <View style={s.numRow}>
-              <Text style={s.numLbl}>Auftragsnummer</Text>
-              <Text style={s.numVal}>{order.orderNumber}</Text>
-            </View>
-          </View>
-          <View style={s.hdrRight}>
-            <Text style={s.coLine}>{CO_NAME}</Text>
-            <Text style={s.coLine}>{CO_ADDR}</Text>
-            <Text style={s.coLine}>{CO_CITY}</Text>
-            <Text style={s.coLine}>{CO_PHONE}</Text>
-          </View>
-        </View>
+  let y = 14;
 
-        <View style={s.box}>
+  // ── HEADER ────────────────────────────────────────────────────────────────
+  bold(); fs(14);
+  tL('Kundenauftrag', ML, y + 5);
 
-          <View style={s.vRow}><Text style={s.vLbl}>Fahrzeug</Text><Text style={s.vVal}>{vehicle}</Text></View>
-          <View style={s.vRow}><Text style={s.vLbl}>1. Inv.-Setzung</Text><Text style={s.vVal}></Text></View>
-          <View style={s.vRow}><Text style={s.vLbl}>Kennzeichen</Text><Text style={s.vVal}>{customer?.kennzeichen ?? ''}</Text></View>
-          <View style={s.vRow}><Text style={s.vLbl}>Chassis-Nr.</Text><Text style={s.vVal}></Text></View>
-          <View style={s.vRow}><Text style={s.vLbl}>Km Stand</Text><Text style={s.vVal}>{customer?.km ?? ''}</Text></View>
-          <View style={s.vRow}><Text style={s.vLbl}>Fahrzeugbesitzer</Text><Text style={s.vVal}>{owner}</Text></View>
+  norm(); fs(9);
+  tL('Auftragsnummer', ML, y + 11);
+  tL(order.orderNumber ?? '', ML + 38, y + 11);
 
-          <View style={s.stdRow}>
-            <Text style={s.stdLbl}>Std.Satz:</Text>
-            <Text style={s.stdVal}>CHF {STD_SATZ}</Text>
-          </View>
+  tR(CO_NAME,  PW - ML, y + 4);
+  tR(CO_ADDR,  PW - ML, y + 8.5);
+  tR(CO_CITY,  PW - ML, y + 13);
+  tR(CO_PHONE, PW - ML, y + 17.5);
 
-          <View style={s.tHead}>
-            <Text style={[s.th, s.cArbeiten]}>Arbeiten</Text>
-            <Text style={[s.th, s.cZE]}>ZE</Text>
-          </View>
+  y += 20;
+  const boxTop = y;
+  y += 2.5;
 
-          {/* Work rows — min 15 rows to match Excel template spacing */}
-          <View style={{ minHeight: 225 }}>
-            {allRows.map((row, i) => (
-              <View key={i} style={s.tRow}>
-                <Text style={[s.td, s.cArbeiten]}>{row.text}</Text>
-                <Text style={[s.td, s.cZE]}>{row.ze}</Text>
-              </View>
-            ))}
-          </View>
+  // ── VEHICLE BLOCK ─────────────────────────────────────────────────────────
+  const RH = 4.5;
+  const vRows: [string, string][] = [
+    ['Fahrzeug', vehicle],
+    ['1. Inv.-Setzung', ''],
+    ['Kennzeichen', customer?.kennzeichen ?? ''],
+    ['Chassis-Nr.', ''],
+    ['Km Stand', customer?.km ?? ''],
+    ['Fahrzeugbesitzer', owner],
+  ];
+  norm(); fs(9);
+  for (const [lbl, val] of vRows) {
+    tL(lbl, TL + PAD, y + RH * 0.65);
+    tL(val, TL + wArb + PAD, y + RH * 0.65);
+    y += RH;
+  }
 
-          <View style={s.zeBlankRow}>
-            <Text style={[s.td, s.cArbeiten]}></Text>
-            <Text style={[s.td, s.cZE]}></Text>
-          </View>
+  // ── STD.SATZ ROW ──────────────────────────────────────────────────────────
+  const RH_S = 6;
+  hLine(y);
+  norm(); fs(9);
+  tL('Std.Satz:', TL + PAD, y + RH_S * 0.62);
+  tL('CHF ' + STD_SATZ, TL + wArb + PAD, y + RH_S * 0.62);
+  y += RH_S;
+  hLine(y);
 
-          <View style={s.zeTotalRow}>
-            <Text style={s.zeTotalLbl}>ZE-Total</Text>
-            <Text style={s.zeTotalVal}>{zeTotal > 0 ? zeTotal.toFixed(1) : ''}</Text>
-          </View>
+  // ── TABLE HEADER: Arbeiten | ZE ───────────────────────────────────────────
+  const RH_H = 6.5;
+  const thY = y + RH_H * 0.65;
+  bold(); fs(9);
+  tL('Arbeiten', TL + PAD, thY);
+  tR('ZE', rZE - PAD, thY);
+  y += RH_H;
+  hLine(y);
 
-          <View style={s.notesWrap}>
-            <Text style={s.noteLine}>ZE basieren auf einer reibungslosen Reparatur</Text>
-            {order.notizen ? <Text style={[s.noteLine, { marginTop: 4 }]}>{order.notizen}</Text> : null}
-          </View>
+  // ── WORK ROWS (min 15 rows) ───────────────────────────────────────────────
+  const posY0 = y;
+  norm(); fs(9);
+  for (const row of allRows) {
+    const bY = y + RH * 0.65;
+    tL(row.text, TL + PAD, bY);
+    if (row.ze) tR(row.ze, rZE - PAD, bY);
+    doc.setLineWidth(0.1);
+    doc.line(ML, y + RH, PW - ML, y + RH);
+    y += RH;
+  }
+  if (y - posY0 < 15 * RH) y = posY0 + 15 * RH;
 
-          <View style={s.dateSection}>
-            <View style={s.datePair}>
-              <Text style={s.dateLbl}>Beginndatum</Text>
-              <Text style={s.dateVal}>{beginDatum}</Text>
-            </View>
-            {/* Extra gap between Beginndatum and Fertigstelldatum matching blank Excel row */}
-            <View style={[s.datePair, { marginTop: 8 }]}>
-              <Text style={s.dateLbl}>Fertigstelldatum</Text>
-              <Text style={s.dateVal}>{fertigDatum}</Text>
-            </View>
-            <View style={s.datePair}>
-              <Text style={s.dateLbl}>Ort</Text>
-              <Text style={s.dateVal}>{CO_LOC}</Text>
-            </View>
-          </View>
+  // ── BLANK SEPARATOR ───────────────────────────────────────────────────────
+  hLine(y);
+  y += RH;
 
-          <View style={s.payRow}>
-            <View>
-              <Text style={s.payLbl}>Zahlungskontitionen bei</Text>
-              <Text style={s.paySub}>Rechnungstellung</Text>
-            </View>
-            <Text style={s.payVal}>10 Tage netto</Text>
-          </View>
+  // ── ZE-TOTAL ROW ──────────────────────────────────────────────────────────
+  const RH_T = 6;
+  hLine(y);
+  const totY = y + RH_T * 0.62;
+  bold(); fs(9);
+  tL('ZE-Total', TL + PAD, totY);
+  if (zeTotal > 0) tR(zeTotal.toFixed(1), rZE - PAD, totY);
+  y += RH_T;
+  hLine(y);
+  norm();
 
-        </View>
-      </Page>
-    </Document>
-  );
-};
+  // ── NOTES ─────────────────────────────────────────────────────────────────
+  y += 5;
+  fs(9);
+  tL('ZE basieren auf einer reibungslosen Reparatur', TL + PAD, y);
+  if (order.notizen) { y += 4.5; tL(order.notizen, TL + PAD, y); }
+
+  // ── DATES ─────────────────────────────────────────────────────────────────
+  y += 13;
+  norm(); fs(9);
+  tL('Beginndatum', TL + PAD, y);
+  bold(); tL(beginDatum, TL + wArb + PAD, y); norm();
+
+  // Extra gap between Beginndatum and Fertigstelldatum (blank row in Excel)
+  y += RH + 3;
+  tL('Fertigstelldatum', TL + PAD, y);
+  bold(); tL(fertigDatum, TL + wArb + PAD, y); norm();
+  y += RH;
+  tL('Ort', TL + PAD, y);
+  bold(); tL(CO_LOC, TL + wArb + PAD, y); norm();
+
+  // ── PAYMENT ───────────────────────────────────────────────────────────────
+  y += 14;
+  fs(9);
+  tL('Zahlungskontitionen bei', TL + PAD, y);
+  bold(); tL('10 Tage netto', TL + wArb + PAD, y); norm();
+  y += RH;
+  tL('Rechnungstellung', TL + PAD, y);
+
+  // ── BOX ───────────────────────────────────────────────────────────────────
+  const boxBottom = y + 4;
+  doc.setLineWidth(0.3);
+  doc.rect(ML, boxTop, PW - 2 * ML, boxBottom - boxTop, 'S');
+}
 
 export async function exportOrderPDF(order: Order, customer: Customer | undefined) {
   try {
-    const blob = await pdf(<AuftragPDF order={order} customer={customer} />).toBlob();
-    const url  = URL.createObjectURL(blob);
-    const a    = Object.assign(document.createElement('a'), {
-      href: url,
-      download: `Auftrag_${order.orderNumber}_${customer?.nachname ?? 'Kunde'}.pdf`,
-    });
-    a.click();
-    URL.revokeObjectURL(url);
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    drawDoc(doc, order, customer);
+    doc.save(`Auftrag_${order.orderNumber}_${customer?.nachname ?? 'Kunde'}.pdf`);
   } catch (err) {
     alert(`PDF-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);
   }
