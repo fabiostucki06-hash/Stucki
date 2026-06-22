@@ -98,8 +98,8 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
       <div className="inset-grouped-list" style={{ marginBottom: 16 }}>
         <div className="list-row" style={{ cursor: 'default' }}>
           <div style={{ flex: 1 }}>
-            <div className="sf-headline">{customer?.vorname ?? ''} {customer?.nachname ?? ''}</div>
-            <div className="sf-subhead" style={{ color: 'var(--label2)' }}>{customer?.telefon} · {customer?.kennzeichen}</div>
+            <div className="sf-headline" style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.5px', textShadow: '0 1px 5px rgba(0,0,0,0.30)' }}>{customer?.vorname ?? ''} {customer?.nachname ?? ''}</div>
+            <div className="sf-subhead" style={{ color: 'var(--label2)', marginTop: 3 }}>{customer?.telefon} · {customer?.kennzeichen}</div>
           </div>
           {edit && (
             <button onClick={() => setEditCust((p) => !p)} style={{ background: 'none', border: 'none', color: 'var(--blue)', fontSize: 14, fontWeight: 600, cursor: 'pointer', padding: '4px 8px' }}>
@@ -172,9 +172,9 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
                 </div>
               );
             })}
-            <div className="list-row" style={{ cursor: 'default', background: 'rgba(0,122,255,0.06)' }}>
-              <div className="sf-headline" style={{ flex: 1 }}>Total Positionen</div>
-              <div style={{ fontWeight: 700, fontSize: 20, color: 'var(--blue)' }}>
+            <div className="list-row" style={{ cursor: 'default', background: 'rgba(0,122,255,0.12)' }}>
+              <div className="sf-headline" style={{ flex: 1, textShadow: '0 1px 4px rgba(0,0,0,0.22)' }}>Total Positionen</div>
+              <div style={{ fontWeight: 800, fontSize: 22, color: 'var(--blue)', textShadow: '0 1px 5px rgba(0,0,0,0.22)', letterSpacing: '-0.4px' }}>
                 CHF {(order.positionen ?? []).reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0).toFixed(2)}
               </div>
             </div>
@@ -219,8 +219,8 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
           justifyContent: 'space-between',
         }}>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--label2)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6, textShadow: '0 1px 2px rgba(255,255,255,0.75)' }}>Total Rechnung</div>
-            <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: '-0.5px', color: recB ? 'var(--blue)' : 'var(--label2)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--label2)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6, textShadow: '0 1px 3px rgba(0,0,0,0.30)' }}>Total Rechnung</div>
+            <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-0.6px', color: recB ? 'var(--blue)' : 'var(--label2)', textShadow: '0 1px 6px rgba(0,0,0,0.25)' }}>
               {recB ? `CHF ${recB}` : '–'}
             </div>
           </div>

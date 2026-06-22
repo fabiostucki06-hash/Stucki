@@ -228,7 +228,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
     });
   }
 
-  const hdrTxt: React.CSSProperties = { fontSize: 10, fontWeight: 700, color: 'var(--label2)', textTransform: 'uppercase', letterSpacing: '0.07em', textShadow: '0 1px 2px rgba(255,255,255,0.75)' };
+  const hdrTxt: React.CSSProperties = { fontSize: 10, fontWeight: 700, color: 'var(--label2)', textTransform: 'uppercase', letterSpacing: '0.07em', textShadow: '0 1px 3px rgba(0,0,0,0.30)' };
 
   return (
     <div>
