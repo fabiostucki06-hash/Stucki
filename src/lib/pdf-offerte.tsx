@@ -1,8 +1,6 @@
-// Uses jsPDF coordinate-based drawing — no @react-pdf/renderer
 import { jsPDF } from 'jspdf';
 import type { ArbeitPosition, Customer, MaterialPosition, Offerte } from '../types';
 
-// ── Company ───────────────────────────────────────────────────────────────────
 const CO_NAME  = 'Fabio Stucki';
 const CO_ADDR  = 'Polenstrasse 245';
 const CO_CITY  = '5112 Thalheim AG';
@@ -10,37 +8,34 @@ const CO_PHONE = '079 850 18 63';
 const CO_LOC   = 'Thalheim AG';
 const STD_SATZ = '80.00';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 const todayCH = () => new Date().toLocaleDateString('de-CH');
 const fN = (v?: string | number) => parseFloat(String(v ?? '0')) || 0;
 const chf = (n: number) => n === 0 ? 'CHF –' : `CHF ${n.toFixed(2)}`;
 
-// ── Layout (mm, A4 = 210 × 297) ──────────────────────────────────────────────
+// ── Layout: A4 = 210 × 297 mm ─────────────────────────────────────────────────
 const PW = 210;
-const ML = 14;            // page left/right margin
-const BPX = 3;            // box inner horizontal padding
-const TL = ML + BPX;     // table left  = 17
-const TR = PW - ML - BPX; // table right = 193
-const TW = TR - TL;       // table width = 176
+const ML = 15;
+const TL = ML, TR = PW - ML, TW = TR - TL; // 15 … 195, width = 180
 
-// Column widths from Excel wch proportions: C:D:E:F:G = 21.79:17.36:9.64:13.93:12.07 (Σ=74.79)
-const P = 74.79;
-const wBez = Math.round(TW * 21.79 / P); // 51
-const wMen = Math.round(TW * 17.36 / P); // 41
-const wStk = Math.round(TW * 9.64  / P); // 23
-const wPre = Math.round(TW * 13.93 / P); // 33
-const wZE  = TW - wBez - wMen - wStk - wPre; // 28
+const RH   = 5;    // data row height mm
+const RH_H = 6.5;  // table header row
+const RH_S = 6;    // section row (vehicle, std.satz, summe)
+const RH_T = 7;    // total row
+const PAD  = 2;    // horizontal cell padding
+const BL   = 0.68; // text baseline inside row (from top)
+const VL   = 55;   // vehicle-info label column width
 
-// Column right-edges (for right-aligned numbers)
-const rMen = TL + wBez + wMen;
-const rStk = rMen + wStk;
-const rPre = rStk + wPre;
-const rZE  = TR; // = rPre + wZE
+// Table columns – Bezeichnung | Menge | Stk.Preis | Preis (CHF) | ZE
+const wBez = 75, wMen = 20, wStk = 30, wPre = 30, wZE = TW - wBez - wMen - wStk - wPre; // 25
+
+const x0 = TL;           // 15  – Bezeichnung left
+const x1 = x0 + wBez;   // 90  – Menge left   / column divider
+const x2 = x1 + wMen;   // 110 – Stk.Preis left
+const x3 = x2 + wStk;   // 140 – Preis left
+const x4 = x3 + wPre;   // 170 – ZE left
+// TR = 195 = x4 + wZE
 
 function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined) {
-  const n   = fN;
-  const PAD = 1; // 1mm padding inside columns
-
   const vehicle = [customer?.marke, customer?.modell].filter(Boolean).join(' ');
   const owner   = customer ? `${customer.vorname} ${customer.nachname}` : '';
   const date    = todayCH();
@@ -50,162 +45,189 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined) {
     (p): p is MaterialPosition =>
       p.typ === 'material' && p.beschreibung === 'Kleinteil Pauschale',
   );
-  const kleinteilAmt = n(kleinteilPos?.preis);
+  const kleinteilAmt = fN(kleinteilPos?.preis);
   const filteredPos  = allPos.filter(
     p => !(p.typ === 'material' && (p as MaterialPosition).beschreibung === 'Kleinteil Pauschale'),
   );
-  const pureMatTotal = n(offerte.totalMaterial) - kleinteilAmt;
-  const totalArb     = n(offerte.totalArbeit);
-  const totalBetrag  = n(offerte.totalBetrag);
+  const pureMatTotal = fN(offerte.totalMaterial) - kleinteilAmt;
+  const totalArb     = fN(offerte.totalArbeit);
+  const totalBetrag  = fN(offerte.totalBetrag);
 
-  // Typography shortcuts
-  const norm = () => doc.setFont('helvetica', 'normal');
-  const bold = () => doc.setFont('helvetica', 'bold');
-  const fs   = (s: number) => doc.setFontSize(s);
+  const norm  = () => doc.setFont('helvetica', 'normal');
+  const bold  = () => doc.setFont('helvetica', 'bold');
+  const fs    = (s: number) => doc.setFontSize(s);
+  const rgb   = (r: number, g: number, b: number) => doc.setTextColor(r, g, b);
+  const drgb  = (r: number, g: number, b: number) => doc.setDrawColor(r, g, b);
+  const frgb  = (r: number, g: number, b: number) => doc.setFillColor(r, g, b);
+  const lw    = (w: number) => doc.setLineWidth(w);
 
-  // Line helpers
-  const hLine = (y: number, lw = 0.25) => {
-    doc.setLineWidth(lw);
-    doc.line(ML, y, PW - ML, y);
+  const hLine = (y: number, xa = TL, xb = TR, w = 0.15) => {
+    lw(w); drgb(180, 180, 180); doc.line(xa, y, xb, y); drgb(0, 0, 0);
+  };
+  const vLine = (x: number, y1: number, y2: number, w = 0.15) => {
+    lw(w); drgb(180, 180, 180); doc.line(x, y1, x, y2); drgb(0, 0, 0);
   };
   const tL = (t: string, x: number, y: number) => doc.text(String(t), x, y);
   const tR = (t: string, x: number, y: number) => doc.text(String(t), x, y, { align: 'right' });
+  const clip = (t: string, maxW: number): string => {
+    const s = String(t);
+    if (doc.getTextWidth(s) <= maxW) return s;
+    let r = s;
+    while (r.length > 1 && doc.getTextWidth(r + '…') > maxW) r = r.slice(0, -1);
+    return r + '…';
+  };
 
-  let y = 14;
+  let y = 12;
 
-  // ── HEADER (outside box) ──────────────────────────────────────────────────
-  bold(); fs(14);
-  tL('Budget Offerte', ML, y + 5);
+  // ── HEADER ────────────────────────────────────────────────────────────────
+  bold(); fs(15); rgb(0, 0, 0);
+  tL('Budget Offerte', TL, y + 7);
 
-  norm(); fs(9);
-  tL('Offertennummer', ML, y + 11);
-  tL(String(offerte.offertNumber ?? ''), ML + 38, y + 11);
+  norm(); fs(8); rgb(120, 120, 120);
+  tL('Offertennummer', TL, y + 13);
+  bold(); fs(8.5); rgb(0, 0, 0);
+  tL(String(offerte.offertNumber ?? ''), TL + 37, y + 13);
+  norm();
 
-  // Company block (right-aligned)
-  tR(CO_NAME,  PW - ML, y + 4);
-  tR(CO_ADDR,  PW - ML, y + 8.5);
-  tR(CO_CITY,  PW - ML, y + 13);
-  tR(CO_PHONE, PW - ML, y + 17.5);
+  bold(); fs(9); rgb(0, 0, 0);
+  tR(CO_NAME,  TR, y + 6);
+  norm(); fs(7.5); rgb(90, 90, 90);
+  tR(CO_ADDR,  TR, y + 11);
+  tR(CO_CITY,  TR, y + 16);
+  tR(CO_PHONE, TR, y + 21);
+  rgb(0, 0, 0);
 
-  y += 20;
-  const boxTop = y;
-  y += 2.5; // box top padding
+  y += 26;
+  lw(0.5); drgb(0, 0, 0); doc.line(TL, y, TR, y); // strong separator
 
-  // ── VEHICLE BLOCK ─────────────────────────────────────────────────────────
+  // ── VEHICLE INFO ──────────────────────────────────────────────────────────
   const vRows: [string, string][] = [
-    ['Fahrzeug', vehicle],
-    ['1. Inv.-Setzung', ''],
-    ['Kennzeichen', customer?.kennzeichen ?? ''],
-    ['Chassis-Nr.', ''],
-    ['Km Stand', customer?.km ?? ''],
-    ['Fahrzeugbesitzer', owner],
+    ['Fahrzeug',          vehicle || '–'],
+    ['1. Inv.-Setzung',   ''],
+    ['Kennzeichen',       customer?.kennzeichen ?? '–'],
+    ['Chassis-Nr.',       ''],
+    ['Km-Stand',          customer?.km ? String(customer.km) + ' km' : '–'],
+    ['Fahrzeugbesitzer',  owner || '–'],
   ];
-  const RH = 4.5;
-  norm(); fs(9);
+  norm(); fs(8.5);
   for (const [lbl, val] of vRows) {
-    tL(lbl, TL + PAD, y + RH * 0.65);
-    tL(val, TL + wBez + PAD, y + RH * 0.65);
-    y += RH;
+    const ty = y + RH_S * BL;
+    rgb(100, 100, 100); tL(lbl, TL + PAD, ty);
+    rgb(0, 0, 0);       bold(); tL(val, TL + VL, ty); norm();
+    hLine(y + RH_S, TL, TR, 0.1);
+    y += RH_S;
   }
 
-  // ── STD.SATZ ROW ──────────────────────────────────────────────────────────
-  const RH_S = 6;
-  hLine(y);
-  norm(); fs(9);
-  tL('Std.Satz:', TL + PAD, y + RH_S * 0.62);
-  tL('CHF ' + STD_SATZ, TL + wBez + PAD, y + RH_S * 0.62);
+  // ── STD.SATZ ──────────────────────────────────────────────────────────────
+  frgb(247, 247, 247); doc.rect(TL, y, TW, RH_S, 'F');
+  const ssY = y + RH_S * BL;
+  fs(8.5); rgb(100, 100, 100); tL('Std.Satz', TL + PAD, ssY);
+  bold(); rgb(0, 0, 0); tL('CHF ' + STD_SATZ, TL + VL, ssY); norm();
   y += RH_S;
-  hLine(y);
+  lw(0.4); drgb(0, 0, 0); doc.line(TL, y, TR, y);
 
   // ── TABLE HEADER ──────────────────────────────────────────────────────────
-  const RH_H = 6.5;
-  const thY = y + RH_H * 0.65;
-  bold(); fs(9);
-  tL('Bezeichnung',  TL + PAD,      thY);
-  tR('Menge',        rMen - PAD,    thY);
-  tR('Stk.Preis',    rStk - PAD,    thY);
-  tR('Preis (CHF)',  rPre - PAD,    thY);
-  tR('ZE',           rZE - PAD,     thY);
+  frgb(22, 22, 22); doc.rect(TL, y, TW, RH_H, 'F');
+  const thY = y + RH_H * BL;
+  bold(); fs(8.5); rgb(255, 255, 255);
+  tL('Bezeichnung',   x0 + PAD,  thY);
+  tR('Menge',         x2 - PAD,  thY);
+  tR('Stk.Preis',     x3 - PAD,  thY);
+  tR('Preis (CHF)',   x4 - PAD,  thY);
+  tR('ZE',            TR - PAD,  thY);
+  rgb(0, 0, 0);
   y += RH_H;
-  hLine(y);
 
-  // ── POSITION ROWS (min 15 rows) ───────────────────────────────────────────
+  // ── POSITION ROWS (min 15) ────────────────────────────────────────────────
   const posY0 = y;
-  norm(); fs(9);
+  norm(); fs(8.5);
+
   for (const p of filteredPos) {
-    const mp  = p.typ === 'material' ? (p as MaterialPosition) : null;
-    const ap  = p.typ === 'arbeit'   ? (p as ArbeitPosition)   : null;
-    const bY  = y + RH * 0.65;
+    const mp = p.typ === 'material' ? (p as MaterialPosition) : null;
+    const ap = p.typ === 'arbeit'   ? (p as ArbeitPosition)   : null;
+    const ty = y + RH * BL;
 
-    tL(p.beschreibung, TL + PAD, bY);
-    if (mp && n(mp.menge))       tR(String(parseFloat(mp.menge!)), rMen - PAD, bY);
-    if (mp && n(mp.stueckpreis)) tR(parseFloat(mp.stueckpreis!).toFixed(2), rStk - PAD, bY);
-    if (n(p.preis))              tR(n(p.preis).toFixed(2), rPre - PAD, bY);
-    if (ap?.ze)                  tR(String(ap.ze), rZE - PAD, bY);
+    rgb(0, 0, 0);
+    tL(clip(p.beschreibung, wBez - PAD * 2), x0 + PAD, ty);
+    rgb(50, 50, 50);
+    if (mp && fN(mp.menge))       tR(String(fN(mp.menge)),            x2 - PAD, ty);
+    if (mp && fN(mp.stueckpreis)) tR(fN(mp.stueckpreis).toFixed(2),   x3 - PAD, ty);
+    if (fN(p.preis))              tR(fN(p.preis).toFixed(2),           x4 - PAD, ty);
+    if (ap?.ze)                   tR(String(ap.ze),                    TR - PAD,  ty);
+    rgb(0, 0, 0);
 
-    doc.setLineWidth(0.1);
-    doc.line(ML, y + RH, PW - ML, y + RH);
+    hLine(y + RH, TL, TR, 0.1);
     y += RH;
   }
-  if (y - posY0 < 15 * RH) y = posY0 + 15 * RH;
+  for (let i = filteredPos.length; i < 15; i++) {
+    hLine(y + RH, TL, TR, 0.1);
+    y += RH;
+  }
 
-  // ── SUMME ROW ─────────────────────────────────────────────────────────────
-  hLine(y);
-  const sumY = y + RH * 0.65;
-  norm(); fs(9);
-  tL('Summe', TL + PAD, sumY);
-  tR(chf(pureMatTotal), rPre - PAD, sumY);
-  tR(chf(totalArb),      rZE - PAD,  sumY);
-  y += RH;
+  // vertical column dividers spanning header + rows
+  const tableBottom = y;
+  vLine(x1, posY0 - RH_H, tableBottom, 0.15);
+  vLine(x2, posY0 - RH_H, tableBottom, 0.15);
+  vLine(x3, posY0 - RH_H, tableBottom, 0.15);
+  vLine(x4, posY0 - RH_H, tableBottom, 0.15);
 
-  // ── SUB-ROW (Kleinteil Pauschale) ─────────────────────────────────────────
-  const RH_sub = 4;
-  tR(chf(kleinteilAmt), rZE - PAD, y + RH_sub * 0.65);
-  y += RH_sub;
+  // ── SUMME ─────────────────────────────────────────────────────────────────
+  lw(0.3); drgb(0, 0, 0); doc.line(TL, y, TR, y);
+  frgb(247, 247, 247); doc.rect(TL, y, TW, RH_S, 'F');
+  const sumY = y + RH_S * BL;
+  norm(); fs(8.5); rgb(80, 80, 80); tL('Summe', x0 + PAD, sumY);
+  bold(); rgb(0, 0, 0);
+  if (pureMatTotal > 0) tR(pureMatTotal.toFixed(2), x4 - PAD, sumY);
+  if (totalArb > 0)     tR(totalArb.toFixed(2),      TR - PAD,  sumY);
+  norm();
+  y += RH_S;
 
-  // ── OFFERTENTOTAL ROW ─────────────────────────────────────────────────────
-  const RH_T = 6;
-  hLine(y);
-  const totY = y + RH_T * 0.62;
-  bold(); fs(9);
-  tL('Offertentotal', TL + PAD, totY);
-  tR(chf(totalBetrag), rZE - PAD, totY);
+  if (kleinteilAmt > 0) {
+    const subH = 4;
+    fs(7.5); rgb(110, 110, 110);
+    tL('Kleinteil Pauschale', x0 + PAD, y + subH * BL);
+    tR(kleinteilAmt.toFixed(2), x4 - PAD, y + subH * BL);
+    rgb(0, 0, 0);
+    y += subH;
+  }
+
+  // ── TOTAL ─────────────────────────────────────────────────────────────────
+  lw(0.5); drgb(0, 0, 0); doc.line(TL, y, TR, y);
+  frgb(22, 22, 22); doc.rect(TL, y, TW, RH_T, 'F');
+  const totY = y + RH_T * BL;
+  bold(); fs(9); rgb(255, 255, 255);
+  tL('Offertentotal', x0 + PAD, totY);
+  tR(chf(totalBetrag), TR - PAD, totY);
+  rgb(0, 0, 0);
   y += RH_T;
-  hLine(y);
+  lw(0.5); drgb(0, 0, 0); doc.line(TL, y, TR, y);
   norm();
 
   // ── NOTES ─────────────────────────────────────────────────────────────────
-  y += 5;
-  fs(9);
-  tL('ZE basieren auf einer reibungslosen Reparatur', TL + PAD, y);
-  y += 4.5;
-  tL('Kleinmaterial-Pauschale wird bei <100 ZE hinzugefügt', TL + PAD, y);
+  y += 6;
+  fs(7.5); rgb(130, 130, 130);
+  tL('* ZE basieren auf einer reibungslosen Reparatur', TL, y);
+  y += 4;
+  tL('* Kleinmaterial-Pauschale wird bei über 100 ZE automatisch hinzugefügt', TL, y);
   if (offerte.notizen) {
-    y += 4.5;
-    tL(offerte.notizen, TL + PAD, y);
+    y += 6;
+    bold(); fs(8.5); rgb(0, 0, 0); tL('Notizen:', TL, y); norm(); y += 4;
+    const lines = doc.splitTextToSize(offerte.notizen, TW);
+    for (const line of lines as string[]) { tL(line, TL, y); y += 4; }
   }
+  rgb(0, 0, 0);
 
   // ── DATE / LOCATION ───────────────────────────────────────────────────────
-  y += 13;
-  norm(); fs(9);
-  tL('Datum', TL + PAD, y);
-  bold(); tL(date,   TL + wBez + PAD, y); norm();
-  y += RH;
-  tL('Ort', TL + PAD, y);
-  bold(); tL(CO_LOC, TL + wBez + PAD, y); norm();
+  y += 10;
+  const col2 = TL + VL;
+  fs(8.5);
+  rgb(100, 100, 100); tL('Datum', TL, y); bold(); rgb(0, 0, 0); tL(date,   col2, y); norm(); y += 5;
+  rgb(100, 100, 100); tL('Ort',   TL, y); bold(); rgb(0, 0, 0); tL(CO_LOC, col2, y); norm();
 
-  // ── PAYMENT TERMS ─────────────────────────────────────────────────────────
-  y += 11;
-  fs(9);
-  tL('Zahlungskontitionen bei', TL + PAD, y);
-  bold(); tL('10 Tage netto', TL + wBez + PAD, y); norm();
-  y += RH;
-  tL('Rechnungstellung', TL + PAD, y);
-
-  // ── OUTER BOX ─────────────────────────────────────────────────────────────
-  const boxBottom = y + 4;
-  doc.setLineWidth(0.3);
-  doc.rect(ML, boxTop, PW - 2 * ML, boxBottom - boxTop, 'S');
+  // ── PAYMENT ───────────────────────────────────────────────────────────────
+  y += 10;
+  rgb(100, 100, 100); tL('Zahlungskonditionen', TL, y); bold(); rgb(0, 0, 0); tL('10 Tage netto', col2, y); norm(); y += 5;
+  rgb(100, 100, 100); tL('Rechnungstellung',    TL, y); norm(); rgb(0, 0, 0);
 }
 
 export async function exportOffertePDF(offerte: Offerte, customer: Customer | undefined) {
