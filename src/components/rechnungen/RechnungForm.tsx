@@ -209,14 +209,14 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
     WebkitBackdropFilter: 'blur(64px) saturate(240%)',
     border: '1px solid rgba(255,255,255,0.20)',
     borderRadius: 18,
-    padding: '16px 18px',
-    marginBottom: 14,
+    padding: '12px 14px',
+    marginBottom: 18,
     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.65), 0 4px 24px rgba(0,0,0,0.06)',
   };
   const gcHdr: React.CSSProperties = {
     fontSize: 11, fontWeight: 700, color: 'var(--label2)',
     textTransform: 'uppercase', letterSpacing: '0.08em',
-    marginBottom: 13, display: 'block',
+    marginBottom: 9, display: 'block',
     textShadow: '0 1px 3px rgba(0,0,0,0.30)',
   };
   const hdrTxt: React.CSSProperties = {
@@ -244,7 +244,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
       {/* ── Section 1: Import aus Auftrag / Offerte ── */}
       <div style={gc}>
         <span style={gcHdr}>Aus bestehendem Dokument befüllen</span>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <div className="cf-field">
             <label className="cf-label">Aus Auftrag</label>
             <select
@@ -300,7 +300,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
         <span style={gcHdr}>Kunde &amp; Details</span>
 
         {/* 2/3 Kunde + 1/3 Fällig am */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12, marginBottom: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10, marginBottom: 10 }}>
           <div className="cf-field">
             <label className="cf-label">Kunde *</label>
             <select
@@ -353,7 +353,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
         <span style={gcHdr}>Positionen</span>
 
         {/* iOS Segmented Control */}
-        <div className="seg-ctrl" style={{ width: '100%', marginBottom: 14 }}>
+        <div className="seg-ctrl" style={{ marginBottom: 12 }}>
           {(['arbeit', 'material'] as const).map((t) => {
             const cnt = t === 'arbeit' ? arbeitCount : materialCount;
             const isActive = tab === t;
@@ -474,7 +474,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
             ['Total',    fCHF(totA + totM), null,                          'var(--indigo)'],
           ] as [string, string, string | null, string][]).map(([l, v, sub, c]) => (
             <div key={l} style={{
-              textAlign: 'center', padding: '10px 6px',
+              textAlign: 'center', padding: '8px 6px',
               background: 'rgba(255,255,255,0.07)',
               backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
               border: '1px solid rgba(255,255,255,0.14)',
@@ -502,16 +502,10 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
         />
       </div>
 
-      {/* ── Actions: side-by-side ── */}
-      <div style={{ display: 'flex', gap: 10, paddingTop: 4, paddingBottom: 8 }}>
-        <button
-          className="mf-btn-cancel"
-          onClick={onCancel}
-          style={{ flex: '0 0 auto', width: 110, height: 50, borderRadius: 14, fontSize: 15 }}
-        >
-          Abbrechen
-        </button>
-        <button className="mf-btn-save" onClick={submit} style={{ flex: 1, height: 50 }}>
+      {/* ── Actions: right-aligned pills ── */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 8, paddingBottom: 6 }}>
+        <button className="mf-btn-cancel" onClick={onCancel}>Abbrechen</button>
+        <button className="mf-btn-save" onClick={submit}>
           {initial ? 'Änderungen speichern' : 'Rechnung erstellen'}
         </button>
       </div>
