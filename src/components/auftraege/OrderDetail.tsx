@@ -21,7 +21,7 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
   const [edit, setEdit] = useState(defaultEdit ?? false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<OrderStatus>(order.status);
-  const [bs, setBs] = useState((order.beanstandungen ?? ['']).filter((b) => !b.trim().toLowerCase().startsWith('offerte')));
+  const [bs, setBs] = useState((order.beanstandungen ?? ['']).filter((b) => !b.trim().toLowerCase().includes('offerte')));
   const [notizen, setNotizen] = useState(order.notizen ?? '');
   const [items] = useState<OrderItem[]>(order.offertItems ?? []);
   const offB = order.offertBetrag ?? '';
@@ -136,7 +136,7 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
       ) : (
         <div className="inset-grouped-list" style={{ marginBottom: 16 }}>
           {(order.beanstandungen ?? [])
-            .filter((b) => b.trim() !== '' && !b.trim().toLowerCase().startsWith('offerte'))
+            .filter((b) => b.trim() !== '' && !b.trim().toLowerCase().includes('offerte'))
             .map((b, i) => (
               <div key={i} className="list-row" style={{ cursor: 'default' }}>
                 <span style={{ fontWeight: 600, color: 'var(--blue)', marginRight: 8, fontSize: 13 }}>{i + 1}.</span>
