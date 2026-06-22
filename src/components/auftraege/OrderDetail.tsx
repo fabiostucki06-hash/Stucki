@@ -82,7 +82,7 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
         <Badge status={status} />
-        <span style={{ fontSize: 13, color: 'var(--label3)' }}>{d < 1 ? `${hh} Std.` : `${d} Tage`}</span>
+        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--label2)' }}>{d < 1 ? `${hh} Std.` : `${d} Tage`}</span>
         {saving && <Spinner size={16} />}
       </div>
 
@@ -159,7 +159,7 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
                 <div key={i} className="list-row" style={{ cursor: 'default' }}>
                   <div style={{ flex: 1 }}>
                     <div className="sf-subhead">{pos.beschreibung}</div>
-                    <div style={{ fontSize: 11, color: 'var(--label3)', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--label2)', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       {ap
                         ? `Arbeit${ap.ze ? ` · ${ap.ze} ZE` : ''}${ap.stundenansatz ? ` · CHF ${ap.stundenansatz}/Std` : ''}`
                         : `Material${mp?.menge ? ` · ${mp.menge}×` : ''}${mp?.stueckpreis ? ` · CHF ${mp.stueckpreis}/Stk` : ''}`
@@ -187,8 +187,8 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
         <div className="form-section" style={{ marginBottom: 20 }}>
           <div style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--label3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>Rechnungsbetrag</div>
-              <div style={{ fontSize: 13, color: 'var(--label3)' }}>Gesamtbetrag in CHF</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--label2)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>Rechnungsbetrag</div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--label2)' }}>Gesamtbetrag in CHF</div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--label2)' }}>CHF</span>
@@ -206,21 +206,21 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
         </div>
       ) : (
         <div style={{
-          background: 'rgba(255,255,255,0.45)',
-          backdropFilter: 'blur(20px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-          border: '1px solid rgba(255,255,255,0.60)',
+          background: 'rgba(255,255,255,0.10)',
+          backdropFilter: 'blur(64px) saturate(240%)',
+          WebkitBackdropFilter: 'blur(64px) saturate(240%)',
+          border: '1px solid rgba(255,255,255,0.20)',
           borderRadius: 16,
           padding: '20px 22px',
           marginBottom: 20,
-          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.70), 0 8px 32px 0 rgba(0,0,0,0.08)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.65), 0 8px 32px rgba(0,0,0,0.08)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
         }}>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--label3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Total Rechnung</div>
-            <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: '-0.5px', color: recB ? 'var(--blue)' : 'var(--label3)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--label2)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6, textShadow: '0 1px 2px rgba(255,255,255,0.75)' }}>Total Rechnung</div>
+            <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: '-0.5px', color: recB ? 'var(--blue)' : 'var(--label2)' }}>
               {recB ? `CHF ${recB}` : '–'}
             </div>
           </div>

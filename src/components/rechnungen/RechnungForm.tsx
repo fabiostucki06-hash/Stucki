@@ -228,7 +228,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
     });
   }
 
-  const hdrTxt: React.CSSProperties = { fontSize: 9, fontWeight: 700, color: 'rgba(60,60,67,0.40)', textTransform: 'uppercase', letterSpacing: '0.07em' };
+  const hdrTxt: React.CSSProperties = { fontSize: 10, fontWeight: 700, color: 'var(--label2)', textTransform: 'uppercase', letterSpacing: '0.07em', textShadow: '0 1px 2px rgba(255,255,255,0.75)' };
 
   return (
     <div>
@@ -259,7 +259,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
           const aCount = pos.filter((p) => p.typ === 'arbeit').length;
           const mCount = pos.filter((p) => p.typ === 'material').length;
           return (
-            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--label3)' }}>
+            <div style={{ marginTop: 6, fontSize: 11, fontWeight: 500, color: 'var(--label2)' }}>
               {aCount + mCount > 0
                 ? `${aCount} Arbeit${aCount !== 1 ? 's' : ''}position${aCount !== 1 ? 'en' : ''} und ${mCount} Materialposition${mCount !== 1 ? 'en' : ''} übernommen.`
                 : 'Kunde übernommen — Auftrag enthält keine Positionen.'}
@@ -293,7 +293,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
           const aCount = pos.filter((p) => p.typ === 'arbeit').length;
           const mCount = pos.filter((p) => p.typ === 'material').length;
           return (
-            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--label3)' }}>
+            <div style={{ marginTop: 6, fontSize: 11, fontWeight: 500, color: 'var(--label2)' }}>
               {aCount + mCount > 0
                 ? `${aCount} Arbeit${aCount !== 1 ? 's' : ''}position${aCount !== 1 ? 'en' : ''} und ${mCount} Materialposition${mCount !== 1 ? 'en' : ''} übernommen.`
                 : 'Kunde übernommen — Offerte enthält keine Positionen.'}

@@ -135,7 +135,7 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
     });
   }
 
-  const hdrTxt: React.CSSProperties = { fontSize: 9, fontWeight: 700, color: 'rgba(60,60,67,0.40)', textTransform: 'uppercase', letterSpacing: '0.07em' };
+  const hdrTxt: React.CSSProperties = { fontSize: 10, fontWeight: 700, color: 'var(--label2)', textTransform: 'uppercase', letterSpacing: '0.07em', textShadow: '0 1px 2px rgba(255,255,255,0.75)' };
 
   return (
     <div>
