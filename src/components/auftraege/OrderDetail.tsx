@@ -135,7 +135,7 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
         </div>
       ) : (
         <div className="inset-grouped-list" style={{ marginBottom: 16 }}>
-          {(order.beanstandungen ?? []).map((b, i) => (
+          {(order.beanstandungen ?? []).filter((b) => !b.trim().toLowerCase().startsWith('offerte')).map((b, i) => (
             <div key={i} className="list-row" style={{ cursor: 'default' }}>
               <span style={{ fontWeight: 600, color: 'var(--blue)', marginRight: 8, fontSize: 13 }}>#{i + 1}</span>
               <span className="sf-subhead">{b}</span>
