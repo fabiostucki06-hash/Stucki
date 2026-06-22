@@ -35,7 +35,7 @@ function drawDoc(doc: jsPDF, order: Order, customer: Customer | undefined) {
   const vehicle = [customer?.marke, customer?.modell].filter(Boolean).join(' ');
   const owner   = customer ? `${customer.vorname} ${customer.nachname}` : '';
 
-  const bItems  = (order.beanstandungen ?? []).filter(Boolean);
+  const bItems  = (order.beanstandungen ?? []).filter((b) => b && !b.trim().toLowerCase().startsWith('offerte'));
   const oItems  = (order.offertItems ?? []).map(i => i.text).filter(Boolean);
   const aPos    = (order.positionen ?? []).filter(p => p.typ === 'arbeit') as ArbeitPosition[];
   const hasPosi = aPos.length > 0;
