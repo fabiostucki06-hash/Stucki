@@ -21,7 +21,7 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
   const [edit, setEdit] = useState(defaultEdit ?? false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<OrderStatus>(order.status);
-  const [bs, setBs] = useState(order.beanstandungen ?? ['']);
+  const [bs, setBs] = useState((order.beanstandungen ?? ['']).filter((b) => !b.trim().toLowerCase().startsWith('offerte')));
   const [notizen, setNotizen] = useState(order.notizen ?? '');
   const [items] = useState<OrderItem[]>(order.offertItems ?? []);
   const offB = order.offertBetrag ?? '';
