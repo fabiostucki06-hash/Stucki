@@ -63,7 +63,7 @@ function drawDoc(doc: jsPDF, order: Order, customer: Customer | undefined) {
 
   norm(); fs(9);
   tL('Auftragsnummer', ML, y + 11);
-  tL(order.orderNumber ?? '', ML + 38, y + 11);
+  tL(String(order.orderNumber ?? ''), ML + 38, y + 11);
 
   tR(CO_NAME,  PW - ML, y + 4);
   tR(CO_ADDR,  PW - ML, y + 8.5);

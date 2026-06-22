@@ -79,7 +79,7 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined) {
 
   norm(); fs(9);
   tL('Offertennummer', ML, y + 11);
-  tL(offerte.offertNumber ?? '', ML + 38, y + 11);
+  tL(String(offerte.offertNumber ?? ''), ML + 38, y + 11);
 
   // Company block (right-aligned)
   tR(CO_NAME,  PW - ML, y + 4);

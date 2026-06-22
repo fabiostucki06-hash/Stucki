@@ -79,7 +79,7 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
 
   norm(); fs(9);
   tL('Rechnungsnummer', ML, y + 11);
-  tL(rechnung.rechnungNumber ?? '', ML + 38, y + 11);
+  tL(String(rechnung.rechnungNumber ?? ''), ML + 38, y + 11);
 
   tR(CO_NAME,  PW - ML, y + 4);
   tR(CO_ADDR,  PW - ML, y + 8.5);
