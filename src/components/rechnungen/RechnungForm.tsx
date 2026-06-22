@@ -82,91 +82,66 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
     : [];
 
   const sortedAuftraege = [...orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  const sortedOfferten = [...offerten].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const sortedOfferten  = [...offerten].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  /* ── Select an Auftrag: pre-fill customer and all positions ── */
   function onAuftragSelect(auftragId: string) {
     setSelectedAuftragId(auftragId);
     setSelectedOfferteId('');
     if (!auftragId) return;
     const auftrag = orders.find((o) => o.id === auftragId);
     if (!auftrag) return;
-
     setCid(auftrag.customerId);
-
     const positions = auftrag.positionen ?? [];
-
     const arbeitRows: ArbeitRow[] = positions
       .filter((p): p is ArbeitPosition => p.typ === 'arbeit')
       .map((p) => {
-        const ze = parseFloat(p.ze) || 0;
-        const sa = parseFloat(p.stundenansatz || '80') || 80;
-        const preis = p.preis || (ze && sa ? ((ze / 100) * sa).toFixed(2) : '');
-        return { ...p, stundenansatz: String(sa), preis, zeLoading: false, zeHint: p.zeHint ?? '' };
+        const ze = parseFloat(p.ze) || 0; const sa = parseFloat(p.stundenansatz || '80') || 80;
+        return { ...p, stundenansatz: String(sa), preis: p.preis || (ze && sa ? ((ze / 100) * sa).toFixed(2) : ''), zeLoading: false, zeHint: p.zeHint ?? '' };
       });
-
     const materialRows: MaterialRow[] = positions
       .filter((p): p is MaterialPosition => p.typ === 'material')
       .map((p) => {
-        const mg = parseFloat(p.menge) || 1;
-        const sp = parseFloat(p.stueckpreis) || 0;
-        const preis = p.preis || (sp ? (sp * mg).toFixed(2) : '');
-        return { ...p, preis };
+        const mg = parseFloat(p.menge) || 1; const sp = parseFloat(p.stueckpreis) || 0;
+        return { ...p, preis: p.preis || (sp ? (sp * mg).toFixed(2) : '') };
       });
-
     setArbeit(arbeitRows.length ? arbeitRows : [newArbeit()]);
     setMaterial(materialRows.length ? materialRows : [newMaterial()]);
-
     if (arbeitRows.length > 0) setTab('arbeit');
     else if (materialRows.length > 0) setTab('material');
   }
 
-  /* ── Select an Offerte: pre-fill customer, titel, and all positions ── */
   function onOfferteSelect(offerteId: string) {
     setSelectedOfferteId(offerteId);
     setSelectedAuftragId('');
     if (!offerteId) return;
     const off = offerten.find((o) => o.id === offerteId);
     if (!off) return;
-
     setCid(off.customerId);
     if (!initial?.titel) setTitel(off.titel ?? `Offerte #${off.offertNumber}`);
-
     const positions = off.positionen ?? [];
-
     const arbeitRows: ArbeitRow[] = positions
       .filter((p): p is ArbeitPosition => p.typ === 'arbeit')
       .map((p) => {
-        const ze = parseFloat(p.ze) || 0;
-        const sa = parseFloat(p.stundenansatz || '80') || 80;
-        const preis = p.preis || (ze && sa ? ((ze / 100) * sa).toFixed(2) : '');
-        return { ...p, stundenansatz: String(sa), preis, zeLoading: false, zeHint: p.zeHint ?? '' };
+        const ze = parseFloat(p.ze) || 0; const sa = parseFloat(p.stundenansatz || '80') || 80;
+        return { ...p, stundenansatz: String(sa), preis: p.preis || (ze && sa ? ((ze / 100) * sa).toFixed(2) : ''), zeLoading: false, zeHint: p.zeHint ?? '' };
       });
-
     const materialRows: MaterialRow[] = positions
       .filter((p): p is MaterialPosition => p.typ === 'material')
       .map((p) => {
-        const mg = parseFloat(p.menge) || 1;
-        const sp = parseFloat(p.stueckpreis) || 0;
-        const preis = p.preis || (sp ? (sp * mg).toFixed(2) : '');
-        return { ...p, preis };
+        const mg = parseFloat(p.menge) || 1; const sp = parseFloat(p.stueckpreis) || 0;
+        return { ...p, preis: p.preis || (sp ? (sp * mg).toFixed(2) : '') };
       });
-
     setArbeit(arbeitRows.length ? arbeitRows : [newArbeit()]);
     setMaterial(materialRows.length ? materialRows : [newMaterial()]);
-
-    // Switch to the tab that has imported content so the user sees it immediately
     if (arbeitRows.length > 0) setTab('arbeit');
     else if (materialRows.length > 0) setTab('material');
   }
 
-  /* ── Zahlungsfrist change ── */
   function handleZahlungsFristChange(val: string) {
     setZahlungsFrist(val);
     setFaelligAm(calcFaelligAm(val));
   }
 
-  /* ── Arbeit mutations ── */
   const addA = () => setArbeit((a) => [...a, newArbeit()]);
   const remA = (i: number) => setArbeit((a) => a.filter((_, j) => j !== i));
   const updA = (i: number, k: string, v: string) => setArbeit((a) => {
@@ -197,7 +172,6 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
     }
   };
 
-  /* ── Material mutations ── */
   const addM = () => setMaterial((m) => [...m, newMaterial()]);
   const remM = (i: number) => setMaterial((m) => m.filter((_, j) => j !== i));
   const updM = (i: number, k: string, v: string) => setMaterial((m) => {
@@ -228,88 +202,109 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
     });
   }
 
-  const hdrTxt: React.CSSProperties = { fontSize: 10, fontWeight: 700, color: 'var(--label2)', textTransform: 'uppercase', letterSpacing: '0.07em', textShadow: '0 1px 3px rgba(0,0,0,0.30)' };
+  /* ── shared style tokens ── */
+  const gc: React.CSSProperties = {
+    background: 'rgba(255,255,255,0.10)',
+    backdropFilter: 'blur(64px) saturate(240%)',
+    WebkitBackdropFilter: 'blur(64px) saturate(240%)',
+    border: '1px solid rgba(255,255,255,0.20)',
+    borderRadius: 18,
+    padding: '16px 18px',
+    marginBottom: 14,
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.65), 0 4px 24px rgba(0,0,0,0.06)',
+  };
+  const gcHdr: React.CSSProperties = {
+    fontSize: 11, fontWeight: 700, color: 'var(--label2)',
+    textTransform: 'uppercase', letterSpacing: '0.08em',
+    marginBottom: 13, display: 'block',
+    textShadow: '0 1px 3px rgba(0,0,0,0.30)',
+  };
+  const hdrTxt: React.CSSProperties = {
+    fontSize: 9.5, fontWeight: 700, color: 'var(--label2)',
+    textTransform: 'uppercase', letterSpacing: '0.07em',
+    textShadow: '0 1px 3px rgba(0,0,0,0.30)',
+  };
+
+  const arbeitCount   = arbeit.filter((p) => p.beschreibung).length;
+  const materialCount = material.filter((p) => p.beschreibung).length;
+
+  /* import status summary */
+  const importActive = selectedAuftragId || selectedOfferteId;
+  const importPos = importActive
+    ? (selectedAuftragId
+        ? (orders.find((x) => x.id === selectedAuftragId)?.positionen ?? [])
+        : (offerten.find((o) => o.id === selectedOfferteId)?.positionen ?? []))
+    : [];
+  const importACount = importPos.filter((p) => p.typ === 'arbeit').length;
+  const importMCount = importPos.filter((p) => p.typ === 'material').length;
 
   return (
     <div>
 
-      {/* ── Aus Auftrag befüllen ── */}
-      <div className="mf-section">
-        <span className="mf-section-label">Aus Auftrag befüllen</span>
-        <select
-          className="mf-select"
-          value={selectedAuftragId}
-          onChange={(e) => onAuftragSelect(e.target.value)}
-          style={{ color: selectedAuftragId ? 'var(--label)' : 'var(--label3)' }}
-        >
-          <option value="">Auftrag auswählen…</option>
-          {sortedAuftraege.map((o) => {
-            const c = customers.find((cu) => cu.id === o.customerId);
-            const hasPos = (o.positionen ?? []).length > 0;
-            return (
-              <option key={o.id} value={o.id}>
-                Auftrag #{o.orderNumber}{hasPos ? '' : ' (keine Pos.)'} · {c ? `${c.vorname} ${c.nachname}` : '?'}
-              </option>
-            );
-          })}
-        </select>
-        {selectedAuftragId && (() => {
-          const o = orders.find((x) => x.id === selectedAuftragId);
-          const pos = o?.positionen ?? [];
-          const aCount = pos.filter((p) => p.typ === 'arbeit').length;
-          const mCount = pos.filter((p) => p.typ === 'material').length;
-          return (
-            <div style={{ marginTop: 6, fontSize: 11, fontWeight: 500, color: 'var(--label2)' }}>
-              {aCount + mCount > 0
-                ? `${aCount} Arbeit${aCount !== 1 ? 's' : ''}position${aCount !== 1 ? 'en' : ''} und ${mCount} Materialposition${mCount !== 1 ? 'en' : ''} übernommen.`
-                : 'Kunde übernommen — Auftrag enthält keine Positionen.'}
-            </div>
-          );
-        })()}
-      </div>
-
-      {/* ── Aus Offerte befüllen ── */}
-      <div className="mf-section">
-        <span className="mf-section-label">Aus Offerte befüllen (optional)</span>
-        <select
-          className="mf-select"
-          value={selectedOfferteId}
-          onChange={(e) => onOfferteSelect(e.target.value)}
-          style={{ color: selectedOfferteId ? 'var(--label)' : 'var(--label3)' }}
-        >
-          <option value="">Offerte auswählen…</option>
-          {sortedOfferten.map((off) => {
-            const c = customers.find((cu) => cu.id === off.customerId);
-            return (
-              <option key={off.id} value={off.id}>
-                Offerte #{off.offertNumber}{off.titel ? ` – ${off.titel}` : ''} · {c ? `${c.vorname} ${c.nachname}` : '?'} · CHF {parseFloat(off.totalBetrag || '0').toFixed(2)}
-              </option>
-            );
-          })}
-        </select>
-        {selectedOfferteId && (() => {
-          const off = offerten.find((o) => o.id === selectedOfferteId);
-          const pos = off?.positionen ?? [];
-          const aCount = pos.filter((p) => p.typ === 'arbeit').length;
-          const mCount = pos.filter((p) => p.typ === 'material').length;
-          return (
-            <div style={{ marginTop: 6, fontSize: 11, fontWeight: 500, color: 'var(--label2)' }}>
-              {aCount + mCount > 0
-                ? `${aCount} Arbeit${aCount !== 1 ? 's' : ''}position${aCount !== 1 ? 'en' : ''} und ${mCount} Materialposition${mCount !== 1 ? 'en' : ''} übernommen.`
-                : 'Kunde übernommen — Offerte enthält keine Positionen.'}
-            </div>
-          );
-        })()}
-      </div>
-
-      {/* ── Kunde & Details ── */}
-      <div className="mf-section">
-        <span className="mf-section-label">Kunde &amp; Details</span>
-        <div className="mf-row-2" style={{ marginBottom: 14 }}>
-          <div>
-            <label className="mf-label">Kunde *</label>
+      {/* ── Section 1: Import aus Auftrag / Offerte ── */}
+      <div style={gc}>
+        <span style={gcHdr}>Aus bestehendem Dokument befüllen</span>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="cf-field">
+            <label className="cf-label">Aus Auftrag</label>
             <select
-              className="mf-select"
+              className="cf-select"
+              value={selectedAuftragId}
+              onChange={(e) => onAuftragSelect(e.target.value)}
+              style={{ color: selectedAuftragId ? 'var(--label)' : 'var(--label3)' }}
+            >
+              <option value="">Auftrag wählen…</option>
+              {sortedAuftraege.map((o) => {
+                const c = customers.find((cu) => cu.id === o.customerId);
+                const hasPos = (o.positionen ?? []).length > 0;
+                return (
+                  <option key={o.id} value={o.id}>
+                    #{o.orderNumber}{hasPos ? '' : ' (keine Pos.)'} · {c ? `${c.vorname} ${c.nachname}` : '?'}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+          <div className="cf-field">
+            <label className="cf-label">Aus Offerte (optional)</label>
+            <select
+              className="cf-select"
+              value={selectedOfferteId}
+              onChange={(e) => onOfferteSelect(e.target.value)}
+              style={{ color: selectedOfferteId ? 'var(--label)' : 'var(--label3)' }}
+            >
+              <option value="">Offerte wählen…</option>
+              {sortedOfferten.map((off) => {
+                const c = customers.find((cu) => cu.id === off.customerId);
+                return (
+                  <option key={off.id} value={off.id}>
+                    #{off.offertNumber}{off.titel ? ` – ${off.titel}` : ''} · {c ? `${c.vorname} ${c.nachname}` : '?'} · CHF {parseFloat(off.totalBetrag || '0').toFixed(2)}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+        </div>
+        {importActive && (
+          <div style={{ marginTop: 10, fontSize: 11, fontWeight: 600, color: 'var(--blue)', padding: '7px 10px', background: 'rgba(0,122,255,0.10)', borderRadius: 8, border: '1px solid rgba(0,122,255,0.20)' }}>
+            {selectedAuftragId ? 'Auftrag' : 'Offerte'} importiert —{' '}
+            {importACount + importMCount > 0
+              ? `${importACount} Arbeits- + ${importMCount} Materialpos. übernommen`
+              : 'Kunde übernommen, keine Positionen'}
+          </div>
+        )}
+      </div>
+
+      {/* ── Section 2: Kunde & Details ── */}
+      <div style={gc}>
+        <span style={gcHdr}>Kunde &amp; Details</span>
+
+        {/* 2/3 Kunde + 1/3 Fällig am */}
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12, marginBottom: 12 }}>
+          <div className="cf-field">
+            <label className="cf-label">Kunde *</label>
+            <select
+              className="cf-select"
               value={cid}
               onChange={(e) => setCid(e.target.value)}
               style={{ color: cid ? 'var(--label)' : 'var(--label3)' }}
@@ -320,73 +315,80 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
               ))}
             </select>
           </div>
-          <div>
-            <label className="mf-label">Fällig am</label>
-            <input className="mf-input" type="date" value={faelligAm} onChange={(e) => setFaelligAm(e.target.value)} />
+          <div className="cf-field">
+            <label className="cf-label">Fällig am</label>
+            <input className="cf-input" type="date" value={faelligAm} onChange={(e) => setFaelligAm(e.target.value)} />
           </div>
         </div>
 
         {vehicleChips.length > 0 && (
-          <div className="mf-chips">
+          <div className="mf-chips" style={{ marginBottom: 10 }}>
             <span style={{ fontSize: 11 }}>🚗</span>
             {vehicleChips.map((v, i) => <span key={i} className="mf-chip">{v}</span>)}
           </div>
         )}
 
-        <div style={{ marginTop: vehicleChips.length ? 12 : 0 }}>
-          <label className="mf-label">Betreff</label>
-          <input className="mf-input" value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="z.B. Inspektion, Reparatur…" />
+        <div className="cf-field" style={{ marginBottom: 12 }}>
+          <label className="cf-label">Betreff</label>
+          <input className="cf-input" value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="z.B. Inspektion, Reparatur…" />
         </div>
 
-        <div style={{ marginTop: 12 }}>
-          <label className="mf-label">Zahlungsfrist (Tage)</label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label className="cf-label" style={{ marginBottom: 0, whiteSpace: 'nowrap' }}>Zahlungsfrist</label>
           <input
-            className="mf-input"
+            className="cf-input"
             type="number"
             value={zahlungsFrist}
             onChange={(e) => handleZahlungsFristChange(e.target.value)}
             placeholder="30"
             min={1}
-            style={{ width: 80 }}
+            style={{ width: 72, flex: 'none' }}
           />
+          <span style={{ fontSize: 13, color: 'var(--label2)', whiteSpace: 'nowrap' }}>Tage</span>
         </div>
       </div>
 
-      {/* ── Totals ── */}
-      <div className="mf-totals">
-        {([
-          ['Arbeit',   fCHF(totA),        totZE ? `${totZE} ZE` : null, 'var(--blue)'],
-          ['Material', fCHF(totM),        null,                          'var(--green)'],
-          ['Total',    fCHF(totA + totM), null,                          'var(--indigo)'],
-        ] as [string, string, string | null, string][]).map(([l, v, sub, c]) => (
-          <div key={l} className="mf-total-pill">
-            <div className="mf-total-name">{l}</div>
-            <div className="mf-total-val" style={{ color: c }}>{v}</div>
-            {sub && <div className="mf-total-sub">{sub}</div>}
-          </div>
-        ))}
-      </div>
+      {/* ── Section 3: Positionen ── */}
+      <div style={gc}>
+        <span style={gcHdr}>Positionen</span>
 
-      {/* ── Positionen ── */}
-      <div className="mf-section">
-        <span className="mf-section-label">Positionen</span>
-
-        <div className="doc-tab-bar" style={{ marginBottom: 10 }}>
-          {(['arbeit', 'material'] as const).map((t) => (
-            <button key={t} className={`doc-tab${tab === t ? ' dt-active' : ''}`} onClick={() => setTab(t)} aria-pressed={tab === t}>
-              {t === 'arbeit' ? (
-                <><svg width={13} height={13} viewBox="0 0 15 15" fill="none" aria-hidden="true"><path d="M9.5 3.5a3.5 3.5 0 01-4.9 4.9L2 11a1.2 1.2 0 001.7 1.7L6.2 10A3.5 3.5 0 019.5 3.5zm.7-.7l-2 2 .8.8 2-2-.8-.8z" stroke="currentColor" strokeWidth={1.2} strokeLinejoin="round" strokeLinecap="round"/></svg>Arbeit</>
-              ) : (
-                <><svg width={13} height={13} viewBox="0 0 15 15" fill="none" aria-hidden="true"><rect x={2} y={4} width={11} height={9} rx={1.5} stroke="currentColor" strokeWidth={1.2}/><path d="M5 4V3a2 2 0 014 0v1" stroke="currentColor" strokeWidth={1.2} strokeLinecap="round"/></svg>Material</>
-              )}
-              <span className={`doc-tab-count${(t === 'arbeit' ? arbeit : material).filter((p) => p.beschreibung).length ? ' has-items' : ''}`}>
-                {(t === 'arbeit' ? arbeit : material).filter((p) => p.beschreibung).length}
-              </span>
-            </button>
-          ))}
+        {/* iOS Segmented Control */}
+        <div className="seg-ctrl" style={{ width: '100%', marginBottom: 14 }}>
+          {(['arbeit', 'material'] as const).map((t) => {
+            const cnt = t === 'arbeit' ? arbeitCount : materialCount;
+            const isActive = tab === t;
+            return (
+              <button
+                key={t}
+                className={`seg-item${isActive ? ' active' : ''}`}
+                onClick={() => setTab(t)}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+              >
+                {t === 'arbeit' ? (
+                  <svg width={12} height={12} viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                    <path d="M9.5 3.5a3.5 3.5 0 01-4.9 4.9L2 11a1.2 1.2 0 001.7 1.7L6.2 10A3.5 3.5 0 019.5 3.5zm.7-.7l-2 2 .8.8 2-2-.8-.8z" stroke="currentColor" strokeWidth={1.2} strokeLinejoin="round" strokeLinecap="round" />
+                  </svg>
+                ) : (
+                  <svg width={12} height={12} viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                    <rect x={2} y={4} width={11} height={9} rx={1.5} stroke="currentColor" strokeWidth={1.2} />
+                    <path d="M5 4V3a2 2 0 014 0v1" stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" />
+                  </svg>
+                )}
+                {t === 'arbeit' ? 'Arbeit' : 'Material'}
+                {cnt > 0 && (
+                  <span style={{
+                    background: isActive ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.18)',
+                    borderRadius: 9, minWidth: 18, height: 18, fontSize: 10, fontWeight: 700,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px',
+                  }}>
+                    {cnt}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        <div className="mf-card">
         {/* Arbeit rows */}
         {tab === 'arbeit' && (
           <>
@@ -402,21 +404,12 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
             {arbeit.map((pos, i) => (
               <div key={i} className="mf-pos-row">
                 <span className="mf-pos-idx">{i + 1}</span>
-                <input
-                  className="mf-pos-desc"
-                  value={pos.beschreibung}
-                  onChange={(e) => updA(i, 'beschreibung', e.target.value)}
-                  placeholder="Arbeitsschritt…"
-                />
+                <input className="mf-pos-desc" value={pos.beschreibung} onChange={(e) => updA(i, 'beschreibung', e.target.value)} placeholder="Arbeitsschritt…" />
                 <input
                   className="mf-pos-num"
                   style={{ width: 42, color: pos.zeKI ? 'var(--teal)' : undefined, fontWeight: pos.zeKI ? 700 : undefined }}
-                  type="number"
-                  value={pos.ze}
-                  onChange={(e) => updA(i, 'ze', e.target.value)}
-                  placeholder="—"
-                  min={0}
-                  title={pos.zeHint || undefined}
+                  type="number" value={pos.ze} onChange={(e) => updA(i, 'ze', e.target.value)}
+                  placeholder="—" min={0} title={pos.zeHint || undefined}
                 />
                 <button
                   className={`mf-pos-ki${pos.zeKI ? ' ki-active' : ''}`}
@@ -427,21 +420,13 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
                 >
                   {pos.zeLoading ? <Spinner size={10} /> : '✦'}
                 </button>
-                <input
-                  className="mf-pos-num"
-                  style={{ width: 50 }}
-                  type="number"
-                  value={pos.stundenansatz}
-                  onChange={(e) => updA(i, 'stundenansatz', e.target.value)}
-                  placeholder="80"
-                />
+                <input className="mf-pos-num" style={{ width: 50 }} type="number" value={pos.stundenansatz} onChange={(e) => updA(i, 'stundenansatz', e.target.value)} placeholder="80" />
                 <span className="mf-pos-total" style={{ color: 'var(--blue)', width: 68 }}>
                   {pos.preis ? fCHF(parseFloat(pos.preis)) : '—'}
                 </span>
                 {arbeit.length > 1
                   ? <button className="mf-pos-del" onClick={() => remA(i)}><SFXmark /></button>
-                  : <span style={{ width: 22 }} />
-                }
+                  : <span style={{ width: 22 }} />}
               </div>
             ))}
             <button className="mf-add-pos" onClick={addA}><SFPlus size={12} /> Arbeitsposition</button>
@@ -462,61 +447,73 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
             {material.map((pos, i) => (
               <div key={i} className="mf-pos-row">
                 <span className="mf-pos-idx">{i + 1}</span>
-                <input
-                  className="mf-pos-desc"
-                  value={pos.beschreibung}
-                  onChange={(e) => updM(i, 'beschreibung', e.target.value)}
-                  placeholder="Ersatzteil / Material…"
-                />
-                <input
-                  className="mf-pos-num"
-                  style={{ width: 44 }}
-                  type="number"
-                  value={pos.menge}
-                  onChange={(e) => updM(i, 'menge', e.target.value)}
-                  min={1}
-                />
-                <input
-                  className="mf-pos-num"
-                  style={{ width: 64 }}
-                  type="number"
-                  value={pos.stueckpreis}
-                  onChange={(e) => updM(i, 'stueckpreis', e.target.value)}
-                  placeholder="0.00"
-                />
+                <input className="mf-pos-desc" value={pos.beschreibung} onChange={(e) => updM(i, 'beschreibung', e.target.value)} placeholder="Ersatzteil / Material…" />
+                <input className="mf-pos-num" style={{ width: 44 }} type="number" value={pos.menge} onChange={(e) => updM(i, 'menge', e.target.value)} min={1} />
+                <input className="mf-pos-num" style={{ width: 64 }} type="number" value={pos.stueckpreis} onChange={(e) => updM(i, 'stueckpreis', e.target.value)} placeholder="0.00" />
                 <span className="mf-pos-total" style={{ color: 'var(--green)', width: 68 }}>
                   {pos.preis ? fCHF(parseFloat(pos.preis)) : '—'}
                 </span>
                 {material.length > 1
                   ? <button className="mf-pos-del" onClick={() => remM(i)}><SFXmark /></button>
-                  : <span style={{ width: 22 }} />
-                }
+                  : <span style={{ width: 22 }} />}
               </div>
             ))}
             <button className="mf-add-pos green" onClick={addM}><SFPlus size={12} /> Materialposition</button>
           </>
         )}
+
+        {/* ── Totals summary ── */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8,
+          marginTop: 14, paddingTop: 12,
+          borderTop: '0.5px solid var(--sep)',
+        }}>
+          {([
+            ['Arbeit',   fCHF(totA),        totZE ? `${totZE} ZE` : null, 'var(--blue)'],
+            ['Material', fCHF(totM),        null,                          'var(--green)'],
+            ['Total',    fCHF(totA + totM), null,                          'var(--indigo)'],
+          ] as [string, string, string | null, string][]).map(([l, v, sub, c]) => (
+            <div key={l} style={{
+              textAlign: 'center', padding: '10px 6px',
+              background: 'rgba(255,255,255,0.07)',
+              backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
+              border: '1px solid rgba(255,255,255,0.14)',
+              borderRadius: 12,
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35)',
+            }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--label2)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3, textShadow: '0 1px 3px rgba(0,0,0,0.30)' }}>{l}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.25px', color: c, textShadow: '0 1px 3px rgba(0,0,0,0.20)', whiteSpace: 'nowrap' }}>{v}</div>
+              {sub && <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--label2)', marginTop: 2 }}>{sub}</div>}
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* ── Notizen ── */}
-      <div className="mf-section">
-        <span className="mf-section-label">Notizen</span>
+      {/* ── Section 4: Notizen ── */}
+      <div style={gc}>
+        <span style={gcHdr}>Notizen</span>
         <textarea
-          className="mf-textarea"
+          className="cf-textarea"
           value={notizen}
           onChange={(e) => setNotizen(e.target.value)}
           placeholder="Interne Notizen zur Rechnung…"
           rows={3}
+          style={{ marginBottom: 0 }}
         />
       </div>
 
-      {/* ── Actions ── */}
-      <div className="mf-actions">
-        <button className="mf-btn-save" onClick={submit}>
+      {/* ── Actions: side-by-side ── */}
+      <div style={{ display: 'flex', gap: 10, paddingTop: 4, paddingBottom: 8 }}>
+        <button
+          className="mf-btn-cancel"
+          onClick={onCancel}
+          style={{ flex: '0 0 auto', width: 110, height: 50, borderRadius: 14, fontSize: 15 }}
+        >
+          Abbrechen
+        </button>
+        <button className="mf-btn-save" onClick={submit} style={{ flex: 1, height: 50 }}>
           {initial ? 'Änderungen speichern' : 'Rechnung erstellen'}
         </button>
-        <button className="mf-btn-cancel" onClick={onCancel}>Abbrechen</button>
       </div>
 
     </div>
