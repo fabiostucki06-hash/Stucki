@@ -72,6 +72,7 @@ export default function OrderForm({ customers, customerId: preCid, onSave, onCan
       {/* ── Beanstandungen ── */}
       <div className="mf-section">
         <span className="mf-section-label">Beanstandungen</span>
+        <div className="mf-card">
         {bs.map((b, i) => (
           <div key={i} className="mf-bean-row">
             <span className="mf-bean-idx">{i + 1}</span>
@@ -87,6 +88,7 @@ export default function OrderForm({ customers, customerId: preCid, onSave, onCan
           </div>
         ))}
         <button className="mf-add-bean" onClick={addB}><SFPlus size={12} /> Beanstandung hinzufügen</button>
+        </div>
       </div>
 
       {/* ── Notizen ── */}

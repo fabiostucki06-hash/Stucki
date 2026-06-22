@@ -135,7 +135,7 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
     });
   }
 
-  const hdrTxt: React.CSSProperties = { fontSize: 9, fontWeight: 700, color: 'var(--label3)', textTransform: 'uppercase', letterSpacing: '0.07em' };
+  const hdrTxt: React.CSSProperties = { fontSize: 9, fontWeight: 700, color: 'rgba(60,60,67,0.40)', textTransform: 'uppercase', letterSpacing: '0.07em' };
 
   return (
     <div>
@@ -219,6 +219,7 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
           ))}
         </div>
 
+        <div className="mf-card">
         {/* Arbeit rows */}
         {tab === 'arbeit' && (
           <>
@@ -338,6 +339,7 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
             <button className="mf-add-pos green" onClick={addM}><SFPlus size={12} /> Materialposition</button>
           </>
         )}
+        </div>
       </div>
 
       {/* ── Notizen ── */}

@@ -35,7 +35,7 @@ export default function CustomerForm({ initial, onSave, onCancel, saving }: Cust
 
   return (
     <div>
-      <div className="cf-section-title">Kontakt</div>
+      <div className="cf-section-title" style={{ marginTop: 0 }}>Kontakt</div>
       <div className="cf-group">
         <div className="cf-grid-2">
           <div className="cf-field">
@@ -84,10 +84,10 @@ export default function CustomerForm({ initial, onSave, onCancel, saving }: Cust
       </div>
 
       <div className="cf-actions">
-        <button className="cf-btn-cancel" onClick={onCancel}>Abbrechen</button>
         <button className="cf-btn-save" onClick={submit} disabled={saving}>
           {saving ? 'Wird gespeichert…' : 'Sichern'}
         </button>
+        <button className="cf-btn-cancel" onClick={onCancel}>Abbrechen</button>
       </div>
     </div>
   );
