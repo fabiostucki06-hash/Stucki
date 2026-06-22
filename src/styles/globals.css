@@ -364,7 +364,7 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .mf-section{margin-bottom:22px}
 .mf-section-label{font-size:11px;font-weight:700;color:var(--label2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px;display:block;text-shadow:0 1px 3px rgba(0,0,0,0.30)}
 .mf-label{font-size:11px;font-weight:700;color:var(--label2);letter-spacing:0.01em;margin-bottom:3px;display:block;text-shadow:0 1px 3px rgba(0,0,0,0.30)}
-.mf-input,.mf-textarea{background:transparent;border:none;border-bottom:1px solid rgba(0,0,0,0.14);border-radius:0;padding:8px 0;font-size:15px;font-weight:500;font-family:inherit;color:var(--label);outline:none;width:100%;transition:border-color 0.18s;letter-spacing:-0.2px;display:block}
+.mf-input,.mf-textarea{background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.18);border-radius:0;padding:8px 0;font-size:15px;font-weight:500;font-family:inherit;color:var(--label);outline:none;width:100%;transition:border-color 0.18s;letter-spacing:-0.2px;display:block}
 .mf-input:focus,.mf-textarea:focus{border-bottom-color:var(--blue)}
 .mf-input::placeholder,.mf-textarea::placeholder{color:var(--label3)}
 .mf-textarea{resize:none;min-height:60px;line-height:1.55}

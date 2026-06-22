@@ -43,7 +43,7 @@ async function schaetzeZEmitKI(beschreibung: string, fz: string): Promise<{ ze: 
 
 const newArbeit   = (): ArbeitRow   => ({ typ: 'arbeit',   beschreibung: '', ze: '', stundenansatz: '80', preis: '', zeKI: false, zeLoading: false, zeHint: '' });
 const newMaterial = (): MaterialRow => ({ typ: 'material', beschreibung: '', menge: '1', stueckpreis: '', preis: '' });
-const fCHF = (n: number) => 'CHF ' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, "'");
+const fCHF = (n: number) => 'CHF ' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, "'");
 
 export default function OfferteForm({ customers, onSave, onCancel, initial }: OfferteFormProps) {
   const [cid,        setCid]        = useState(initial?.customerId ?? '');
@@ -68,7 +68,6 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
        selectedCustomer.km ? selectedCustomer.km + ' km' : ''].filter(Boolean)
     : [];
 
-  /* ── Arbeit mutations ── */
   const addA = () => setArbeit((a) => [...a, newArbeit()]);
   const remA = (i: number) => setArbeit((a) => a.filter((_, j) => j !== i));
   const updA = (i: number, k: string, v: string) => setArbeit((a) => {
@@ -99,7 +98,6 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
     }
   };
 
-  /* ── Material mutations ── */
   const addM = () => setMaterial((m) => [...m, newMaterial()]);
   const remM = (i: number) => setMaterial((m) => m.filter((_, j) => j !== i));
   const updM = (i: number, k: string, v: string) => setMaterial((m) => {
@@ -115,7 +113,6 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
   const totA  = arbeit.reduce((s, p) => s + (parseFloat(p.preis) || 0), 0);
   const totM  = material.reduce((s, p) => s + (parseFloat(p.preis) || 0), 0);
   const totZE = arbeit.reduce((s, p) => s + (parseFloat(p.ze) || 0), 0);
-
   const kleinteilActive = totZE > 100;
   const kleinteilBetrag = kleinteilActive ? 10 : 0;
   const totMeff = totM + kleinteilBetrag;
@@ -135,19 +132,45 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
     });
   }
 
-  const hdrTxt: React.CSSProperties = { fontSize: 10, fontWeight: 700, color: 'var(--label2)', textTransform: 'uppercase', letterSpacing: '0.07em', textShadow: '0 1px 3px rgba(0,0,0,0.30)' };
+  /* ── shared style tokens ── */
+  const gc: React.CSSProperties = {
+    background: 'rgba(255,255,255,0.10)',
+    backdropFilter: 'blur(64px) saturate(240%)',
+    WebkitBackdropFilter: 'blur(64px) saturate(240%)',
+    border: '1px solid rgba(255,255,255,0.20)',
+    borderRadius: 18,
+    padding: '16px 18px',
+    marginBottom: 14,
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.65), 0 4px 24px rgba(0,0,0,0.06)',
+  };
+  const gcHdr: React.CSSProperties = {
+    fontSize: 11, fontWeight: 700, color: 'var(--label2)',
+    textTransform: 'uppercase', letterSpacing: '0.08em',
+    marginBottom: 13, display: 'block',
+    textShadow: '0 1px 3px rgba(0,0,0,0.30)',
+  };
+  const hdrTxt: React.CSSProperties = {
+    fontSize: 9.5, fontWeight: 700, color: 'var(--label2)',
+    textTransform: 'uppercase', letterSpacing: '0.07em',
+    textShadow: '0 1px 3px rgba(0,0,0,0.30)',
+  };
+
+  const arbeitCount   = arbeit.filter((p) => p.beschreibung).length;
+  const materialCount = material.filter((p) => p.beschreibung).length;
 
   return (
     <div>
 
-      {/* ── Kunde & Details ── */}
-      <div className="mf-section">
-        <span className="mf-section-label">Kunde &amp; Details</span>
-        <div className="mf-row-2" style={{ marginBottom: 14 }}>
-          <div>
-            <label className="mf-label">Kunde *</label>
+      {/* ── Section 1: Kunde & Details ── */}
+      <div style={gc}>
+        <span style={gcHdr}>Kunde &amp; Details</span>
+
+        {/* 2/3 Kunde + 1/3 Datum */}
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12, marginBottom: 12 }}>
+          <div className="cf-field">
+            <label className="cf-label">Kunde *</label>
             <select
-              className="mf-select"
+              className="cf-select"
               value={cid}
               onChange={(e) => setCid(e.target.value)}
               style={{ color: cid ? 'var(--label)' : 'var(--label3)' }}
@@ -158,68 +181,66 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
               ))}
             </select>
           </div>
-          <div>
-            <label className="mf-label">Gültig bis</label>
-            <input className="mf-input" type="date" value={gueltigBis} onChange={(e) => setGueltigBis(e.target.value)} />
+          <div className="cf-field">
+            <label className="cf-label">Gültig bis</label>
+            <input className="cf-input" type="date" value={gueltigBis} onChange={(e) => setGueltigBis(e.target.value)} />
           </div>
         </div>
 
         {vehicleChips.length > 0 && (
-          <div className="mf-chips">
+          <div className="mf-chips" style={{ marginBottom: 10 }}>
             <span style={{ fontSize: 11 }}>🚗</span>
             {vehicleChips.map((v, i) => <span key={i} className="mf-chip">{v}</span>)}
           </div>
         )}
 
-        <div style={{ marginTop: vehicleChips.length ? 12 : 0 }}>
-          <label className="mf-label">Betreff</label>
-          <input className="mf-input" value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="z.B. Inspektion, Reparatur…" />
+        <div className="cf-field">
+          <label className="cf-label">Betreff</label>
+          <input className="cf-input" value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="z.B. Inspektion, Reparatur…" />
         </div>
       </div>
 
-      {/* ── Totals ── */}
-      <div className="mf-totals">
-        {([
-          ['Arbeit',   fCHF(totA),     totZE ? `${totZE} ZE` : null,                'var(--blue)'],
-          ['Material', fCHF(totMeff),  kleinteilActive ? '+Kleinteil' : null,         'var(--green)'],
-          ['Total',    fCHF(totA + totMeff), null,                                   'var(--indigo)'],
-        ] as [string, string, string | null, string][]).map(([l, v, sub, c]) => (
-          <div key={l} className="mf-total-pill">
-            <div className="mf-total-name">{l}</div>
-            <div className="mf-total-val" style={{ color: c }}>{v}</div>
-            {sub && <div className="mf-total-sub" style={{ color: l === 'Material' && kleinteilActive ? 'var(--blue)' : undefined }}>{sub}</div>}
-          </div>
-        ))}
-      </div>
+      {/* ── Section 2: Positionen ── */}
+      <div style={gc}>
+        <span style={gcHdr}>Positionen</span>
 
-      {kleinteilActive && (
-        <div style={{ marginTop: -12, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', background: 'rgba(0,122,255,0.07)', borderRadius: 10, border: '1px solid rgba(0,122,255,0.15)' }}>
-          <span style={{ fontSize: 14 }}>✦</span>
-          <span className="sf-subhead" style={{ color: 'var(--blue)', flex: 1 }}>Kleinteil Pauschale automatisch aktiv (&gt;100 ZE)</span>
-          <span className="sf-subhead" style={{ color: 'var(--blue)', fontWeight: 700 }}>+CHF 10.00</span>
+        {/* iOS Segmented Control */}
+        <div className="seg-ctrl" style={{ width: '100%', marginBottom: 14 }}>
+          {(['arbeit', 'material'] as const).map((t) => {
+            const cnt = t === 'arbeit' ? arbeitCount : materialCount;
+            const isActive = tab === t;
+            return (
+              <button
+                key={t}
+                className={`seg-item${isActive ? ' active' : ''}`}
+                onClick={() => setTab(t)}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+              >
+                {t === 'arbeit' ? (
+                  <svg width={12} height={12} viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                    <path d="M9.5 3.5a3.5 3.5 0 01-4.9 4.9L2 11a1.2 1.2 0 001.7 1.7L6.2 10A3.5 3.5 0 019.5 3.5zm.7-.7l-2 2 .8.8 2-2-.8-.8z" stroke="currentColor" strokeWidth={1.2} strokeLinejoin="round" strokeLinecap="round" />
+                  </svg>
+                ) : (
+                  <svg width={12} height={12} viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                    <rect x={2} y={4} width={11} height={9} rx={1.5} stroke="currentColor" strokeWidth={1.2} />
+                    <path d="M5 4V3a2 2 0 014 0v1" stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" />
+                  </svg>
+                )}
+                {t === 'arbeit' ? 'Arbeit' : 'Material'}
+                {cnt > 0 && (
+                  <span style={{
+                    background: isActive ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.18)',
+                    borderRadius: 9, minWidth: 18, height: 18, fontSize: 10, fontWeight: 700,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px',
+                  }}>
+                    {cnt}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
-      )}
 
-      {/* ── Positionen ── */}
-      <div className="mf-section">
-        <span className="mf-section-label">Positionen</span>
-
-        <div className="doc-tab-bar" style={{ marginBottom: 10 }}>
-          {(['arbeit', 'material'] as const).map((t) => (
-            <button key={t} className={`doc-tab${tab === t ? ' dt-active' : ''}`} onClick={() => setTab(t)} aria-pressed={tab === t}>
-              {t === 'arbeit' ? (
-                <><svg width={13} height={13} viewBox="0 0 15 15" fill="none" aria-hidden="true"><path d="M9.5 3.5a3.5 3.5 0 01-4.9 4.9L2 11a1.2 1.2 0 001.7 1.7L6.2 10A3.5 3.5 0 019.5 3.5zm.7-.7l-2 2 .8.8 2-2-.8-.8z" stroke="currentColor" strokeWidth={1.2} strokeLinejoin="round" strokeLinecap="round"/></svg>Arbeit</>
-              ) : (
-                <><svg width={13} height={13} viewBox="0 0 15 15" fill="none" aria-hidden="true"><rect x={2} y={4} width={11} height={9} rx={1.5} stroke="currentColor" strokeWidth={1.2}/><path d="M5 4V3a2 2 0 014 0v1" stroke="currentColor" strokeWidth={1.2} strokeLinecap="round"/></svg>Material</>
-              )}
-              <span className={`doc-tab-count${(t === 'arbeit' ? arbeit : material).filter((p) => p.beschreibung).length ? ' has-items' : ''}`}>
-                {(t === 'arbeit' ? arbeit : material).filter((p) => p.beschreibung).length}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        <div className="mf-card">
         {/* Arbeit rows */}
         {tab === 'arbeit' && (
           <>
@@ -244,12 +265,8 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
                 <input
                   className="mf-pos-num"
                   style={{ width: 42, color: pos.zeKI ? 'var(--teal)' : undefined, fontWeight: pos.zeKI ? 700 : undefined }}
-                  type="number"
-                  value={pos.ze}
-                  onChange={(e) => updA(i, 'ze', e.target.value)}
-                  placeholder="—"
-                  min={0}
-                  title={pos.zeHint || undefined}
+                  type="number" value={pos.ze} onChange={(e) => updA(i, 'ze', e.target.value)}
+                  placeholder="—" min={0} title={pos.zeHint || undefined}
                 />
                 <button
                   className={`mf-pos-ki${pos.zeKI ? ' ki-active' : ''}`}
@@ -263,9 +280,7 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
                 <input
                   className="mf-pos-num"
                   style={{ width: 50 }}
-                  type="number"
-                  value={pos.stundenansatz}
-                  onChange={(e) => updA(i, 'stundenansatz', e.target.value)}
+                  type="number" value={pos.stundenansatz} onChange={(e) => updA(i, 'stundenansatz', e.target.value)}
                   placeholder="80"
                 />
                 <span className="mf-pos-total" style={{ color: 'var(--blue)', width: 68 }}>
@@ -273,8 +288,7 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
                 </span>
                 {arbeit.length > 1
                   ? <button className="mf-pos-del" onClick={() => remA(i)}><SFXmark /></button>
-                  : <span style={{ width: 22 }} />
-                }
+                  : <span style={{ width: 22 }} />}
               </div>
             ))}
             <button className="mf-add-pos" onClick={addA}><SFPlus size={12} /> Arbeitsposition</button>
@@ -304,17 +318,12 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
                 <input
                   className="mf-pos-num"
                   style={{ width: 44 }}
-                  type="number"
-                  value={pos.menge}
-                  onChange={(e) => updM(i, 'menge', e.target.value)}
-                  min={1}
+                  type="number" value={pos.menge} onChange={(e) => updM(i, 'menge', e.target.value)} min={1}
                 />
                 <input
                   className="mf-pos-num"
                   style={{ width: 64 }}
-                  type="number"
-                  value={pos.stueckpreis}
-                  onChange={(e) => updM(i, 'stueckpreis', e.target.value)}
+                  type="number" value={pos.stueckpreis} onChange={(e) => updM(i, 'stueckpreis', e.target.value)}
                   placeholder="0.00"
                 />
                 <span className="mf-pos-total" style={{ color: 'var(--green)', width: 68 }}>
@@ -322,12 +331,11 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
                 </span>
                 {material.length > 1
                   ? <button className="mf-pos-del" onClick={() => remM(i)}><SFXmark /></button>
-                  : <span style={{ width: 22 }} />
-                }
+                  : <span style={{ width: 22 }} />}
               </div>
             ))}
             {kleinteilActive && (
-              <div className="mf-pos-row" style={{ background: 'rgba(0,122,255,0.06)', borderRadius: 8, marginTop: 4 }}>
+              <div className="mf-pos-row" style={{ background: 'rgba(0,122,255,0.08)', borderRadius: 8, marginTop: 4 }}>
                 <span className="mf-pos-idx" style={{ color: 'var(--blue)' }}>✦</span>
                 <span style={{ flex: 1, fontSize: 13, color: 'var(--blue)', fontWeight: 600, padding: '0 6px' }}>Kleinteil Pauschale (auto)</span>
                 <span style={{ width: 44, textAlign: 'right', fontSize: 12, color: 'var(--label3)', paddingRight: 4 }}>1</span>
@@ -339,27 +347,75 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
             <button className="mf-add-pos green" onClick={addM}><SFPlus size={12} /> Materialposition</button>
           </>
         )}
+
+        {/* ── Totals summary ── */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8,
+          marginTop: 14, paddingTop: 12,
+          borderTop: '0.5px solid var(--sep)',
+        }}>
+          {([
+            ['Arbeit',   fCHF(totA),         totZE ? `${totZE} ZE` : null,            'var(--blue)'],
+            ['Material', fCHF(totMeff),       kleinteilActive ? '+CHF 10 auto' : null, 'var(--green)'],
+            ['Total',    fCHF(totA + totMeff), null,                                    'var(--indigo)'],
+          ] as [string, string, string | null, string][]).map(([l, v, sub, c]) => (
+            <div key={l} style={{
+              textAlign: 'center', padding: '10px 6px',
+              background: 'rgba(255,255,255,0.07)',
+              backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
+              border: '1px solid rgba(255,255,255,0.14)',
+              borderRadius: 12,
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35)',
+            }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--label2)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3, textShadow: '0 1px 3px rgba(0,0,0,0.30)' }}>{l}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.25px', color: c, textShadow: '0 1px 3px rgba(0,0,0,0.20)', whiteSpace: 'nowrap' }}>{v}</div>
+              {sub && <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--label2)', marginTop: 2 }}>{sub}</div>}
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* ── Notizen ── */}
-      <div className="mf-section">
-        <span className="mf-section-label">Notizen</span>
+      {/* Kleinteil badge */}
+      {kleinteilActive && (
+        <div style={{
+          marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8,
+          padding: '10px 14px',
+          background: 'rgba(0,122,255,0.12)',
+          borderRadius: 12,
+          border: '1px solid rgba(0,122,255,0.25)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18)',
+        }}>
+          <span style={{ fontSize: 14, flexShrink: 0 }}>✦</span>
+          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--blue)', flex: 1 }}>Kleinteil Pauschale aktiv (&gt;100 ZE)</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue)', flexShrink: 0 }}>+CHF 10.00</span>
+        </div>
+      )}
+
+      {/* ── Section 3: Notizen ── */}
+      <div style={gc}>
+        <span style={gcHdr}>Notizen</span>
         <textarea
-          className="mf-textarea"
+          className="cf-textarea"
           value={notizen}
           onChange={(e) => setNotizen(e.target.value)}
           placeholder="Interne Notizen zur Offerte…"
           rows={3}
+          style={{ marginBottom: 0 }}
         />
       </div>
 
-      {/* ── Actions ── */}
-      <div className="mf-actions">
-        <button className="mf-btn-save" onClick={submit}>
+      {/* ── Actions: side-by-side ── */}
+      <div style={{ display: 'flex', gap: 10, paddingTop: 4, paddingBottom: 8 }}>
+        <button
+          className="mf-btn-cancel"
+          onClick={onCancel}
+          style={{ flex: '0 0 auto', width: 110, height: 50, borderRadius: 14, fontSize: 15 }}
+        >
+          Abbrechen
+        </button>
+        <button className="mf-btn-save" onClick={submit} style={{ flex: 1, height: 50 }}>
           {initial ? 'Änderungen speichern' : 'Offerte erstellen'}
         </button>
-        <button className="mf-btn-cancel" onClick={onCancel}>Abbrechen</button>
       </div>
 
     </div>
