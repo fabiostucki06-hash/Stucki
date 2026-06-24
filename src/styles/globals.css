@@ -414,3 +414,4 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .mf-btn-save:disabled{opacity:0.35;transform:none;cursor:default;box-shadow:none}
 .mf-btn-cancel{height:34px;border-radius:980px;padding:0 14px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;letter-spacing:-0.2px;color:var(--label2);border:1px solid rgba(255,255,255,0.22);background:rgba(255,255,255,0.12);-webkit-backdrop-filter:blur(40px);backdrop-filter:blur(40px);transition:background 0.15s,color 0.15s}
 .mf-btn-cancel:hover{background:rgba(255,255,255,0.24);color:var(--label)}
+
