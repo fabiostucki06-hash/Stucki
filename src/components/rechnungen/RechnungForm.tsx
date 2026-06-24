@@ -209,8 +209,8 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
     WebkitBackdropFilter: 'blur(64px) saturate(240%)',
     border: '1px solid rgba(255,255,255,0.20)',
     borderRadius: 18,
-    padding: '12px 14px',
-    marginBottom: 18,
+    padding: '10px 12px',
+    marginBottom: 24,
     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.65), 0 4px 24px rgba(0,0,0,0.06)',
   };
   const gcHdr: React.CSSProperties = {
@@ -220,8 +220,8 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
     textShadow: '0 1px 3px rgba(0,0,0,0.30)',
   };
   const hdrTxt: React.CSSProperties = {
-    fontSize: 9.5, fontWeight: 700, color: 'var(--label2)',
-    textTransform: 'uppercase', letterSpacing: '0.07em',
+    fontSize: 9, fontWeight: 700, color: 'var(--label2)',
+    textTransform: 'uppercase', letterSpacing: '0.08em',
     textShadow: '0 1px 3px rgba(0,0,0,0.30)',
   };
 
@@ -353,7 +353,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
         <span style={gcHdr}>Positionen</span>
 
         {/* iOS Segmented Control */}
-        <div className="seg-ctrl" style={{ marginBottom: 12 }}>
+        <div className="seg-ctrl" style={{ marginBottom: 10 }}>
           {(['arbeit', 'material'] as const).map((t) => {
             const cnt = t === 'arbeit' ? arbeitCount : materialCount;
             const isActive = tab === t;
@@ -465,7 +465,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
         {/* ── Totals summary ── */}
         <div style={{
           display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8,
-          marginTop: 14, paddingTop: 12,
+          marginTop: 10, paddingTop: 10,
           borderTop: '0.5px solid var(--sep)',
         }}>
           {([
@@ -474,7 +474,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
             ['Total',    fCHF(totA + totM), null,                          'var(--indigo)'],
           ] as [string, string, string | null, string][]).map(([l, v, sub, c]) => (
             <div key={l} style={{
-              textAlign: 'center', padding: '8px 6px',
+              textAlign: 'center', padding: '6px 5px',
               background: 'rgba(255,255,255,0.07)',
               backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
               border: '1px solid rgba(255,255,255,0.14)',

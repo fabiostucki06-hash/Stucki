@@ -42,8 +42,8 @@ export default function OrderForm({ customers, customerId: preCid, onSave, onCan
     WebkitBackdropFilter: 'blur(64px) saturate(240%)',
     border: '1px solid rgba(255,255,255,0.20)',
     borderRadius: 18,
-    padding: '12px 14px',
-    marginBottom: 18,
+    padding: '10px 12px',
+    marginBottom: 24,
     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.65), 0 4px 24px rgba(0,0,0,0.06)',
   };
   const gcHdr: React.CSSProperties = {
