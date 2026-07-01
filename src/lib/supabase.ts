@@ -9,6 +9,7 @@ export const ASSETS = {
   wallpaper2: `${SUPA_URL}/storage/v1/object/public/wallpaper/mac_wallpaper_2.png`,
   logo:       `${SUPA_URL}/storage/v1/object/public/logo/Gemini_Generated_Image_.png`,
   iconImage:  `${SUPA_URL}/storage/v1/object/public/assets/icon_image.jpg`,
+  rechnungVorlage: `${SUPA_URL}/storage/v1/object/public/Rechnung_Vorlage/Vorlage_Rechnung.xlsx`,
 };
 
 const h = (token?: string | null): Record<string, string> => ({
@@ -16,6 +17,12 @@ const h = (token?: string | null): Record<string, string> => ({
   apikey: SUPA_KEY,
   Authorization: `Bearer ${token ?? SUPA_KEY}`,
 });
+
+export async function fetchRechnungVorlage(): Promise<ArrayBuffer> {
+  const r = await fetch(ASSETS.rechnungVorlage, { headers: { apikey: SUPA_KEY } });
+  if (!r.ok) throw new Error(`Vorlage_Rechnung.xlsx laden fehlgeschlagen: HTTP ${r.status}`);
+  return r.arrayBuffer();
+}
 
 export const auth = {
   async signIn(email: string, password: string) {

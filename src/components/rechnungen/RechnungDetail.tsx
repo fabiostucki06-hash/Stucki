@@ -34,6 +34,7 @@ const HDR: React.CSSProperties = {
 export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, onDelete, onEdit }: RechnungDetailProps) {
   const [saving, setSaving] = useState(false);
   const [posSaving, setPosSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [positionen, setPositionen] = useState<Position[]>(() => rechnung.positionen ?? []);
   const [dirty, setDirty] = useState(false);
 
@@ -285,8 +286,13 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
         </div>
       )}
 
-      <button onClick={() => exportRechnungPDF(rechnung, customer)} className="btn-system btn-green" style={{ marginBottom: 12 }}>
-        PDF exportieren
+      <button
+        onClick={async () => { setExporting(true); await exportRechnungPDF(rechnung, customer); setExporting(false); }}
+        disabled={exporting}
+        className="btn-system btn-green"
+        style={{ marginBottom: 12, opacity: exporting ? 0.6 : 1 }}
+      >
+        {exporting ? <><Spinner size={12} /> PDF wird erstellt…</> : 'PDF exportieren'}
       </button>
       <button
         onClick={async () => { if (window.confirm('Rechnung löschen?')) await onDelete(rechnung.id); }}

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { SFChevron } from '../Icons';
 import { exportRechnungPDF } from '../../lib/pdf-rechnung';
 import type { Customer, Rechnung, RechnungStatus } from '../../types';
@@ -24,6 +25,7 @@ const STATUS_COLORS: Record<RechnungStatus, string> = {
 };
 
 export default function RechnungenList({ rechnungen, customers, onRechnungClick, onEdit, onNew }: RechnungenListProps) {
+  const [exportingId, setExportingId] = useState<string | null>(null);
   const sortByName = (a: Rechnung, b: Rechnung) => {
     const ca = customers.find((x) => x.id === a.customerId);
     const cb = customers.find((x) => x.id === b.customerId);
@@ -71,11 +73,18 @@ export default function RechnungenList({ rechnungen, customers, onRechnungClick,
                       )}
                     </div>
                     <button
-                      onClick={(e) => { e.stopPropagation(); exportRechnungPDF(rec, c); }}
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        setExportingId(rec.id);
+                        await exportRechnungPDF(rec, c);
+                        setExportingId(null);
+                      }}
+                      disabled={exportingId === rec.id}
                       className="excel-btn"
+                      style={{ opacity: exportingId === rec.id ? 0.6 : 1 }}
                       title="PDF herunterladen"
                     >
-                      PDF
+                      {exportingId === rec.id ? '…' : 'PDF'}
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); onEdit(rec); }}
