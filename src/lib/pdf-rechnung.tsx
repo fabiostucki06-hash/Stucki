@@ -1,4 +1,5 @@
 import { buildRechnungWorkbookBuffer } from './xlsx-rechnung';
+import { showToast } from '../components/ui/Toast';
 import type { Customer, Rechnung } from '../types';
 
 function bufferToBase64(buf: ArrayBuffer): string {
@@ -35,6 +36,10 @@ export async function exportRechnungPDF(rechnung: Rechnung, customer: Customer |
     a.click();
     URL.revokeObjectURL(url);
   } catch (err) {
-    alert(`PDF-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);
+    const raw = err instanceof Error ? err.message : String(err);
+    const msg = raw.includes('CLOUDCONVERT_API_KEY')
+      ? 'PDF-Dienst ist noch nicht konfiguriert (fehlender API-Key). Bitte Admin kontaktieren.'
+      : `PDF-Export fehlgeschlagen: ${raw}`;
+    showToast(msg, 'error');
   }
 }
