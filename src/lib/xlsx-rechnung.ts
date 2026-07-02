@@ -97,7 +97,8 @@ export async function buildRechnungWorkbookBuffer(
   g32.numFmt = CHF_FMT;
 
   // Remove note that doesn't apply to all invoices; keep C36 (Kleinmaterial note)
-  sheet.getCell('C35').value = null;
+  sheet.getCell('C35').value = '';
+  sheet.getCell('C35').font = {};
 
   // Date and payment terms (original cell addresses)
   const today = new Date();
