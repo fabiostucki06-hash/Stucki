@@ -75,48 +75,37 @@ export async function buildRechnungWorkbookBuffer(
   const zwischensumme = totalMaterial + totalArbeit;
   const rechnungstotal = roundToRappen(zwischensumme);
 
-  // Insert one blank row at position 31 so we have 4 labelled total rows:
-  //   Row 30 → Total Material
-  //   Row 31 → Total Arbeit        (new)
-  //   Row 32 → Zwischensumme       (was row 31)
-  //   Row 33 → Rechnungstotal      (was row 32, keeps highlight fill)
-  // All subsequent rows (date, payment terms, etc.) shift down by 1.
-  sheet.spliceRows(31, 0, []);
-
-  // Row 30: Total Material
-  sheet.getCell('C30').value = 'Total Material';
+  // ── Totals rows (original template row numbers, no splice) ──────────────────
+  // Row 30: "Summe" — Material total in F (price col) and Arbeit total in G (ZE col)
+  sheet.getCell('C30').value = 'Summe';
   const f30 = sheet.getCell('F30');
   f30.value = totalMaterial;
   f30.numFmt = CHF_FMT;
-  sheet.getCell('G30').value = null; // clear old arbeit formula
+  const g30 = sheet.getCell('G30');
+  g30.value = totalArbeit;
+  g30.numFmt = CHF_FMT;
 
-  // Row 31 (new): Total Arbeit
-  sheet.getCell('C31').value = 'Total Arbeit';
+  // Row 31: Zwischensumme
+  sheet.getCell('C31').value = 'Zwischensumme';
   const g31 = sheet.getCell('G31');
-  g31.value = totalArbeit;
+  g31.value = zwischensumme;
   g31.numFmt = CHF_FMT;
 
-  // Row 32 (was 31): Zwischensumme
-  sheet.getCell('C32').value = 'Zwischensumme';
+  // Row 32: Rechnungstotal (template highlight fill already on this row)
   const g32 = sheet.getCell('G32');
-  g32.value = zwischensumme;
+  g32.value = rechnungstotal;
   g32.numFmt = CHF_FMT;
 
-  // Row 33 (was 32): Rechnungstotal — label + highlight fill already shifted from template
-  const g33 = sheet.getCell('G33');
-  g33.value = rechnungstotal;
-  g33.numFmt = CHF_FMT;
-
-  // Date and payment terms (each shifted +1 due to the spliced row above)
+  // Date and payment terms (original cell addresses)
   const today = new Date();
   const dd = String(today.getDate()).padStart(2, '0');
   const mm = String(today.getMonth() + 1).padStart(2, '0');
   const dateStr = `${dd}.${mm}.${today.getFullYear()}`;
-  sheet.getCell('D41').value = dateStr;
-  sheet.getCell('D41').fill = noFill;
+  sheet.getCell('D40').value = dateStr;
+  sheet.getCell('D40').fill = noFill;
 
   if (rechnung.zahlungsFrist) {
-    sheet.getCell('D45').value = `${rechnung.zahlungsFrist} Tage netto`;
+    sheet.getCell('D44').value = `${rechnung.zahlungsFrist} Tage netto`;
   }
 
   return workbook.xlsx.writeBuffer();

@@ -258,28 +258,30 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
 
         {/* ── Totals breakdown ── */}
         <div style={{ borderTop: '0.5px solid var(--sep)' }}>
-          {/* Row 1: Total Material */}
+          {/* Row 1: Summe — Material (price col) + Arbeit (ZE col) side by side */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 16px', borderBottom: '0.5px solid var(--sep)' }}>
-            <div style={{ fontSize: 13, color: 'var(--label2)' }}>Total Material</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--green)' }}>CHF {fCHF(totM)}</div>
-          </div>
-
-          {/* Row 2: Total Arbeit */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 16px', borderBottom: '0.5px solid var(--sep)' }}>
-            <div>
-              <div style={{ fontSize: 13, color: 'var(--label2)' }}>Total Arbeit</div>
-              {totZE > 0 && <div style={{ fontSize: 10, color: 'var(--label3)', marginTop: 1 }}>{totZE} ZE</div>}
+            <div style={{ fontSize: 13, color: 'var(--label2)' }}>Summe</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10, color: 'var(--label3)', marginBottom: 1 }}>Material</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--green)' }}>CHF {fCHF(totM)}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10, color: 'var(--label3)', marginBottom: 1 }}>
+                  Arbeit{totZE > 0 ? ` · ${totZE} ZE` : ''}
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--blue)' }}>CHF {fCHF(totA)}</div>
+              </div>
             </div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--blue)' }}>CHF {fCHF(totA)}</div>
           </div>
 
-          {/* Row 3: Zwischensumme */}
+          {/* Row 2: Zwischensumme */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 16px', borderBottom: '0.5px solid var(--sep)' }}>
             <div style={{ fontSize: 13, color: 'var(--label2)' }}>Zwischensumme</div>
             <div style={{ fontSize: 13, fontWeight: 600 }}>CHF {fCHF(total)}</div>
           </div>
 
-          {/* Row 4: Rechnungstotal (Swiss-rounded to 0.05 CHF) */}
+          {/* Row 3: Rechnungstotal (Swiss-rounded to 0.05 CHF) */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(0,122,255,0.06)' }}>
             <div>
               <div className="sf-headline">Rechnungstotal</div>
