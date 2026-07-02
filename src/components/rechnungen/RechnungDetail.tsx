@@ -49,6 +49,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
   const totM  = positionen.filter((p) => p.typ === 'material').reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
   const totZE = positionen.filter((p): p is ArbeitPosition => p.typ === 'arbeit').reduce((s, p) => s + (parseFloat(p.ze || '0') || 0), 0);
   const total = totA + totM;
+  const rechnungstotal = Math.round(total * 20) / 20;
 
   function updPos(i: number, key: string, val: string) {
     setPositionen((prev) => {
@@ -75,7 +76,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
       await onUpdate({
         ...rechnung,
         positionen,
-        totalBetrag: total.toFixed(2),
+        totalBetrag: rechnungstotal.toFixed(2),
         totalArbeit: totA.toFixed(2),
         totalMaterial: totM.toFixed(2),
         totalZE: totZE,
@@ -255,27 +256,38 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
           </div>
         ))}
 
-        {/* Total row – live from local state */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '12px 16px',
-          background: 'rgba(0,122,255,0.06)',
-          borderTop: '0.5px solid var(--sep)',
-        }}>
-          <div>
-            <div className="sf-headline">Total</div>
-            {(totA > 0 || totM > 0) && (
-              <div style={{ fontSize: 11, color: 'var(--label3)', marginTop: 2 }}>
-                {totA > 0 && <span style={{ color: 'var(--blue)' }}>Arbeit CHF {fCHF(totA)}</span>}
-                {totA > 0 && totM > 0 && <span style={{ margin: '0 5px', color: 'var(--label3)' }}>·</span>}
-                {totM > 0 && <span style={{ color: 'var(--green)' }}>Material CHF {fCHF(totM)}</span>}
-                {totZE > 0 && <span style={{ margin: '0 5px', color: 'var(--label3)' }}>·</span>}
-                {totZE > 0 && <span>{totZE} ZE</span>}
-              </div>
-            )}
+        {/* ── Totals breakdown ── */}
+        <div style={{ borderTop: '0.5px solid var(--sep)' }}>
+          {/* Row 1: Total Material */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 16px', borderBottom: '0.5px solid var(--sep)' }}>
+            <div style={{ fontSize: 13, color: 'var(--label2)' }}>Total Material</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--green)' }}>CHF {fCHF(totM)}</div>
           </div>
-          <div style={{ fontWeight: 800, fontSize: 22, color: 'var(--blue)', letterSpacing: '-0.5px' }}>
-            CHF {fCHF(total)}
+
+          {/* Row 2: Total Arbeit */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 16px', borderBottom: '0.5px solid var(--sep)' }}>
+            <div>
+              <div style={{ fontSize: 13, color: 'var(--label2)' }}>Total Arbeit</div>
+              {totZE > 0 && <div style={{ fontSize: 10, color: 'var(--label3)', marginTop: 1 }}>{totZE} ZE</div>}
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--blue)' }}>CHF {fCHF(totA)}</div>
+          </div>
+
+          {/* Row 3: Zwischensumme */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 16px', borderBottom: '0.5px solid var(--sep)' }}>
+            <div style={{ fontSize: 13, color: 'var(--label2)' }}>Zwischensumme</div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>CHF {fCHF(total)}</div>
+          </div>
+
+          {/* Row 4: Rechnungstotal (Swiss-rounded to 0.05 CHF) */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(0,122,255,0.06)' }}>
+            <div>
+              <div className="sf-headline">Rechnungstotal</div>
+              <div style={{ fontSize: 10, color: 'var(--label3)', marginTop: 1 }}>gerundet auf 5 Rp.</div>
+            </div>
+            <div style={{ fontWeight: 800, fontSize: 22, color: 'var(--blue)', letterSpacing: '-0.5px' }}>
+              CHF {fCHF(rechnungstotal)}
+            </div>
           </div>
         </div>
       </div>
