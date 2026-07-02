@@ -31,8 +31,11 @@ export async function buildRechnungWorkbookBuffer(
   const vehicle = [customer?.marke, customer?.modell].filter(Boolean).join(' ');
   const owner = customer ? `${customer.vorname} ${customer.nachname}` : '';
 
+  const noFill: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+
+  sheet.getCell('C3').fill = noFill;
   sheet.getCell('D3').value = rechnung.rechnungNumber;
-  sheet.getCell('D3').fill = { type: 'pattern', pattern: 'none' };
+  sheet.getCell('D3').fill = noFill;
   sheet.getCell('D6').value = vehicle || undefined;
   sheet.getCell('D8').value = customer?.kennzeichen || undefined;
   sheet.getCell('D10').value = customer?.km || undefined;
@@ -57,7 +60,7 @@ export async function buildRechnungWorkbookBuffer(
   const mm = String(today.getMonth() + 1).padStart(2, '0');
   const dateStr = `${dd}.${mm}.${today.getFullYear()}`;
   sheet.getCell('D40').value = dateStr;
-  sheet.getCell('D40').fill = { type: 'pattern', pattern: 'none' };
+  sheet.getCell('D40').fill = noFill;
   if (rechnung.zahlungsFrist) {
     sheet.getCell('D44').value = `${rechnung.zahlungsFrist} Tage netto`;
   }
