@@ -1,4 +1,5 @@
 import { createRoot, type Root } from 'react-dom/client';
+import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from './rechnung-totals';
 import type { ArbeitPosition, Customer, MaterialPosition, Position, Rechnung } from '../types';
 
 const CO_NAME  = 'Fabio Stucki';
@@ -39,12 +40,19 @@ function InvoiceDocument({ rechnung, customer }: { rechnung: Rechnung; customer:
   const vehicle = [customer?.marke, customer?.modell].filter(Boolean).join(' ');
   const owner = customer ? `${customer.vorname} ${customer.nachname}` : '';
 
-  const totM  = positionen.filter((p) => p.typ === 'material').reduce((s, p) => s + fN(p.preis), 0);
-  const totA  = positionen.filter((p) => p.typ === 'arbeit').reduce((s, p) => s + fN(p.preis), 0);
-  const total = totM + totA;
-  const rechnungstotal = Math.round(total * 20) / 20;
+  const { totalMaterial: totM, totalArbeit: totA, zwischensumme: total, rechnungstotal, kleinteilApplied } =
+    computeRechnungTotals(positionen);
 
   const rows: (Position | undefined)[] = [...positionen];
+  if (kleinteilApplied) {
+    rows.push({
+      typ: 'material',
+      beschreibung: KLEINTEIL_LABEL,
+      menge: '',
+      stueckpreis: '',
+      preis: String(KLEINTEIL_BETRAG),
+    });
+  }
   while (rows.length < MIN_ROWS) rows.push(undefined);
 
   const vRows: [string, string][] = [
@@ -128,7 +136,6 @@ function InvoiceDocument({ rechnung, customer }: { rechnung: Rechnung; customer:
 
         {/* Notes */}
         <div style={{ padding: '4mm 2mm 2mm', fontSize: '7.5pt', color: '#777' }}>
-          <div>* ZE basieren auf einer reibungslosen Reparatur</div>
           <div>* Kleinmaterial-Pauschale wird bei &lt;100 ZE hinzugefügt</div>
           {rechnung.notizen && (
             <div style={{ marginTop: '3mm', color: '#000' }}>

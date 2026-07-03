@@ -3,6 +3,7 @@ import Sheet from '../ui/Sheet';
 import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
 import { printRechnung } from '../../lib/print-rechnung';
+import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../lib/rechnung-totals';
 import type { Customer, Rechnung, RechnungStatus, Position, ArbeitPosition, MaterialPosition } from '../../types';
 
 interface RechnungDetailProps {
@@ -44,11 +45,8 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
     && new Date(rechnung.faelligAm) < new Date();
 
   /* ── live totals from local state ── */
-  const totA  = positionen.filter((p) => p.typ === 'arbeit').reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
-  const totM  = positionen.filter((p) => p.typ === 'material').reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
-  const totZE = positionen.filter((p): p is ArbeitPosition => p.typ === 'arbeit').reduce((s, p) => s + (parseFloat(p.ze || '0') || 0), 0);
-  const total = totA + totM;
-  const rechnungstotal = Math.round(total * 20) / 20;
+  const { totalMaterial: totM, totalArbeit: totA, totalZE: totZE, zwischensumme: total, rechnungstotal, kleinteilApplied } =
+    computeRechnungTotals(positionen);
 
   function updPos(i: number, key: string, val: string) {
     setPositionen((prev) => {
@@ -171,7 +169,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
               alignItems: 'center',
               gap: 10,
               padding: '10px 16px',
-              borderBottom: i < positionen.length - 1 ? '0.5px solid var(--sep)' : 'none',
+              borderBottom: (i < positionen.length - 1 || kleinteilApplied) ? '0.5px solid var(--sep)' : 'none',
               minHeight: 52,
             }}
           >
@@ -254,6 +252,29 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
             </div>
           </div>
         ))}
+
+        {kleinteilApplied && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '10px 16px',
+              borderBottom: '0.5px solid var(--sep)',
+              minHeight: 52,
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="sf-subhead">{KLEINTEIL_LABEL}</div>
+              <div style={{ fontSize: 10, color: 'var(--label3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>
+                Automatisch · ZE &gt; 100
+              </div>
+            </div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--blue)', flexShrink: 0, minWidth: 68, textAlign: 'right', letterSpacing: '-0.2px' }}>
+              CHF {fCHF(KLEINTEIL_BETRAG)}
+            </div>
+          </div>
+        )}
 
         {/* ── Totals breakdown ── */}
         <div style={{ borderTop: '0.5px solid var(--sep)' }}>
