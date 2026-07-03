@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Sheet from '../ui/Sheet';
 import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
-import { exportRechnungPDF } from '../../lib/pdf-rechnung';
+import { printRechnung } from '../../lib/print-rechnung';
 import type { Customer, Rechnung, RechnungStatus, Position, ArbeitPosition, MaterialPosition } from '../../types';
 
 interface RechnungDetailProps {
@@ -34,7 +34,6 @@ const HDR: React.CSSProperties = {
 export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, onDelete, onEdit }: RechnungDetailProps) {
   const [saving, setSaving] = useState(false);
   const [posSaving, setPosSaving] = useState(false);
-  const [exporting, setExporting] = useState(false);
   const [positionen, setPositionen] = useState<Position[]>(() => rechnung.positionen ?? []);
   const [dirty, setDirty] = useState(false);
 
@@ -301,12 +300,11 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
       )}
 
       <button
-        onClick={async () => { setExporting(true); await exportRechnungPDF(rechnung, customer); setExporting(false); }}
-        disabled={exporting}
+        onClick={() => printRechnung(rechnung, customer)}
         className="btn-system btn-green"
-        style={{ marginBottom: 12, opacity: exporting ? 0.6 : 1 }}
+        style={{ marginBottom: 12 }}
       >
-        {exporting ? <><Spinner size={12} /> PDF wird erstellt…</> : 'PDF exportieren'}
+        Drucken / PDF exportieren
       </button>
       <button
         onClick={async () => { if (window.confirm('Rechnung löschen?')) await onDelete(rechnung.id); }}
