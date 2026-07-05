@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { SwissQRBill } from 'swissqrbill/svg';
 import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from './rechnung-totals';
 import { formatDateCH } from './utils';
+import { getIban } from './settings';
 import type { ArbeitPosition, Customer, MaterialPosition, Position, Rechnung } from '../types';
 
 const CO_NAME      = 'Fabio Stucki';
@@ -12,8 +13,6 @@ const CO_PHONE     = '079 850 18 63';
 const CO_LOC       = 'Thalheim AG';
 const CO_ZIP       = 5112;
 const CO_CITY_NAME = 'Thalheim AG';
-// Platzhalter-IBAN (gültiges Format, aber keine echte Kontoverbindung) — vor Live-Betrieb durch die echte Raiffeisen-IBAN/QR-IBAN ersetzen.
-const CO_IBAN      = 'CH9300762011623852957';
 const STD_SATZ = '80.00';
 const MIN_ROWS = 15;
 
@@ -42,29 +41,44 @@ function PositionRow({ pos, rowH }: { pos?: Position; rowH: string }) {
   );
 }
 
+const qrWarningStyle: React.CSSProperties = {
+  width: '210mm', height: '105mm', boxSizing: 'border-box',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  border: '0.5pt dashed #999', color: '#c00', fontSize: '11pt', fontWeight: 700, textAlign: 'center',
+};
+
 /** Renders the official Swiss QR-Bill (payment part + receipt) as SVG. No debtor address on file, so the payer section is left blank for the client to fill in by hand — valid per spec, debtor is optional. */
 function QRBillSection({ rechnung, amount }: { rechnung: Rechnung; amount: number }) {
   const ref = useRef<HTMLDivElement>(null);
+  const iban = getIban().replace(/\s+/g, '').toUpperCase();
 
   useLayoutEffect(() => {
     const container = ref.current;
-    if (!container) return;
+    if (!container || !iban) return;
     container.innerHTML = '';
-    const svg = new SwissQRBill({
-      currency: 'CHF',
-      amount,
-      message: `Rechnung #${rechnung.rechnungNumber}`,
-      creditor: {
-        name: CO_NAME,
-        address: CO_ADDR,
-        zip: CO_ZIP,
-        city: CO_CITY_NAME,
-        country: 'CH',
-        account: CO_IBAN,
-      },
-    }, { language: 'DE' });
-    container.appendChild(svg.element);
-  }, [rechnung.rechnungNumber, amount]);
+    try {
+      const svg = new SwissQRBill({
+        currency: 'CHF',
+        amount,
+        message: `Rechnung #${rechnung.rechnungNumber}`,
+        creditor: {
+          name: CO_NAME,
+          address: CO_ADDR,
+          zip: CO_ZIP,
+          city: CO_CITY_NAME,
+          country: 'CH',
+          account: iban,
+        },
+      }, { language: 'DE' });
+      container.appendChild(svg.element);
+    } catch {
+      container.textContent = 'IBAN ungültig – bitte in den Einstellungen prüfen';
+    }
+  }, [rechnung.rechnungNumber, amount, iban]);
+
+  if (!iban) {
+    return <div style={qrWarningStyle}>Bitte IBAN in den Einstellungen hinterlegen</div>;
+  }
 
   return <div ref={ref} style={{ width: '210mm', height: '105mm' }} />;
 }

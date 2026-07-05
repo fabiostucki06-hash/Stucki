@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ASSETS } from '../../lib/supabase';
+import { getIban, setIban } from '../../lib/settings';
 import { SFCheckmark } from '../Icons';
 
 const WALLPAPERS = [
@@ -14,6 +15,12 @@ interface SettingsViewProps {
 
 export default function SettingsView({ currentWallpaper, onWallpaperChange }: SettingsViewProps) {
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
+  const [iban, setIbanValue] = useState<string>(() => getIban());
+
+  function handleIbanChange(v: string) {
+    setIbanValue(v);
+    setIban(v);
+  }
 
   useEffect(() => {
     const blobs: string[] = [];
@@ -147,6 +154,42 @@ export default function SettingsView({ currentWallpaper, onWallpaperChange }: Se
             );
           })}
         </div>
+      </div>
+
+      {/* Zahlungsinformationen */}
+      <div style={{
+        background: 'rgba(255,255,255,0.70)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255,255,255,0.5)',
+        boxShadow: '0 8px 32px 0 rgba(0,0,0,0.10)',
+        borderRadius: 18,
+        padding: '18px 18px 22px',
+        marginBottom: 20,
+      }}>
+        <p style={{
+          fontSize: 13,
+          fontWeight: 600,
+          letterSpacing: 0.3,
+          textTransform: 'uppercase',
+          color: 'var(--label2)',
+          marginBottom: 16,
+        }}>
+          Zahlungsinformationen
+        </p>
+
+        <div className="cf-field">
+          <label className="cf-label">Haupt-IBAN / QR-IBAN</label>
+          <input
+            className="cf-input"
+            value={iban}
+            onChange={(e) => handleIbanChange(e.target.value)}
+            placeholder="CH00 0000 0000 0000 0000 0"
+          />
+        </div>
+        <p style={{ fontSize: 12, color: 'var(--label3)', marginTop: 8 }}>
+          Wird für den Swiss QR-Code auf der Rechnung verwendet.
+        </p>
       </div>
     </div>
   );
