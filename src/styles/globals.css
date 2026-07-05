@@ -83,23 +83,6 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 ::-webkit-scrollbar-thumb{background:var(--sep-opaque);border-radius:10px}
 ::-webkit-scrollbar-track{background:transparent}
 
-/* ── PRINT (invoice export via window.print) ── */
-.invoice-print-root{display:none}
-
-@media print{
-  @page{size:A4;margin:0}
-  html,body{height:auto;background:#fff!important}
-  body *{visibility:hidden}
-  #root,.bg{display:none!important}
-  .invoice-print-root{
-    display:block!important;
-    visibility:visible;
-    position:absolute;
-    inset:0;
-  }
-  .invoice-print-root *{visibility:visible}
-}
-
 /* ── TYPOGRAPHY ── */
 .sf-title1   {font-size:28px;font-weight:800;letter-spacing:-0.6px;line-height:1.18;text-shadow:0 1px 6px rgba(0,0,0,0.28)}
 .sf-title2   {font-size:22px;font-weight:700;letter-spacing:-0.4px;line-height:1.24;text-shadow:0 1px 5px rgba(0,0,0,0.25)}

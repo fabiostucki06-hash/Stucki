@@ -1,5 +1,5 @@
 import { SFChevron } from '../Icons';
-import { printRechnung } from '../../lib/print-rechnung';
+import { exportRechnungPDF } from '../../lib/pdf-rechnung';
 import { formatDateCH } from '../../lib/utils';
 import type { Customer, Rechnung, RechnungStatus } from '../../types';
 
@@ -74,7 +74,7 @@ export default function RechnungenList({ rechnungen, customers, onRechnungClick,
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        printRechnung(rec, c);
+                        exportRechnungPDF(rec, c);
                       }}
                       className="excel-btn"
                       title="Drucken / PDF exportieren"

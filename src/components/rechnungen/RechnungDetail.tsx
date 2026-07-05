@@ -3,7 +3,7 @@ import Sheet from '../ui/Sheet';
 import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
 import { SFPlus, SFXmark } from '../Icons';
-import { printRechnung } from '../../lib/print-rechnung';
+import { exportRechnungPDF } from '../../lib/pdf-rechnung';
 import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../lib/rechnung-totals';
 import { formatDateCH } from '../../lib/utils';
 import type { Customer, Rechnung, RechnungStatus, Position, ArbeitPosition, MaterialPosition } from '../../types';
@@ -453,7 +453,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
       )}
 
       <button
-        onClick={() => printRechnung(rechnung, customer)}
+        onClick={() => exportRechnungPDF(rechnung, customer)}
         className="btn-system btn-green"
         style={{ marginBottom: 12 }}
       >
