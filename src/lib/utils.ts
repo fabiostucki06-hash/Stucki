@@ -1,5 +1,9 @@
 import type { Order, Customer } from '../types';
 
+/** Formats any date as DD.MM.YYYY (de-CH), always zero-padded — de-CH's default toLocaleDateString does not pad. */
+export const formatDateCH = (d: string | Date): string =>
+  new Date(d).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
 export const daysSince = (d?: string): number =>
   d ? Math.floor((Date.now() - new Date(d).getTime()) / 86_400_000) : 0;
 

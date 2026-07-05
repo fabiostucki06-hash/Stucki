@@ -1,5 +1,6 @@
 import { createRoot, type Root } from 'react-dom/client';
 import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from './rechnung-totals';
+import { formatDateCH } from './utils';
 import type { ArbeitPosition, Customer, MaterialPosition, Position, Rechnung } from '../types';
 
 const CO_NAME  = 'Fabio Stucki';
@@ -12,7 +13,7 @@ const MIN_ROWS = 15;
 
 const fN = (v?: string | number) => parseFloat(String(v ?? '0')) || 0;
 const chf = (n: number) => `CHF ${n.toFixed(2)}`;
-const dateCH = () => new Date().toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
+const dateCH = () => formatDateCH(new Date());
 
 // Column widths in mm — mirrors the official Rechnung template (Bezeichnung | Menge | Stk.Preis | Preis (CHF) | ZE)
 const COLS = '75mm 20mm 30mm 30mm 25mm';

@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf';
+import { formatDateCH } from './utils';
 import type { ArbeitPosition, Customer, Order } from '../types';
 
 const CO_NAME  = 'Fabio Stucki';
@@ -8,7 +9,7 @@ const CO_PHONE = '079 850 18 63';
 const CO_LOC   = 'Thalheim AG';
 const STD_SATZ = '80.00';
 
-const dateCH = (iso?: string) => iso ? new Date(iso).toLocaleDateString('de-CH') : '';
+const dateCH = (iso?: string) => iso ? formatDateCH(iso) : '';
 const fN = (v?: string | number) => parseFloat(String(v ?? '0')) || 0;
 
 // ── Layout: A4 = 210 × 297 mm ─────────────────────────────────────────────────

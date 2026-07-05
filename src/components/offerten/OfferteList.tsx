@@ -1,5 +1,6 @@
 import { SFChevron } from '../Icons';
 import { exportOffertePDF } from '../../lib/pdf-offerte';
+import { formatDateCH } from '../../lib/utils';
 import type { Customer, Offerte, OfferteStatus } from '../../types';
 
 interface OfferteListProps {
@@ -55,7 +56,7 @@ export default function OfferteList({ offerten, customers, onOfferteClick, onEdi
                     <button onClick={(e) => { e.stopPropagation(); exportOffertePDF(off, c); }} className="excel-btn" title="PDF herunterladen">PDF</button>
                     <button onClick={(e) => { e.stopPropagation(); onEdit(off); }} className="excel-btn" style={{ background: 'rgba(0,122,255,0.12)', color: 'var(--blue)', border: '1px solid rgba(0,122,255,0.25)' }} title="Bearbeiten">✎</button>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, marginLeft: 4 }}>
-                      <div style={{ fontSize: 12, color: 'var(--label3)' }}>{new Date(off.createdAt).toLocaleDateString('de-CH')}</div>
+                      <div style={{ fontSize: 12, color: 'var(--label3)' }}>{formatDateCH(off.createdAt)}</div>
                       <span style={{ color: 'var(--label3)' }}><SFChevron /></span>
                     </div>
                   </div>

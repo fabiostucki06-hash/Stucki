@@ -1,5 +1,6 @@
 import { SFChevron } from '../Icons';
 import { printRechnung } from '../../lib/print-rechnung';
+import { formatDateCH } from '../../lib/utils';
 import type { Customer, Rechnung, RechnungStatus } from '../../types';
 
 interface RechnungenListProps {
@@ -90,7 +91,7 @@ export default function RechnungenList({ rechnungen, customers, onRechnungClick,
                     </button>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, marginLeft: 4 }}>
                       <div style={{ fontSize: 12, color: 'var(--label3)' }}>
-                        {new Date(rec.createdAt).toLocaleDateString('de-CH')}
+                        {formatDateCH(rec.createdAt)}
                       </div>
                       <span style={{ color: 'var(--label3)' }}><SFChevron /></span>
                     </div>

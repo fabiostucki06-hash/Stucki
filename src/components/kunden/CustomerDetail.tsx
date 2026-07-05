@@ -1,7 +1,7 @@
 import Sheet from '../ui/Sheet';
 import Badge from '../ui/Badge';
 import { SFChevron } from '../Icons';
-import { isOverdue } from '../../lib/utils';
+import { isOverdue, formatDateCH } from '../../lib/utils';
 import type { Customer, Order } from '../../types';
 
 interface CustomerDetailProps {
@@ -55,7 +55,7 @@ export default function CustomerDetail({ customer, orders, onClose, onEdit, onNe
             <div style={{ flex: 1 }}>
               {isOverdue(o) && <div style={{ fontSize: 11, color: 'var(--red)', fontWeight: 600, marginBottom: 2 }}>Frist überschritten</div>}
               <div className="sf-subhead" style={{ fontWeight: 600 }}>Auftrag #{o.orderNumber}</div>
-              <div className="sf-footnote" style={{ color: 'var(--label3)' }}>{new Date(o.createdAt).toLocaleDateString('de-CH')}</div>
+              <div className="sf-footnote" style={{ color: 'var(--label3)' }}>{formatDateCH(o.createdAt)}</div>
             </div>
             <Badge status={o.status} small />
             <span style={{ color: 'var(--label3)', marginLeft: 6 }}><SFChevron /></span>

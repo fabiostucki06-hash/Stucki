@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Sheet from '../ui/Sheet';
 import Spinner from '../ui/Spinner';
 import { exportOffertePDF } from '../../lib/pdf-offerte';
+import { formatDateCH } from '../../lib/utils';
 import type { Customer, Offerte, OfferteStatus } from '../../types';
 
 interface OfferteDetailProps {
@@ -116,7 +117,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
 
       {offerte.gueltigBis && (
         <div className="sf-subhead" style={{ color: isExpired ? 'var(--red)' : 'var(--label2)', marginBottom: 12 }}>
-          Gültig bis: {new Date(offerte.gueltigBis).toLocaleDateString('de-CH')}{isExpired ? ' (abgelaufen)' : ''}
+          Gültig bis: {formatDateCH(offerte.gueltigBis)}{isExpired ? ' (abgelaufen)' : ''}
         </div>
       )}
 
@@ -243,7 +244,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
 
       <button onClick={() => exportOffertePDF(offerte, customer)} className="btn-system btn-green" style={{ marginBottom: 12 }}>PDF exportieren</button>
       <button onClick={async () => { if (window.confirm('Offerte löschen?')) await onDelete(offerte.id); }} className="btn-system btn-destructive">Offerte löschen</button>
-      <div style={{ marginTop: 16, fontSize: 13, color: 'var(--label3)', textAlign: 'center' }}>Erstellt: {new Date(offerte.createdAt).toLocaleDateString('de-CH')} · Offerte #{offerte.offertNumber}</div>
+      <div style={{ marginTop: 16, fontSize: 13, color: 'var(--label3)', textAlign: 'center' }}>Erstellt: {formatDateCH(offerte.createdAt)} · Offerte #{offerte.offertNumber}</div>
     </Sheet>
   );
 }

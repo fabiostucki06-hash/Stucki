@@ -3,7 +3,7 @@ import Sheet from '../ui/Sheet';
 import Badge from '../ui/Badge';
 import Spinner from '../ui/Spinner';
 import { SFPlus, SFXmark } from '../Icons';
-import { isOverdue, daysSince, hoursSince } from '../../lib/utils';
+import { isOverdue, daysSince, hoursSince, formatDateCH } from '../../lib/utils';
 import { SC, SO } from '../../constants/statuses';
 import { exportOrderPDF } from '../../lib/pdf-auftrag';
 import type { ArbeitPosition, Customer, MaterialPosition, Order, OrderItem, OrderStatus } from '../../types';
@@ -271,7 +271,7 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
 
       <button onClick={() => exportOrderPDF(order, customer)} className="btn-system btn-secondary" style={{ marginBottom: 12 }}>↓  PDF herunterladen</button>
       <button onClick={async () => { if (window.confirm('Auftrag wirklich löschen?')) await onDelete(order.id); }} className="btn-system btn-destructive" style={{ marginBottom: 12 }}>Auftrag löschen</button>
-      <div style={{ fontSize: 13, color: 'var(--label3)', textAlign: 'center', paddingBottom: 8 }}>Erstellt: {new Date(order.createdAt).toLocaleDateString('de-CH')} · #{order.orderNumber}</div>
+      <div style={{ fontSize: 13, color: 'var(--label3)', textAlign: 'center', paddingBottom: 8 }}>Erstellt: {formatDateCH(order.createdAt)} · #{order.orderNumber}</div>
     </Sheet>
   );
 }

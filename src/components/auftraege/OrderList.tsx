@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Badge from '../ui/Badge';
 import { SFChevron, SFXmark } from '../Icons';
-import { isOverdue, daysSince } from '../../lib/utils';
+import { isOverdue, daysSince, formatDateCH } from '../../lib/utils';
 import { SC, SO } from '../../constants/statuses';
 import { exportOrderPDF } from '../../lib/pdf-auftrag';
 import type { Customer, Order } from '../../types';
@@ -96,7 +96,7 @@ export default function OrderList({ orders, customers, onOrderClick, onEditClick
                 <div key={o.id} className="list-row" onClick={() => onOrderClick(o)} style={{ opacity: 0.65 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 500, fontSize: 15 }}>#{o.orderNumber} – {c?.vorname ?? ''} {c?.nachname ?? ''}</div>
-                    <div style={{ fontSize: 12, color: 'var(--label3)' }}>{new Date(o.createdAt).toLocaleDateString('de-CH')}</div>
+                    <div style={{ fontSize: 12, color: 'var(--label3)' }}>{formatDateCH(o.createdAt)}</div>
                   </div>
                   <button onClick={(e) => { e.stopPropagation(); exportOrderPDF(o, c); }} className="excel-btn" title="PDF herunterladen">PDF</button>
                   <button onClick={(e) => { e.stopPropagation(); onEditClick(o); }} className="excel-btn" style={{ background: 'rgba(0,122,255,0.12)', color: 'var(--blue)', border: '1px solid rgba(0,122,255,0.25)' }} title="Bearbeiten">✎</button>

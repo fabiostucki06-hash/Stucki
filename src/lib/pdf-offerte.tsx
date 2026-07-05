@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf';
+import { formatDateCH } from './utils';
 import type { ArbeitPosition, Customer, MaterialPosition, Offerte } from '../types';
 
 const CO_NAME  = 'Fabio Stucki';
@@ -8,7 +9,7 @@ const CO_PHONE = '079 850 18 63';
 const CO_LOC   = 'Thalheim AG';
 const STD_SATZ = '80.00';
 
-const todayCH = () => new Date().toLocaleDateString('de-CH');
+const todayCH = () => formatDateCH(new Date());
 const fN = (v?: string | number) => parseFloat(String(v ?? '0')) || 0;
 const chf = (n: number) => n === 0 ? 'CHF –' : `CHF ${n.toFixed(2)}`;
 
