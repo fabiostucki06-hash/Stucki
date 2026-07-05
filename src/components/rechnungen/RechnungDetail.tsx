@@ -2,8 +2,10 @@ import { useState } from 'react';
 import Sheet from '../ui/Sheet';
 import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
+import { SFPlus } from '../Icons';
 import { printRechnung } from '../../lib/print-rechnung';
 import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../lib/rechnung-totals';
+import { formatDateCH } from '../../lib/utils';
 import type { Customer, Rechnung, RechnungStatus, Position, ArbeitPosition, MaterialPosition } from '../../types';
 
 interface RechnungDetailProps {
@@ -25,6 +27,14 @@ const ST_META: Record<RechnungStatus, StatusMeta> = {
 
 const fCHF = (n: number) => n.toFixed(2);
 
+function calcFaelligAm(createdAt: string, days: string): string {
+  const n = parseInt(days);
+  if (isNaN(n) || n <= 0) return '';
+  const d = new Date(createdAt);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().split('T')[0];
+}
+
 const HDR: React.CSSProperties = {
   fontSize: 9, fontWeight: 700, color: 'var(--label3)',
   textTransform: 'uppercase', letterSpacing: '0.06em',
@@ -36,13 +46,27 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
   const [saving, setSaving] = useState(false);
   const [posSaving, setPosSaving] = useState(false);
   const [positionen, setPositionen] = useState<Position[]>(() => rechnung.positionen ?? []);
+  const [zahlungsFrist, setZahlungsFrist] = useState(rechnung.zahlungsFrist ?? '30');
   const [dirty, setDirty] = useState(false);
 
-  const sc = ST_META[rechnung.status] ?? ST_META.entwurf;
+  const [addingTyp, setAddingTyp] = useState<'arbeit' | 'material' | null>(null);
+  const [newBeschreibung, setNewBeschreibung] = useState('');
+  const [newZE, setNewZE] = useState('');
+  const [newAW, setNewAW] = useState('80');
+  const [newMenge, setNewMenge] = useState('1');
+  const [newPreis, setNewPreis] = useState('');
 
-  const isOverdue = rechnung.faelligAm
+  const sc = ST_META[rechnung.status] ?? ST_META.entwurf;
+  const faelligAm = calcFaelligAm(rechnung.createdAt, zahlungsFrist);
+
+  const isOverdue = faelligAm
     && rechnung.status === 'versendet'
-    && new Date(rechnung.faelligAm) < new Date();
+    && new Date(faelligAm) < new Date();
+
+  function handleZahlungsFristChange(val: string) {
+    setZahlungsFrist(val);
+    setDirty(true);
+  }
 
   /* ── live totals from local state ── */
   const { totalMaterial: totM, totalArbeit: totA, totalZE: totZE, zwischensumme: total, rechnungstotal, kleinteilApplied } =
@@ -67,6 +91,37 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
     setDirty(true);
   }
 
+  function resetNewPos() {
+    setAddingTyp(null);
+    setNewBeschreibung('');
+    setNewZE('');
+    setNewAW('80');
+    setNewMenge('1');
+    setNewPreis('');
+  }
+
+  function addPosition() {
+    if (!addingTyp || !newBeschreibung.trim()) return;
+    const pos: Position = addingTyp === 'arbeit'
+      ? {
+          typ: 'arbeit',
+          beschreibung: newBeschreibung.trim(),
+          ze: newZE,
+          stundenansatz: newAW || '80',
+          preis: (((parseFloat(newZE) || 0) / 100) * (parseFloat(newAW) || 0)).toFixed(2),
+        }
+      : {
+          typ: 'material',
+          beschreibung: newBeschreibung.trim(),
+          menge: newMenge || '1',
+          stueckpreis: newPreis || '0',
+          preis: ((parseFloat(newMenge) || 1) * (parseFloat(newPreis) || 0)).toFixed(2),
+        };
+    setPositionen((prev) => [...prev, pos]);
+    setDirty(true);
+    resetNewPos();
+  }
+
   async function savePositionen() {
     setPosSaving(true);
     try {
@@ -77,6 +132,8 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
         totalArbeit: totA.toFixed(2),
         totalMaterial: totM.toFixed(2),
         totalZE: totZE,
+        zahlungsFrist,
+        faelligAm,
       });
       setDirty(false);
       showToast('Positionen gespeichert', 'success');
@@ -132,18 +189,28 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
         </div>
       )}
 
-      {rechnung.faelligAm && (
+      {faelligAm && (
         <div className="sf-subhead" style={{ color: isOverdue ? 'var(--red)' : 'var(--label2)', marginBottom: 12 }}>
-          Zahlbar bis: {new Date(rechnung.faelligAm).toLocaleDateString('de-CH')}{isOverdue ? ' (überfällig)' : ''}
+          Zahlbar bis: {formatDateCH(faelligAm)}{isOverdue ? ' (überfällig)' : ''}
         </div>
       )}
 
-      {rechnung.zahlungsFrist && (
-        <div style={{ background: 'rgba(52,199,89,0.09)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, border: '0.5px solid rgba(52,199,89,0.22)' }}>
-          <span style={{ fontSize: 16, color: 'var(--green)' }}>✓</span>
-          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--green)' }}>Zahlungsziel: {rechnung.zahlungsFrist} Tage netto</span>
-        </div>
-      )}
+      <div style={{ background: 'rgba(52,199,89,0.09)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, border: '0.5px solid rgba(52,199,89,0.22)' }}>
+        <span style={{ fontSize: 16, color: 'var(--green)' }}>✓</span>
+        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--green)' }}>Zahlungsziel:</span>
+        <input
+          type="number"
+          value={zahlungsFrist}
+          onChange={(e) => handleZahlungsFristChange(e.target.value)}
+          min={1}
+          style={{
+            width: 48, padding: '3px 6px', fontSize: 15, fontWeight: 600, color: 'var(--green)',
+            background: 'rgba(255,255,255,0.6)', border: '0.5px solid rgba(52,199,89,0.3)',
+            borderRadius: 6, textAlign: 'center', outline: 'none',
+          }}
+        />
+        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--green)' }}>Tage netto</span>
+      </div>
 
       {/* ── Positionen – inline editable ── */}
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 0 }}>
@@ -169,7 +236,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
               alignItems: 'center',
               gap: 10,
               padding: '10px 16px',
-              borderBottom: (i < positionen.length - 1 || kleinteilApplied) ? '0.5px solid var(--sep)' : 'none',
+              borderBottom: '0.5px solid var(--sep)',
               minHeight: 52,
             }}
           >
@@ -276,6 +343,56 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
           </div>
         )}
 
+        {/* ── Add new position ── */}
+        <div style={{ padding: '10px 16px' }}>
+          {!addingTyp ? (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setAddingTyp('arbeit')} className="mf-add-pos"><SFPlus size={12} /> Arbeitsposition</button>
+              <button onClick={() => setAddingTyp('material')} className="mf-add-pos green"><SFPlus size={12} /> Materialposition</button>
+            </div>
+          ) : (
+            <div>
+              <div className="cf-field" style={{ marginBottom: 8 }}>
+                <label className="cf-label">Bezeichnung</label>
+                <input
+                  className="cf-input"
+                  value={newBeschreibung}
+                  onChange={(e) => setNewBeschreibung(e.target.value)}
+                  placeholder={addingTyp === 'arbeit' ? 'z.B. Ölwechsel' : 'z.B. Ölfilter'}
+                  autoFocus
+                />
+              </div>
+              {addingTyp === 'arbeit' ? (
+                <div className="cf-grid-2" style={{ marginBottom: 10 }}>
+                  <div className="cf-field">
+                    <label className="cf-label">ZE</label>
+                    <input className="cf-input" type="number" min={0} value={newZE} onChange={(e) => setNewZE(e.target.value)} placeholder="0" />
+                  </div>
+                  <div className="cf-field">
+                    <label className="cf-label">AW (CHF/h)</label>
+                    <input className="cf-input" type="number" min={0} value={newAW} onChange={(e) => setNewAW(e.target.value)} placeholder="80" />
+                  </div>
+                </div>
+              ) : (
+                <div className="cf-grid-2" style={{ marginBottom: 10 }}>
+                  <div className="cf-field">
+                    <label className="cf-label">Stk.</label>
+                    <input className="cf-input" type="number" min={1} value={newMenge} onChange={(e) => setNewMenge(e.target.value)} placeholder="1" />
+                  </div>
+                  <div className="cf-field">
+                    <label className="cf-label">CHF</label>
+                    <input className="cf-input" type="number" min={0} value={newPreis} onChange={(e) => setNewPreis(e.target.value)} placeholder="0.00" />
+                  </div>
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button onClick={resetNewPos} className="mf-btn-cancel">Abbrechen</button>
+                <button onClick={addPosition} disabled={!newBeschreibung.trim()} className="mf-btn-save">Hinzufügen</button>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* ── Totals breakdown ── */}
         <div style={{ borderTop: '0.5px solid var(--sep)' }}>
           {/* Row 1: Summe — Material (price col) + Arbeit (ZE col) side by side */}
@@ -334,7 +451,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
         Rechnung löschen
       </button>
       <div style={{ marginTop: 16, fontSize: 13, color: 'var(--label3)', textAlign: 'center' }}>
-        Erstellt: {new Date(rechnung.createdAt).toLocaleDateString('de-CH')} · Rechnung #{rechnung.rechnungNumber}
+        Erstellt: {formatDateCH(rechnung.createdAt)} · Rechnung #{rechnung.rechnungNumber}
       </div>
     </Sheet>
   );
