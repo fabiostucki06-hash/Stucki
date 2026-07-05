@@ -1,13 +1,19 @@
+import { useLayoutEffect, useRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { SwissQRBill } from 'swissqrbill/svg';
 import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from './rechnung-totals';
 import { formatDateCH } from './utils';
 import type { ArbeitPosition, Customer, MaterialPosition, Position, Rechnung } from '../types';
 
-const CO_NAME  = 'Fabio Stucki';
-const CO_ADDR  = 'Polenstrasse 245';
-const CO_CITY  = '5112 Thalheim AG';
-const CO_PHONE = '079 850 18 63';
-const CO_LOC   = 'Thalheim AG';
+const CO_NAME      = 'Fabio Stucki';
+const CO_ADDR      = 'Polenstrasse 245';
+const CO_CITY      = '5112 Thalheim AG';
+const CO_PHONE     = '079 850 18 63';
+const CO_LOC       = 'Thalheim AG';
+const CO_ZIP       = 5112;
+const CO_CITY_NAME = 'Thalheim AG';
+// Platzhalter-IBAN (gültiges Format, aber keine echte Kontoverbindung) — vor Live-Betrieb durch die echte Raiffeisen-IBAN/QR-IBAN ersetzen.
+const CO_IBAN      = 'CH9300762011623852957';
 const STD_SATZ = '80.00';
 const MIN_ROWS = 15;
 
@@ -34,6 +40,33 @@ function PositionRow({ pos, rowH }: { pos?: Position; rowH: string }) {
       <div style={zeCell}>{ap?.ze || ''}</div>
     </div>
   );
+}
+
+/** Renders the official Swiss QR-Bill (payment part + receipt) as SVG. No debtor address on file, so the payer section is left blank for the client to fill in by hand — valid per spec, debtor is optional. */
+function QRBillSection({ rechnung, amount }: { rechnung: Rechnung; amount: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const container = ref.current;
+    if (!container) return;
+    container.innerHTML = '';
+    const svg = new SwissQRBill({
+      currency: 'CHF',
+      amount,
+      message: `Rechnung #${rechnung.rechnungNumber}`,
+      creditor: {
+        name: CO_NAME,
+        address: CO_ADDR,
+        zip: CO_ZIP,
+        city: CO_CITY_NAME,
+        country: 'CH',
+        account: CO_IBAN,
+      },
+    }, { language: 'DE' });
+    container.appendChild(svg.element);
+  }, [rechnung.rechnungNumber, amount]);
+
+  return <div ref={ref} style={{ width: '210mm', height: '105mm' }} />;
 }
 
 function InvoiceDocument({ rechnung, customer }: { rechnung: Rechnung; customer: Customer | undefined }) {
@@ -66,6 +99,7 @@ function InvoiceDocument({ rechnung, customer }: { rechnung: Rechnung; customer:
   ];
 
   return (
+    <>
     <div style={{
       width: '210mm', minHeight: '297mm', padding: '12mm 15mm', boxSizing: 'border-box',
       background: '#fff', color: '#000', fontFamily: 'Helvetica, Arial, sans-serif', fontSize: '8.5pt',
@@ -169,6 +203,14 @@ function InvoiceDocument({ rechnung, customer }: { rechnung: Rechnung; customer:
         </div>
       </div>
     </div>
+
+    {/* Swiss QR-Bill — own page, full-bleed & bottom-aligned per official layout spec (must not be padded/inset) */}
+    <div style={{ width: '210mm', height: '297mm', boxSizing: 'border-box', position: 'relative', background: '#fff', breakBefore: 'page' }}>
+      <div style={{ position: 'absolute', bottom: 0, left: 0 }}>
+        <QRBillSection rechnung={rechnung} amount={rechnungstotal} />
+      </div>
+    </div>
+    </>
   );
 }
 
