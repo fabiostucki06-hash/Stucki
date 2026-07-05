@@ -139,6 +139,11 @@ export default function App() {
   async function handleDeleteOfferte(id: string) {
     await deleteOfferte(id); setSelOff(null);
   }
+  async function handleDuplicateOfferte(offerte: Offerte) {
+    const { id, offertNumber, status, createdAt, ...rest } = offerte;
+    const dup = await addOfferte(rest);
+    setSelOff(dup);
+  }
   async function handleCreateAuftragFromOfferte(offerte: Offerte, acceptedIndices: number[]) {
     // Copy every accepted position individually — no grouping or merging
     const positions = (offerte.positionen ?? []).filter((_, i) => acceptedIndices.includes(i));
@@ -310,12 +315,14 @@ export default function App() {
 
       {selOff && (
         <OfferteDetail
+          key={selOff.id}
           offerte={selOff}
           customer={customers.find((c) => c.id === selOff.customerId)}
           onClose={() => setSelOff(null)}
           onUpdate={handleUpdateOfferte}
           onDelete={handleDeleteOfferte}
           onEdit={(off) => { setSelOff(null); setEditOff(off); }}
+          onDuplicate={handleDuplicateOfferte}
           onCreateAuftrag={handleCreateAuftragFromOfferte}
           onCreateRechnung={handleCreateRechnungFromOfferte}
         />

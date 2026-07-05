@@ -21,7 +21,7 @@ interface AppContextValue {
   addOrder: (data: Pick<Order, 'customerId' | 'beanstandungen' | 'notizen' | 'positionen' | 'offertId'>) => Promise<void>;
   updateOrder: (upd: Order, cp: Partial<Customer> | null) => Promise<void>;
   deleteOrder: (id: string) => Promise<void>;
-  addOfferte: (data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>) => Promise<void>;
+  addOfferte: (data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>) => Promise<Offerte>;
   updateOfferte: (upd: Offerte) => Promise<void>;
   deleteOfferte: (id: string) => Promise<void>;
   addRechnung: (data: Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>) => Promise<void>;
@@ -135,14 +135,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setOrders((p) => p.filter((o) => o.id !== id));
   }
 
-  async function addOfferte(data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>) {
+  async function addOfferte(data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>): Promise<Offerte> {
     const num = offertNum + 1;
     const newOff: Offerte = { id: `off_${Date.now()}`, offertNumber: num, status: 'entwurf', createdAt: new Date().toISOString(), ...data };
-    try {
-      await syncOk(() => db.upsert('offerten', { id: newOff.id, data: newOff }, token!));
-    } catch { return; }
+    await syncOk(() => db.upsert('offerten', { id: newOff.id, data: newOff }, token!));
     setOfferten((p) => [...p, newOff]); setOffertNum(num);
     showToast(`Offerte #${num} gespeichert`, 'success');
+    return newOff;
   }
 
   async function updateOfferte(upd: Offerte) {

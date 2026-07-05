@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Sheet from '../ui/Sheet';
 import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
-import { SFPlus } from '../Icons';
+import { SFPlus, SFXmark } from '../Icons';
 import { printRechnung } from '../../lib/print-rechnung';
 import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../lib/rechnung-totals';
 import { formatDateCH } from '../../lib/utils';
@@ -88,6 +88,11 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
       next[i] = pos;
       return next;
     });
+    setDirty(true);
+  }
+
+  function removePosition(i: number) {
+    setPositionen((prev) => prev.filter((_, j) => j !== i));
     setDirty(true);
   }
 
@@ -204,8 +209,8 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
           onChange={(e) => handleZahlungsFristChange(e.target.value)}
           min={1}
           style={{
-            width: 48, padding: '3px 6px', fontSize: 15, fontWeight: 600, color: 'var(--green)',
-            background: 'rgba(255,255,255,0.6)', border: '0.5px solid rgba(52,199,89,0.3)',
+            width: 48, padding: '3px 6px', fontSize: 15, fontWeight: 700, color: '#ffffff',
+            background: 'var(--input-bg)', border: '1.5px solid rgba(52,199,89,0.55)',
             borderRadius: 6, textAlign: 'center', outline: 'none',
           }}
         />
@@ -317,6 +322,16 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
             }}>
               CHF {fCHF(parseFloat(pos.preis || '0'))}
             </div>
+
+            {/* Delete position */}
+            <button
+              onClick={() => removePosition(i)}
+              className="del-btn-visible"
+              title="Position löschen"
+              aria-label="Position löschen"
+            >
+              <SFXmark />
+            </button>
           </div>
         ))}
 
