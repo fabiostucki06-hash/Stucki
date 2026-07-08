@@ -18,6 +18,7 @@ interface AppContextValue {
   authChecked: boolean;
   addCustomer: (data: Omit<Customer, 'id' | 'createdAt'>) => Promise<string>;
   updateCustomer: (id: string, data: Partial<Customer>) => Promise<void>;
+  deleteCustomer: (id: string) => Promise<void>;
   addOrder: (data: Pick<Order, 'customerId' | 'beanstandungen' | 'notizen' | 'positionen' | 'offertId'>) => Promise<void>;
   updateOrder: (upd: Order, cp: Partial<Customer> | null) => Promise<void>;
   deleteOrder: (id: string) => Promise<void>;
@@ -117,6 +118,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setCustomers((p) => p.map((c) => (c.id === id ? updated : c)));
   }
 
+  async function deleteCustomer(id: string) {
+    await syncOk(() => db.delete('customers', id, token!));
+    setCustomers((p) => p.filter((c) => c.id !== id));
+  }
+
   async function addOrder(data: Pick<Order, 'customerId' | 'beanstandungen' | 'notizen' | 'positionen' | 'offertId'>) {
     const num = orderNum + 1;
     const newO: Order = { id: `o_${Date.now()}`, orderNumber: num, status: 'aufnahme', statusChangedAt: new Date().toISOString(), createdAt: new Date().toISOString(), ...data };
@@ -186,7 +192,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AppContext.Provider value={{ customers, orders, offerten, rechnungen, orderNum, offertNum, rechnungNum, loading, syncStatus, token, userEmail, authChecked, addCustomer, updateCustomer, addOrder, updateOrder, deleteOrder, addOfferte, updateOfferte, deleteOfferte, addRechnung, updateRechnung, deleteRechnung, handleLogin, handleLogout }}>
+    <AppContext.Provider value={{ customers, orders, offerten, rechnungen, orderNum, offertNum, rechnungNum, loading, syncStatus, token, userEmail, authChecked, addCustomer, updateCustomer, deleteCustomer, addOrder, updateOrder, deleteOrder, addOfferte, updateOfferte, deleteOfferte, addRechnung, updateRechnung, deleteRechnung, handleLogin, handleLogout }}>
       {children}
     </AppContext.Provider>
   );

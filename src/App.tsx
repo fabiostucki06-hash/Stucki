@@ -33,7 +33,7 @@ export default function App() {
     customers, orders, offerten, rechnungen,
     syncStatus, token, authChecked, loading,
     handleLogin, handleLogout,
-    addCustomer, updateCustomer,
+    addCustomer, updateCustomer, deleteCustomer,
     addOrder, updateOrder, deleteOrder,
     addOfferte, updateOfferte, deleteOfferte,
     addRechnung, updateRechnung, deleteRechnung,
@@ -109,6 +109,9 @@ export default function App() {
   async function handleAddCustomer(data: Omit<Customer, 'id' | 'createdAt'>) {
     const id = await addCustomer(data);
     setShowNC(false); setAfterSave(id);
+  }
+  async function handleDeleteCustomer(id: string) {
+    await deleteCustomer(id); setSelC(null);
   }
 
   /* ── Order handlers ── */
@@ -243,7 +246,7 @@ export default function App() {
         {tab === 'offerten'    && <OfferteList offerten={offerten} customers={customers} onOfferteClick={setSelOff} onEdit={(off) => setEditOff(off)} onNew={() => setShowNOff(true)} />}
         {tab === 'rechnungen'  && <RechnungenList rechnungen={rechnungen} customers={customers} onRechnungClick={setSelR} onEdit={(r) => setEditR(r)} onNew={() => setShowNR(true)} />}
         {tab === 'kunden'      && <CustomerList customers={customers} orders={orders} onCustomerClick={setSelC} />}
-        {tab === 'statistiken'   && <StatistikDashboard orders={orders} offerten={offerten} customers={customers} />}
+        {tab === 'statistiken'   && <StatistikDashboard orders={orders} offerten={offerten} rechnungen={rechnungen} customers={customers} />}
         {tab === 'einstellungen' && <SettingsView currentWallpaper={wallpaper} onWallpaperChange={handleWallpaperChange} />}
       </div>
 
@@ -360,6 +363,7 @@ export default function App() {
           onEdit={() => setEditC(selC)}
           onNewOrder={() => { setNewOCid(selC.id); setShowNO(true); setSelC(null); }}
           onOrderClick={(o) => { setSelO(o); setSelC(null); }}
+          onDelete={() => handleDeleteCustomer(selC.id)}
         />
       )}
 

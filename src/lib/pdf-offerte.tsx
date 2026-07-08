@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { formatDateCH } from './utils';
+import { formatDateCH, buildDocumentFilename } from './utils';
 import type { ArbeitPosition, Customer, MaterialPosition, Offerte } from '../types';
 
 const CO_NAME  = 'Fabio Stucki';
@@ -104,9 +104,9 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined) {
   // ── VEHICLE INFO ──────────────────────────────────────────────────────────
   const vRows: [string, string][] = [
     ['Fahrzeug',          vehicle || '–'],
-    ['1. Inv.-Setzung',   ''],
+    ['1. Inv.-Setzung',   customer?.erstzulassung ? formatDateCH(customer.erstzulassung) : '–'],
     ['Kennzeichen',       customer?.kennzeichen ?? '–'],
-    ['Chassis-Nr.',       ''],
+    ['Chassis-Nr.',       customer?.chassisnummer ?? '–'],
     ['Km-Stand',          customer?.km ? String(customer.km) + ' km' : '–'],
     ['Fahrzeugbesitzer',  owner || '–'],
   ];
@@ -235,7 +235,7 @@ export async function exportOffertePDF(offerte: Offerte, customer: Customer | un
   try {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     drawDoc(doc, offerte, customer);
-    doc.save(`Offerte_${offerte.offertNumber}_${customer?.nachname ?? 'Kunde'}.pdf`);
+    doc.save(`${buildDocumentFilename(customer, 'Offerte', offerte.offertNumber ?? '')}.pdf`);
   } catch (err) {
     alert(`PDF-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);
   }

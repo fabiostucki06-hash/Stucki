@@ -4,6 +4,21 @@ import type { Order, Customer } from '../types';
 export const formatDateCH = (d: string | Date): string =>
   new Date(d).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
+/** Builds the standard export filename "Vorname Nachname DocType_Nummer", stripped of characters invalid in filenames. */
+export function buildDocumentFilename(customer: Customer | undefined, docType: string, number: number | string): string {
+  const name = customer ? `${customer.vorname} ${customer.nachname}`.trim() : 'Kunde';
+  return `${name} ${docType}_${number}`.replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+/** Prints with document.title temporarily set so the browser's print/"Save as PDF" dialog suggests the right filename. */
+export function printWithFilename(filename: string): void {
+  const prevTitle = document.title;
+  document.title = filename;
+  const restore = () => { document.title = prevTitle; window.removeEventListener('afterprint', restore); };
+  window.addEventListener('afterprint', restore);
+  window.print();
+}
+
 export const daysSince = (d?: string): number =>
   d ? Math.floor((Date.now() - new Date(d).getTime()) / 86_400_000) : 0;
 

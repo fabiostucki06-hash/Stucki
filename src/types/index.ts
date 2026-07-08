@@ -8,6 +8,8 @@ export interface Customer {
   modell?: string;
   kennzeichen?: string;
   km?: string;
+  chassisnummer?: string;
+  erstzulassung?: string;
   createdAt: string;
 }
 

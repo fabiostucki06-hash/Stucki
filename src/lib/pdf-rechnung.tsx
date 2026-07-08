@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { SwissQRBill } from 'swissqrbill/svg';
 import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from './rechnung-totals';
-import { formatDateCH } from './utils';
+import { formatDateCH, buildDocumentFilename } from './utils';
 import { getIban } from './settings';
 import type { ArbeitPosition, Customer, MaterialPosition, Position, Rechnung } from '../types';
 
@@ -42,11 +42,6 @@ const x2 = x1 + wMen;   // 110 – Stk.Preis left
 const x3 = x2 + wStk;   // 140 – Preis left
 const x4 = x3 + wPre;   // 170 – ZE left
 // TR = 195 = x4 + wZE
-
-/** Strips characters that are invalid in filenames on Windows/macOS/Linux, keeping spaces intact. */
-function sanitizeFilename(name: string): string {
-  return name.replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim();
-}
 
 function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined) {
   const vehicle = [customer?.marke, customer?.modell].filter(Boolean).join(' ');
@@ -117,9 +112,9 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
   // ── VEHICLE INFO ──────────────────────────────────────────────────────────
   const vRows: [string, string][] = [
     ['Fahrzeug',         vehicle || '–'],
-    ['1. Inv.-Setzung',  ''],
+    ['1. Inv.-Setzung',  customer?.erstzulassung ? formatDateCH(customer.erstzulassung) : '–'],
     ['Kennzeichen',      customer?.kennzeichen ?? '–'],
-    ['Chassis-Nr.',      ''],
+    ['Chassis-Nr.',      customer?.chassisnummer ?? '–'],
     ['Km Stand',         customer?.km ? `${customer.km} km` : '–'],
     ['Fahrzeugbesitzer', owner || '–'],
   ];
@@ -284,7 +279,7 @@ async function renderQrBillImage(rechnung: Rechnung, amount: number): Promise<{ 
   }
 }
 
-/** Renders the invoice + Swiss QR-Bill as a jsPDF document and saves it as "[Kundenname] Rechnungsnummer [X].pdf". */
+/** Renders the invoice + Swiss QR-Bill as a jsPDF document and saves it as "Vorname Nachname Rechnung_[X].pdf". */
 export async function exportRechnungPDF(rechnung: Rechnung, customer: Customer | undefined): Promise<void> {
   try {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -301,9 +296,7 @@ export async function exportRechnungPDF(rechnung: Rechnung, customer: Customer |
       doc.setTextColor(0, 0, 0);
     }
 
-    const owner = customer ? `${customer.vorname} ${customer.nachname}`.trim() : '';
-    const filename = sanitizeFilename(`${owner || 'Kunde'} Rechnungsnummer ${rechnung.rechnungNumber ?? ''}`);
-    doc.save(`${filename}.pdf`);
+    doc.save(`${buildDocumentFilename(customer, 'Rechnung', rechnung.rechnungNumber ?? '')}.pdf`);
   } catch (err) {
     alert(`PDF-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);
   }

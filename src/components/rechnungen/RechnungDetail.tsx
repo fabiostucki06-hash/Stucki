@@ -5,7 +5,7 @@ import { showToast } from '../ui/Toast';
 import { SFPlus, SFXmark } from '../Icons';
 import { exportRechnungPDF } from '../../lib/pdf-rechnung';
 import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../lib/rechnung-totals';
-import { formatDateCH } from '../../lib/utils';
+import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../lib/utils';
 import type { Customer, Rechnung, RechnungStatus, Position, ArbeitPosition, MaterialPosition } from '../../types';
 
 interface RechnungDetailProps {
@@ -457,7 +457,14 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
         className="btn-system btn-green"
         style={{ marginBottom: 12 }}
       >
-        Drucken / PDF exportieren
+        PDF speichern
+      </button>
+      <button
+        onClick={() => printWithFilename(buildDocumentFilename(customer, 'Rechnung', rechnung.rechnungNumber ?? ''))}
+        className="btn-system btn-secondary"
+        style={{ marginBottom: 12 }}
+      >
+        Drucken
       </button>
       <button
         onClick={async () => { if (window.confirm('Rechnung löschen?')) await onDelete(rechnung.id); }}

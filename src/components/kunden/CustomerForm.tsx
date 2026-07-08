@@ -19,8 +19,10 @@ export default function CustomerForm({ initial, onSave, onCancel, saving }: Cust
     email:       initial?.email       ?? '',
     marke:       initial?.marke       ?? '',
     modell:      initial?.modell      ?? '',
-    kennzeichen: initial?.kennzeichen ?? '',
-    km:          initial?.km          ?? '',
+    kennzeichen:    initial?.kennzeichen    ?? '',
+    km:             initial?.km             ?? '',
+    chassisnummer:  initial?.chassisnummer  ?? '',
+    erstzulassung:  initial?.erstzulassung  ?? '',
   });
 
   const s = (k: keyof CustomerData) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -79,6 +81,16 @@ export default function CustomerForm({ initial, onSave, onCancel, saving }: Cust
           <div className="cf-field">
             <label className="cf-label">KM-Stand</label>
             <input className="cf-input" type="number" value={String(f.km ?? '')} onChange={s('km')} placeholder="85000" />
+          </div>
+        </div>
+        <div className="cf-grid-2" style={{ marginTop: 10 }}>
+          <div className="cf-field">
+            <label className="cf-label">Chassisnummer</label>
+            <input className="cf-input" value={f.chassisnummer} onChange={s('chassisnummer')} placeholder="WBA12345678901234" />
+          </div>
+          <div className="cf-field">
+            <label className="cf-label">1. Inv. Setzung</label>
+            <input className="cf-input" type="date" value={f.erstzulassung} onChange={s('erstzulassung')} />
           </div>
         </div>
       </div>

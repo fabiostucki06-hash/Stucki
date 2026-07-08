@@ -224,6 +224,23 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .context-menu{animation:pop-in 0.22s cubic-bezier(0.34,1.56,0.64,1)}
 .overdue-dot{width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block;flex-shrink:0}
 
+/* ── PRINT ── hide app chrome, show only the sheet content ── */
+@page{
+  size:auto;
+  margin:15mm 12mm;
+}
+@media print{
+  html,body{margin:0}
+  .no-print{display:none!important}
+  body *{visibility:hidden}
+  .sheet-content,.sheet-content *{visibility:visible}
+  .sheet-backdrop,.sheet-handle,.sheet-nav{display:none!important}
+  .sheet-container{position:absolute;top:0;left:0;right:auto;bottom:auto;width:100%;max-height:none;box-shadow:none;border:none;background:#fff;-webkit-backdrop-filter:none;backdrop-filter:none;animation:none}
+  .sheet-content{position:static;overflow:visible;padding:0;background:#fff}
+  .sheet-content button{display:none!important}
+  .sheet-content *{background:none!important;box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;color:#000!important;text-shadow:none!important}
+}
+
 /* ── LOGIN ── */
 .login-card{background:rgba(255,255,255,0.12);-webkit-backdrop-filter:saturate(260%) blur(72px);backdrop-filter:saturate(260%) blur(72px);border-radius:var(--radius-xl);border:1px solid rgba(255,255,255,0.22);padding:36px 32px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.65),var(--shadow-xl);width:100%;max-width:380px}
 .werkstatt-logo{max-height:60px;width:auto;object-fit:contain;display:block}

@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import type { Order, Offerte, Customer } from '../../types';
+import type { Order, Offerte, Rechnung, Customer } from '../../types';
 
 interface Props {
   orders: Order[];
   offerten: Offerte[];
+  rechnungen: Rechnung[];
   customers: Customer[];
 }
 
@@ -39,7 +40,7 @@ const LockIcon = () => (
   </svg>
 );
 
-export default function StatistikDashboard({ orders, offerten, customers }: Props) {
+export default function StatistikDashboard({ orders, offerten, rechnungen, customers }: Props) {
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth());
@@ -54,23 +55,18 @@ export default function StatistikDashboard({ orders, offerten, customers }: Prop
     return d.getFullYear() === y && d.getMonth() === m;
   };
 
-  const orderRevenue = (y: number, m: number) =>
-    orders
-      .filter((o) => (o.status === 'zahlung_erhalten' || o.status === 'abgeschlossen') && inMonth(o.createdAt, y, m))
-      .reduce((s, o) => s + (parseFloat(o.rechnungsBetrag ?? '0') || 0), 0);
+  // Reiner Gewinn: nur die Arbeitsposition ("Arbeit") bezahlter Rechnungen zählt, Material wird ignoriert.
+  const paidRechnungen = (y: number, m: number) =>
+    rechnungen.filter((r) => r.status === 'bezahlt' && inMonth(r.createdAt, y, m));
 
-  const offerteRevenue = (y: number, m: number) =>
-    offerten
-      .filter((o) => o.status === 'angenommen' && inMonth(o.createdAt, y, m))
-      .reduce((s, o) => s + (parseFloat(o.totalBetrag ?? '0') || 0), 0);
+  const profit = (y: number, m: number) =>
+    paidRechnungen(y, m).reduce((s, r) => s + (parseFloat(r.totalArbeit ?? '0') || 0), 0);
 
-  const curOrderRev   = orderRevenue(viewYear, viewMonth);
-  const curOfferteRev = offerteRevenue(viewYear, viewMonth);
-  const curTotal      = curOrderRev + curOfferteRev;
-
-  const prevOrderRev   = orderRevenue(prevYear, prevMonth);
-  const prevOfferteRev = offerteRevenue(prevYear, prevMonth);
-  const prevTotal      = prevOrderRev + prevOfferteRev;
+  const curTotal  = profit(viewYear, viewMonth);
+  const prevTotal = profit(prevYear, prevMonth);
+  const curPaidCount = paidRechnungen(viewYear, viewMonth).length;
+  const curMaterialExcluded = paidRechnungen(viewYear, viewMonth)
+    .reduce((s, r) => s + (parseFloat(r.totalMaterial ?? '0') || 0), 0);
 
   const delta = prevTotal > 0 ? ((curTotal - prevTotal) / prevTotal) * 100 : null;
 
@@ -135,7 +131,8 @@ export default function StatistikDashboard({ orders, offerten, customers }: Prop
           <button onClick={() => navMonth(1)} disabled={isCurrentMonth} style={{ width: 32, height: 32, background: isCurrentMonth ? 'transparent' : 'rgba(0,122,255,0.10)', border: 'none', borderRadius: 8, color: isCurrentMonth ? 'var(--label4)' : 'var(--blue)', cursor: isCurrentMonth ? 'default' : 'pointer', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
         </div>
 
-        {/* ── Umsatz ── */}
+        {/* ── Reiner Gewinn (nur Arbeit bezahlter Rechnungen, Material ausgeklammert) ── */}
+        <p className="section-header" style={{ paddingLeft: 0 }}>Reiner Gewinn</p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
           {/* Current month */}
           <div className="stat-card" style={{ position: 'relative', overflow: 'hidden' }}>
@@ -159,16 +156,16 @@ export default function StatistikDashboard({ orders, offerten, customers }: Prop
           </div>
         </div>
 
-        {/* Umsatz Aufschlüsselung */}
+        {/* Aufschlüsselung: was in den reinen Gewinn eingeflossen ist */}
         <div className="glass-panel" style={{ padding: '14px 16px', marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--label2)' }}>Erledigte Aufträge</span>
-            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--blue)', letterSpacing: '-0.3px' }}>{fCHF(curOrderRev)}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--label2)' }}>Bezahlte Rechnungen</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--blue)', letterSpacing: '-0.3px' }}>{curPaidCount}</span>
           </div>
           <div style={{ height: '0.5px', background: 'var(--sep)', marginBottom: 10 }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--label2)' }}>Offerten angenommen</span>
-            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--green)', letterSpacing: '-0.3px' }}>{fCHF(curOfferteRev)}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--label2)' }}>Material (nicht Gewinn)</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--label3)', letterSpacing: '-0.3px' }}>{fCHF(curMaterialExcluded)}</span>
           </div>
         </div>
 

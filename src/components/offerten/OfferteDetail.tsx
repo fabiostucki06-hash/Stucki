@@ -4,7 +4,7 @@ import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
 import { SFPlus, SFXmark } from '../Icons';
 import { exportOffertePDF } from '../../lib/pdf-offerte';
-import { formatDateCH } from '../../lib/utils';
+import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../lib/utils';
 import type { Customer, Offerte, OfferteStatus, Position, ArbeitPosition, MaterialPosition } from '../../types';
 
 interface OfferteDetailProps {
@@ -486,7 +486,8 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
 
       {offerte.notizen && <div style={{ background: 'var(--fill3)', borderRadius: 12, padding: '12px 14px', fontSize: 15, color: 'var(--label2)', marginBottom: 16 }}>{offerte.notizen}</div>}
 
-      <button onClick={() => exportOffertePDF(offerte, customer)} className="btn-system btn-green" style={{ marginBottom: 12 }}>PDF exportieren</button>
+      <button onClick={() => exportOffertePDF(offerte, customer)} className="btn-system btn-green" style={{ marginBottom: 12 }}>PDF speichern</button>
+      <button onClick={() => printWithFilename(buildDocumentFilename(customer, 'Offerte', offerte.offertNumber ?? ''))} className="btn-system btn-secondary" style={{ marginBottom: 12 }}>Drucken</button>
       <button onClick={handleDuplicate} disabled={duplicating} className="btn-system btn-secondary" style={{ marginBottom: 12 }}>
         {duplicating ? <><Spinner size={13} />&nbsp; Wird dupliziert…</> : 'Offerte duplizieren'}
       </button>
