@@ -31,7 +31,7 @@ export default function CustomerDetail({ customer, orders, onClose, onEdit, onNe
             boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.5),0 3px 8px rgba(0,86,179,0.35)',
             textShadow: '0 -1px 0 rgba(0,0,0,0.3)',
           }}>
-            {(customer.vorname[0] ?? '').toUpperCase()}{(customer.nachname[0] ?? '').toUpperCase()}
+            {(customer.vorname?.[0] ?? '').toUpperCase()}{(customer.nachname?.[0] ?? '').toUpperCase()}
           </div>
           <div>
             <div className="sf-title3">{customer.vorname} {customer.nachname}</div>

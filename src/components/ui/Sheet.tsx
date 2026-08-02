@@ -11,9 +11,22 @@ interface SheetProps {
 
 export default function Sheet({ title, onClose, children, full, barLeft, barRight }: SheetProps) {
   useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
+    // Plain `overflow:hidden` doesn't block background scroll on iOS Safari.
+    // Pin the body in place instead and restore the scroll position on close.
+    const scrollY = window.scrollY;
+    const body = document.body.style;
+    const prev = { position: body.position, top: body.top, width: body.width, overflow: body.overflow };
+    body.position = 'fixed';
+    body.top = `-${scrollY}px`;
+    body.width = '100%';
+    body.overflow = 'hidden';
+    return () => {
+      body.position = prev.position;
+      body.top = prev.top;
+      body.width = prev.width;
+      body.overflow = prev.overflow;
+      window.scrollTo(0, scrollY);
+    };
   }, []);
 
   return (

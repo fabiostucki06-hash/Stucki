@@ -62,7 +62,7 @@ export default function CustomerList({ customers, orders, onCustomerClick }: Cus
             return (
               <div key={c.id} className="list-row" onClick={() => onCustomerClick(c)}>
                 <div style={{ width: 36, height: 36, borderRadius: 18, background: 'linear-gradient(to bottom,#54a4ff,#007aff)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.5),0 2px 6px rgba(0,86,179,0.30)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#fff', flexShrink: 0, textShadow: '0 -1px 0 rgba(0,0,0,0.25)' }}>
-                  {(c.vorname[0] ?? '').toUpperCase()}{(c.nachname[0] ?? '').toUpperCase()}
+                  {(c.vorname?.[0] ?? '').toUpperCase()}{(c.nachname?.[0] ?? '').toUpperCase()}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: 16 }}>{c.vorname} {c.nachname}</div>
