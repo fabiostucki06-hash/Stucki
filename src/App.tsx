@@ -242,10 +242,10 @@ export default function App() {
 
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 0 8px' }}>
         {tab === 'dashboard'   && <Dashboard customers={customers} orders={orders} onOrderClick={(o) => { setSelOInEdit(false); setSelO(o); }} />}
-        {tab === 'auftraege'   && <OrderList orders={orders} customers={customers} onOrderClick={(o) => { setSelOInEdit(false); setSelO(o); }} onEditClick={(o) => { setSelOInEdit(true); setSelO(o); }} />}
+        {tab === 'auftraege'   && <OrderList orders={orders} customers={customers} onOrderClick={(o) => { setSelOInEdit(false); setSelO(o); }} onEditClick={(o) => { setSelOInEdit(true); setSelO(o); }} onNew={() => { setNewOCid(null); setShowNO(true); }} />}
         {tab === 'offerten'    && <OfferteList offerten={offerten} customers={customers} onOfferteClick={setSelOff} onEdit={(off) => setEditOff(off)} onNew={() => setShowNOff(true)} />}
         {tab === 'rechnungen'  && <RechnungenList rechnungen={rechnungen} customers={customers} onRechnungClick={setSelR} onEdit={(r) => setEditR(r)} onNew={() => setShowNR(true)} />}
-        {tab === 'kunden'      && <CustomerList customers={customers} orders={orders} onCustomerClick={setSelC} />}
+        {tab === 'kunden'      && <CustomerList customers={customers} orders={orders} onCustomerClick={setSelC} onNew={() => setShowNC(true)} />}
         {tab === 'statistiken'   && <StatistikDashboard orders={orders} offerten={offerten} rechnungen={rechnungen} customers={customers} />}
         {tab === 'einstellungen' && <SettingsView currentWallpaper={wallpaper} onWallpaperChange={handleWallpaperChange} />}
       </div>

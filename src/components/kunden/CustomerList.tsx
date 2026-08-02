@@ -8,9 +8,10 @@ interface CustomerListProps {
   customers: Customer[];
   orders: Order[];
   onCustomerClick: (c: Customer) => void;
+  onNew: () => void;
 }
 
-export default function CustomerList({ customers, orders, onCustomerClick }: CustomerListProps) {
+export default function CustomerList({ customers, orders, onCustomerClick, onNew }: CustomerListProps) {
   const [search, setSearch] = useState('');
   const [filterK, setFilterK] = useState<'all' | 'active' | 'inactive'>('all');
 
@@ -29,8 +30,9 @@ export default function CustomerList({ customers, orders, onCustomerClick }: Cus
 
   return (
     <div>
-      <div style={{ padding: '16px 16px 0' }}>
+      <div style={{ padding: '16px 16px 0', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
         <h1 className="sf-title1" style={{ marginBottom: 8, paddingTop: 8 }}>Kunden</h1>
+        <button onClick={onNew} className="btn-tinted">+ Neue</button>
       </div>
 
       <div className="search-bar-wrap">

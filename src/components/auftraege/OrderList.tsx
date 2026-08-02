@@ -11,9 +11,10 @@ interface OrderListProps {
   customers: Customer[];
   onOrderClick: (o: Order) => void;
   onEditClick: (o: Order) => void;
+  onNew: () => void;
 }
 
-export default function OrderList({ orders, customers, onOrderClick, onEditClick }: OrderListProps) {
+export default function OrderList({ orders, customers, onOrderClick, onEditClick, onNew }: OrderListProps) {
   const [search, setSearch] = useState('');
 
   const filtered = search.trim()
@@ -37,7 +38,10 @@ export default function OrderList({ orders, customers, onOrderClick, onEditClick
 
   return (
     <div style={{ padding: '16px 16px 0' }}>
-      <h1 className="sf-title1" style={{ marginBottom: 8, paddingTop: 8 }}>Aufträge</h1>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+        <h1 className="sf-title1" style={{ marginBottom: 8, paddingTop: 8 }}>Aufträge</h1>
+        <button onClick={onNew} className="btn-tinted">+ Neue</button>
+      </div>
 
       <div className="search-bar-wrap" style={{ padding: '8px 0 12px' }}>
         <div className="search-bar">
