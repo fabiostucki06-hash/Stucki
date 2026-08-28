@@ -85,6 +85,8 @@ export interface Offerte {
 
 export type RechnungStatus = 'entwurf' | 'versendet' | 'bezahlt' | 'storniert';
 
+export type RechnungKategorie = 'reparatur' | 'karosserie' | 'inspektion' | 'service';
+
 export interface Rechnung {
   id: string;
   rechnungNumber: number;
@@ -101,6 +103,9 @@ export interface Rechnung {
   totalArbeit?: string;
   totalMaterial?: string;
   totalZE?: number;
+  kategorie?: RechnungKategorie;
+  /** Manual Kleinteilepauschale override: true=erzwingen, false=unterdrücken, undefined/null=automatisch (nach Kategorie). */
+  kleinteilManuell?: boolean | null;
 }
 
 export type TabId = 'dashboard' | 'auftraege' | 'offerten' | 'rechnungen' | 'kunden' | 'statistiken' | 'einstellungen';

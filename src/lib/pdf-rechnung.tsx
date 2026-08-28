@@ -48,7 +48,7 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
   const owner   = customer ? `${customer.vorname} ${customer.nachname}` : '';
 
   const { totalMaterial: totM, totalArbeit: totA, zwischensumme: total, rechnungstotal, kleinteilApplied } =
-    computeRechnungTotals(rechnung.positionen ?? []);
+    computeRechnungTotals(rechnung.positionen ?? [], rechnung.kategorie, rechnung.kleinteilManuell);
 
   const rows: (Position | undefined)[] = [...(rechnung.positionen ?? [])];
   if (kleinteilApplied) {

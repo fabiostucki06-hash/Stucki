@@ -2,7 +2,8 @@ import { useState } from 'react';
 import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
 import { SFPlus, SFXmark } from '../Icons';
-import type { Customer, Order, Offerte, ArbeitPosition, MaterialPosition, Rechnung } from '../../types';
+import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../lib/rechnung-totals';
+import type { Customer, Order, Offerte, ArbeitPosition, MaterialPosition, Rechnung, RechnungKategorie } from '../../types';
 
 type ArbeitRow   = ArbeitPosition  & { zeLoading: boolean; zeHint: string };
 type MaterialRow = MaterialPosition;
@@ -43,6 +44,13 @@ async function schaetzeZEmitKI(beschreibung: string, fz: string): Promise<{ ze: 
   return { ze: String(Math.round(parsed.ze)), begruendung: parsed.begruendung };
 }
 
+const KATEGORIE_OPTS: [RechnungKategorie, string][] = [
+  ['reparatur',  'Reparatur'],
+  ['karosserie', 'Karosserie'],
+  ['inspektion', 'Inspektion'],
+  ['service',    'Service'],
+];
+
 const newArbeit   = (): ArbeitRow   => ({ typ: 'arbeit',   beschreibung: '', ze: '', stundenansatz: '80', preis: '', zeKI: false, zeLoading: false, zeHint: '' });
 const newMaterial = (): MaterialRow => ({ typ: 'material', beschreibung: '', menge: '1', stueckpreis: '', preis: '' });
 const fCHF = (n: number) => 'CHF ' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, "'");
@@ -70,6 +78,8 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
     return mp.length ? [...mp] : [newMaterial()];
   });
   const [notizen,      setNotizen]      = useState(initial?.notizen ?? '');
+  const [kategorie,    setKategorie]    = useState<RechnungKategorie | ''>(initial?.kategorie ?? '');
+  const [kleinteilManuell, setKleinteilManuell] = useState<boolean | null>(initial?.kleinteilManuell ?? null);
   const [zahlungsFrist, setZahlungsFrist] = useState(initial?.zahlungsFrist ?? '30');
   const [faelligAm,    setFaelligAm]    = useState(
     () => initial?.faelligAm ?? calcFaelligAm(initial?.zahlungsFrist ?? '30')
@@ -184,19 +194,19 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
     return n;
   });
 
-  const totA  = arbeit.reduce((s, p) => s + (parseFloat(p.preis) || 0), 0);
-  const totM  = material.reduce((s, p) => s + (parseFloat(p.preis) || 0), 0);
-  const totZE = arbeit.reduce((s, p) => s + (parseFloat(p.ze) || 0), 0);
+  const ap = arbeit.filter((p) => p.beschreibung.trim());
+  const mp = material.filter((p) => p.beschreibung.trim());
+  const { totalMaterial: totM, totalArbeit: totA, totalZE: totZE, rechnungstotal, kleinteilApplied } =
+    computeRechnungTotals([...ap, ...mp], kategorie || undefined, kleinteilManuell);
 
   function submit() {
     if (!cid) { showToast('Bitte einen Kunden auswählen', 'error'); return; }
-    const ap = arbeit.filter((p) => p.beschreibung.trim());
-    const mp = material.filter((p) => p.beschreibung.trim());
     if (!ap.length && !mp.length) { showToast('Mindestens eine Position eingeben', 'error'); return; }
     onSave({
       customerId: cid, titel, positionen: [...ap, ...mp], notizen,
       zahlungsFrist, faelligAm,
-      totalBetrag: (totA + totM).toFixed(2), totalArbeit: totA.toFixed(2),
+      kategorie: kategorie || undefined, kleinteilManuell,
+      totalBetrag: rechnungstotal.toFixed(2), totalArbeit: totA.toFixed(2),
       totalMaterial: totM.toFixed(2), totalZE: totZE,
       auftragId: selectedAuftragId || undefined,
     });
@@ -333,6 +343,19 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
           <input className="cf-input" value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="z.B. Inspektion, Reparatur…" />
         </div>
 
+        <div className="cf-field" style={{ marginBottom: 12 }}>
+          <label className="cf-label">Auftragsart</label>
+          <select
+            className="cf-select"
+            value={kategorie}
+            onChange={(e) => setKategorie(e.target.value as RechnungKategorie | '')}
+            style={{ color: kategorie ? 'var(--label)' : 'var(--label3)' }}
+          >
+            <option value="">Keine Angabe</option>
+            {KATEGORIE_OPTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+          </select>
+        </div>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <label className="cf-label" style={{ marginBottom: 0, whiteSpace: 'nowrap' }}>Zahlungsfrist</label>
           <input
@@ -462,6 +485,34 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
           </>
         )}
 
+        {/* ── Kleinteilepauschale: manual override ── */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          marginTop: 10, paddingTop: 10, borderTop: '0.5px solid var(--sep)',
+        }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={kleinteilApplied}
+              onChange={(e) => setKleinteilManuell(e.target.checked)}
+              style={{ width: 16, height: 16, accentColor: 'var(--blue)' }}
+            />
+            <span style={{ fontSize: 13 }}>
+              {KLEINTEIL_LABEL} hinzufügen <span style={{ color: 'var(--label3)' }}>(CHF {fCHF(KLEINTEIL_BETRAG)})</span>
+            </span>
+          </label>
+          {kleinteilManuell != null && (
+            <button
+              type="button"
+              onClick={() => setKleinteilManuell(null)}
+              className="pill-btn pill-btn-inactive"
+              style={{ fontSize: 11, padding: '4px 10px' }}
+            >
+              Automatisch
+            </button>
+          )}
+        </div>
+
         {/* ── Totals summary ── */}
         <div style={{
           display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8,
@@ -469,9 +520,9 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
           borderTop: '0.5px solid var(--sep)',
         }}>
           {([
-            ['Arbeit',   fCHF(totA),        totZE ? `${totZE} ZE` : null, 'var(--blue)'],
-            ['Material', fCHF(totM),        null,                          'var(--green)'],
-            ['Total',    fCHF(totA + totM), null,                          'var(--indigo)'],
+            ['Arbeit',   fCHF(totA),           totZE ? `${totZE} ZE` : null, 'var(--blue)'],
+            ['Material', fCHF(totM),           null,                          'var(--green)'],
+            ['Total',    fCHF(rechnungstotal), null,                          'var(--indigo)'],
           ] as [string, string, string | null, string][]).map(([l, v, sub, c]) => (
             <div key={l} style={{
               textAlign: 'center', padding: '6px 5px',

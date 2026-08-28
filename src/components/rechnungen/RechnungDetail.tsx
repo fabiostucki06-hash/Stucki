@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Sheet from '../ui/Sheet';
 import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
@@ -6,7 +6,7 @@ import { SFPlus, SFXmark } from '../Icons';
 import { exportRechnungPDF } from '../../lib/pdf-rechnung';
 import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../lib/rechnung-totals';
 import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../lib/utils';
-import type { Customer, Rechnung, RechnungStatus, Position, ArbeitPosition, MaterialPosition } from '../../types';
+import type { Customer, Rechnung, RechnungStatus, RechnungKategorie, Position, ArbeitPosition, MaterialPosition } from '../../types';
 
 interface RechnungDetailProps {
   rechnung: Rechnung;
@@ -26,6 +26,16 @@ const ST_META: Record<RechnungStatus, StatusMeta> = {
 };
 
 const fCHF = (n: number) => n.toFixed(2);
+
+const KATEGORIE_OPTS: [RechnungKategorie, string][] = [
+  ['reparatur',  'Reparatur'],
+  ['karosserie', 'Karosserie'],
+  ['inspektion', 'Inspektion'],
+  ['service',    'Service'],
+];
+const KATEGORIE_LABEL: Record<RechnungKategorie, string> = {
+  reparatur: 'Reparatur', karosserie: 'Karosserie', inspektion: 'Inspektion', service: 'Service',
+};
 
 function calcFaelligAm(createdAt: string, days: string): string {
   const n = parseInt(days);
@@ -47,6 +57,8 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
   const [posSaving, setPosSaving] = useState(false);
   const [positionen, setPositionen] = useState<Position[]>(() => rechnung.positionen ?? []);
   const [zahlungsFrist, setZahlungsFrist] = useState(rechnung.zahlungsFrist ?? '30');
+  const [kategorie, setKategorie] = useState<RechnungKategorie | ''>(rechnung.kategorie ?? '');
+  const [kleinteilManuell, setKleinteilManuell] = useState<boolean | null>(rechnung.kleinteilManuell ?? null);
   const [dirty, setDirty] = useState(false);
 
   const [addingTyp, setAddingTyp] = useState<'arbeit' | 'material' | null>(null);
@@ -55,6 +67,14 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
   const [newAW, setNewAW] = useState('80');
   const [newMenge, setNewMenge] = useState('1');
   const [newPreis, setNewPreis] = useState('');
+
+  // rechnung prop can change (e.g. after editing) while this component stays
+  // mounted — resync local Zahlungsfrist so the countdown never shows stale data.
+  useEffect(() => {
+    setZahlungsFrist(rechnung.zahlungsFrist ?? '30');
+    setKategorie(rechnung.kategorie ?? '');
+    setKleinteilManuell(rechnung.kleinteilManuell ?? null);
+  }, [rechnung.id, rechnung.zahlungsFrist, rechnung.kategorie, rechnung.kleinteilManuell]);
 
   const sc = ST_META[rechnung.status] ?? ST_META.entwurf;
   const faelligAm = calcFaelligAm(rechnung.createdAt, zahlungsFrist);
@@ -68,9 +88,24 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
     setDirty(true);
   }
 
+  function handleKategorieChange(val: RechnungKategorie | '') {
+    setKategorie(val);
+    setDirty(true);
+  }
+
+  function handleKleinteilToggle(checked: boolean) {
+    setKleinteilManuell(checked);
+    setDirty(true);
+  }
+
+  function resetKleinteilAuto() {
+    setKleinteilManuell(null);
+    setDirty(true);
+  }
+
   /* ── live totals from local state ── */
   const { totalMaterial: totM, totalArbeit: totA, totalZE: totZE, zwischensumme: total, rechnungstotal, kleinteilApplied } =
-    computeRechnungTotals(positionen);
+    computeRechnungTotals(positionen, kategorie || undefined, kleinteilManuell);
 
   function updPos(i: number, key: string, val: string) {
     setPositionen((prev) => {
@@ -139,6 +174,8 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
         totalZE: totZE,
         zahlungsFrist,
         faelligAm,
+        kategorie: kategorie || undefined,
+        kleinteilManuell,
       });
       setDirty(false);
       showToast('Positionen gespeichert', 'success');
@@ -199,6 +236,19 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
           Zahlbar bis: {formatDateCH(faelligAm)}{isOverdue ? ' (überfällig)' : ''}
         </div>
       )}
+
+      <p className="section-header">Auftragsart</p>
+      <div className="h-scroll" style={{ marginBottom: 16 }}>
+        {KATEGORIE_OPTS.map(([k, l]) => (
+          <button
+            key={k}
+            onClick={() => handleKategorieChange(kategorie === k ? '' : k)}
+            className={`pill-btn ${kategorie === k ? 'pill-btn-active' : 'pill-btn-inactive'}`}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
 
       <div style={{ background: 'rgba(52,199,89,0.09)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, border: '0.5px solid rgba(52,199,89,0.22)' }}>
         <span style={{ fontSize: 16, color: 'var(--green)' }}>✓</span>
@@ -349,7 +399,9 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="sf-subhead">{KLEINTEIL_LABEL}</div>
               <div style={{ fontSize: 10, color: 'var(--label3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>
-                Automatisch · ZE &gt; 100
+                {kleinteilManuell != null
+                  ? 'Manuell aktiviert'
+                  : `Automatisch · ${kategorie ? KATEGORIE_LABEL[kategorie] : '—'}`}
               </div>
             </div>
             <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--blue)', flexShrink: 0, minWidth: 68, textAlign: 'right', letterSpacing: '-0.2px' }}>
@@ -357,6 +409,28 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
             </div>
           </div>
         )}
+
+        {/* ── Kleinteilepauschale: manual override ── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '0.5px solid var(--sep)' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={kleinteilApplied}
+              onChange={(e) => handleKleinteilToggle(e.target.checked)}
+              style={{ width: 16, height: 16, accentColor: 'var(--blue)' }}
+            />
+            <span className="sf-subhead">Kleinteilepauschale hinzufügen</span>
+          </label>
+          {kleinteilManuell != null && (
+            <button
+              onClick={resetKleinteilAuto}
+              className="pill-btn pill-btn-inactive"
+              style={{ fontSize: 11, padding: '4px 10px' }}
+            >
+              Automatisch
+            </button>
+          )}
+        </div>
 
         {/* ── Add new position ── */}
         <div style={{ padding: '10px 16px' }}>
