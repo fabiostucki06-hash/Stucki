@@ -68,13 +68,10 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
   const [newMenge, setNewMenge] = useState('1');
   const [newPreis, setNewPreis] = useState('');
 
-  // rechnung prop can change (e.g. after editing) while this component stays
-  // mounted — resync local Zahlungsfrist so the countdown never shows stale data.
   useEffect(() => {
-    setZahlungsFrist(rechnung.zahlungsFrist ?? '30');
     setKategorie(rechnung.kategorie ?? '');
     setKleinteilManuell(rechnung.kleinteilManuell ?? null);
-  }, [rechnung.id, rechnung.zahlungsFrist, rechnung.kategorie, rechnung.kleinteilManuell]);
+  }, [rechnung.id, rechnung.kategorie, rechnung.kleinteilManuell]);
 
   const sc = ST_META[rechnung.status] ?? ST_META.entwurf;
   const faelligAm = calcFaelligAm(rechnung.createdAt, zahlungsFrist);
