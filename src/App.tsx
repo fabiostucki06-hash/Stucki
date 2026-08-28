@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useApp } from './context/AppContext';
 import { ASSETS } from './lib/supabase';
 import { needsAttention } from './lib/utils';
+import { sampleImageColor, applyBgTheme } from './lib/theme';
 
 import Spinner from './components/ui/Spinner';
 import Sheet from './components/ui/Sheet';
@@ -58,6 +59,9 @@ export default function App() {
         if (prevBlobRef.current) URL.revokeObjectURL(prevBlobRef.current);
         prevBlobRef.current = url;
         setBgSrc(url);
+        // Sample the local blob (same-origin, won't taint the canvas) so text/card/
+        // accent tokens adapt to how bright the chosen wallpaper actually is.
+        sampleImageColor(url).then(applyBgTheme).catch(() => {});
       })
       .catch(() => { if (!cancelled) setBgSrc(wallpaper); });
     return () => { cancelled = true; };

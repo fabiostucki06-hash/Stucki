@@ -32,6 +32,12 @@
   --sep:       rgba(255,255,255,0.12);   /* dividers on dark glass */
   --sep-opaque: rgba(255,255,255,0.35);
 
+  /* Card/sheet surface tint — overwritten per-wallpaper by applyBgTheme() (lib/theme.ts)
+     so panels stay legible against light backgrounds too. Defaults match the
+     dark-photo baseline this app shipped with. */
+  --card-bg:     rgba(255,255,255,0.10);
+  --card-border: rgba(255,255,255,0.20);
+
   /* iOS 26 Liquid Glass — ultra transparent, deep blur */
   --glass-light: rgba(255,255,255,0.10);
   --glass-border: 1px solid rgba(255,255,255,0.20);
@@ -97,7 +103,7 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 
 /* ── GROUPED LIST ── */
 .section-header{font-size:12px;font-weight:700;color:var(--label2);letter-spacing:0.5px;text-transform:uppercase;padding:20px 20px 8px;text-shadow:0 1px 4px rgba(0,0,0,0.35)}
-.inset-grouped-list{background:rgba(255,255,255,0.10);-webkit-backdrop-filter:blur(64px) saturate(240%);backdrop-filter:blur(64px) saturate(240%);border-radius:var(--radius-md);border:1px solid rgba(255,255,255,0.20);overflow:hidden;margin-bottom:28px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.65),inset 0 -1px 2px rgba(0,0,0,0.03),var(--shadow-sm)}
+.inset-grouped-list{background:var(--card-bg);-webkit-backdrop-filter:blur(64px) saturate(240%);backdrop-filter:blur(64px) saturate(240%);border-radius:var(--radius-md);border:1px solid var(--card-border);overflow:hidden;margin-bottom:28px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.65),inset 0 -1px 2px rgba(0,0,0,0.03),var(--shadow-sm)}
 .list-row{display:flex;align-items:center;gap:14px;padding:13px 20px;min-height:48px;border-bottom:0.5px solid var(--sep);cursor:pointer;background:transparent;transition:background 0.18s ease,transform 0.22s cubic-bezier(0.34,1.56,0.64,1),box-shadow 0.18s ease;position:relative}
 .list-row:hover{background:rgba(0,122,255,0.055);transform:translateX(3px);box-shadow:inset 3px 0 0 var(--blue)}
 .list-row:last-child{border-bottom:none}
@@ -139,7 +145,7 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .pill-btn-inactive:hover{background:rgba(255,255,255,0.28);color:#fff}
 
 /* ── GLASS PANEL ── */
-.glass-panel{background:rgba(255,255,255,0.10);-webkit-backdrop-filter:blur(64px) saturate(240%);backdrop-filter:blur(64px) saturate(240%);border:1px solid rgba(255,255,255,0.20);box-shadow:inset 0 1px 0 rgba(255,255,255,0.65),0 4px 32px rgba(0,0,0,0.06);border-radius:12px}
+.glass-panel{background:var(--card-bg);-webkit-backdrop-filter:blur(64px) saturate(240%);backdrop-filter:blur(64px) saturate(240%);border:1px solid var(--card-border);box-shadow:inset 0 1px 0 rgba(255,255,255,0.65),0 4px 32px rgba(0,0,0,0.06);border-radius:12px}
 .btn-plain{background:none;border:none;color:var(--blue);font-size:17px;font-weight:500;letter-spacing:-0.4px;cursor:pointer;padding:0;transition:opacity 0.12s}
 .btn-plain:active{opacity:0.5}
 .bar-btn{background:none;border:none;color:var(--blue);font-size:17px;font-weight:600;letter-spacing:-0.4px;cursor:pointer;padding:0 4px;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;transition:background 0.12s;border-radius:8px}
@@ -200,7 +206,7 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 
 /* ── MODAL / SHEET ── iOS 26 Liquid Glass */
 .sheet-backdrop{position:fixed;inset:0;z-index:400;background:rgba(0,0,0,0.12);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
-.sheet-container{position:fixed;left:0;right:0;bottom:0;z-index:401;background:rgba(255,255,255,0.08);-webkit-backdrop-filter:blur(80px) saturate(280%);backdrop-filter:blur(80px) saturate(280%);border-radius:20px 20px 0 0;border-top:1px solid rgba(255,255,255,0.20);border-left:1px solid rgba(255,255,255,0.12);border-right:1px solid rgba(255,255,255,0.12);max-height:96dvh;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -4px 48px rgba(0,0,0,0.07),inset 0 1px 0 rgba(255,255,255,0.65)}
+.sheet-container{position:fixed;left:0;right:0;bottom:0;z-index:401;background:var(--card-bg);-webkit-backdrop-filter:blur(80px) saturate(280%);backdrop-filter:blur(80px) saturate(280%);border-radius:20px 20px 0 0;border-top:1px solid var(--card-border);border-left:1px solid rgba(255,255,255,0.12);border-right:1px solid rgba(255,255,255,0.12);max-height:96dvh;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -4px 48px rgba(0,0,0,0.07),inset 0 1px 0 rgba(255,255,255,0.65)}
 .sheet-handle{width:40px;height:5px;background:rgba(0,0,0,0.22);border-radius:3px;margin:10px auto 0;flex-shrink:0}
 .sheet-nav{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:0.5px solid var(--sep);flex-shrink:0;min-height:48px}
 .sheet-content{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;padding:24px 20px}
