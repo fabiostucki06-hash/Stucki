@@ -6,6 +6,7 @@ import { SFCheckmark } from '../Icons';
 const WALLPAPERS = [
   { id: 'wp1', label: 'Wallpaper 1', url: ASSETS.wallpaper1 },
   { id: 'wp2', label: 'Wallpaper 2', url: ASSETS.wallpaper2 },
+  { id: 'wp3', label: 'Wallpaper 3', url: ASSETS.wallpaper3 },
 ];
 
 interface SettingsViewProps {
