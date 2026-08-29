@@ -1,5 +1,5 @@
 import { ASSETS } from '../lib/supabase';
-import { SFCloud, SFMenu } from './Icons';
+import { SFCloud, SFMenu, SFRefresh } from './Icons';
 import type { SyncStatus } from '../types';
 
 interface NavBarProps {
@@ -21,6 +21,21 @@ export default function NavBar({ syncStatus, todosCount, onMenuToggle, onLogoCli
     : syncStatus === 'ok' ? 'Gespeichert ✓'
     : syncStatus === 'error' ? 'Sync-Fehler'
     : 'Cloud-Sync';
+
+  const handleHardRefresh = async () => {
+    try {
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((key) => caches.delete(key)));
+      }
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((reg) => reg.unregister()));
+      }
+    } finally {
+      window.location.reload();
+    }
+  };
 
   return (
     <div className="nav-bar">
@@ -51,6 +66,15 @@ export default function NavBar({ syncStatus, todosCount, onMenuToggle, onLogoCli
 
         {/* Right side: sync indicator + todo badge */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
+          <button
+            onClick={handleHardRefresh}
+            className="bar-btn"
+            style={{ color: 'var(--label)' }}
+            title="Seite neu laden"
+            aria-label="Seite neu laden"
+          >
+            <SFRefresh />
+          </button>
           <div className={cloudClass} title={cloudTitle} style={{ display: 'flex', alignItems: 'center', padding: '4px 6px', borderRadius: 8, cursor: 'default' }}>
             <SFCloud />
           </div>

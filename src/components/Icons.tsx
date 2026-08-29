@@ -78,6 +78,12 @@ export const SFMenu = () => (
   </svg>
 );
 
+export const SFRefresh = () => (
+  <svg width={20} height={20} viewBox="0 0 20 20" fill="none">
+    <path d="M17 10a7 7 0 10-2.3 5.2M17 10V4m0 6h-6" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 export const SFGear = () => (
   <svg width={25} height={25} viewBox="0 0 25 25" fill="none">
     <circle cx={12.5} cy={12.5} r={3} stroke="currentColor" strokeWidth={1.5}/>
