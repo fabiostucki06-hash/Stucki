@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import Badge from '../ui/Badge';
 import { SFChevron, SFXmark } from '../Icons';
 import { isOverdue, daysSince, formatDateCH } from '../../lib/utils';
 import { SC, SO } from '../../constants/statuses';

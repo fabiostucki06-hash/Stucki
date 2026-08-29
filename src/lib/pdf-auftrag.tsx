@@ -26,7 +26,7 @@ const BL   = 0.68; // text baseline inside row (from top)
 const VL   = 55;   // vehicle-info label column width
 
 // Table columns – Arbeiten | ZE
-const wArb = 150, wZE = TW - wArb; // 30
+const wArb = 150; // 30
 
 const x0 = TL;           // 15  – Arbeiten left
 const x1 = x0 + wArb;   // 165 – ZE left / column divider

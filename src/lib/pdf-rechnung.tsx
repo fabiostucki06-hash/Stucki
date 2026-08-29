@@ -34,7 +34,7 @@ const BL   = 0.68; // text baseline inside row (from top)
 const VL   = 55;   // vehicle-info label column width
 
 // Table columns – Bezeichnung | Menge | Stk.Preis | Preis (CHF) | ZE
-const wBez = 75, wMen = 20, wStk = 30, wPre = 30, wZE = TW - wBez - wMen - wStk - wPre; // 25
+const wBez = 75, wMen = 20, wStk = 30, wPre = 30; // 25
 
 const x0 = TL;          // 15  – Bezeichnung left
 const x1 = x0 + wBez;   // 90  – Menge left   / column divider
