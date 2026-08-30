@@ -80,7 +80,7 @@ body{
 }
 
 .bg{position:fixed;inset:0;z-index:-1;overflow:hidden;background:#c4b0d4;}
-.bg img{width:100%;height:100%;object-fit:cover;object-position:center 65%;display:block;image-rendering:-webkit-optimize-contrast;image-rendering:high-quality;}
+.bg img{width:100%;height:100%;object-fit:cover;object-position:center 65%;display:block;image-rendering:auto;}
 .bg::after{content:'';position:absolute;inset:0;background:linear-gradient(to bottom,rgba(180,155,210,0.45) 0%,rgba(180,155,210,0.15) 40%,transparent 70%);pointer-events:none;}
 input,textarea,select{font-family:inherit;font-size:17px!important;color:var(--label)}
 button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:inherit}
