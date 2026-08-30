@@ -60,6 +60,38 @@ function rgbToHueSat(r: number, g: number, b: number): { h: number; s: number } 
   return { h, s };
 }
 
+export type WallpaperThemeId = 'wallpaper-1' | 'wallpaper-2' | 'wallpaper-3';
+
+interface AccentPalette {
+  h: number;              // accent hue
+  s: number;              // accent saturation (0-1)
+  lightnessShift?: number; // shifts the whole ladder darker/lighter (HSL lightness isn't perceptually even across hues — green/orange read brighter than blue at the same L)
+  borderHue?: number;     // if set, tints --card-border/--sep toward this hue instead of neutral
+  borderSat?: number;
+}
+
+/** Curated per-wallpaper accent palettes (distinct from the auto-sampled photo color below). */
+const WALLPAPER_PALETTES: Record<WallpaperThemeId, AccentPalette> = {
+  'wallpaper-1': { h: 211, s: 1.00 },                                                    // Mac Standard — classic Apple blue, neutral chrome
+  'wallpaper-2': { h: 32,  s: 0.92 },                                                     // Mac Secondary — warm amber/orange
+  'wallpaper-3': { h: 148, s: 0.55, lightnessShift: -0.08, borderHue: 74, borderSat: 0.38 }, // Nature/Green — deep forest green, olive borders
+};
+
+const hslToRgb = (h: number, s: number, l: number): RGB => {
+  h = ((h % 360) + 360) % 360;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let [r, g, b] = [0, 0, 0];
+  if (h < 60)       [r, g, b] = [c, x, 0];
+  else if (h < 120) [r, g, b] = [x, c, 0];
+  else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c];
+  else if (h < 300) [r, g, b] = [x, 0, c];
+  else              [r, g, b] = [c, 0, x];
+  return [(r + m) * 255, (g + m) * 255, (b + m) * 255];
+};
+
 export interface SampledColor { r: number; g: number; b: number; }
 
 /**
@@ -89,8 +121,19 @@ export function sampleImageColor(src: string): Promise<SampledColor> {
   });
 }
 
-/** Sets the root CSS custom properties that drive text, dividers, cards and the blue accent. */
-export function applyBgTheme({ r, g, b }: SampledColor): void {
+const setRgbVar = (root: CSSStyleDeclaration, name: string, [r, g, b]: RGB) =>
+  root.setProperty(name, `${Math.round(r)} ${Math.round(g)} ${Math.round(b)}`);
+
+/**
+ * Sets the root CSS custom properties that drive text, dividers, cards and the
+ * accent color family (buttons, active tabs, chips, input focus rings, ...).
+ *
+ * `themeId` selects a curated palette (see WALLPAPER_PALETTES) for the known
+ * wallpapers so each one gets a deliberately distinct look; for an unrecognized
+ * (e.g. custom-uploaded) wallpaper it falls back to nudging the classic blue
+ * toward the photo's own dominant hue, same as before this existed.
+ */
+export function applyBgTheme({ r, g, b }: SampledColor, themeId?: WallpaperThemeId): void {
   const photo: RGB = [r, g, b];
   const brightness = relLuminance(photo);
 
@@ -103,6 +146,9 @@ export function applyBgTheme({ r, g, b }: SampledColor): void {
   const useDark = darkContrast >= lightContrast;
 
   const root = document.documentElement.style;
+  document.documentElement.dataset.theme = themeId ?? 'wallpaper-1';
+
+  const palette = themeId ? WALLPAPER_PALETTES[themeId] : undefined;
 
   if (useDark) {
     root.setProperty('--label',      'rgba(255,255,255,0.96)');
@@ -124,12 +170,39 @@ export function applyBgTheme({ r, g, b }: SampledColor): void {
     root.setProperty('--card-border', 'rgba(18,18,22,0.18)');
   }
 
-  // Accent: nudge the brand blue's hue slightly toward the wallpaper's dominant
-  // hue (capped small so it always reads as "blue"), lightness tuned for whichever
-  // card surface got picked above.
-  const { h, s } = rgbToHueSat(r, g, b);
+  // Border tint: wallpaper-1 stays neutral (classic dark-mode chrome); wallpapers
+  // with a curated borderHue (e.g. wallpaper-3's olive) get their card/separator
+  // borders tinted to match instead, at the same alpha the neutral version used.
+  if (palette?.borderHue !== undefined) {
+    const borderTint = hslToRgb(palette.borderHue, palette.borderSat ?? palette.s, useDark ? 0.62 : 0.38);
+    root.setProperty('--card-border', rgba(borderTint, useDark ? 0.26 : 0.24));
+    root.setProperty('--sep',         rgba(borderTint, useDark ? 0.18 : 0.22));
+  }
+
+  // Accent hue: curated per known wallpaper, or nudged from the classic blue
+  // toward the photo's dominant hue (capped small so it stays recognizably
+  // "on-brand") for anything without a curated palette.
   const baseHue = 211; // hue of #007AFF
-  const mixedHue = lerpHue(baseHue, h, Math.min(s, 0.6) * 0.22);
+  let h: number, s: number, shift: number;
+  if (palette) {
+    h = palette.h; s = palette.s; shift = palette.lightnessShift ?? 0;
+  } else {
+    const sampled = rgbToHueSat(r, g, b);
+    h = lerpHue(baseHue, sampled.h, Math.min(sampled.s, 0.6) * 0.22);
+    s = 1; shift = 0;
+  }
+  const rung = (l: number) => Math.max(0, Math.min(1, l + shift));
+
   const accentLightness = useDark ? 58 : 42;
-  root.setProperty('--blue', `hsl(${mixedHue.toFixed(1)} 88% ${accentLightness}%)`);
+  root.setProperty('--blue', `hsl(${h.toFixed(1)} ${(s * 88).toFixed(0)}% ${Math.round(rung(accentLightness / 100) * 100)}%)`);
+
+  // Full ladder backing the shared button/tab/chip/focus-ring CSS (see globals.css
+  // rgb(var(--accent-*-rgb) / alpha) usages) — kept independent of useDark since
+  // those surfaces always render white text on a solid/glass accent fill.
+  setRgbVar(root, '--accent-chip-rgb',  hslToRgb(h, s, rung(0.77)));
+  setRgbVar(root, '--accent-light-rgb', hslToRgb(h, s, rung(0.66)));
+  setRgbVar(root, '--accent-hover-rgb', hslToRgb(h, s, rung(0.58)));
+  setRgbVar(root, '--accent-rgb',       hslToRgb(h, s, rung(0.50)));
+  setRgbVar(root, '--accent-dark-rgb',  hslToRgb(h, s, rung(0.35)));
+  setRgbVar(root, '--accent-border-rgb',hslToRgb(h, s, rung(0.34)));
 }

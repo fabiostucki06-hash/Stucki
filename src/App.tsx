@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useApp } from './context/AppContext';
 import { ASSETS } from './lib/supabase';
 import { needsAttention } from './lib/utils';
-import { sampleImageColor, applyBgTheme } from './lib/theme';
+import { sampleImageColor, applyBgTheme, type WallpaperThemeId } from './lib/theme';
 
 import Spinner from './components/ui/Spinner';
 import Sheet from './components/ui/Sheet';
@@ -51,6 +51,10 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
+    const themeId: WallpaperThemeId =
+      wallpaper === ASSETS.wallpaper2 ? 'wallpaper-2' :
+      wallpaper === ASSETS.wallpaper3 ? 'wallpaper-3' :
+      'wallpaper-1'; // default asset + wallpaper1 both use the classic-blue theme
     fetch(wallpaper, { cache: 'no-cache' })
       .then(r => r.blob())
       .then(blob => {
@@ -59,9 +63,10 @@ export default function App() {
         if (prevBlobRef.current) URL.revokeObjectURL(prevBlobRef.current);
         prevBlobRef.current = url;
         setBgSrc(url);
-        // Sample the local blob (same-origin, won't taint the canvas) so text/card/
-        // accent tokens adapt to how bright the chosen wallpaper actually is.
-        sampleImageColor(url).then(applyBgTheme).catch(() => {});
+        // Sample the local blob (same-origin, won't taint the canvas) so text/card
+        // tokens adapt to how bright the chosen wallpaper actually is, while the
+        // accent hue itself comes from the curated per-wallpaper palette.
+        sampleImageColor(url).then((c) => applyBgTheme(c, themeId)).catch(() => {});
       })
       .catch(() => { if (!cancelled) setBgSrc(wallpaper); });
     return () => { cancelled = true; };

@@ -93,12 +93,12 @@ export default function Sidebar({ open, activeTab, onTabChange, onClose, onLogou
                   gap: 13,
                   padding: '11px 14px',
                   borderRadius: 12,
-                  border: active ? '1px solid rgba(0,122,255,0.18)' : '1px solid transparent',
+                  border: active ? '1px solid rgb(var(--accent-rgb) / 0.18)' : '1px solid transparent',
                   cursor: 'pointer',
                   width: '100%',
                   textAlign: 'left',
                   background: active
-                    ? 'rgba(0,122,255,0.10)'
+                    ? 'rgb(var(--accent-rgb) / 0.10)'
                     : 'transparent',
                   color: active ? 'var(--blue)' : 'var(--label)',
                   fontWeight: active ? 600 : 400,
@@ -118,7 +118,7 @@ export default function Sidebar({ open, activeTab, onTabChange, onClose, onLogou
                   width: 34,
                   height: 34,
                   borderRadius: 9,
-                  background: active ? 'rgba(0,122,255,0.14)' : 'rgba(120,120,128,0.10)',
+                  background: active ? 'rgb(var(--accent-rgb) / 0.14)' : 'rgba(120,120,128,0.10)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
