@@ -68,6 +68,12 @@
   --accent-dark-rgb:   0 86 179;
   --accent-border-rgb: 0 79 176;
 
+  /* Wallpaper legibility scrim/placeholder — overwritten per-wallpaper by
+     applyBgTheme() so non-blue wallpapers (e.g. wallpaper-3) don't get a
+     violet-tinted overlay wash. Defaults match the original lavender look. */
+  --bg-scrim-rgb:       180 155 210;
+  --bg-placeholder-rgb: 196 176 212;
+
   --sidebar-width: 260px;
   --radius-sm: 10px;
   --radius-md: 14px;
@@ -89,9 +95,9 @@ body{
   text-shadow:0 1px 3px rgba(0,0,0,0.18);
 }
 
-.bg{position:fixed;inset:0;z-index:-1;overflow:hidden;background:#c4b0d4;}
+.bg{position:fixed;inset:0;z-index:-1;overflow:hidden;background:rgb(var(--bg-placeholder-rgb));}
 .bg img{width:100%;height:100%;object-fit:cover;object-position:center 65%;display:block;image-rendering:auto;}
-.bg::after{content:'';position:absolute;inset:0;background:linear-gradient(to bottom,rgba(180,155,210,0.45) 0%,rgba(180,155,210,0.15) 40%,transparent 70%);pointer-events:none;}
+.bg::after{content:'';position:absolute;inset:0;background:linear-gradient(to bottom,rgb(var(--bg-scrim-rgb) / 0.45) 0%,rgb(var(--bg-scrim-rgb) / 0.15) 40%,transparent 70%);pointer-events:none;}
 input,textarea,select{font-family:inherit;font-size:17px!important;color:var(--label)}
 button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:inherit}
 

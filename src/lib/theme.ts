@@ -68,13 +68,19 @@ interface AccentPalette {
   lightnessShift?: number; // shifts the whole ladder darker/lighter (HSL lightness isn't perceptually even across hues — green/orange read brighter than blue at the same L)
   borderHue?: number;     // if set, tints --card-border/--sep toward this hue instead of neutral
   borderSat?: number;
+  scrimRgb: RGB;          // .bg::after top-of-photo legibility gradient
+  placeholderRgb: RGB;    // .bg solid color shown before the photo has loaded
 }
 
 /** Curated per-wallpaper accent palettes (distinct from the auto-sampled photo color below). */
 const WALLPAPER_PALETTES: Record<WallpaperThemeId, AccentPalette> = {
-  'wallpaper-1': { h: 211, s: 1.00 },                                                    // Mac Standard — classic Apple blue, neutral chrome
-  'wallpaper-2': { h: 32,  s: 0.92 },                                                     // Mac Secondary — warm amber/orange
-  'wallpaper-3': { h: 148, s: 0.55, lightnessShift: -0.08, borderHue: 74, borderSat: 0.38 }, // Nature/Green — deep forest green, olive borders
+  // Mac Standard — classic Apple blue, neutral chrome, original lavender scrim/placeholder
+  'wallpaper-1': { h: 211, s: 1.00, scrimRgb: [180, 155, 210], placeholderRgb: [196, 176, 212] },
+  // Mac Secondary — warm amber/orange, warm tan scrim (no blue/violet cast)
+  'wallpaper-2': { h: 32,  s: 0.92, scrimRgb: [150, 110, 70],  placeholderRgb: [176, 140, 100] },
+  // Nature/Green — deep forest green, olive borders, dark olive scrim (zero blue saturation)
+  'wallpaper-3': { h: 148, s: 0.55, lightnessShift: -0.08, borderHue: 74, borderSat: 0.38,
+                   scrimRgb: [58, 74, 46], placeholderRgb: [72, 92, 58] },
 };
 
 const hslToRgb = (h: number, s: number, l: number): RGB => {
@@ -149,6 +155,14 @@ export function applyBgTheme({ r, g, b }: SampledColor, themeId?: WallpaperTheme
   document.documentElement.dataset.theme = themeId ?? 'wallpaper-1';
 
   const palette = themeId ? WALLPAPER_PALETTES[themeId] : undefined;
+
+  // Always set unconditionally (not just when a palette overrides them) so
+  // switching back to a theme without a custom scrim doesn't leave the
+  // previous theme's tint stuck via the inline style.
+  const scrim = palette ? palette.scrimRgb : WALLPAPER_PALETTES['wallpaper-1'].scrimRgb;
+  const placeholder = palette ? palette.placeholderRgb : WALLPAPER_PALETTES['wallpaper-1'].placeholderRgb;
+  setRgbVar(root, '--bg-scrim-rgb', scrim);
+  setRgbVar(root, '--bg-placeholder-rgb', placeholder);
 
   if (useDark) {
     root.setProperty('--label',      'rgba(255,255,255,0.96)');
