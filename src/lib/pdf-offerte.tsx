@@ -227,7 +227,7 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined) {
 
   // ── PAYMENT ───────────────────────────────────────────────────────────────
   y += 10;
-  rgb(100, 100, 100); tL('Zahlungskonditionen', TL, y); bold(); rgb(0, 0, 0); tL('10 Tage netto', col2, y); norm(); y += 5;
+  rgb(100, 100, 100); tL('Zahlungskonditionen', TL, y); bold(); rgb(0, 0, 0); tL(`${offerte.zahlungsziel ?? '10'} Tage netto`, col2, y); norm(); y += 5;
   rgb(100, 100, 100); tL('Rechnungstellung',    TL, y); norm(); rgb(0, 0, 0);
 }
 

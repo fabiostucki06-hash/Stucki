@@ -41,14 +41,14 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   const [creatingRechnung, setCreatingRechnung] = useState(false);
   const [positionen, setPositionen] = useState<Position[]>(() => offerte.positionen ?? []);
   const [posAccepted, setPosAccepted] = useState<boolean[]>(() => (offerte.positionen ?? []).map(() => true));
-  const [zahlungsziel, setZahlungsziel] = useState(offerte.zahlungsziel ?? '30');
+  const [zahlungsziel, setZahlungsziel] = useState(offerte.zahlungsziel ?? '10');
   const [dirty, setDirty] = useState(false);
   const [posSaving, setPosSaving] = useState(false);
 
   // offerte prop can change (e.g. after editing) while this component stays
   // mounted — resync local Zahlungsziel so it never shows stale data.
   useEffect(() => {
-    setZahlungsziel(offerte.zahlungsziel ?? '30');
+    setZahlungsziel(offerte.zahlungsziel ?? '10');
   }, [offerte.id, offerte.zahlungsziel]);
 
   const [addingTyp, setAddingTyp] = useState<'arbeit' | 'material' | null>(null);

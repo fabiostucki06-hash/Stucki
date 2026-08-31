@@ -61,7 +61,7 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
   });
   const [notizen,    setNotizen]    = useState(initial?.notizen ?? '');
   const [gueltigBis, setGueltigBis] = useState(initial?.gueltigBis ?? '');
-  const [zahlungsziel, setZahlungsziel] = useState(initial?.zahlungsziel ?? '30');
+  const [zahlungsziel, setZahlungsziel] = useState(initial?.zahlungsziel ?? '10');
 
   const selectedCustomer = customers.find((c) => c.id === cid) ?? null;
   const vehicleChips = selectedCustomer
@@ -190,7 +190,7 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
 
         <div className="cf-field" style={{ marginBottom: 10 }}>
           <label className="cf-label">Zahlungsziel (Tage netto)</label>
-          <input className="cf-input" type="number" min={1} value={zahlungsziel} onChange={(e) => setZahlungsziel(e.target.value)} placeholder="30" />
+          <input className="cf-input" type="number" min={1} value={zahlungsziel} onChange={(e) => setZahlungsziel(e.target.value)} placeholder="10" />
         </div>
 
         {vehicleChips.length > 0 && (
