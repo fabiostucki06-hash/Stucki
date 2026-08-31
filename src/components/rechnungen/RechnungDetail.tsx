@@ -56,7 +56,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
   const [saving, setSaving] = useState(false);
   const [posSaving, setPosSaving] = useState(false);
   const [positionen, setPositionen] = useState<Position[]>(() => rechnung.positionen ?? []);
-  const [zahlungsFrist, setZahlungsFrist] = useState(rechnung.zahlungsFrist ?? '30');
+  const [zahlungsFrist, setZahlungsFrist] = useState(rechnung.zahlungsFrist ?? '10');
   const [kategorie, setKategorie] = useState<RechnungKategorie | ''>(rechnung.kategorie ?? '');
   const [kleinteilManuell, setKleinteilManuell] = useState<boolean | null>(rechnung.kleinteilManuell ?? null);
   const [dirty, setDirty] = useState(false);
@@ -71,7 +71,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
   // rechnung prop can change (e.g. after editing) while this component stays
   // mounted — resync local Zahlungsfrist so the countdown never shows stale data.
   useEffect(() => {
-    setZahlungsFrist(rechnung.zahlungsFrist ?? '30');
+    setZahlungsFrist(rechnung.zahlungsFrist ?? '10');
     setKategorie(rechnung.kategorie ?? '');
     setKleinteilManuell(rechnung.kleinteilManuell ?? null);
   }, [rechnung.id, rechnung.zahlungsFrist, rechnung.kategorie, rechnung.kleinteilManuell]);

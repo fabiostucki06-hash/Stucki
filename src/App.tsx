@@ -193,13 +193,13 @@ export default function App() {
       .filter((p) => p.typ === 'arbeit')
       .reduce((s, p) => s + (parseFloat((p as ArbeitPosition).ze || '0') || 0), 0);
     const faelligDate = new Date();
-    faelligDate.setDate(faelligDate.getDate() + 30);
+    faelligDate.setDate(faelligDate.getDate() + 10);
     await addRechnung({
       customerId: offerte.customerId,
       titel: offerte.titel,
       positionen: positions,
       notizen: offerte.notizen,
-      zahlungsFrist: '30',
+      zahlungsFrist: '10',
       faelligAm: faelligDate.toISOString(),
       totalBetrag: (totalArbeit + totalMaterial).toFixed(2),
       totalArbeit: totalArbeit.toFixed(2),

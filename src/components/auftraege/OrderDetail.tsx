@@ -26,7 +26,7 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
   const [items] = useState<OrderItem[]>(order.offertItems ?? []);
   const offB = order.offertBetrag ?? '';
   const [recB, setRecB] = useState(order.rechnungsBetrag ?? '');
-  const [zahlungsFrist, setZahlungsFrist] = useState(order.zahlungsFrist ?? '30');
+  const [zahlungsFrist, setZahlungsFrist] = useState(order.zahlungsFrist ?? '10');
   const [cv, setCv] = useState(customer?.vorname ?? '');
   const [cn, setCn] = useState(customer?.nachname ?? '');
   const [ct, setCt] = useState(customer?.telefon ?? '');

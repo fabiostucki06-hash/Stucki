@@ -80,9 +80,9 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
   const [notizen,      setNotizen]      = useState(initial?.notizen ?? '');
   const [kategorie,    setKategorie]    = useState<RechnungKategorie | ''>(initial?.kategorie ?? '');
   const [kleinteilManuell, setKleinteilManuell] = useState<boolean | null>(initial?.kleinteilManuell ?? null);
-  const [zahlungsFrist, setZahlungsFrist] = useState(initial?.zahlungsFrist ?? '30');
+  const [zahlungsFrist, setZahlungsFrist] = useState(initial?.zahlungsFrist ?? '10');
   const [faelligAm,    setFaelligAm]    = useState(
-    () => initial?.faelligAm ?? calcFaelligAm(initial?.zahlungsFrist ?? '30')
+    () => initial?.faelligAm ?? calcFaelligAm(initial?.zahlungsFrist ?? '10')
   );
 
   const selectedCustomer = customers.find((c) => c.id === cid) ?? null;

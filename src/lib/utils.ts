@@ -28,7 +28,7 @@ export const hoursSince = (d?: string): number =>
 export const isOverdue = (o: Order): boolean => {
   if (o.status === 'offerte_versendet' && hoursSince(o.statusChangedAt) > 48) return true;
   if (o.status === 'zahlung_versendet') {
-    const f = o.zahlungsFrist ? parseInt(o.zahlungsFrist) : 30;
+    const f = o.zahlungsFrist ? parseInt(o.zahlungsFrist) : 10;
     if (daysSince(o.statusChangedAt) > f) return true;
   }
   return false;
