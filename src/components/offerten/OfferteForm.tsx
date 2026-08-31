@@ -2,11 +2,18 @@ import { useState } from 'react';
 import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
 import { SFPlus, SFXmark } from '../Icons';
-import type { Customer, ArbeitPosition, MaterialPosition, Offerte } from '../../types';
+import type { Customer, ArbeitPosition, MaterialPosition, Offerte, OfferteStatus } from '../../types';
 
 type ArbeitRow   = ArbeitPosition  & { zeLoading: boolean; zeHint: string };
 type MaterialRow = MaterialPosition;
-type OfferteData = Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>;
+type OfferteData = Omit<Offerte, 'id' | 'offertNumber' | 'createdAt'>;
+
+const STATUS_OPTS: [OfferteStatus, string][] = [
+  ['entwurf',    'Entwurf'],
+  ['versendet',  'Versendet'],
+  ['angenommen', 'Angenommen'],
+  ['abgelehnt',  'Abgelehnt'],
+];
 
 interface OfferteFormProps {
   customers: Customer[];
@@ -62,6 +69,7 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
   const [notizen,    setNotizen]    = useState(initial?.notizen ?? '');
   const [gueltigBis, setGueltigBis] = useState(initial?.gueltigBis ?? '');
   const [zahlungsziel, setZahlungsziel] = useState(initial?.zahlungsziel ?? '10');
+  const [status,     setStatus]     = useState<OfferteStatus>(initial?.status ?? 'entwurf');
 
   const selectedCustomer = customers.find((c) => c.id === cid) ?? null;
   const vehicleChips = selectedCustomer
@@ -127,7 +135,7 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
       ? [{ typ: 'material', beschreibung: 'Kleinteil Pauschale', menge: '1', stueckpreis: '10', preis: '10.00' }]
       : [];
     onSave({
-      customerId: cid, titel, positionen: [...ap, ...mp, ...autoPauschale], notizen, gueltigBis, zahlungsziel,
+      customerId: cid, titel, positionen: [...ap, ...mp, ...autoPauschale], notizen, gueltigBis, zahlungsziel, status,
       totalBetrag: (totA + totMeff).toFixed(2), totalArbeit: totA.toFixed(2),
       totalMaterial: totMeff.toFixed(2), totalZE: totZE,
     });
@@ -192,6 +200,15 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
           <label className="cf-label">Zahlungsziel (Tage netto)</label>
           <input className="cf-input" type="number" min={1} value={zahlungsziel} onChange={(e) => setZahlungsziel(e.target.value)} placeholder="10" />
         </div>
+
+        {initial && (
+          <div className="cf-field" style={{ marginBottom: 10 }}>
+            <label className="cf-label">Status</label>
+            <select className="cf-select" value={status} onChange={(e) => setStatus(e.target.value as OfferteStatus)}>
+              {STATUS_OPTS.map(([s, l]) => <option key={s} value={s}>{l}</option>)}
+            </select>
+          </div>
+        )}
 
         {vehicleChips.length > 0 && (
           <div className="mf-chips" style={{ marginBottom: 10 }}>
