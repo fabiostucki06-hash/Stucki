@@ -44,20 +44,107 @@ export const auth = {
   },
 };
 
+/* ── Session auto-refresh ──
+   Every db.* call runs through authedFetch(), which (1) proactively refreshes
+   the access token if it's about to expire, and (2) on a 401 "JWT expired"
+   response retries once with a freshly refreshed token. Only if refresh
+   itself fails (refresh token missing/expired) do we surface a session-expired
+   state via onSessionExpired, instead of throwing straight to the UI. */
+
+type AuthHandlers = {
+  onTokenRefreshed?: (token: string) => void;
+  onSessionExpired?: () => void;
+};
+let handlers: AuthHandlers = {};
+
+export function setAuthHandlers(h: AuthHandlers) {
+  handlers = h;
+}
+
+function decodeExp(token: string): number | null {
+  try {
+    const payload = token.split('.')[1];
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    const exp = JSON.parse(json).exp;
+    return typeof exp === 'number' ? exp : null;
+  } catch {
+    return null;
+  }
+}
+
+function isExpiringSoon(token: string, marginSec = 30): boolean {
+  const exp = decodeExp(token);
+  if (exp == null) return false;
+  return Date.now() / 1000 >= exp - marginSec;
+}
+
+let refreshing: Promise<string | null> | null = null;
+
+async function doRefresh(): Promise<string | null> {
+  if (!refreshing) {
+    refreshing = (async () => {
+      const rt = localStorage.getItem('garage_refresh');
+      if (!rt) return null;
+      try {
+        const res = await auth.refresh(rt);
+        if (res.access_token) {
+          localStorage.setItem('garage_token', res.access_token);
+          if (res.refresh_token) localStorage.setItem('garage_refresh', res.refresh_token);
+          handlers.onTokenRefreshed?.(res.access_token);
+          return res.access_token as string;
+        }
+        return null;
+      } catch {
+        return null;
+      } finally {
+        refreshing = null;
+      }
+    })();
+  }
+  return refreshing;
+}
+
+function isJwtExpiredBody(body: unknown): boolean {
+  const msg = ((body as Record<string, string>)?.message || (body as Record<string, string>)?.msg || '').toLowerCase();
+  return msg.includes('jwt') || msg.includes('expired');
+}
+
+async function authedFetch(url: string, init: RequestInit, token: string, extraHeaders?: Record<string, string>): Promise<Response> {
+  let activeToken = token;
+  if (isExpiringSoon(activeToken)) {
+    const fresh = await doRefresh();
+    if (fresh) activeToken = fresh;
+  }
+
+  let res = await fetch(url, { ...init, headers: { ...h(activeToken), ...extraHeaders } });
+
+  if (res.status === 401) {
+    const body = await res.clone().json().catch(() => ({}));
+    if (isJwtExpiredBody(body)) {
+      const fresh = await doRefresh();
+      if (fresh) {
+        res = await fetch(url, { ...init, headers: { ...h(fresh), ...extraHeaders } });
+      } else {
+        handlers.onSessionExpired?.();
+      }
+    }
+  }
+
+  return res;
+}
 
 export const db = {
   async get(table: string, token: string) {
-    const r = await fetch(`${SUPA_URL}/rest/v1/${table}?select=*`, { headers: h(token) });
+    const r = await authedFetch(`${SUPA_URL}/rest/v1/${table}?select=*`, {}, token);
     const j = await r.json();
     if (!r.ok) console.error(`[Supabase] get("${table}") HTTP ${r.status}:`, j);
     return j;
   },
   async upsert(table: string, obj: Record<string, unknown>, token: string) {
-    const r = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
+    const r = await authedFetch(`${SUPA_URL}/rest/v1/${table}`, {
       method: 'POST',
-      headers: { ...h(token), Prefer: 'resolution=merge-duplicates' },
       body: JSON.stringify(obj),
-    });
+    }, token, { Prefer: 'resolution=merge-duplicates' });
     if (!r.ok) {
       const e = await r.json().catch(() => ({} as Record<string, string>));
       console.error(`[Supabase] upsert("${table}") HTTP ${r.status}:`, e);
@@ -65,25 +152,23 @@ export const db = {
     }
   },
   async delete(table: string, id: string, token: string) {
-    const r = await fetch(`${SUPA_URL}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
+    const r = await authedFetch(`${SUPA_URL}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
       method: 'DELETE',
-      headers: h(token),
-    });
+    }, token);
     if (!r.ok) {
       const e = await r.json().catch(() => ({} as Record<string, string>));
       throw new Error(e.message || e.hint || `HTTP ${r.status}`);
     }
   },
   async getCounter(token: string): Promise<number> {
-    const r = await fetch(`${SUPA_URL}/rest/v1/counters?id=eq.orderNum&select=value`, { headers: h(token) });
+    const r = await authedFetch(`${SUPA_URL}/rest/v1/counters?id=eq.orderNum&select=value`, {}, token);
     const d = await r.json();
     return d[0]?.value ?? 0;
   },
   async setCounter(val: number, token: string) {
-    await fetch(`${SUPA_URL}/rest/v1/counters?id=eq.orderNum`, {
+    await authedFetch(`${SUPA_URL}/rest/v1/counters?id=eq.orderNum`, {
       method: 'PATCH',
-      headers: h(token),
       body: JSON.stringify({ value: val }),
-    });
+    }, token);
   },
 };

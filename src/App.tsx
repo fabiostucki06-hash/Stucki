@@ -6,6 +6,7 @@ import { sampleImageColor, applyBgTheme, type WallpaperThemeId } from './lib/the
 
 import Spinner from './components/ui/Spinner';
 import Sheet from './components/ui/Sheet';
+import ReauthModal from './components/ui/ReauthModal';
 import LoginPage from './components/LoginPage';
 import NavBar from './components/NavBar';
 import TabBar from './components/TabBar';
@@ -33,6 +34,7 @@ export default function App() {
   const {
     customers, orders, offerten, rechnungen,
     syncStatus, token, authChecked, loading,
+    userEmail, sessionExpired, updateToken,
     handleLogin, handleLogout,
     addCustomer, updateCustomer, deleteCustomer,
     addOrder, updateOrder, deleteOrder,
@@ -227,6 +229,8 @@ export default function App() {
 
   return (
     <div style={{ minHeight: '100dvh', paddingBottom: 'calc(55px + env(safe-area-inset-bottom))' }}>
+      {sessionExpired && <ReauthModal email={userEmail} onResolved={updateToken} />}
+
       {/* Background */}
       <div className="bg">
         <img

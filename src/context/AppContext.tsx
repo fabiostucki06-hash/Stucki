@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { auth, db } from '../lib/supabase';
+import { auth, db, setAuthHandlers } from '../lib/supabase';
 import { showToast } from '../components/ui/Toast';
 import type { Customer, Order, Offerte, Rechnung, SyncStatus } from '../types';
 
@@ -16,6 +16,8 @@ interface AppContextValue {
   token: string | null;
   userEmail: string | null;
   authChecked: boolean;
+  sessionExpired: boolean;
+  updateToken: (token: string) => void;
   addCustomer: (data: Omit<Customer, 'id' | 'createdAt'>) => Promise<string>;
   updateCustomer: (id: string, data: Partial<Customer>) => Promise<void>;
   deleteCustomer: (id: string) => Promise<void>;
@@ -47,6 +49,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [rechnungNum, setRechnungNum] = useState(0);
   const [loading, setLoading] = useState(true);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
+  const [sessionExpired, setSessionExpired] = useState(false);
+
+  function updateToken(t: string) {
+    localStorage.setItem('garage_token', t);
+    setToken(t);
+    setSessionExpired(false);
+  }
+
+  useEffect(() => {
+    setAuthHandlers({
+      onTokenRefreshed: (t) => { setToken(t); setSessionExpired(false); },
+      onSessionExpired: () => setSessionExpired(true),
+    });
+    return () => setAuthHandlers({});
+  }, []);
 
   useEffect(() => {
     if (!token) { setAuthChecked(true); return; }
@@ -99,7 +116,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.error(e);
       setSyncStatus('error');
-      showToast('Speichern fehlgeschlagen: ' + ((e instanceof Error ? e.message : '') || 'Unbekannter Fehler'), 'error');
+      const msg = e instanceof Error ? e.message : '';
+      if (msg.toLowerCase().includes('jwt') || msg.toLowerCase().includes('expired')) {
+        // Session-expired dialog already prompts re-login; skip the redundant toast.
+        setSessionExpired(true);
+      } else {
+        showToast('Speichern fehlgeschlagen: ' + (msg || 'Unbekannter Fehler'), 'error');
+      }
       throw e;
     }
   }
@@ -192,7 +215,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AppContext.Provider value={{ customers, orders, offerten, rechnungen, orderNum, offertNum, rechnungNum, loading, syncStatus, token, userEmail, authChecked, addCustomer, updateCustomer, deleteCustomer, addOrder, updateOrder, deleteOrder, addOfferte, updateOfferte, deleteOfferte, addRechnung, updateRechnung, deleteRechnung, handleLogin, handleLogout }}>
+    <AppContext.Provider value={{ customers, orders, offerten, rechnungen, orderNum, offertNum, rechnungNum, loading, syncStatus, token, userEmail, authChecked, sessionExpired, updateToken, addCustomer, updateCustomer, deleteCustomer, addOrder, updateOrder, deleteOrder, addOfferte, updateOfferte, deleteOfferte, addRechnung, updateRechnung, deleteRechnung, handleLogin, handleLogout }}>
       {children}
     </AppContext.Provider>
   );
