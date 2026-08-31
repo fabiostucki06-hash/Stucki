@@ -77,6 +77,7 @@ export interface Offerte {
   positionen?: Position[];
   notizen?: string;
   gueltigBis?: string;
+  zahlungsziel?: string;
   totalBetrag?: string;
   totalArbeit?: string;
   totalMaterial?: string;

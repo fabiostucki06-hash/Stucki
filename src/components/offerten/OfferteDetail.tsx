@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Sheet from '../ui/Sheet';
 import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
@@ -41,8 +41,15 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   const [creatingRechnung, setCreatingRechnung] = useState(false);
   const [positionen, setPositionen] = useState<Position[]>(() => offerte.positionen ?? []);
   const [posAccepted, setPosAccepted] = useState<boolean[]>(() => (offerte.positionen ?? []).map(() => true));
+  const [zahlungsziel, setZahlungsziel] = useState(offerte.zahlungsziel ?? '30');
   const [dirty, setDirty] = useState(false);
   const [posSaving, setPosSaving] = useState(false);
+
+  // offerte prop can change (e.g. after editing) while this component stays
+  // mounted — resync local Zahlungsziel so it never shows stale data.
+  useEffect(() => {
+    setZahlungsziel(offerte.zahlungsziel ?? '30');
+  }, [offerte.id, offerte.zahlungsziel]);
 
   const [addingTyp, setAddingTyp] = useState<'arbeit' | 'material' | null>(null);
   const [newBeschreibung, setNewBeschreibung] = useState('');
@@ -69,6 +76,11 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   const acceptedMaterial = positionen.filter((p, i) => posAccepted[i] && p.typ === 'material')
     .reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
   const acceptedTotal = acceptedArbeit + acceptedMaterial;
+
+  function handleZahlungszielChange(val: string) {
+    setZahlungsziel(val);
+    setDirty(true);
+  }
 
   function togglePos(i: number, val: boolean) {
     setPosAccepted((prev) => { const n = [...prev]; n[i] = val; return n; });
@@ -145,6 +157,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
         totalArbeit: totalArbeit.toFixed(2),
         totalMaterial: totalMaterial.toFixed(2),
         totalZE,
+        zahlungsziel,
       });
       setDirty(false);
       showToast('Positionen gespeichert', 'success');
@@ -237,7 +250,19 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
 
       <div style={{ background: 'rgba(52,199,89,0.09)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, border: '0.5px solid rgba(52,199,89,0.22)' }}>
         <span style={{ fontSize: 16, color: 'var(--green)' }}>✓</span>
-        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--green)' }}>Zahlungsziel: 30 Tage netto</span>
+        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--green)' }}>Zahlungsziel:</span>
+        <input
+          type="number"
+          value={zahlungsziel}
+          onChange={(e) => handleZahlungszielChange(e.target.value)}
+          min={1}
+          style={{
+            width: 48, padding: '3px 6px', fontSize: 15, fontWeight: 700, color: '#ffffff',
+            background: 'var(--input-bg)', border: '1.5px solid rgba(52,199,89,0.55)',
+            borderRadius: 6, textAlign: 'center', outline: 'none',
+          }}
+        />
+        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--green)' }}>Tage netto</span>
       </div>
 
       {/* ── Positionen – inline editable mit Accept/Reject ── */}

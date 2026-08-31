@@ -61,6 +61,7 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
   });
   const [notizen,    setNotizen]    = useState(initial?.notizen ?? '');
   const [gueltigBis, setGueltigBis] = useState(initial?.gueltigBis ?? '');
+  const [zahlungsziel, setZahlungsziel] = useState(initial?.zahlungsziel ?? '30');
 
   const selectedCustomer = customers.find((c) => c.id === cid) ?? null;
   const vehicleChips = selectedCustomer
@@ -126,7 +127,7 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
       ? [{ typ: 'material', beschreibung: 'Kleinteil Pauschale', menge: '1', stueckpreis: '10', preis: '10.00' }]
       : [];
     onSave({
-      customerId: cid, titel, positionen: [...ap, ...mp, ...autoPauschale], notizen, gueltigBis,
+      customerId: cid, titel, positionen: [...ap, ...mp, ...autoPauschale], notizen, gueltigBis, zahlungsziel,
       totalBetrag: (totA + totMeff).toFixed(2), totalArbeit: totA.toFixed(2),
       totalMaterial: totMeff.toFixed(2), totalZE: totZE,
     });
@@ -185,6 +186,11 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
             <label className="cf-label">Gültig bis</label>
             <input className="cf-input" type="date" value={gueltigBis} onChange={(e) => setGueltigBis(e.target.value)} />
           </div>
+        </div>
+
+        <div className="cf-field" style={{ marginBottom: 10 }}>
+          <label className="cf-label">Zahlungsziel (Tage netto)</label>
+          <input className="cf-input" type="number" min={1} value={zahlungsziel} onChange={(e) => setZahlungsziel(e.target.value)} placeholder="30" />
         </div>
 
         {vehicleChips.length > 0 && (
