@@ -25,14 +25,24 @@ export default function CustomerForm({ initial, onSave, onCancel, saving }: Cust
     erstzulassung:  initial?.erstzulassung  ?? '',
   });
 
+  const [busy, setBusy] = useState(false);
+
   const s = (k: keyof CustomerData) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setF((p) => ({ ...p, [k]: e.target.value }));
 
-  function submit() {
+  async function submit() {
+    if (busy) return;
     if (!f.vorname.trim() || !f.nachname.trim() || !f.telefon.trim()) {
       showToast('Bitte Pflichtfelder ausfüllen', 'error'); return;
     }
-    onSave(f);
+    setBusy(true);
+    try {
+      await onSave(f);
+    } catch {
+      // Error toast already shown by the context (syncOk). Form stays open, input intact.
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -96,8 +106,8 @@ export default function CustomerForm({ initial, onSave, onCancel, saving }: Cust
       </div>
 
       <div className="cf-actions">
-        <button className="cf-btn-save" onClick={submit} disabled={saving}>
-          {saving ? 'Wird gespeichert…' : 'Sichern'}
+        <button className="cf-btn-save" onClick={submit} disabled={saving || busy}>
+          {saving || busy ? 'Wird gespeichert…' : 'Sichern'}
         </button>
         <button className="cf-btn-cancel" onClick={onCancel}>Abbrechen</button>
       </div>

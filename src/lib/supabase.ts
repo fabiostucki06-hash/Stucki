@@ -148,6 +148,7 @@ export const db = {
     if (!r.ok) {
       const e = await r.json().catch(() => ({} as Record<string, string>));
       console.error(`[Supabase] upsert("${table}") HTTP ${r.status}:`, e);
+      if (e.code === '42501') throw new Error('Keine Berechtigung (RLS). Bitte neu anmelden oder Admin kontaktieren.');
       throw new Error(e.message || e.hint || `HTTP ${r.status}${e.code ? ' (' + e.code + ')' : ''}`);
     }
   },
