@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import Sheet from '../ui/Sheet';
 import Badge from '../ui/Badge';
 import Spinner from '../ui/Spinner';
+import DocumentViewerModal from '../ui/DocumentViewerModal';
 import { SFChevron, SFPaperclip, SFDownload, SFTrash } from '../Icons';
 import { isOverdue, formatDateCH } from '../../lib/utils';
 import { showToast } from '../ui/Toast';
@@ -33,6 +34,10 @@ export default function CustomerDetail({ customer, orders, onClose, onEdit, onNe
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [busyPath, setBusyPath] = useState<string | null>(null);
+  const [viewerDoc, setViewerDoc] = useState<VehicleDocument | null>(null);
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null);
+  const [viewerLoading, setViewerLoading] = useState(false);
+  const [viewerError, setViewerError] = useState<string | null>(null);
   const docs = customer.vehicleDocuments ?? [];
 
   const cos = orders
@@ -78,18 +83,42 @@ export default function CustomerDetail({ customer, orders, onClose, onEdit, onNe
     }
   }
 
-  async function handleDeleteDoc(doc: VehicleDocument) {
-    if (!token) return;
-    if (!window.confirm(`"${doc.name}" löschen?`)) return;
+  async function handleDeleteDoc(doc: VehicleDocument): Promise<boolean> {
+    if (!token) return false;
+    if (!window.confirm(`"${doc.name}" löschen?`)) return false;
     setBusyPath(doc.path);
     try {
       await storage.remove(DOCS_BUCKET, [doc.path], token);
       await updateCustomer(customer.id, { vehicleDocuments: docs.filter((d) => d.path !== doc.path) });
+      return true;
     } catch (e) {
       showToast('Löschen fehlgeschlagen: ' + (e instanceof Error ? e.message : 'Unbekannter Fehler'), 'error');
+      return false;
     } finally {
       setBusyPath(null);
     }
+  }
+
+  async function openViewer(doc: VehicleDocument) {
+    setViewerDoc(doc);
+    setViewerUrl(null);
+    setViewerError(null);
+    if (!token) { setViewerError('Nicht angemeldet'); return; }
+    setViewerLoading(true);
+    try {
+      const url = await storage.createSignedUrl(DOCS_BUCKET, doc.path, token, 300);
+      setViewerUrl(url);
+    } catch (e) {
+      setViewerError(e instanceof Error ? e.message : 'Unbekannter Fehler');
+    } finally {
+      setViewerLoading(false);
+    }
+  }
+
+  function closeViewer() {
+    setViewerDoc(null);
+    setViewerUrl(null);
+    setViewerError(null);
   }
 
   return (
@@ -166,7 +195,7 @@ export default function CustomerDetail({ customer, orders, onClose, onEdit, onNe
         {docs.length > 0 && (
           <div className="inset-grouped-list" style={{ margin: 0 }}>
             {docs.map((doc) => (
-              <div key={doc.path} className="list-row" style={{ cursor: 'default' }}>
+              <div key={doc.path} className="list-row" onClick={() => openViewer(doc)}>
                 <span className="list-row-icon" style={{ background: 'rgb(var(--accent-rgb) / 0.12)', color: 'var(--blue)' }}>
                   <SFPaperclip size={16} />
                 </span>
@@ -178,8 +207,8 @@ export default function CustomerDetail({ customer, orders, onClose, onEdit, onNe
                   <Spinner size={18} />
                 ) : (
                   <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                    <button onClick={() => handleDownload(doc)} className="bar-btn" title="Herunterladen" style={{ color: 'var(--blue)' }}><SFDownload /></button>
-                    <button onClick={() => handleDeleteDoc(doc)} className="bar-btn" title="Löschen" style={{ color: 'var(--red)' }}><SFTrash /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDownload(doc); }} className="bar-btn" title="Herunterladen" style={{ color: 'var(--blue)' }}><SFDownload /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(doc); }} className="bar-btn" title="Löschen" style={{ color: 'var(--red)' }}><SFTrash /></button>
                   </div>
                 )}
               </div>
@@ -212,6 +241,19 @@ export default function CustomerDetail({ customer, orders, onClose, onEdit, onNe
           </div>
         ))}
       </div>
+
+      {viewerDoc && (
+        <DocumentViewerModal
+          doc={viewerDoc}
+          url={viewerUrl}
+          loading={viewerLoading}
+          error={viewerError}
+          deleting={busyPath === viewerDoc.path}
+          onClose={closeViewer}
+          onDownload={() => handleDownload(viewerDoc)}
+          onDelete={async () => { if (await handleDeleteDoc(viewerDoc)) closeViewer(); }}
+        />
+      )}
     </Sheet>
   );
 }
