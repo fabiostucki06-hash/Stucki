@@ -84,6 +84,24 @@ export const SFRefresh = () => (
   </svg>
 );
 
+export const SFPaperclip = ({ size = 18 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 18 18" fill="none">
+    <path d="M12.5 6.5l-6 6a2.5 2.5 0 003.5 3.5l6.5-6.5a4 4 0 00-5.5-5.5l-6.5 6.5a5.5 5.5 0 007.5 7.5" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+export const SFDownload = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+    <path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13.5h10" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+export const SFTrash = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+    <path d="M3 4.5h10M6.5 4.5V3a1 1 0 011-1h1a1 1 0 011 1v1.5m-6.5 0L4.3 13a1 1 0 001 .9h5.4a1 1 0 001-.9l.8-8.5" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 export const SFGear = () => (
   <svg width={25} height={25} viewBox="0 0 25 25" fill="none">
     <circle cx={12.5} cy={12.5} r={3} stroke="currentColor" strokeWidth={1.5}/>

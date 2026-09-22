@@ -116,14 +116,15 @@ async function authedFetch(url: string, init: RequestInit, token: string, extraH
     if (fresh) activeToken = fresh;
   }
 
-  let res = await fetch(url, { ...init, headers: { ...h(activeToken), ...extraHeaders } });
+  // no-store: never serve REST data from the browser HTTP cache (stale customers/orders/invoices).
+  let res = await fetch(url, { ...init, cache: 'no-store', headers: { ...h(activeToken), ...extraHeaders } });
 
   if (res.status === 401) {
     const body = await res.clone().json().catch(() => ({}));
     if (isJwtExpiredBody(body)) {
       const fresh = await doRefresh();
       if (fresh) {
-        res = await fetch(url, { ...init, headers: { ...h(fresh), ...extraHeaders } });
+        res = await fetch(url, { ...init, cache: 'no-store', headers: { ...h(fresh), ...extraHeaders } });
       } else {
         handlers.onSessionExpired?.();
       }
@@ -132,6 +133,42 @@ async function authedFetch(url: string, init: RequestInit, token: string, extraH
 
   return res;
 }
+
+function encodePath(path: string): string {
+  return path.split('/').map(encodeURIComponent).join('/');
+}
+
+export const storage = {
+  async upload(bucket: string, path: string, file: File, token: string): Promise<void> {
+    const r = await authedFetch(`${SUPA_URL}/storage/v1/object/${bucket}/${encodePath(path)}`, {
+      method: 'POST',
+      body: file,
+    }, token, { 'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'false' });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({} as Record<string, string>));
+      throw new Error(e.message || e.error || `HTTP ${r.status}`);
+    }
+  },
+  async remove(bucket: string, paths: string[], token: string): Promise<void> {
+    const r = await authedFetch(`${SUPA_URL}/storage/v1/object/${bucket}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ prefixes: paths }),
+    }, token);
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({} as Record<string, string>));
+      throw new Error(e.message || e.error || `HTTP ${r.status}`);
+    }
+  },
+  async createSignedUrl(bucket: string, path: string, token: string, expiresIn = 60): Promise<string> {
+    const r = await authedFetch(`${SUPA_URL}/storage/v1/object/sign/${bucket}/${encodePath(path)}`, {
+      method: 'POST',
+      body: JSON.stringify({ expiresIn }),
+    }, token);
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.message || j.error || `HTTP ${r.status}`);
+    return `${SUPA_URL}/storage/v1${j.signedURL}`;
+  },
+};
 
 export const db = {
   async get(table: string, token: string) {

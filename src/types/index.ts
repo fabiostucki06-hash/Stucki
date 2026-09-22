@@ -1,3 +1,10 @@
+export interface VehicleDocument {
+  path: string;
+  name: string;
+  uploadedAt: string;
+  size: number;
+}
+
 export interface Customer {
   id: string;
   vorname: string;
@@ -11,6 +18,7 @@ export interface Customer {
   chassisnummer?: string;
   erstzulassung?: string;
   createdAt: string;
+  vehicleDocuments?: VehicleDocument[];
 }
 
 export interface OrderItem {
