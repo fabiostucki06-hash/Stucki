@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { auth, db, setAuthHandlers } from '../lib/supabase';
 import { showToast } from '../components/ui/Toast';
 import type { Customer, Order, Offerte, Rechnung, SyncStatus } from '../types';
@@ -36,6 +36,17 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
+/** Min gap between focus/visibility-triggered refetches (focus + visibilitychange often fire together). */
+const REVALIDATE_MIN_MS = 10_000;
+
+function parseRows(arr: unknown[]) {
+  return arr.map((r: unknown) => {
+    if (!r || typeof r !== 'object') return null;
+    const row = r as Record<string, unknown>;
+    return (row.data as Customer | Order | Offerte | Rechnung) ?? (row.id ? r : null);
+  }).filter(Boolean);
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('garage_token'));
   const [userEmail, setUserEmail] = useState<string | null>(() => localStorage.getItem('garage_email'));
@@ -50,6 +61,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [sessionExpired, setSessionExpired] = useState(false);
+  const lastSyncAt = useRef(0);
+  const writesInFlight = useRef(0);
+  const writeSeq = useRef(0);
 
   function updateToken(t: string) {
     localStorage.setItem('garage_token', t);
@@ -76,39 +90,64 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  /* Load on open/login, then silently revalidate whenever the tab regains
+     focus or becomes visible again (throttled), so data edited on another
+     device shows up without a manual reload. */
   useEffect(() => {
     if (!token || !authChecked) return;
-    (async () => {
-      try {
-        const [cr, or, cnt, offr, rechr] = await Promise.all([
-          db.get('customers', token),
-          db.get('orders', token),
-          db.getCounter(token),
-          db.get('offerten', token).catch((e) => { console.error('[Supabase] get(offerten):', e); return []; }),
-          db.get('rechnungen', token).catch((e) => { console.error('[Supabase] get(rechnungen):', e); return []; }),
-        ]);
-        const parseRows = (arr: unknown[]) =>
-          (Array.isArray(arr) ? arr : []).map((r: unknown) => {
-            if (!r || typeof r !== 'object') return null;
-            const row = r as Record<string, unknown>;
-            return (row.data as Customer | Order | Offerte | Rechnung) ?? (row.id ? r : null);
-          }).filter(Boolean);
-        setCustomers(parseRows(cr) as Customer[]);
-        setOrders(parseRows(or) as Order[]);
-        setOrderNum(cnt);
+    let cancelled = false;
+
+    const sync = async () => {
+      lastSyncAt.current = Date.now();
+      const seq = writeSeq.current;
+      const [cr, or, cnt, offr, rechr] = await Promise.all([
+        db.get('customers', token),
+        db.get('orders', token),
+        db.getCounter(token),
+        db.get('offerten', token).catch((e) => { console.error('[Supabase] get(offerten):', e); return null; }),
+        db.get('rechnungen', token).catch((e) => { console.error('[Supabase] get(rechnungen):', e); return null; }),
+      ]);
+      // A save overlapped this fetch: the response may predate it and would revert local state.
+      if (cancelled || writesInFlight.current > 0 || seq !== writeSeq.current) return;
+      // db.get resolves with an error object on HTTP errors; never let that wipe good data.
+      if (Array.isArray(cr)) setCustomers(parseRows(cr) as Customer[]);
+      if (Array.isArray(or)) setOrders(parseRows(or) as Order[]);
+      setOrderNum((p) => Math.max(p, cnt));
+      if (Array.isArray(offr)) {
         const offs = parseRows(offr) as Offerte[];
         setOfferten(offs);
-        if (offs.length) setOffertNum(Math.max(...offs.map((o) => o.offertNumber ?? 0)));
+        setOffertNum((p) => Math.max(p, ...offs.map((o) => o.offertNumber ?? 0)));
+      }
+      if (Array.isArray(rechr)) {
         const rechns = parseRows(rechr) as Rechnung[];
         setRechnungen(rechns);
-        if (rechns.length) setRechnungNum(Math.max(...rechns.map((r) => r.rechnungNumber ?? 0)));
-      } catch (e) { console.error(e); }
-      setLoading(false);
+        setRechnungNum((p) => Math.max(p, ...rechns.map((r) => r.rechnungNumber ?? 0)));
+      }
+    };
+
+    const onWake = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastSyncAt.current < REVALIDATE_MIN_MS) return;
+      sync().catch((e) => console.warn('[Supabase] background refresh failed:', e));
+    };
+
+    (async () => {
+      try { await sync(); } catch (e) { console.error(e); }
+      if (!cancelled) setLoading(false);
     })();
+
+    document.addEventListener('visibilitychange', onWake);
+    window.addEventListener('focus', onWake);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onWake);
+      window.removeEventListener('focus', onWake);
+    };
   }, [token, authChecked]);
 
   async function syncOk(fn: () => Promise<void>) {
     setSyncStatus('saving');
+    writesInFlight.current++;
     try {
       await fn();
       setSyncStatus('ok');
@@ -124,6 +163,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         showToast('Speichern fehlgeschlagen: ' + (msg || 'Unbekannter Fehler'), 'error');
       }
       throw e;
+    } finally {
+      writesInFlight.current--;
+      writeSeq.current++;
     }
   }
 

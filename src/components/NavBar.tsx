@@ -1,4 +1,5 @@
 import { ASSETS } from '../lib/supabase';
+import { hardReload } from '../lib/reload';
 import { SFCloud, SFMenu, SFRefresh } from './Icons';
 import type { SyncStatus } from '../types';
 
@@ -21,21 +22,6 @@ export default function NavBar({ syncStatus, todosCount, onMenuToggle, onLogoCli
     : syncStatus === 'ok' ? 'Gespeichert ✓'
     : syncStatus === 'error' ? 'Sync-Fehler'
     : 'Cloud-Sync';
-
-  const handleHardRefresh = async () => {
-    try {
-      if ('caches' in window) {
-        const keys = await caches.keys();
-        await Promise.all(keys.map((key) => caches.delete(key)));
-      }
-      if ('serviceWorker' in navigator) {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(regs.map((reg) => reg.unregister()));
-      }
-    } finally {
-      window.location.reload();
-    }
-  };
 
   return (
     <div className="nav-bar">
@@ -67,7 +53,7 @@ export default function NavBar({ syncStatus, todosCount, onMenuToggle, onLogoCli
         {/* Right side: sync indicator + todo badge */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
           <button
-            onClick={handleHardRefresh}
+            onClick={hardReload}
             className="bar-btn"
             style={{ color: 'var(--label)' }}
             title="Seite neu laden"

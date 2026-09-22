@@ -3,10 +3,12 @@ import { useApp } from './context/AppContext';
 import { ASSETS } from './lib/supabase';
 import { needsAttention } from './lib/utils';
 import { sampleImageColor, applyBgTheme, type WallpaperThemeId } from './lib/theme';
+import { useVersionCheck } from './hooks/useVersionCheck';
 
 import Spinner from './components/ui/Spinner';
 import Sheet from './components/ui/Sheet';
 import ReauthModal from './components/ui/ReauthModal';
+import UpdateBanner from './components/ui/UpdateBanner';
 import LoginPage from './components/LoginPage';
 import NavBar from './components/NavBar';
 import TabBar from './components/TabBar';
@@ -42,6 +44,7 @@ export default function App() {
     addRechnung, updateRechnung, deleteRechnung,
   } = useApp();
 
+  const updateAvailable = useVersionCheck();
   const [tab, setTab] = useState<TabId>('dashboard');
   const [fabOpen, setFabOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -94,6 +97,13 @@ export default function App() {
   const [editOff,  setEditOff]  = useState<Offerte | null>(null);
   const [selR,     setSelR]     = useState<Rechnung | null>(null);
   const [editR,    setEditR]    = useState<Rechnung | null>(null);
+
+  // Open detail sheets hold a snapshot; re-point them at fresh rows after a background refresh.
+  // Keep the old snapshot if the row vanished (deleted elsewhere) so the sheet doesn't blank out mid-view.
+  useEffect(() => { setSelC((p) => (p && customers.find((x) => x.id === p.id)) || p); }, [customers]);
+  useEffect(() => { setSelO((p) => (p && orders.find((x) => x.id === p.id)) || p); }, [orders]);
+  useEffect(() => { setSelOff((p) => (p && offerten.find((x) => x.id === p.id)) || p); }, [offerten]);
+  useEffect(() => { setSelR((p) => (p && rechnungen.find((x) => x.id === p.id)) || p); }, [rechnungen]);
 
   const todos = orders.filter(needsAttention);
 
@@ -401,6 +411,8 @@ export default function App() {
           defaultEdit={selOInEdit}
         />
       )}
+
+      {updateAvailable && <UpdateBanner />}
 
       {/* Build timestamp */}
       <div style={{
