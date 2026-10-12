@@ -1,7 +1,14 @@
 /** Desktop bookmarklet: runs on the active Autodoc/ATP product page, pulls
     title/price/article-number straight out of the live DOM (more reliable than
     a server-side re-fetch, which only sees raw HTML and can hit anti-bot
-    blocks), then opens GarageOS's import flow with them pre-filled. */
+    blocks), then opens GarageOS's import flow with them pre-filled in a NEW
+    tab — the original product page must stay open. `window.open` can get
+    popup-blocked depending on the browser's heuristics for bookmarklet-
+    triggered calls, so a synthetic `<a target="_blank">` click is the
+    fallback; neither path ever navigates the current tab away.
+    NOTE: no `//` line comments inside the `code` template below — whitespace
+    collapse below turns a trailing newline into a space, which would make an
+    unterminated `//` comment swallow the rest of the script. */
 export function buildImportBookmarklet(origin: string): string {
   const code = `(function(){
     var d=document,b=(d.body&&d.body.innerText)||'';
@@ -15,7 +22,13 @@ export function buildImportBookmarklet(origin: string): string {
       +'&import_title='+encodeURIComponent(t.trim())
       +'&import_price='+encodeURIComponent(p)
       +'&import_artnr='+encodeURIComponent(a);
-    window.open('${origin}/?'+q,'_blank');
+    var u='${origin}/?'+q;
+    var w=window.open(u,'_blank','noopener,noreferrer');
+    if(!w){
+      var link=document.createElement('a');
+      link.href=u; link.target='_blank'; link.rel='noopener noreferrer';
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }
   })();`;
   // Not URI-encoded: browsers execute the text after "javascript:" as literal JS
   // source, they don't percent-decode it first. Only whitespace is collapsed.
