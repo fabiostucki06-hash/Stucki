@@ -104,7 +104,7 @@ function extractFromJsonLd(html: string): { title?: string; price?: string } {
         const candidates = node['@graph'] ? node['@graph'] : [node];
         for (const c of candidates) {
           const offers = Array.isArray(c?.offers) ? c.offers[0] : c?.offers;
-          const price = offers?.price ?? offers?.priceSpecification?.price;
+          const price = offers?.price ?? offers?.priceSpecification?.price ?? offers?.lowPrice ?? c?.lowPrice;
           if (c?.name || price != null) {
             return { title: c?.name, price: price != null ? String(price) : undefined };
           }
@@ -127,11 +127,43 @@ function extractTitle(html: string): string {
   return '';
 }
 
+// Meta tags carry content/property or content/name attributes in either order
+// ("<meta property=... content=...>" or "<meta content=... property=...>").
+function metaContent(html: string, key: 'property' | 'name', value: string): string | undefined {
+  const forward = html.match(new RegExp(`<meta[^>]+${key}=["']${value}["'][^>]+content=["']([^"']+)["']`, 'i'));
+  if (forward) return forward[1];
+  const backward = html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+${key}=["']${value}["']`, 'i'));
+  return backward?.[1];
+}
+
 function extractPrice(html: string): string {
-  const metaPrice = html.match(/<meta[^>]+property=["'](?:og:price:amount|product:price:amount)["'][^>]+content=["']([^"']+)["']/i);
-  if (metaPrice) return normalizePrice(metaPrice[1]);
+  const metaPrice =
+    metaContent(html, 'property', 'og:price:amount') ??
+    metaContent(html, 'property', 'product:price:amount') ??
+    metaContent(html, 'property', 'g:price') ??
+    metaContent(html, 'name', 'g:price') ??
+    metaContent(html, 'name', 'twitter:data1');
+  if (metaPrice) {
+    const m = priceMatchValue(metaPrice.match(PRICE_RE)) ?? metaPrice.match(/\d{1,3}(?:[.,'\s]\d{3})*(?:[.,]\d{2})?/)?.[0];
+    if (m) return normalizePrice(m);
+  }
   const itemprop = html.match(/itemprop=["']price["'][^>]*(?:content|value)=["']([^"']+)["']/i);
   if (itemprop) return normalizePrice(itemprop[1]);
+  // Autodoc-style price containers: <span class="product-price">29.90 CHF</span>,
+  // data-price="29.90", class="price-value" etc. — not structured metadata, so
+  // only trust them if a plausible price pattern is actually inside.
+  const cssSelectors = [
+    /class=["'][^"']*product-price[^"']*["'][^>]*>([^<]+)</i,
+    /class=["'][^"']*price-value[^"']*["'][^>]*>([^<]+)</i,
+    /<span[^>]+data-price=["']([^"']+)["']/i,
+  ];
+  for (const re of cssSelectors) {
+    const match = html.match(re);
+    if (match) {
+      const m = priceMatchValue(match[1].match(PRICE_RE)) ?? match[1].match(/\d{1,3}(?:[.,'\s]\d{3})*[.,]\d{2}/)?.[0];
+      if (m) return normalizePrice(m);
+    }
+  }
   const m = priceMatchValue(html.match(PRICE_RE));
   return m ? normalizePrice(m) : '';
 }
