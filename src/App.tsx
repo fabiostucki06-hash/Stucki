@@ -126,17 +126,26 @@ export default function App() {
   const [prefillMat, setPrefillMat] = useState<MaterialPosition | null>(null);
   const [prefillCid, setPrefillCid] = useState<string | undefined>(undefined);
 
-  // Entry point for the iOS-Shortcut / share-sheet part import: a Shortcut opens
-  // https://<app>/?import_url=<shared link> (or import_text=<shared text>). Captured
-  // once on mount (independent of login state, since this component never remounts
-  // across the login transition) and stripped from the URL so a reload doesn't repeat it.
+  // Entry point for the iOS-Shortcut / share-sheet / desktop-bookmarklet part
+  // import: a Shortcut or bookmarklet opens https://<app>/?import_url=<link>
+  // (plus, from the bookmarklet, import_title/import_price/import_artnr already
+  // extracted client-side). Captured once on mount (independent of login state,
+  // since this component never remounts across the login transition) and
+  // stripped from the URL so a reload doesn't repeat it.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const url = params.get('import_url');
     const text = params.get('import_text');
+    const title = params.get('import_title');
+    const price = params.get('import_price');
+    const artnr = params.get('import_artnr');
     if (url || text) {
-      setImportPayload({ url: url ?? undefined, text: text ?? undefined });
+      setImportPayload({
+        url: url ?? undefined, text: text ?? undefined,
+        title: title ?? undefined, price: price ?? undefined, artikelnummer: artnr ?? undefined,
+      });
       params.delete('import_url'); params.delete('import_text');
+      params.delete('import_title'); params.delete('import_price'); params.delete('import_artnr');
       const rest = params.toString();
       window.history.replaceState({}, '', window.location.pathname + (rest ? `?${rest}` : ''));
     }

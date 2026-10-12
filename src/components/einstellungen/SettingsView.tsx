@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ASSETS } from '../../lib/supabase';
 import { getIban, setIban, getMargin, setMargin, type BgMode } from '../../lib/settings';
+import { buildImportBookmarklet } from '../../lib/bookmarklet';
 import { SFCheckmark } from '../Icons';
 
 const WALLPAPERS = [
@@ -10,11 +11,16 @@ const WALLPAPERS = [
 ];
 
 const SOLID_COLORS = [
-  { id: 'black',     label: 'Schwarz',     hex: '#000000' },
-  { id: 'slate',     label: 'Dunkelgrau',  hex: '#1C1C1E' },
-  { id: 'darkblue',  label: 'Dunkelblau',  hex: '#0A2540' },
-  { id: 'lightgray', label: 'Hellgrau',    hex: '#F2F2F7' },
+  { id: 'black',     label: 'Schwarz',       hex: '#000000' },
+  { id: 'anthrazit', label: 'Anthrazit',     hex: '#1e293b' },
+  { id: 'midnight',  label: 'Mitternacht',   hex: '#0f172a' },
+  { id: 'indigo',    label: 'Dunkelblau',    hex: '#312e81' },
+  { id: 'green',     label: 'Dunkelgrün',    hex: '#14532d' },
+  { id: 'gray',      label: 'Neutrales Grau', hex: '#6b7280' },
+  { id: 'lightgray', label: 'Hellgrau',      hex: '#F2F2F7' },
 ];
+
+const HEX_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 
 interface SettingsViewProps {
   currentWallpaper: string;
@@ -29,6 +35,23 @@ export default function SettingsView({ currentWallpaper, onWallpaperChange, bgMo
   const [iban, setIbanValue] = useState<string>(() => getIban());
   const [margin, setMarginValue] = useState<number>(() => getMargin());
   const [bgTab, setBgTab] = useState<'bilder' | 'unifarben'>(bgMode === 'color' ? 'unifarben' : 'bilder');
+  const bookmarklet = buildImportBookmarklet(window.location.origin);
+  // Separate draft buffer: the hex text field must let the user type freely
+  // ("#", "#1", "#1e"…) without committing/persisting an invalid color on
+  // every keystroke. Only a complete, valid hex is forwarded to onBgColorChange.
+  const [hexDraft, setHexDraft] = useState(bgMode === 'color' ? bgColor : '');
+
+  function handleHexInput(v: string) {
+    setHexDraft(v);
+    if (HEX_RE.test(v)) onBgColorChange(v);
+  }
+
+  // Keep the draft in sync when the color changes via a preset swatch or the
+  // native <input type="color"> picker (not while the user is mid-typing an
+  // invalid draft — HEX_RE above already filters those commits out).
+  useEffect(() => {
+    setHexDraft(bgMode === 'color' ? bgColor : '');
+  }, [bgMode, bgColor]);
 
   function handleIbanChange(v: string) {
     setIbanValue(v);
@@ -248,9 +271,9 @@ export default function SettingsView({ currentWallpaper, onWallpaperChange, bgMo
               <input
                 className="cf-input"
                 style={{ flex: 1 }}
-                value={bgMode === 'color' ? bgColor : ''}
-                onChange={(e) => onBgColorChange(e.target.value)}
-                placeholder="#1C1C1E"
+                value={hexDraft}
+                onChange={(e) => handleHexInput(e.target.value)}
+                placeholder="#1e293b"
               />
             </div>
           </div>
@@ -346,6 +369,41 @@ export default function SettingsView({ currentWallpaper, onWallpaperChange, bgMo
           <li>Unter „Details&quot; → „Im Freigabe-Sheet anzeigen&quot; aktivieren und Autodoc als zulässige App erlauben.</li>
           <li>In der Autodoc-App auf Teilen tippen und den neuen Kurzbefehl auswählen – GarageOS öffnet sich mit dem erkannten Teil.</li>
         </ol>
+
+        <p className="cf-label" style={{ marginTop: 20, marginBottom: 6 }}>Teile per Desktop-Browser importieren</p>
+        <p style={{ fontSize: 12, color: 'var(--label2)', lineHeight: 1.5, margin: '0 0 10px' }}>
+          Dieses Lesezeichen liest Titel, Preis und Artikelnummer direkt von der geöffneten Autodoc/ATP-Produktseite
+          und öffnet GarageOS damit vorausgefüllt.
+        </p>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>
+          <a
+            href={bookmarklet}
+            className="mf-btn-save"
+            style={{ display: 'inline-flex' }}
+            onClick={(e) => e.preventDefault()}
+            draggable
+          >
+            🔧 Teil importieren
+          </a>
+          <span style={{ fontSize: 12, color: 'var(--label3)' }}>← zur Lesezeichenleiste ziehen</span>
+        </div>
+
+        <p style={{ fontSize: 12, color: 'var(--label2)', lineHeight: 1.6, margin: '0 0 6px' }}>
+          Zieht der Browser nicht mit (z.B. per Touchpad), Code manuell als Lesezeichen anlegen:
+        </p>
+        <ol style={{ fontSize: 12, color: 'var(--label2)', lineHeight: 1.6, margin: '0 0 10px', paddingLeft: 18 }}>
+          <li>Neues Lesezeichen anlegen (beliebiger Name, z.B. „Teil importieren&quot;).</li>
+          <li>Unten stehenden Code als URL/Adresse einfügen und speichern.</li>
+        </ol>
+        <textarea
+          readOnly
+          value={bookmarklet}
+          onFocus={(e) => e.currentTarget.select()}
+          className="cf-textarea"
+          rows={3}
+          style={{ fontSize: 11, fontFamily: 'monospace', wordBreak: 'break-all', resize: 'vertical' }}
+        />
       </div>
     </div>
   );

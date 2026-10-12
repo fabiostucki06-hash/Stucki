@@ -7,6 +7,11 @@ import type { Customer, MaterialPosition, Offerte, MaterialCatalogItem } from '.
 export interface ImportPayload {
   url?: string;
   text?: string;
+  /** Already extracted client-side (e.g. by the desktop bookmarklet, which has
+      direct DOM access to the product page) — skips the server-side re-fetch. */
+  title?: string;
+  price?: string;
+  artikelnummer?: string;
 }
 
 interface ImportPartSheetProps {
@@ -25,6 +30,7 @@ interface ParsedPart {
   ek: string;
   artikelnummer: string;
   quelle: string;
+  blocked?: boolean;
 }
 
 const round2 = (n: number) => (Number.isFinite(n) ? n.toFixed(2) : '');
@@ -45,6 +51,18 @@ export default function ImportPartSheet({ payload, customers, offerten, onClose,
   const openDrafts = offerten.filter((o) => o.status === 'entwurf');
 
   useEffect(() => {
+    // Bookmarklet path: title/price already extracted client-side from the live,
+    // JS-rendered product page — more reliable than a server-side re-fetch (which
+    // sees raw HTML and can hit anti-bot blocks), so use it directly.
+    if (payload.title || payload.price) {
+      setBeschreibung(payload.title || '');
+      setEk(payload.price || '');
+      setArtikelnummer(payload.artikelnummer || '');
+      if (payload.price) setStueckpreis(round2(parseFloat(payload.price) * (1 + margin / 100)));
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
     (async () => {
       try {
@@ -60,8 +78,15 @@ export default function ImportPartSheet({ payload, customers, offerten, onClose,
         setArtikelnummer(data.artikelnummer || '');
         if (data.quelle) setQuelle(data.quelle);
         if (data.ek) setStueckpreis(round2(parseFloat(data.ek) * (1 + margin / 100)));
-        if (!data.ok && !data.title && !data.ek) {
-          showToast('Konnte nichts automatisch erkennen – bitte manuell ausfüllen', 'error');
+        if (!data.ok) {
+          showToast(
+            data.blocked
+              ? 'Shop blockiert automatische Anfragen – bitte Daten manuell eintragen'
+              : 'Konnte nichts automatisch erkennen – bitte manuell ausfüllen',
+            'error',
+          );
+        } else if (data.blocked) {
+          showToast('Shop evtl. blockiert – Angaben bitte prüfen', 'error');
         }
       } catch {
         if (!cancelled) showToast('Import fehlgeschlagen – bitte manuell ausfüllen', 'error');

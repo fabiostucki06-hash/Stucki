@@ -14,6 +14,9 @@ interface ImportResult {
   ek: string;
   artikelnummer: string;
   quelle: string;
+  /** Shop responded but looks bot-blocked (403/429/503 or a challenge page) —
+      distinct from "nothing matched", so the UI can say something more useful. */
+  blocked?: boolean;
   error?: string;
 }
 
@@ -28,8 +31,23 @@ interface VercelLikeResponse {
 }
 
 const URL_RE = /https?:\/\/[^\s"'<>]+/i;
-const PRICE_RE = /(?:CHF|EUR|€|Fr\.?)\s?([\d]{1,3}(?:[.'\s]\d{3})*(?:[.,]\d{2})?)/i;
-const ARTNR_RE = /(?:Art(?:ikel)?\.?-?Nr\.?|Artikelnummer|SKU|MPN)[:\s]*([A-Za-z0-9\-/]{3,})/i;
+// Some share-sheet strings drop the scheme entirely ("autodoc.ch/de/part/123" or
+// "www.autodoc.ch/..."); still recognizable as a link by the domain.tld/path shape.
+const BARE_DOMAIN_RE = /\b((?:www\.)?[a-z0-9][a-z0-9-]*\.[a-z]{2,}\/[^\s"'<>]*)/i;
+
+function extractLink(text: string): string | undefined {
+  return text.match(URL_RE)?.[0] ?? text.match(BARE_DOMAIN_RE)?.[1];
+}
+
+// Currency before the amount ("CHF 29.90", "€12,50") OR after it ("29.90 CHF",
+// "12,50 €") — Autodoc's site and its app's share text use different orders.
+const PRICE_RE = /(?:(?:CHF|EUR|€|Fr\.?)\s?(\d{1,3}(?:[.,'\s]\d{3})*(?:[.,]\d{2})?)|(\d{1,3}(?:[.,'\s]\d{3})*[.,]\d{2})\s?(?:CHF|EUR|€|Fr\.?))/i;
+const ARTNR_RE = /(?:Art(?:ikel)?\.?-?Nr\.?|Artikelnummer|OE[\s-]?Nr\.?|OEM|SKU|MPN)[:\s#]*([A-Za-z0-9\-/]{3,})/i;
+const BLOCK_SIGNATURE_RE = /attention required|access denied|just a moment|captcha|are you a human|cloudflare|request blocked|bot detection/i;
+
+function priceMatchValue(m: RegExpMatchArray | null): string | undefined {
+  return m ? (m[1] ?? m[2]) : undefined;
+}
 
 function normalizePrice(raw: string): string {
   // "1'234.50" / "1.234,50" / "49,90" -> "1234.50" / "49.90"
@@ -44,6 +62,15 @@ function normalizePrice(raw: string): string {
   }
   const n = parseFloat(normalized);
   return Number.isFinite(n) ? n.toFixed(2) : '';
+}
+
+/** Best-effort: not every absolute-looking link the Autodoc app shares has a
+    scheme (some share-sheet strings drop it), and stray trailing punctuation
+    from the surrounding sentence often rides along. */
+function sanitizeUrl(raw: string): string {
+  let u = raw.trim().replace(/[)\].,;!?'"]+$/, '');
+  if (!/^https?:\/\//i.test(u)) u = `https://${u}`;
+  return u;
 }
 
 function extractFromJsonLd(html: string): { title?: string; price?: string } {
@@ -81,13 +108,12 @@ function extractTitle(html: string): string {
 }
 
 function extractPrice(html: string): string {
-  const ogPrice = html.match(/<meta[^>]+property=["']og:price:amount["'][^>]+content=["']([^"']+)["']/i);
-  if (ogPrice) return normalizePrice(ogPrice[1]);
+  const metaPrice = html.match(/<meta[^>]+property=["'](?:og:price:amount|product:price:amount)["'][^>]+content=["']([^"']+)["']/i);
+  if (metaPrice) return normalizePrice(metaPrice[1]);
   const itemprop = html.match(/itemprop=["']price["'][^>]*(?:content|value)=["']([^"']+)["']/i);
   if (itemprop) return normalizePrice(itemprop[1]);
-  const m = html.match(PRICE_RE);
-  if (m) return normalizePrice(m[1]);
-  return '';
+  const m = priceMatchValue(html.match(PRICE_RE));
+  return m ? normalizePrice(m) : '';
 }
 
 function extractArtNr(html: string): string {
@@ -97,21 +123,59 @@ function extractArtNr(html: string): string {
   return m ? m[1].trim() : '';
 }
 
-async function parseUrl(url: string): Promise<Partial<ImportResult>> {
+/** A redirect/share link ("autodoc.app.link/...") sometimes resolves via a
+    client-side `<meta http-equiv="refresh">` or canonical link rather than a
+    real HTTP 3xx, which plain `fetch` redirect-following won't catch. */
+function extractIndirectRedirect(html: string): string | undefined {
+  const refresh = html.match(/<meta[^>]+http-equiv=["']refresh["'][^>]+content=["'][^;]*;\s*url=([^"'>]+)["']/i);
+  if (refresh) return refresh[1];
+  const canonical = html.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i);
+  if (canonical) return canonical[1];
+  return undefined;
+}
+
+const BROWSER_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'de-CH,de;q=0.9,en;q=0.8',
+};
+
+async function fetchHtml(url: string, signal: AbortSignal): Promise<{ html: string; status: number }> {
+  const res = await fetch(url, { signal, headers: BROWSER_HEADERS });
+  return { html: await res.text(), status: res.status };
+}
+
+async function parseUrl(rawUrl: string): Promise<Partial<ImportResult>> {
+  const url = sanitizeUrl(rawUrl);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+  const timeout = setTimeout(() => controller.abort(), 9000);
   try {
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; GarageOS-Import/1.0)' },
-    });
-    const html = await res.text();
+    let { html, status } = await fetchHtml(url, controller.signal);
+    let finalUrl = url;
+
+    const redirect = extractIndirectRedirect(html);
+    if (redirect) {
+      try {
+        const resolved = new URL(redirect, url).toString();
+        const next = await fetchHtml(resolved, controller.signal);
+        html = next.html; status = next.status; finalUrl = resolved;
+      } catch {
+        // indirect redirect target unreachable — keep parsing the page we already have
+      }
+    }
+
+    const blocked = status === 403 || status === 429 || status === 503 || BLOCK_SIGNATURE_RE.test(html.slice(0, 2000));
     const ld = extractFromJsonLd(html);
+    // A challenge/block page has no real product markup, so a loose <title>/text
+    // regex fallback on it only ever picks up junk ("Attention Required! |
+    // Cloudflare") — worse than leaving the field empty for manual entry. Only
+    // trust structured data (JSON-LD/OG meta) here, which a block page won't have.
     return {
-      title: ld.title?.trim() || extractTitle(html),
-      ek: (ld.price && normalizePrice(ld.price)) || extractPrice(html),
-      artikelnummer: extractArtNr(html),
-      quelle: url,
+      title: ld.title?.trim() || (!blocked ? extractTitle(html) : ''),
+      ek: (ld.price && normalizePrice(ld.price)) || (!blocked ? extractPrice(html) : ''),
+      artikelnummer: !blocked ? extractArtNr(html) : '',
+      quelle: finalUrl,
+      blocked: blocked || undefined,
     };
   } finally {
     clearTimeout(timeout);
@@ -119,13 +183,33 @@ async function parseUrl(url: string): Promise<Partial<ImportResult>> {
 }
 
 function parseText(text: string): Partial<ImportResult> {
-  const firstLine = text.split('\n').map((l) => l.trim()).filter(Boolean)[0] ?? '';
-  const priceMatch = text.match(PRICE_RE);
-  const artMatch = text.match(ARTNR_RE);
+  const link = extractLink(text);
+  const withoutLink = link ? text.replace(link, ' ') : text;
+  const priceMatch = withoutLink.match(PRICE_RE);
+  const priceRaw = priceMatchValue(priceMatch);
+  const artMatch = withoutLink.match(ARTNR_RE);
+
+  // Share-sheet text is usually one line ("<title> – 29.90 CHF"); strip the
+  // matched price/art-nr and leftover separators to leave just the title.
+  let title = withoutLink.split('\n').map((l) => l.trim()).filter(Boolean)[0] ?? '';
+  if (priceMatch) title = title.replace(priceMatch[0], ' ');
+  if (artMatch) title = title.replace(artMatch[0], ' ');
+  title = title.replace(/\s{2,}/g, ' ').trim().replace(/[-–|,:]+$/, '').trim();
+
   return {
-    title: firstLine.replace(PRICE_RE, '').trim(),
-    ek: priceMatch ? normalizePrice(priceMatch[1]) : '',
+    title,
+    ek: priceRaw ? normalizePrice(priceRaw) : '',
     artikelnummer: artMatch ? artMatch[1].trim() : '',
+  };
+}
+
+function merge(a: Partial<ImportResult>, b: Partial<ImportResult>): Omit<ImportResult, 'ok'> {
+  return {
+    title: a.title || b.title || '',
+    ek: a.ek || b.ek || '',
+    artikelnummer: a.artikelnummer || b.artikelnummer || '',
+    quelle: a.quelle || b.quelle || '',
+    blocked: a.blocked || b.blocked || undefined,
   };
 }
 
@@ -138,46 +222,32 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
   const body = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body) as ImportRequestBody | undefined;
   const rawUrl = body?.url?.trim();
   const rawText = body?.text?.trim();
-  const linkInText = !rawUrl && rawText ? rawText.match(URL_RE)?.[0] : undefined;
+  const linkInText = !rawUrl && rawText ? extractLink(rawText) : undefined;
   const targetUrl = rawUrl || linkInText;
 
-  try {
-    if (targetUrl) {
-      const fromUrl = await parseUrl(targetUrl);
-      const fallback = rawText ? parseText(rawText) : {};
-      res.status(200).json({
-        ok: true,
-        title: fromUrl.title || fallback.title || '',
-        ek: fromUrl.ek || fallback.ek || '',
-        artikelnummer: fromUrl.artikelnummer || fallback.artikelnummer || '',
-        quelle: targetUrl,
-      });
-      return;
-    }
+  // Always compute the text-only fallback up front: if fetching the shop page
+  // fails outright (blocked, timed out, unreachable redirect target, …) the
+  // regex read of the shared text itself is still the best data we have,
+  // rather than discarding it and reporting nothing found.
+  const textResult = rawText ? parseText(rawText) : {};
 
-    if (rawText) {
-      const fromText = parseText(rawText);
-      res.status(200).json({
-        ok: true,
-        title: fromText.title || '',
-        ek: fromText.ek || '',
-        artikelnummer: fromText.artikelnummer || '',
-        quelle: '',
-      });
-      return;
+  let fetchResult: Partial<ImportResult> = {};
+  let fetchError: string | undefined;
+  if (targetUrl) {
+    try {
+      fetchResult = await parseUrl(targetUrl);
+    } catch (e) {
+      fetchError = e instanceof Error ? e.message : 'Unbekannter Fehler';
     }
-
-    res.status(400).json({ ok: false, title: '', ek: '', artikelnummer: '', quelle: '', error: 'Weder url noch text übergeben' });
-  } catch (e) {
-    // Parsing failed (unreachable page, blocked fetch, …) — the client falls back
-    // to a blank, manually-filled form, so this is a soft failure, not a 500.
-    res.status(200).json({
-      ok: false,
-      title: '',
-      ek: '',
-      artikelnummer: '',
-      quelle: targetUrl ?? '',
-      error: e instanceof Error ? e.message : 'Unbekannter Fehler',
-    });
   }
+
+  const merged = merge(fetchResult, textResult);
+  if (!merged.quelle && targetUrl) merged.quelle = targetUrl;
+  const found = Boolean(merged.title || merged.ek || merged.artikelnummer);
+
+  res.status(200).json({
+    ok: found,
+    ...merged,
+    error: !found ? fetchError : undefined,
+  });
 }
