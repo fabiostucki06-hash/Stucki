@@ -53,7 +53,7 @@ export default function ImportPartSheet({ payload, customers, offerten, onClose,
   const [busy, setBusy] = useState(false);
   const [debugInfo, setDebugInfo] = useState<{ raw: string; decoded: string } | null>(null);
 
-  const openDrafts = offerten.filter((o) => o.status === 'entwurf');
+  const openDrafts = offerten.filter((o) => o.status === 'entwurf' || o.status === 'versendet');
 
   useEffect(() => {
     // Bookmarklet path: title/price already extracted client-side from the live,
@@ -112,6 +112,10 @@ export default function ImportPartSheet({ payload, customers, offerten, onClose,
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const mengeNum = parseFloat(menge) || 1;
+  const ekTotal = (parseFloat(ek) || 0) * mengeNum;
+  const vkTotal = (parseFloat(stueckpreis) || 0) * mengeNum;
 
   function handleEkChange(v: string) {
     setEk(v);
@@ -228,6 +232,20 @@ export default function ImportPartSheet({ payload, customers, offerten, onClose,
             <input className="cf-input" value={artikelnummer} onChange={(e) => setArtikelnummer(e.target.value)} placeholder="optional" />
           </div>
         </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+          <div className="cf-field">
+            <label className="cf-label">EK Gesamt</label>
+            <div className="cf-input" style={{ display: 'flex', alignItems: 'center', color: 'var(--label2)' }}>
+              {ekTotal ? `CHF ${round2(ekTotal)}` : '–'}
+            </div>
+          </div>
+          <div className="cf-field">
+            <label className="cf-label">VK Gesamt</label>
+            <div className="cf-input" style={{ display: 'flex', alignItems: 'center', fontWeight: 600 }}>
+              {vkTotal ? `CHF ${round2(vkTotal)}` : '–'}
+            </div>
+          </div>
+        </div>
         <p style={{ fontSize: 11, color: 'var(--label3)', marginTop: 8, marginBottom: 0 }}>
           VK = EK + {margin}% Marge (einstellbar unter Einstellungen → Teile-Import).
         </p>
@@ -238,12 +256,13 @@ export default function ImportPartSheet({ payload, customers, offerten, onClose,
         {openDrafts.length > 0 ? (
           <>
             <div className="cf-field" style={{ marginBottom: 10 }}>
-              <label className="cf-label">Offerte (Entwurf)</label>
+              <label className="cf-label">Offene Offerte</label>
               <select className="cf-select" value={targetOfferteId} onChange={(e) => setTargetOfferteId(e.target.value)}>
                 <option value="">Auswählen…</option>
                 {openDrafts.map((o) => {
                   const c = customers.find((x) => x.id === o.customerId);
-                  return <option key={o.id} value={o.id}>#{o.offertNumber} – {o.titel || (c ? `${c.vorname} ${c.nachname}` : 'Offerte')}</option>;
+                  const statusLabel = o.status === 'entwurf' ? 'Entwurf' : 'Versendet';
+                  return <option key={o.id} value={o.id}>#{o.offertNumber} – {o.titel || (c ? `${c.vorname} ${c.nachname}` : 'Offerte')} ({statusLabel})</option>;
                 })}
               </select>
             </div>
