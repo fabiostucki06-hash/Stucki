@@ -117,5 +117,15 @@ export interface Rechnung {
   kleinteilManuell?: boolean | null;
 }
 
+export interface MaterialCatalogItem {
+  id: string;
+  beschreibung: string;
+  ek?: string;
+  stueckpreis: string;
+  artikelnummer?: string;
+  quelle?: string;
+  createdAt: string;
+}
+
 export type TabId = 'dashboard' | 'auftraege' | 'offerten' | 'rechnungen' | 'kunden' | 'statistiken' | 'einstellungen';
 export type SyncStatus = 'idle' | 'saving' | 'ok' | 'error';

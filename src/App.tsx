@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useApp } from './context/AppContext';
+import { showToast } from './components/ui/Toast';
 import { ASSETS } from './lib/supabase';
 import { needsAttention } from './lib/utils';
 import { sampleImageColor, applyBgTheme, type WallpaperThemeId } from './lib/theme';
@@ -25,13 +26,14 @@ import OrderDetail from './components/auftraege/OrderDetail';
 import OfferteList from './components/offerten/OfferteList';
 import OfferteForm from './components/offerten/OfferteForm';
 import OfferteDetail from './components/offerten/OfferteDetail';
+import ImportPartSheet, { type ImportPayload } from './components/offerten/ImportPartSheet';
 import StatistikDashboard from './components/statistiken/StatistikDashboard';
 import SettingsView from './components/einstellungen/SettingsView';
 import RechnungenList from './components/rechnungen/RechnungenList';
 import RechnungForm from './components/rechnungen/RechnungForm';
 import RechnungDetail from './components/rechnungen/RechnungDetail';
 
-import type { ArbeitPosition, Customer, Order, Offerte, Rechnung, TabId } from './types';
+import type { ArbeitPosition, MaterialPosition, Customer, Order, Offerte, Rechnung, TabId } from './types';
 
 export default function App() {
   const {
@@ -43,6 +45,7 @@ export default function App() {
     addOrder, updateOrder, deleteOrder,
     addOfferte, updateOfferte, deleteOfferte,
     addRechnung, updateRechnung, deleteRechnung,
+    addMaterial,
   } = useApp();
 
   const updateAvailable = useVersionCheck();
@@ -99,6 +102,26 @@ export default function App() {
   const [selR,     setSelR]     = useState<Rechnung | null>(null);
   const [editR,    setEditR]    = useState<Rechnung | null>(null);
 
+  const [importPayload, setImportPayload] = useState<ImportPayload | null>(null);
+  const [prefillMat, setPrefillMat] = useState<MaterialPosition | null>(null);
+  const [prefillCid, setPrefillCid] = useState<string | undefined>(undefined);
+
+  // Entry point for the iOS-Shortcut / share-sheet part import: a Shortcut opens
+  // https://<app>/?import_url=<shared link> (or import_text=<shared text>). Captured
+  // once on mount (independent of login state, since this component never remounts
+  // across the login transition) and stripped from the URL so a reload doesn't repeat it.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const url = params.get('import_url');
+    const text = params.get('import_text');
+    if (url || text) {
+      setImportPayload({ url: url ?? undefined, text: text ?? undefined });
+      params.delete('import_url'); params.delete('import_text');
+      const rest = params.toString();
+      window.history.replaceState({}, '', window.location.pathname + (rest ? `?${rest}` : ''));
+    }
+  }, []);
+
   // Open detail sheets hold a snapshot; re-point them at fresh rows after a background refresh.
   // Keep the old snapshot if the row vanished (deleted elsewhere) so the sheet doesn't blank out mid-view.
   useEffect(() => { setSelC((p) => (p && customers.find((x) => x.id === p.id)) || p); }, [customers]);
@@ -114,7 +137,7 @@ export default function App() {
   // So: reload the instant it's safe (nothing open), and the instant it becomes
   // safe again if a new version lands while something is.
   const anySheetOpen = showNC || showNO || showNOff || showNR || !!afterSave
-    || !!selC || !!editC || !!selO || !!selOff || !!editOff || !!selR || !!editR;
+    || !!selC || !!editC || !!selO || !!selOff || !!editOff || !!selR || !!editR || !!importPayload;
   const reloadTriggered = useRef(false);
   useEffect(() => {
     if (!updateAvailable || anySheetOpen || reloadTriggered.current) return;
@@ -237,6 +260,23 @@ export default function App() {
     setTab('rechnungen');
   }
 
+  /* ── Teile-Import handlers ── */
+  async function handleAddImportedPartToOfferte(offerteId: string, position: MaterialPosition) {
+    const off = offerten.find((o) => o.id === offerteId);
+    if (!off) return;
+    const positionen = [...(off.positionen ?? []), position];
+    const totalArbeit = positionen.filter((p) => p.typ === 'arbeit').reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
+    const totalMaterial = positionen.filter((p) => p.typ === 'material').reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
+    await updateOfferte({ ...off, positionen, totalArbeit: totalArbeit.toFixed(2), totalMaterial: totalMaterial.toFixed(2), totalBetrag: (totalArbeit + totalMaterial).toFixed(2) });
+    showToast(`Teil zu Offerte #${off.offertNumber} hinzugefügt`, 'success');
+  }
+  function handleStartNewOfferteFromImport(position: MaterialPosition, customerId?: string) {
+    setPrefillMat(position);
+    setPrefillCid(customerId);
+    setImportPayload(null);
+    setShowNOff(true);
+  }
+
   /* ── Rechnung handlers ── */
   async function handleAddRechnung(data: Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>) {
     await addRechnung(data); setShowNR(false); setTab('rechnungen');
@@ -342,10 +382,34 @@ export default function App() {
         </Sheet>
       )}
 
-      {showNOff && (
-        <Sheet title="Neue Offerte" onClose={() => setShowNOff(false)} full
-          barRight={<button onClick={() => setShowNOff(false)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
-          <OfferteForm customers={customers} onSave={handleAddOfferte} onCancel={() => setShowNOff(false)} />
+      {showNOff && (() => {
+        const closeNOff = () => { setShowNOff(false); setPrefillMat(null); setPrefillCid(undefined); };
+        return (
+          <Sheet title="Neue Offerte" onClose={closeNOff} full
+            barRight={<button onClick={closeNOff} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
+            <OfferteForm
+              customers={customers}
+              onSave={async (data) => { await handleAddOfferte(data); setPrefillMat(null); setPrefillCid(undefined); }}
+              onCancel={closeNOff}
+              prefillMaterial={prefillMat ?? undefined}
+              prefillCustomerId={prefillCid}
+            />
+          </Sheet>
+        );
+      })()}
+
+      {importPayload && (
+        <Sheet title="Teil importieren" onClose={() => setImportPayload(null)}
+          barRight={<button onClick={() => setImportPayload(null)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
+          <ImportPartSheet
+            payload={importPayload}
+            customers={customers}
+            offerten={offerten}
+            onClose={() => setImportPayload(null)}
+            onAddToOfferte={handleAddImportedPartToOfferte}
+            onStartNewOfferte={handleStartNewOfferteFromImport}
+            onSaveToCatalog={addMaterial}
+          />
         </Sheet>
       )}
 

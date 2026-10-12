@@ -21,6 +21,9 @@ interface OfferteFormProps {
   onCancel: () => void;
   saving?: boolean;
   initial?: Offerte;
+  /** Pre-fills the material tab with one row (e.g. from the part-import flow). Ignored when `initial` is set. */
+  prefillMaterial?: MaterialPosition;
+  prefillCustomerId?: string;
 }
 
 function schaetzeZE(desc: string): string {
@@ -63,10 +66,10 @@ const toArbeitPosition = (p: ArbeitRow): ArbeitPosition => ({
 const newMaterial = (): MaterialRow => ({ typ: 'material', beschreibung: '', menge: '1', stueckpreis: '', preis: '' });
 const fCHF = (n: number) => 'CHF ' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, "'");
 
-export default function OfferteForm({ customers, onSave, onCancel, saving: savingProp, initial }: OfferteFormProps) {
-  const [cid,        setCid]        = useState(initial?.customerId ?? '');
+export default function OfferteForm({ customers, onSave, onCancel, saving: savingProp, initial, prefillMaterial, prefillCustomerId }: OfferteFormProps) {
+  const [cid,        setCid]        = useState(initial?.customerId ?? prefillCustomerId ?? '');
   const [titel,      setTitel]      = useState(initial?.titel ?? '');
-  const [tab,        setTab]        = useState<'arbeit' | 'material'>('arbeit');
+  const [tab,        setTab]        = useState<'arbeit' | 'material'>(initial ? 'arbeit' : prefillMaterial ? 'material' : 'arbeit');
   const [arbeit,     setArbeit]     = useState<ArbeitRow[]>(() => {
     const ap = (initial?.positionen ?? []).filter((p): p is ArbeitPosition => p.typ === 'arbeit');
     return ap.length ? ap.map((p) => ({ ...p, zeLoading: false, zeHint: p.zeHint ?? '' })) : [newArbeit()];
@@ -75,7 +78,9 @@ export default function OfferteForm({ customers, onSave, onCancel, saving: savin
     const mp = (initial?.positionen ?? [])
       .filter((p): p is MaterialPosition => p.typ === 'material')
       .filter((p) => p.beschreibung !== 'Kleinteil Pauschale');
-    return mp.length ? [...mp] : [newMaterial()];
+    if (mp.length) return [...mp];
+    if (!initial && prefillMaterial) return [{ ...prefillMaterial }];
+    return [newMaterial()];
   });
   const [notizen,    setNotizen]    = useState(initial?.notizen ?? '');
   const [gueltigBis, setGueltigBis] = useState(initial?.gueltigBis ?? '');

@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { auth, db, setAuthHandlers } from '../lib/supabase';
 import { showToast } from '../components/ui/Toast';
-import type { Customer, Order, Offerte, Rechnung, SyncStatus } from '../types';
+import type { Customer, Order, Offerte, Rechnung, MaterialCatalogItem, SyncStatus } from '../types';
 
 interface AppContextValue {
   customers: Customer[];
@@ -30,6 +30,7 @@ interface AppContextValue {
   addRechnung: (data: Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>) => Promise<void>;
   updateRechnung: (upd: Rechnung) => Promise<void>;
   deleteRechnung: (id: string) => Promise<void>;
+  addMaterial: (data: Omit<MaterialCatalogItem, 'id' | 'createdAt'>) => Promise<void>;
   handleLogin: (token: string, email: string) => void;
   handleLogout: () => Promise<void>;
 }
@@ -266,6 +267,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setRechnungen((p) => p.filter((r) => r.id !== id));
   }
 
+  async function addMaterial(data: Omit<MaterialCatalogItem, 'id' | 'createdAt'>) {
+    const newM: MaterialCatalogItem = { id: `mat_${Date.now()}`, createdAt: new Date().toISOString(), ...data };
+    await syncOk(() => db.upsert('materials', { id: newM.id, data: newM }, token!));
+    showToast(`"${newM.beschreibung}" im Materialkatalog gespeichert`, 'success');
+  }
+
   function handleLogin(t: string, e: string) {
     setToken(t); setUserEmail(e); setLoading(true);
   }
@@ -278,7 +285,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AppContext.Provider value={{ customers, orders, offerten, rechnungen, orderNum, offertNum, rechnungNum, loading, syncStatus, token, userEmail, authChecked, sessionExpired, updateToken, addCustomer, updateCustomer, deleteCustomer, addOrder, updateOrder, deleteOrder, addOfferte, updateOfferte, deleteOfferte, addRechnung, updateRechnung, deleteRechnung, handleLogin, handleLogout }}>
+    <AppContext.Provider value={{ customers, orders, offerten, rechnungen, orderNum, offertNum, rechnungNum, loading, syncStatus, token, userEmail, authChecked, sessionExpired, updateToken, addCustomer, updateCustomer, deleteCustomer, addOrder, updateOrder, deleteOrder, addOfferte, updateOfferte, deleteOfferte, addRechnung, updateRechnung, deleteRechnung, addMaterial, handleLogin, handleLogout }}>
       {children}
     </AppContext.Provider>
   );

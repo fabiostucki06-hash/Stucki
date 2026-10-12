@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ASSETS } from '../../lib/supabase';
-import { getIban, setIban } from '../../lib/settings';
+import { getIban, setIban, getMargin, setMargin } from '../../lib/settings';
 import { SFCheckmark } from '../Icons';
 
 const WALLPAPERS = [
@@ -17,10 +17,18 @@ interface SettingsViewProps {
 export default function SettingsView({ currentWallpaper, onWallpaperChange }: SettingsViewProps) {
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [iban, setIbanValue] = useState<string>(() => getIban());
+  const [margin, setMarginValue] = useState<number>(() => getMargin());
 
   function handleIbanChange(v: string) {
     setIbanValue(v);
     setIban(v);
+  }
+
+  function handleMarginChange(v: string) {
+    const n = parseFloat(v);
+    const pct = Number.isFinite(n) ? n : 0;
+    setMarginValue(pct);
+    setMargin(pct);
   }
 
   useEffect(() => {
@@ -191,6 +199,60 @@ export default function SettingsView({ currentWallpaper, onWallpaperChange }: Se
         <p style={{ fontSize: 12, color: 'var(--label3)', marginTop: 8 }}>
           Wird für den Swiss QR-Code auf der Rechnung verwendet.
         </p>
+      </div>
+
+      {/* Teile-Import */}
+      <div style={{
+        background: 'rgba(255,255,255,0.70)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255,255,255,0.5)',
+        boxShadow: '0 8px 32px 0 rgba(0,0,0,0.10)',
+        borderRadius: 18,
+        padding: '18px 18px 22px',
+        marginBottom: 20,
+      }}>
+        <p style={{
+          fontSize: 13,
+          fontWeight: 600,
+          letterSpacing: 0.3,
+          textTransform: 'uppercase',
+          color: 'var(--label2)',
+          marginBottom: 16,
+        }}>
+          Teile-Import
+        </p>
+
+        <div className="cf-field">
+          <label className="cf-label">Standard-Marge auf Einkaufspreis (%)</label>
+          <input
+            className="cf-input"
+            type="number"
+            min={0}
+            value={margin}
+            onChange={(e) => handleMarginChange(e.target.value)}
+            placeholder="30"
+          />
+        </div>
+        <p style={{ fontSize: 12, color: 'var(--label3)', marginTop: 8, marginBottom: 16 }}>
+          Wird beim Import eines Teils automatisch auf den Einkaufspreis (EK) aufgeschlagen, um den Verkaufspreis (VK) vorzuschlagen.
+        </p>
+
+        <p className="cf-label" style={{ marginBottom: 6 }}>Teile per iPhone importieren</p>
+        <p style={{ fontSize: 12, color: 'var(--label2)', lineHeight: 1.5, margin: 0 }}>
+          Mit einer iOS-Kurzbefehl-Automatisierung lässt sich ein geteilter Link (z.B. aus der Autodoc-App)
+          direkt in GarageOS importieren:
+        </p>
+        <ol style={{ fontSize: 12, color: 'var(--label2)', lineHeight: 1.6, margin: '8px 0 0', paddingLeft: 18 }}>
+          <li>Kurzbefehle-App → Neuer Kurzbefehl → Aktion „Text erhalten, wenn geteilt&nbsp;wird&quot; hinzufügen.</li>
+          <li>Aktion „URL öffnen&quot; hinzufügen und als URL eingeben:<br />
+            <code style={{ fontSize: 11, wordBreak: 'break-all' }}>
+              {window.location.origin}/?import_url=[Textausgabe (URL-codiert)]
+            </code>
+          </li>
+          <li>Unter „Details&quot; → „Im Freigabe-Sheet anzeigen&quot; aktivieren und Autodoc als zulässige App erlauben.</li>
+          <li>In der Autodoc-App auf Teilen tippen und den neuen Kurzbefehl auswählen – GarageOS öffnet sich mit dem erkannten Teil.</li>
+        </ol>
       </div>
     </div>
   );
