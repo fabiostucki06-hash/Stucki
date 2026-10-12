@@ -177,17 +177,22 @@ export const db = {
     if (!r.ok) console.error(`[Supabase] get("${table}") HTTP ${r.status}:`, j);
     return j;
   },
-  async upsert(table: string, obj: Record<string, unknown>, token: string) {
+  /** POST + resolution=merge-duplicates = upsert on the primary key.
+      return=representation makes PostgREST echo the stored row, so callers can
+      sync their state from what the database really persisted instead of from
+      the optimistic payload. Returns null if the body can't be parsed. */
+  async upsert(table: string, obj: Record<string, unknown>, token: string): Promise<unknown> {
     const r = await authedFetch(`${SUPA_URL}/rest/v1/${table}`, {
       method: 'POST',
       body: JSON.stringify(obj),
-    }, token, { Prefer: 'resolution=merge-duplicates' });
+    }, token, { Prefer: 'resolution=merge-duplicates,return=representation' });
     if (!r.ok) {
       const e = await r.json().catch(() => ({} as Record<string, string>));
       console.error(`[Supabase] upsert("${table}") HTTP ${r.status}:`, e);
       if (e.code === '42501') throw new Error('Keine Berechtigung (RLS). Bitte neu anmelden oder Admin kontaktieren.');
       throw new Error(e.message || e.hint || `HTTP ${r.status}${e.code ? ' (' + e.code + ')' : ''}`);
     }
+    return r.json().catch(() => null);
   },
   async delete(table: string, id: string, token: string) {
     const r = await authedFetch(`${SUPA_URL}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {

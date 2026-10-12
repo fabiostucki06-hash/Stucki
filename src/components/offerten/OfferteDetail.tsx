@@ -45,11 +45,18 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   const [dirty, setDirty] = useState(false);
   const [posSaving, setPosSaving] = useState(false);
 
-  // offerte prop can change (e.g. after editing) while this component stays
-  // mounted — resync local Zahlungsziel so it never shows stale data.
+  // The offerte prop can change under us while this component stays mounted
+  // (edit sheet saved, background revalidate, another device). Re-seed the local
+  // position state from the new prop — otherwise "Positionen speichern" writes the
+  // stale snapshot back and silently overwrites those changes. Unsaved local edits
+  // (dirty) win until they are saved or discarded.
   useEffect(() => {
+    if (dirty) return;
+    const pos = offerte.positionen ?? [];
+    setPositionen(pos);
+    setPosAccepted(pos.map(() => true));
     setZahlungsziel(offerte.zahlungsziel ?? '10');
-  }, [offerte.id, offerte.zahlungsziel]);
+  }, [dirty, offerte.id, offerte.positionen, offerte.zahlungsziel]);
 
   const [addingTyp, setAddingTyp] = useState<'arbeit' | 'material' | null>(null);
   const [newBeschreibung, setNewBeschreibung] = useState('');
@@ -147,22 +154,29 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
     resetNewPos();
   }
 
+  /* Every write from this sheet goes through here, so a status change can't drop
+     unsaved position edits and a position save can't drop the current status. */
+  function buildPayload(patch?: Partial<Offerte>): Offerte {
+    return {
+      ...offerte,
+      positionen,
+      totalBetrag: (totalArbeit + totalMaterial).toFixed(2),
+      totalArbeit: totalArbeit.toFixed(2),
+      totalMaterial: totalMaterial.toFixed(2),
+      totalZE,
+      zahlungsziel,
+      ...patch,
+    };
+  }
+
   async function savePositionen() {
     setPosSaving(true);
     try {
-      await onUpdate({
-        ...offerte,
-        positionen,
-        totalBetrag: (totalArbeit + totalMaterial).toFixed(2),
-        totalArbeit: totalArbeit.toFixed(2),
-        totalMaterial: totalMaterial.toFixed(2),
-        totalZE,
-        zahlungsziel,
-      });
+      await onUpdate(buildPayload());
       setDirty(false);
       showToast('Positionen gespeichert', 'success');
     } catch {
-      showToast('Fehler beim Speichern', 'error');
+      // onUpdate already toasted the concrete reason; keep the edits marked dirty.
     } finally {
       setPosSaving(false);
     }
@@ -221,7 +235,17 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
         {(Object.entries(ST_META) as [OfferteStatus, StatusMeta][]).map(([s, meta]) => (
           <button
             key={s}
-            onClick={async () => { setSaving(true); await onUpdate({ ...offerte, status: s }); setSaving(false); }}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                await onUpdate(buildPayload({ status: s }));
+                setDirty(false);
+              } catch {
+                // onUpdate already toasted the reason; leave the old status selected.
+              } finally {
+                setSaving(false);
+              }
+            }}
             disabled={saving}
             className={`pill-btn ${offerte.status === s ? 'pill-btn-active' : 'pill-btn-inactive'}`}
             style={{ opacity: saving ? 0.5 : 1 }}

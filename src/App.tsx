@@ -152,13 +152,15 @@ export default function App() {
     await addOfferte(data); setShowNOff(false); setTab('offerten');
   }
   async function handleUpdateOfferte(upd: Offerte) {
-    await updateOfferte(upd); setSelOff(upd);
+    const saved = await updateOfferte(upd); setSelOff(saved);
   }
-  async function handleSaveEditOfferte(data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>) {
+  async function handleSaveEditOfferte(data: Omit<Offerte, 'id' | 'offertNumber' | 'createdAt'>) {
     if (!editOff) return;
     const updated: Offerte = { ...editOff, ...data };
-    await updateOfferte(updated);
-    setEditOff(null); setSelOff(updated);
+    // Close the sheet only once the write is confirmed; a throw propagates to the
+    // form, which keeps the edit on screen instead of discarding it.
+    const saved = await updateOfferte(updated);
+    setEditOff(null); setSelOff(saved);
   }
   async function handleDeleteOfferte(id: string) {
     await deleteOfferte(id); setSelOff(null);
@@ -357,7 +359,7 @@ export default function App() {
       {editOff && (
         <Sheet title={`Offerte #${editOff.offertNumber} bearbeiten`} onClose={() => setEditOff(null)} full
           barRight={<button onClick={() => setEditOff(null)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
-          <OfferteForm customers={customers} initial={editOff} onSave={handleSaveEditOfferte} onCancel={() => setEditOff(null)} />
+          <OfferteForm key={editOff.id} customers={customers} initial={editOff} onSave={handleSaveEditOfferte} onCancel={() => setEditOff(null)} />
         </Sheet>
       )}
 

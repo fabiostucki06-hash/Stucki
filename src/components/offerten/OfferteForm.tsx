@@ -49,10 +49,21 @@ async function schaetzeZEmitKI(beschreibung: string, fz: string): Promise<{ ze: 
 }
 
 const newArbeit   = (): ArbeitRow   => ({ typ: 'arbeit',   beschreibung: '', ze: '', stundenansatz: '80', preis: '', zeKI: false, zeLoading: false, zeHint: '' });
+/* zeLoading is row-only UI state and must never reach the offerten jsonb payload,
+   so the persisted shape is spelled out instead of spreading the whole row. */
+const toArbeitPosition = (p: ArbeitRow): ArbeitPosition => ({
+  typ: 'arbeit',
+  beschreibung: p.beschreibung,
+  ze: p.ze,
+  stundenansatz: p.stundenansatz,
+  preis: p.preis,
+  zeKI: p.zeKI,
+  zeHint: p.zeHint,
+});
 const newMaterial = (): MaterialRow => ({ typ: 'material', beschreibung: '', menge: '1', stueckpreis: '', preis: '' });
 const fCHF = (n: number) => 'CHF ' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, "'");
 
-export default function OfferteForm({ customers, onSave, onCancel, initial }: OfferteFormProps) {
+export default function OfferteForm({ customers, onSave, onCancel, saving: savingProp, initial }: OfferteFormProps) {
   const [cid,        setCid]        = useState(initial?.customerId ?? '');
   const [titel,      setTitel]      = useState(initial?.titel ?? '');
   const [tab,        setTab]        = useState<'arbeit' | 'material'>('arbeit');
@@ -70,6 +81,8 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
   const [gueltigBis, setGueltigBis] = useState(initial?.gueltigBis ?? '');
   const [zahlungsziel, setZahlungsziel] = useState(initial?.zahlungsziel ?? '10');
   const [status,     setStatus]     = useState<OfferteStatus>(initial?.status ?? 'entwurf');
+  const [savingLocal, setSavingLocal] = useState(false);
+  const busy = savingProp || savingLocal;
 
   const selectedCustomer = customers.find((c) => c.id === cid) ?? null;
   const vehicleChips = selectedCustomer
@@ -126,19 +139,29 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
   const kleinteilBetrag = kleinteilActive ? 10 : 0;
   const totMeff = totM + kleinteilBetrag;
 
-  function submit() {
+  async function submit() {
+    if (busy) return;
     if (!cid) { showToast('Bitte einen Kunden auswählen', 'error'); return; }
-    const ap = arbeit.filter((p) => p.beschreibung.trim());
+    const ap = arbeit.filter((p) => p.beschreibung.trim()).map(toArbeitPosition);
     const mp = material.filter((p) => p.beschreibung.trim());
     if (!ap.length && !mp.length) { showToast('Mindestens eine Position eingeben', 'error'); return; }
     const autoPauschale: MaterialPosition[] = kleinteilActive
       ? [{ typ: 'material', beschreibung: 'Kleinteil Pauschale', menge: '1', stueckpreis: '10', preis: '10.00' }]
       : [];
-    onSave({
-      customerId: cid, titel, positionen: [...ap, ...mp, ...autoPauschale], notizen, gueltigBis, zahlungsziel, status,
-      totalBetrag: (totA + totMeff).toFixed(2), totalArbeit: totA.toFixed(2),
-      totalMaterial: totMeff.toFixed(2), totalZE: totZE,
-    });
+    setSavingLocal(true);
+    try {
+      // Awaited so a rejected write keeps the sheet (and the user's input) open;
+      // the save path already toasts the reason via syncOk().
+      await onSave({
+        customerId: cid, titel, positionen: [...ap, ...mp, ...autoPauschale], notizen, gueltigBis, zahlungsziel, status,
+        totalBetrag: (totA + totMeff).toFixed(2), totalArbeit: totA.toFixed(2),
+        totalMaterial: totMeff.toFixed(2), totalZE: totZE,
+      });
+    } catch (e) {
+      console.error('[Offerte] save failed:', e);
+    } finally {
+      setSavingLocal(false);
+    }
   }
 
   /* ── shared style tokens ── */
@@ -429,9 +452,11 @@ export default function OfferteForm({ customers, onSave, onCancel, initial }: Of
 
       {/* ── Actions: right-aligned pills ── */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 8, paddingBottom: 6 }}>
-        <button className="mf-btn-cancel" onClick={onCancel}>Abbrechen</button>
-        <button className="mf-btn-save" onClick={submit}>
-          {initial ? 'Änderungen speichern' : 'Offerte erstellen'}
+        <button className="mf-btn-cancel" onClick={onCancel} disabled={busy} style={{ opacity: busy ? 0.5 : 1 }}>Abbrechen</button>
+        <button className="mf-btn-save" onClick={submit} disabled={busy}>
+          {busy
+            ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Spinner size={12} /> Speichern…</span>
+            : initial ? 'Änderungen speichern' : 'Offerte erstellen'}
         </button>
       </div>
 

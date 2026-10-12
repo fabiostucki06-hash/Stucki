@@ -25,7 +25,7 @@ interface AppContextValue {
   updateOrder: (upd: Order, cp: Partial<Customer> | null) => Promise<void>;
   deleteOrder: (id: string) => Promise<void>;
   addOfferte: (data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>) => Promise<Offerte>;
-  updateOfferte: (upd: Offerte) => Promise<void>;
+  updateOfferte: (upd: Offerte) => Promise<Offerte>;
   deleteOfferte: (id: string) => Promise<void>;
   addRechnung: (data: Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>) => Promise<void>;
   updateRechnung: (upd: Rechnung) => Promise<void>;
@@ -45,6 +45,13 @@ function parseRows(arr: unknown[]) {
     const row = r as Record<string, unknown>;
     return (row.data as Customer | Order | Offerte | Rechnung) ?? (row.id ? r : null);
   }).filter(Boolean);
+}
+
+/** First row of an upsert's return=representation body, unwrapped to its payload. */
+function pickRow<T>(rows: unknown): T | null {
+  const row = (Array.isArray(rows) ? rows[0] : rows) as Record<string, unknown> | undefined;
+  if (!row || typeof row !== 'object') return null;
+  return (row.data as T) ?? (row.id ? (row as T) : null);
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -145,7 +152,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [token, authChecked]);
 
-  async function syncOk(fn: () => Promise<void>) {
+  // fn may resolve with a value (db.upsert echoes the stored row); it's ignored here.
+  async function syncOk(fn: () => Promise<unknown>) {
     setSyncStatus('saving');
     writesInFlight.current++;
     try {
@@ -207,17 +215,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   async function addOfferte(data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>): Promise<Offerte> {
-    const num = offertNum + 1;
+    // offertNum can lag behind the loaded rows (e.g. the offerten fetch failed on
+    // startup), which would hand out a number that already exists — take both maxima.
+    const num = Math.max(offertNum, ...offerten.map((o) => o.offertNumber ?? 0)) + 1;
     const newOff: Offerte = { id: `off_${Date.now()}`, offertNumber: num, status: 'entwurf', createdAt: new Date().toISOString(), ...data };
-    await syncOk(() => db.upsert('offerten', { id: newOff.id, data: newOff }, token!));
-    setOfferten((p) => [...p, newOff]); setOffertNum(num);
-    showToast(`Offerte #${num} gespeichert`, 'success');
-    return newOff;
+    let saved = newOff;
+    await syncOk(async () => {
+      const rows = await db.upsert('offerten', { id: newOff.id, data: newOff }, token!);
+      saved = pickRow<Offerte>(rows) ?? newOff;
+    });
+    setOfferten((p) => [...p, saved]); setOffertNum(saved.offertNumber ?? num);
+    showToast(`Offerte #${saved.offertNumber ?? num} gespeichert`, 'success');
+    return saved;
   }
 
-  async function updateOfferte(upd: Offerte) {
-    await syncOk(() => db.upsert('offerten', { id: upd.id, data: upd }, token!));
-    setOfferten((p) => p.map((o) => (o.id === upd.id ? upd : o)));
+  // Returns the row as the database stored it, so callers re-point their local
+  // snapshots at the persisted object instead of the optimistic payload.
+  async function updateOfferte(upd: Offerte): Promise<Offerte> {
+    let saved = upd;
+    await syncOk(async () => {
+      const rows = await db.upsert('offerten', { id: upd.id, data: upd }, token!);
+      saved = pickRow<Offerte>(rows) ?? upd;
+    });
+    setOfferten((p) => p.map((o) => (o.id === saved.id ? saved : o)));
+    return saved;
   }
 
   async function deleteOfferte(id: string) {
