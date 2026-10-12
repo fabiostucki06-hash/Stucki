@@ -12,6 +12,10 @@ export interface ImportPayload {
   title?: string;
   price?: string;
   artikelnummer?: string;
+  /** Pre-decode raw query values, kept only for the failure-path debug hint
+      below (see "what was received vs. decoded"). */
+  _rawUrl?: string;
+  _rawText?: string;
 }
 
 interface ImportPartSheetProps {
@@ -47,6 +51,7 @@ export default function ImportPartSheet({ payload, customers, offerten, onClose,
   const [cid, setCid] = useState('');
   const [targetOfferteId, setTargetOfferteId] = useState('');
   const [busy, setBusy] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<{ raw: string; decoded: string } | null>(null);
 
   const openDrafts = offerten.filter((o) => o.status === 'entwurf');
 
@@ -79,6 +84,10 @@ export default function ImportPartSheet({ payload, customers, offerten, onClose,
         if (data.quelle) setQuelle(data.quelle);
         if (data.ek) setStueckpreis(round2(parseFloat(data.ek) * (1 + margin / 100)));
         if (!data.ok) {
+          const raw = payload._rawUrl || payload._rawText || '';
+          const decoded = payload.url || payload.text || '';
+          console.warn('[Import] auto-detection failed — received vs. decoded:', { raw, decoded, response: data });
+          setDebugInfo({ raw, decoded });
           showToast(
             data.blocked
               ? 'Shop blockiert automatische Anfragen – bitte Daten manuell eintragen'
@@ -88,8 +97,14 @@ export default function ImportPartSheet({ payload, customers, offerten, onClose,
         } else if (data.blocked) {
           showToast('Shop evtl. blockiert – Angaben bitte prüfen', 'error');
         }
-      } catch {
-        if (!cancelled) showToast('Import fehlgeschlagen – bitte manuell ausfüllen', 'error');
+      } catch (e) {
+        if (!cancelled) {
+          const raw = payload._rawUrl || payload._rawText || '';
+          const decoded = payload.url || payload.text || '';
+          console.warn('[Import] request failed — received vs. decoded:', { raw, decoded, error: e });
+          setDebugInfo({ raw, decoded });
+          showToast('Import fehlgeschlagen – bitte manuell ausfüllen', 'error');
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -176,6 +191,14 @@ export default function ImportPartSheet({ payload, customers, offerten, onClose,
       {quelle && (
         <div style={{ fontSize: 12, color: 'var(--label3)', marginBottom: 12, wordBreak: 'break-all' }}>
           Quelle: {quelle}
+        </div>
+      )}
+
+      {debugInfo && (
+        <div style={{ fontSize: 11, color: 'var(--label3)', marginBottom: 12, wordBreak: 'break-all', background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.25)', borderRadius: 10, padding: '8px 10px' }}>
+          <strong style={{ color: 'var(--red)' }}>Debug – automatische Erkennung fehlgeschlagen</strong><br />
+          Erhalten: {debugInfo.raw || '(leer)'}<br />
+          Entschlüsselt: {debugInfo.decoded || '(leer)'}
         </div>
       )}
 

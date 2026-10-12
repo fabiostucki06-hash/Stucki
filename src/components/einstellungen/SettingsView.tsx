@@ -361,11 +361,12 @@ export default function SettingsView({ currentWallpaper, onWallpaperChange, bgMo
         </p>
         <ol style={{ fontSize: 12, color: 'var(--label2)', lineHeight: 1.6, margin: '8px 0 0', paddingLeft: 18 }}>
           <li>Kurzbefehle-App → Neuer Kurzbefehl → Aktion „Text erhalten, wenn geteilt&nbsp;wird&quot; hinzufügen.</li>
-          <li>Aktion „URL öffnen&quot; hinzufügen und als URL eingeben:<br />
+          <li>Aktion „URL öffnen&quot; hinzufügen. Ins URL-Feld <strong>nur genau diesen Text</strong> einfügen (keine Klammern, kein Platzhalter):<br />
             <code style={{ fontSize: 11, wordBreak: 'break-all' }}>
-              {window.location.origin}/?import_url=[Textausgabe (URL-codiert)]
+              {window.location.origin}/?import_url=
             </code>
           </li>
+          <li>Direkt danach im selben URL-Feld auf das blaue <strong>＋</strong> tippen und die Variable „Kurzbefehl-Eingabe&quot; einfügen (nicht abtippen!). Bei dieser Variable unter „Formatieren&quot; → „Text&quot; die Option „URL-codieren&quot; aktivieren.</li>
           <li>Unter „Details&quot; → „Im Freigabe-Sheet anzeigen&quot; aktivieren und Autodoc als zulässige App erlauben.</li>
           <li>In der Autodoc-App auf Teilen tippen und den neuen Kurzbefehl auswählen – GarageOS öffnet sich mit dem erkannten Teil.</li>
         </ol>

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useApp } from './context/AppContext';
 import { showToast } from './components/ui/Toast';
 import { ASSETS } from './lib/supabase';
-import { needsAttention } from './lib/utils';
+import { needsAttention, decodeMaybeDouble } from './lib/utils';
 import { sampleImageColor, applyBgTheme, hexToRgb, type WallpaperThemeId } from './lib/theme';
 import { getBgMode, setBgMode as persistBgMode, getBgColor, setBgColor as persistBgColor, type BgMode } from './lib/settings';
 import { useVersionCheck } from './hooks/useVersionCheck';
@@ -134,16 +134,31 @@ export default function App() {
   // stripped from the URL so a reload doesn't repeat it.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const url = params.get('import_url');
-    const text = params.get('import_text');
-    const title = params.get('import_title');
-    const price = params.get('import_price');
-    const artnr = params.get('import_artnr');
-    if (url || text) {
-      setImportPayload({
-        url: url ?? undefined, text: text ?? undefined,
-        title: title ?? undefined, price: price ?? undefined, artikelnummer: artnr ?? undefined,
-      });
+    const rawUrl = params.get('import_url');
+    const rawText = params.get('import_text');
+    const rawTitle = params.get('import_title');
+    const rawPrice = params.get('import_price');
+    const rawArtnr = params.get('import_artnr');
+    if (rawUrl || rawText) {
+      // URLSearchParams.get() already undoes one layer of percent-encoding; some
+      // iOS Shortcuts "URL öffnen" actions re-encode a value that was already
+      // encoded, so undo any further layers too (see decodeMaybeDouble).
+      const url = rawUrl ? decodeMaybeDouble(rawUrl) : undefined;
+      const text = rawText ? decodeMaybeDouble(rawText) : undefined;
+      const title = rawTitle ? decodeMaybeDouble(rawTitle) : undefined;
+      const price = rawPrice ? decodeMaybeDouble(rawPrice) : undefined;
+      const artnr = rawArtnr ? decodeMaybeDouble(rawArtnr) : undefined;
+
+      // An unresolved Shortcuts variable placeholder (e.g. the literal text
+      // "[Textausgabe (URL-codiert)]" instead of the actual shared value) looks
+      // nothing like a URL/price/title — surface it loudly instead of silently
+      // failing, since it means the Shortcut itself is misconfigured.
+      const looksLikePlaceholder = (v?: string) => !!v && /^\[.*\]$/.test(v.trim());
+      if (looksLikePlaceholder(url) || looksLikePlaceholder(text)) {
+        console.warn('[Import] received an unresolved Shortcuts placeholder instead of real data.', { rawUrl, rawText, decodedUrl: url, decodedText: text });
+      }
+
+      setImportPayload({ url, text, title, price, artikelnummer: artnr, _rawUrl: rawUrl ?? undefined, _rawText: rawText ?? undefined });
       params.delete('import_url'); params.delete('import_text');
       params.delete('import_title'); params.delete('import_price'); params.delete('import_artnr');
       const rest = params.toString();

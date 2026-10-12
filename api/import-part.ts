@@ -43,6 +43,26 @@ function extractLink(text: string): string | undefined {
 // "12,50 €") — Autodoc's site and its app's share text use different orders.
 const PRICE_RE = /(?:(?:CHF|EUR|€|Fr\.?)\s?(\d{1,3}(?:[.,'\s]\d{3})*(?:[.,]\d{2})?)|(\d{1,3}(?:[.,'\s]\d{3})*[.,]\d{2})\s?(?:CHF|EUR|€|Fr\.?))/i;
 const ARTNR_RE = /(?:Art(?:ikel)?\.?-?Nr\.?|Artikelnummer|OE[\s-]?Nr\.?|OEM|SKU|MPN)[:\s#]*([A-Za-z0-9\-/]{3,})/i;
+// Common share-sheet lead-ins ("Schau dir diesen Artikel an:", "Check this out:",
+// "Guarda questo:"…) are noise, not part of the product title.
+const WRAPPER_RE = /^(schau\s*(dir)?[^:]*an|sieh\s*dir[^:]*an|check\s*(this|it)\s*out|look\s*at\s*this|guarda\s*questo)[:\s-]+/i;
+
+/** Undoes accidental double-encoding from some iOS Shortcuts "URL öffnen" actions
+    (which can re-encode a value that's already URL-encoded), up to a small cap
+    so a malformed "%" sequence can't throw or loop forever. */
+function decodeMaybeDouble(v: string): string {
+  let out = v;
+  for (let i = 0; i < 3 && /%[0-9A-Fa-f]{2}/.test(out); i++) {
+    try {
+      const next = decodeURIComponent(out);
+      if (next === out) break;
+      out = next;
+    } catch {
+      break;
+    }
+  }
+  return out;
+}
 const BLOCK_SIGNATURE_RE = /attention required|access denied|just a moment|captcha|are you a human|cloudflare|request blocked|bot detection/i;
 
 function priceMatchValue(m: RegExpMatchArray | null): string | undefined {
@@ -182,7 +202,8 @@ async function parseUrl(rawUrl: string): Promise<Partial<ImportResult>> {
   }
 }
 
-function parseText(text: string): Partial<ImportResult> {
+function parseText(rawText: string): Partial<ImportResult> {
+  const text = rawText.replace(WRAPPER_RE, '');
   const link = extractLink(text);
   const withoutLink = link ? text.replace(link, ' ') : text;
   const priceMatch = withoutLink.match(PRICE_RE);
@@ -220,8 +241,18 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
   }
 
   const body = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body) as ImportRequestBody | undefined;
-  const rawUrl = body?.url?.trim();
-  const rawText = body?.text?.trim();
+  // Defense in depth: the client already decodes query params (see App.tsx's
+  // decodeMaybeDouble), but decode again here too in case this endpoint is ever
+  // called directly with a still-encoded value.
+  const isPlaceholder = (v?: string) => !!v && /^\[.*\]$/.test(v.trim());
+  let rawUrl = body?.url?.trim() ? decodeMaybeDouble(body.url.trim()) : undefined;
+  let rawText = body?.text?.trim() ? decodeMaybeDouble(body.text.trim()) : undefined;
+  // An unresolved Shortcuts variable placeholder (literal "[Textausgabe
+  // (URL-codiert)]" instead of the actual shared value) means the Shortcut
+  // itself is misconfigured, not that there's anything here to parse.
+  const sawPlaceholder = isPlaceholder(rawUrl) || isPlaceholder(rawText);
+  if (isPlaceholder(rawUrl)) rawUrl = undefined;
+  if (isPlaceholder(rawText)) rawText = undefined;
   const linkInText = !rawUrl && rawText ? extractLink(rawText) : undefined;
   const targetUrl = rawUrl || linkInText;
 
@@ -245,9 +276,13 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
   if (!merged.quelle && targetUrl) merged.quelle = targetUrl;
   const found = Boolean(merged.title || merged.ek || merged.artikelnummer);
 
+  if (sawPlaceholder) {
+    console.warn('[import-part] received an unresolved Shortcuts placeholder instead of real data:', { url: body?.url, text: body?.text });
+  }
+
   res.status(200).json({
     ok: found,
     ...merged,
-    error: !found ? fetchError : undefined,
+    error: !found ? (sawPlaceholder ? 'Shortcut-Variable wurde nicht ersetzt (Platzhalter erhalten statt echtem Wert)' : fetchError) : undefined,
   });
 }

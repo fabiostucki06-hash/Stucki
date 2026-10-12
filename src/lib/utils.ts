@@ -45,6 +45,25 @@ export const getActiveStatus = (orders: Order[], cid: string): string | null => 
   )[0].status;
 };
 
+/** Undoes accidental double-encoding (seen from some iOS Shortcuts "URL öffnen"
+    actions, which can re-encode a value that's already URL-encoded) by decoding
+    repeatedly while the string still looks percent-encoded, up to a small cap so
+    a malformed "%" sequence can't throw or loop forever. `URLSearchParams.get()`
+    already strips one layer, so this only ever fires on genuine double-encoding. */
+export function decodeMaybeDouble(v: string): string {
+  let out = v;
+  for (let i = 0; i < 3 && /%[0-9A-Fa-f]{2}/.test(out); i++) {
+    try {
+      const next = decodeURIComponent(out);
+      if (next === out) break;
+      out = next;
+    } catch {
+      break;
+    }
+  }
+  return out;
+}
+
 export const sortCustomers = (a: Customer, b: Customer): number => {
   const na = `${a.nachname} ${a.vorname}`.toLowerCase();
   const nb = `${b.nachname} ${b.vorname}`.toLowerCase();
