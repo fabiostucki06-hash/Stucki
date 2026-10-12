@@ -4,6 +4,7 @@ import { ASSETS } from './lib/supabase';
 import { needsAttention } from './lib/utils';
 import { sampleImageColor, applyBgTheme, type WallpaperThemeId } from './lib/theme';
 import { useVersionCheck } from './hooks/useVersionCheck';
+import { hardReload } from './lib/reload';
 
 import Spinner from './components/ui/Spinner';
 import Sheet from './components/ui/Sheet';
@@ -106,6 +107,20 @@ export default function App() {
   useEffect(() => { setSelR((p) => (p && rechnungen.find((x) => x.id === p.id)) || p); }, [rechnungen]);
 
   const todos = orders.filter(needsAttention);
+
+  // Any open sheet/detail can hold unsaved local edits (Offerte positions, inline
+  // status changes, a half-filled new-customer form, …) — force-reloading through
+  // one would silently discard it, same failure mode as the offerten save bug.
+  // So: reload the instant it's safe (nothing open), and the instant it becomes
+  // safe again if a new version lands while something is.
+  const anySheetOpen = showNC || showNO || showNOff || showNR || !!afterSave
+    || !!selC || !!editC || !!selO || !!selOff || !!editOff || !!selR || !!editR;
+  const reloadTriggered = useRef(false);
+  useEffect(() => {
+    if (!updateAvailable || anySheetOpen || reloadTriggered.current) return;
+    reloadTriggered.current = true;
+    hardReload();
+  }, [updateAvailable, anySheetOpen]);
 
   if (!authChecked) {
     return (

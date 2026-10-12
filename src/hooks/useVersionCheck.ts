@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 /** Throttle so focus + visibilitychange (which often fire together) don't double-check. */
 const CHECK_MIN_GAP_MS = 60_000;
 const POLL_INTERVAL_MS = 5 * 60_000;
-const INITIAL_DELAY_MS = 15_000;
+/** Short, not zero — let the shell paint before competing for network with the data fetch. */
+const INITIAL_DELAY_MS = 2_000;
 
 /** Polls the never-cached /version.json (written at build time, see vite.config.ts)
  *  and flags true once its buildTime no longer matches the build this tab is running. */
