@@ -14,7 +14,9 @@ export function buildImportBookmarklet(origin: string): string {
     var d=document,b=(d.body&&d.body.innerText)||'';
     var og=d.querySelector('meta[property="og:title"]');
     var t=(og&&og.content)||d.title||'';
-    var pm=b.match(/(?:CHF|EUR|\\u20ac|Fr\\.?)\\s?([\\d]{1,3}(?:[.'\\s]\\d{3})*(?:[.,]\\d{2})?)/i);
+    var pe=d.querySelector('.product-price, .price-value, [data-price], .p-price');
+    var pt=pe?((pe.getAttribute&&pe.getAttribute('data-price'))||pe.innerText||''):'';
+    var pm=pt.match(/([\\d]{1,3}(?:[.'\\s]\\d{3})*(?:[.,]\\d{2})?)/) || b.match(/(?:CHF|EUR|\\u20ac|Fr\\.?)\\s?([\\d]{1,3}(?:[.'\\s]\\d{3})*(?:[.,]\\d{2})?)/i);
     var p=pm?pm[1].replace(/['\\s]/g,'').replace(',', '.'):'';
     var am=b.match(/(?:Art(?:ikel)?\\.?-?Nr\\.?|Artikelnummer|SKU|MPN)[:\\s]*([A-Za-z0-9\\-\\/]{3,})/i);
     var a=am?am[1]:'';

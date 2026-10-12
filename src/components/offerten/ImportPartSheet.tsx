@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
 import { getMargin } from '../../lib/settings';
@@ -52,6 +52,7 @@ export default function ImportPartSheet({ payload, customers, offerten, onClose,
   const [targetOfferteId, setTargetOfferteId] = useState('');
   const [busy, setBusy] = useState(false);
   const [debugInfo, setDebugInfo] = useState<{ raw: string; decoded: string } | null>(null);
+  const ekInputRef = useRef<HTMLInputElement>(null);
 
   const openDrafts = offerten.filter((o) => o.status === 'entwurf' || o.status === 'versendet');
 
@@ -112,6 +113,11 @@ export default function ImportPartSheet({ payload, customers, offerten, onClose,
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!loading && !ek) ekInputRef.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
 
   const mengeNum = parseFloat(menge) || 1;
   const ekTotal = (parseFloat(ek) || 0) * mengeNum;
@@ -215,7 +221,7 @@ export default function ImportPartSheet({ payload, customers, offerten, onClose,
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
           <div className="cf-field">
             <label className="cf-label">Einkaufspreis (EK)</label>
-            <input className="cf-input" type="number" value={ek} onChange={(e) => handleEkChange(e.target.value)} placeholder="0.00" />
+            <input ref={ekInputRef} className="cf-input" type="number" value={ek} onChange={(e) => handleEkChange(e.target.value)} placeholder="0.00" />
           </div>
           <div className="cf-field">
             <label className="cf-label">Verkaufspreis (VK) *</label>
