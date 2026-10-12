@@ -95,9 +95,11 @@ body{
   text-shadow:0 1px 3px rgba(0,0,0,0.18);
 }
 
-.bg{position:fixed;inset:0;z-index:-1;overflow:hidden;background:rgb(var(--bg-placeholder-rgb));}
+.bg{position:fixed;inset:0;z-index:-1;overflow:hidden;background:rgb(var(--bg-placeholder-rgb));transition:background-color 0.3s ease;}
 .bg img{width:100%;height:100%;object-fit:cover;object-position:center 65%;display:block;image-rendering:auto;}
 .bg::after{content:'';position:absolute;inset:0;background:linear-gradient(to bottom,rgb(var(--bg-scrim-rgb) / 0.45) 0%,rgb(var(--bg-scrim-rgb) / 0.15) 40%,transparent 70%);pointer-events:none;}
+/* Flat solid-color background: no photo to legibility-scrim over. */
+.bg.flat::after{display:none;}
 input,textarea,select{font-family:inherit;font-size:17px!important;color:var(--label)}
 button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:inherit}
 

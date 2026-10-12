@@ -100,6 +100,15 @@ const hslToRgb = (h: number, s: number, l: number): RGB => {
 
 export interface SampledColor { r: number; g: number; b: number; }
 
+/** Parses a `#rgb`/`#rrggbb` hex string (as produced by `<input type="color">`) into a SampledColor. */
+export function hexToRgb(hex: string): SampledColor {
+  const h = hex.replace('#', '');
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  const n = parseInt(full, 16);
+  if (full.length !== 6 || Number.isNaN(n)) return { r: 28, g: 28, b: 30 }; // #1C1C1E fallback
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
 /**
  * Downsamples the image (already a same-origin/blob URL — call this with the
  * local blob URL, not the remote asset URL, to avoid canvas tainting) and

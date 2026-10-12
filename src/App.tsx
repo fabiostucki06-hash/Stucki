@@ -3,7 +3,8 @@ import { useApp } from './context/AppContext';
 import { showToast } from './components/ui/Toast';
 import { ASSETS } from './lib/supabase';
 import { needsAttention } from './lib/utils';
-import { sampleImageColor, applyBgTheme, type WallpaperThemeId } from './lib/theme';
+import { sampleImageColor, applyBgTheme, hexToRgb, type WallpaperThemeId } from './lib/theme';
+import { getBgMode, setBgMode as persistBgMode, getBgColor, setBgColor as persistBgColor, type BgMode } from './lib/settings';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { hardReload } from './lib/reload';
 
@@ -56,9 +57,12 @@ export default function App() {
     () => localStorage.getItem('garage_wallpaper') || ASSETS.wallpaper
   );
   const [bgSrc, setBgSrc] = useState(wallpaper);
+  const [bgMode, setBgMode] = useState<BgMode>(() => getBgMode());
+  const [bgColor, setBgColor] = useState<string>(() => getBgColor());
   const prevBlobRef = useRef<string>('');
 
   useEffect(() => {
+    if (bgMode !== 'image') return;
     let cancelled = false;
     const themeId: WallpaperThemeId =
       wallpaper === ASSETS.wallpaper2 ? 'wallpaper-2' :
@@ -79,11 +83,27 @@ export default function App() {
       })
       .catch(() => { if (!cancelled) setBgSrc(wallpaper); });
     return () => { cancelled = true; };
-  }, [wallpaper]);
+  }, [wallpaper, bgMode]);
+
+  // Flat color mode: no photo to sample, the chosen color itself drives the
+  // text/card/accent theme derivation (same function the wallpaper path uses).
+  useEffect(() => {
+    if (bgMode !== 'color') return;
+    applyBgTheme(hexToRgb(bgColor));
+  }, [bgMode, bgColor]);
 
   function handleWallpaperChange(url: string) {
     setWallpaper(url);
     localStorage.setItem('garage_wallpaper', url);
+    setBgMode('image');
+    persistBgMode('image');
+  }
+
+  function handleBgColorChange(hex: string) {
+    setBgColor(hex);
+    persistBgColor(hex);
+    setBgMode('color');
+    persistBgMode('color');
   }
 
   const [showNC,   setShowNC]   = useState(false);
@@ -299,15 +319,17 @@ export default function App() {
       {sessionExpired && <ReauthModal email={userEmail} onResolved={updateToken} />}
 
       {/* Background */}
-      <div className="bg">
-        <img
-          src={bgSrc}
-          alt=""
-          onError={(e) => {
-            const img = e.currentTarget;
-            if (!img.dataset.fb) { img.dataset.fb = '1'; img.src = '/mac_wallpaper.png'; }
-          }}
-        />
+      <div className={`bg${bgMode === 'color' ? ' flat' : ''}`} style={bgMode === 'color' ? { backgroundColor: bgColor } : undefined}>
+        {bgMode === 'image' && (
+          <img
+            src={bgSrc}
+            alt=""
+            onError={(e) => {
+              const img = e.currentTarget;
+              if (!img.dataset.fb) { img.dataset.fb = '1'; img.src = '/mac_wallpaper.png'; }
+            }}
+          />
+        )}
       </div>
 
       <NavBar syncStatus={syncStatus} todosCount={todos.length} onMenuToggle={() => setSidebarOpen((p) => !p)} onLogoClick={() => setTab('dashboard')} />
@@ -327,7 +349,15 @@ export default function App() {
         {tab === 'rechnungen'  && <RechnungenList rechnungen={rechnungen} customers={customers} onRechnungClick={setSelR} onEdit={(r) => setEditR(r)} onNew={() => setShowNR(true)} />}
         {tab === 'kunden'      && <CustomerList customers={customers} orders={orders} onCustomerClick={setSelC} onNew={() => setShowNC(true)} />}
         {tab === 'statistiken'   && <StatistikDashboard orders={orders} offerten={offerten} rechnungen={rechnungen} customers={customers} />}
-        {tab === 'einstellungen' && <SettingsView currentWallpaper={wallpaper} onWallpaperChange={handleWallpaperChange} />}
+        {tab === 'einstellungen' && (
+          <SettingsView
+            currentWallpaper={wallpaper}
+            onWallpaperChange={handleWallpaperChange}
+            bgMode={bgMode}
+            bgColor={bgColor}
+            onBgColorChange={handleBgColorChange}
+          />
+        )}
       </div>
 
       {/* FAB context menu backdrop */}

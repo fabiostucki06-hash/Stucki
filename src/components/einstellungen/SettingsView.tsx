@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ASSETS } from '../../lib/supabase';
-import { getIban, setIban, getMargin, setMargin } from '../../lib/settings';
+import { getIban, setIban, getMargin, setMargin, type BgMode } from '../../lib/settings';
 import { SFCheckmark } from '../Icons';
 
 const WALLPAPERS = [
@@ -9,15 +9,26 @@ const WALLPAPERS = [
   { id: 'wp3', label: 'Wallpaper 3', url: ASSETS.wallpaper3 },
 ];
 
+const SOLID_COLORS = [
+  { id: 'black',     label: 'Schwarz',     hex: '#000000' },
+  { id: 'slate',     label: 'Dunkelgrau',  hex: '#1C1C1E' },
+  { id: 'darkblue',  label: 'Dunkelblau',  hex: '#0A2540' },
+  { id: 'lightgray', label: 'Hellgrau',    hex: '#F2F2F7' },
+];
+
 interface SettingsViewProps {
   currentWallpaper: string;
   onWallpaperChange: (url: string) => void;
+  bgMode: BgMode;
+  bgColor: string;
+  onBgColorChange: (hex: string) => void;
 }
 
-export default function SettingsView({ currentWallpaper, onWallpaperChange }: SettingsViewProps) {
+export default function SettingsView({ currentWallpaper, onWallpaperChange, bgMode, bgColor, onBgColorChange }: SettingsViewProps) {
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [iban, setIbanValue] = useState<string>(() => getIban());
   const [margin, setMarginValue] = useState<number>(() => getMargin());
+  const [bgTab, setBgTab] = useState<'bilder' | 'unifarben'>(bgMode === 'color' ? 'unifarben' : 'bilder');
 
   function handleIbanChange(v: string) {
     setIbanValue(v);
@@ -77,12 +88,18 @@ export default function SettingsView({ currentWallpaper, onWallpaperChange }: Se
           color: 'var(--label2)',
           marginBottom: 16,
         }}>
-          Hintergrundbild
+          Hintergrund
         </p>
 
+        <div className="seg-ctrl" style={{ marginBottom: 16 }}>
+          <button className={`seg-item${bgTab === 'bilder' ? ' active' : ''}`} onClick={() => setBgTab('bilder')}>Bilder</button>
+          <button className={`seg-item${bgTab === 'unifarben' ? ' active' : ''}`} onClick={() => setBgTab('unifarben')}>Unifarben</button>
+        </div>
+
+        {bgTab === 'bilder' && (
         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
           {WALLPAPERS.map((wp) => {
-            const active = currentWallpaper === wp.url;
+            const active = bgMode === 'image' && currentWallpaper === wp.url;
             return (
               <button
                 key={wp.id}
@@ -163,6 +180,82 @@ export default function SettingsView({ currentWallpaper, onWallpaperChange }: Se
             );
           })}
         </div>
+        )}
+
+        {bgTab === 'unifarben' && (
+        <div>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
+            {SOLID_COLORS.map((c) => {
+              const active = bgMode === 'color' && bgColor.toLowerCase() === c.hex.toLowerCase();
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => onBgColorChange(c.hex)}
+                  style={{
+                    position: 'relative',
+                    width: 64,
+                    height: 64,
+                    borderRadius: 14,
+                    cursor: 'pointer',
+                    padding: 0,
+                    background: c.hex,
+                    border: active ? '2.5px solid #007AFF' : '2.5px solid rgba(255,255,255,0.6)',
+                    boxShadow: active
+                      ? '0 0 0 4px rgba(0,122,255,0.18), 0 4px 16px rgba(0,0,0,0.15)'
+                      : '0 2px 10px rgba(0,0,0,0.12)',
+                    transition: 'all 0.18s ease',
+                    transform: active ? 'scale(1.05)' : 'scale(1)',
+                    flexShrink: 0,
+                  }}
+                  aria-label={c.label}
+                  aria-pressed={active}
+                  title={c.label}
+                >
+                  {active && (
+                    <div style={{
+                      position: 'absolute',
+                      top: -6,
+                      right: -6,
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      background: 'linear-gradient(to bottom, #54a4ff 0%, #007aff 50%, #0056b3 100%)',
+                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.6), 0 2px 6px rgba(0,0,0,0.2)',
+                      border: '1px solid #004fb0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#fff',
+                    }}>
+                      <SFCheckmark />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="cf-field">
+            <label className="cf-label">Eigene Farbe</label>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <input
+                type="color"
+                value={bgMode === 'color' ? bgColor : '#1C1C1E'}
+                onChange={(e) => onBgColorChange(e.target.value)}
+                style={{ width: 44, height: 36, border: '1.5px solid var(--input-border)', borderRadius: 8, padding: 2, cursor: 'pointer', background: 'var(--input-bg)' }}
+                aria-label="Eigene Hintergrundfarbe"
+              />
+              <input
+                className="cf-input"
+                style={{ flex: 1 }}
+                value={bgMode === 'color' ? bgColor : ''}
+                onChange={(e) => onBgColorChange(e.target.value)}
+                placeholder="#1C1C1E"
+              />
+            </div>
+          </div>
+        </div>
+        )}
       </div>
 
       {/* Zahlungsinformationen */}
