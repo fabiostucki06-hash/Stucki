@@ -50,6 +50,7 @@ export interface Order {
   zahlungsFrist?: string;
   offertId?: string;
   positionen?: Position[];
+  materialStatus?: MaterialStatus;
 }
 
 export type OfferteStatus = 'entwurf' | 'versendet' | 'angenommen' | 'abgelehnt';
@@ -76,7 +77,13 @@ export interface MaterialPosition {
   /** Purchase price and article number read from the shop page. Internal reference only, like `link`. */
   ek?: string;
   artikelnummer?: string;
+  /** Ticked off in "Teile bestellen". Internal only. */
+  bestellt?: boolean;
 }
+
+/** How far the parts of an Auftrag / accepted Offerte are ordered. Derived
+    from the positions' `bestellt` flags whenever one is ticked. */
+export type MaterialStatus = 'offen' | 'teilweise' | 'bestellt';
 
 export type Position = ArbeitPosition | MaterialPosition;
 
@@ -95,6 +102,7 @@ export interface Offerte {
   totalArbeit?: string;
   totalMaterial?: string;
   totalZE?: number;
+  materialStatus?: MaterialStatus;
 }
 
 export type RechnungStatus = 'entwurf' | 'versendet' | 'bezahlt' | 'storniert';

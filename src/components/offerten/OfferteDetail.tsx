@@ -5,6 +5,7 @@ import { showToast } from '../ui/Toast';
 import { SFPlus, SFXmark } from '../Icons';
 import { PartLink } from '../ui/DocForm';
 import { ActiveOfferteBanner } from './ActiveOfferte';
+import PartsOrder from '../teile/PartsOrder';
 import { exportOffertePDF } from '../../lib/pdf-offerte';
 import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../lib/utils';
 import type { Customer, Offerte, OfferteStatus, Position, ArbeitPosition, MaterialPosition } from '../../types';
@@ -495,6 +496,18 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
           </div>
         )}
       </div>
+
+      {offerte.status === 'angenommen' && (
+        <PartsOrder
+          docLabel={`Offerte #${offerte.offertNumber}`}
+          positionen={positionen}
+          onSave={async (pos, materialStatus) => {
+            await onUpdate(buildPayload({ positionen: pos, materialStatus }));
+            setPositionen(pos);
+            setDirty(false);
+          }}
+        />
+      )}
 
       {/* ── Aktionen: Auftrag / Rechnung erstellen ── */}
       {positionen.length > 0 && (

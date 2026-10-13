@@ -4,6 +4,7 @@ import Badge from '../ui/Badge';
 import Spinner from '../ui/Spinner';
 import { SFPlus, SFXmark } from '../Icons';
 import { PartLink } from '../ui/DocForm';
+import PartsOrder from '../teile/PartsOrder';
 import { isOverdue, daysSince, hoursSince, formatDateCH } from '../../lib/utils';
 import { SC, SO } from '../../constants/statuses';
 import { exportOrderPDF } from '../../lib/pdf-auftrag';
@@ -183,6 +184,12 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
           </div>
         </>
       )}
+
+      <PartsOrder
+        docLabel={`Auftrag #${order.orderNumber}`}
+        positionen={order.positionen ?? []}
+        onSave={(positionen, materialStatus) => onUpdate({ ...order, positionen, materialStatus }, null)}
+      />
 
       <p className="section-header">Rechnung</p>
       {edit ? (
