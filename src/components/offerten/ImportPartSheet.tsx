@@ -23,6 +23,8 @@ interface ImportPartSheetProps {
   payload: ImportPayload;
   customers: Customer[];
   offerten: Offerte[];
+  /** Preselected target, if it still takes positions (the active Offerte). */
+  defaultOfferteId?: string;
   onClose: () => void;
   onAddToOfferte: (offerteId: string, position: MaterialPosition) => Promise<void>;
   onStartNewOfferte: (position: MaterialPosition, customerId?: string) => void;
@@ -40,7 +42,7 @@ interface ParsedPart {
 
 const round2 = (n: number) => (Number.isFinite(n) ? n.toFixed(2) : '');
 
-export default function ImportPartSheet({ payload, customers, offerten, onClose, onAddToOfferte, onStartNewOfferte, onSaveToCatalog }: ImportPartSheetProps) {
+export default function ImportPartSheet({ payload, customers, offerten, defaultOfferteId, onClose, onAddToOfferte, onStartNewOfferte, onSaveToCatalog }: ImportPartSheetProps) {
   const [loading, setLoading] = useState(true);
   const [beschreibung, setBeschreibung] = useState('');
   const [ek, setEk] = useState('');
@@ -50,12 +52,11 @@ export default function ImportPartSheet({ payload, customers, offerten, onClose,
   const [quelle, setQuelle] = useState(payload.url ?? '');
   const [margin] = useState(getMargin());
   const [cid, setCid] = useState('');
-  const [targetOfferteId, setTargetOfferteId] = useState('');
+  const openDrafts = offerten.filter((o) => o.status === 'entwurf' || o.status === 'versendet');
+  const [targetOfferteId, setTargetOfferteId] = useState(() => (openDrafts.some((o) => o.id === defaultOfferteId) ? defaultOfferteId! : ''));
   const [busy, setBusy] = useState(false);
   const [debugInfo, setDebugInfo] = useState<{ raw: string; decoded: string } | null>(null);
   const ekInputRef = useRef<HTMLInputElement>(null);
-
-  const openDrafts = offerten.filter((o) => o.status === 'entwurf' || o.status === 'versendet');
 
   useEffect(() => {
     // Bookmarklet path: title/price already extracted client-side from the live,
@@ -134,7 +135,7 @@ export default function ImportPartSheet({ payload, customers, offerten, onClose,
     const sp = parseFloat(stueckpreis) || 0;
     const mg = parseFloat(menge) || 1;
     if (!beschreibung.trim() || !sp) return null;
-    return { typ: 'material', beschreibung: beschreibung.trim(), menge: String(mg), stueckpreis: stueckpreis, preis: (sp * mg).toFixed(2), link: quelle || undefined };
+    return { typ: 'material', beschreibung: beschreibung.trim(), menge: String(mg), stueckpreis: stueckpreis, preis: (sp * mg).toFixed(2), link: quelle || undefined, ek: ek || undefined, artikelnummer: artikelnummer || undefined };
   }
 
   async function handleAddToOfferte() {

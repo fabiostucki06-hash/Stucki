@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useSyncExternalStore } from 'react';
 import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
-import { getMargin, getActiveOfferteId, setActiveOfferteId } from '../../lib/settings';
+import { getMargin, getActiveOfferteId, setActiveOfferteId, subscribeActiveOfferteId } from '../../lib/settings';
 import { parsePartLink } from '../../lib/utils';
 import { cleanPartTitle } from '../../lib/partTitle';
 import type { Customer, MaterialPosition, Offerte } from '../../types';
@@ -18,7 +18,7 @@ interface QuickAddPartProps {
     description or a pasted shop link — a link is resolved to the product
     title (and, if no price was typed, to EK + margin) via /api/import-part. */
 export default function QuickAddPart({ offerten, customers, onAdd }: QuickAddPartProps) {
-  const [selected, setSelected] = useState(getActiveOfferteId);
+  const selected = useSyncExternalStore(subscribeActiveOfferteId, getActiveOfferteId);
   const [text, setText] = useState('');
   const [preis, setPreis] = useState('');
   const [busy, setBusy] = useState(false);
@@ -27,11 +27,6 @@ export default function QuickAddPart({ offerten, customers, onAdd }: QuickAddPar
   if (!offerten.length) return null;
   // The remembered Offerte may have been accepted or deleted in the meantime.
   const active = offerten.find((o) => o.id === selected) ?? offerten[0];
-
-  function pick(id: string) {
-    setSelected(id);
-    setActiveOfferteId(id);
-  }
 
   async function add() {
     if (busy) return;
@@ -88,7 +83,7 @@ export default function QuickAddPart({ offerten, customers, onAdd }: QuickAddPar
       </div>
       <div className="cf-field" style={{ marginBottom: 12 }}>
         <label className="cf-label" htmlFor="qa-offerte">Aktive Offerte</label>
-        <select id="qa-offerte" className="cf-select" value={active.id} onChange={(e) => pick(e.target.value)}>
+        <select id="qa-offerte" className="cf-select" value={active.id} onChange={(e) => setActiveOfferteId(e.target.value)}>
           {offerten.map((o) => {
             const c = customers.find((x) => x.id === o.customerId);
             return (

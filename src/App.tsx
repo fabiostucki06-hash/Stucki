@@ -4,7 +4,8 @@ import { showToast } from './components/ui/Toast';
 import { ASSETS } from './lib/supabase';
 import { needsAttention, decodeMaybeDouble } from './lib/utils';
 import { sampleImageColor, applyBgTheme, hexToRgb, type WallpaperThemeId } from './lib/theme';
-import { getBgMode, setBgMode as persistBgMode, getBgColor, setBgColor as persistBgColor, type BgMode } from './lib/settings';
+import { getBgMode, setBgMode as persistBgMode, getBgColor, setBgColor as persistBgColor, getActiveOfferteId, setActiveOfferteId, getMargin, type BgMode } from './lib/settings';
+import { cleanPartTitle } from './lib/partTitle';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { hardReload } from './lib/reload';
 
@@ -123,6 +124,8 @@ export default function App() {
   const [editR,    setEditR]    = useState<Rechnung | null>(null);
 
   const [importPayload, setImportPayload] = useState<ImportPayload | null>(null);
+  const [importTargetId, setImportTargetId] = useState<string | undefined>(undefined);
+  const [pendingImport, setPendingImport] = useState<{ payload: ImportPayload; offerteId?: string; fromBookmarklet: boolean } | null>(null);
   const [prefillMat, setPrefillMat] = useState<MaterialPosition | null>(null);
   const [prefillCid, setPrefillCid] = useState<string | undefined>(undefined);
 
@@ -158,13 +161,80 @@ export default function App() {
         console.warn('[Import] received an unresolved Shortcuts placeholder instead of real data.', { rawUrl, rawText, decodedUrl: url, decodedText: text });
       }
 
-      setImportPayload({ url, text, title, price, artikelnummer: artnr, _rawUrl: rawUrl ?? undefined, _rawText: rawText ?? undefined });
+      setPendingImport({
+        payload: { url, text, title, price, artikelnummer: artnr, _rawUrl: rawUrl ?? undefined, _rawText: rawText ?? undefined },
+        offerteId: params.get('offerte_id') || undefined,
+        fromBookmarklet: params.get('import_src') === 'bookmarklet',
+      });
       params.delete('import_url'); params.delete('import_text');
       params.delete('import_title'); params.delete('import_price'); params.delete('import_artnr');
+      params.delete('offerte_id'); params.delete('import_src');
       const rest = params.toString();
       window.history.replaceState({}, '', window.location.pathname + (rest ? `?${rest}` : ''));
     }
   }, []);
+
+  // Opening or editing an Offerte makes it the active one (see getActiveOfferteId).
+  const openOfferteId = selOff?.id ?? editOff?.id;
+  useEffect(() => { if (openOfferteId) setActiveOfferteId(openOfferteId); }, [openOfferteId]);
+
+  // Once the data is loaded, a captured import goes straight into the active
+  // Offerte (or the one named by ?offerte_id=) when the part is fully known:
+  // title plus EK. Without such an Offerte, or with anything missing, the
+  // import sheet opens instead so the user can complete and place it by hand.
+  const importStarted = useRef(false);
+  useEffect(() => {
+    if (!pendingImport || !token || loading || importStarted.current) return;
+    importStarted.current = true;
+    const { payload, offerteId, fromBookmarklet } = pendingImport;
+    const wanted = offerteId || getActiveOfferteId();
+    const target = offerten.find((o) => o.id === wanted && (o.status === 'entwurf' || o.status === 'versendet'));
+    const openSheet = (p: ImportPayload) => {
+      setImportTargetId(target?.id);
+      setImportPayload(p);
+      setPendingImport(null);
+      importStarted.current = false;
+    };
+    if (!target) { openSheet(payload); return; }
+
+    (async () => {
+      let part = { title: payload.title, ek: payload.price, artikelnummer: payload.artikelnummer, link: payload.url };
+      try {
+        // Share-sheet path: nothing extracted client-side yet.
+        if (!part.title && !part.ek) {
+          const r = await fetch('/api/import-part', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const data: { title?: string; ek?: string; artikelnummer?: string; quelle?: string } = await r.json();
+          part = { title: data.title, ek: data.ek, artikelnummer: data.artikelnummer, link: data.quelle || payload.url };
+        }
+        const beschreibung = cleanPartTitle(part.title ?? '');
+        const ek = parseFloat(part.ek ?? '');
+        if (!beschreibung || !(ek > 0)) {
+          openSheet({ ...payload, title: part.title, price: part.ek, artikelnummer: part.artikelnummer });
+          return;
+        }
+        const vk = (ek * (1 + getMargin() / 100)).toFixed(2);
+        await handleAddImportedPartToOfferte(target.id, {
+          typ: 'material', beschreibung, menge: '1', stueckpreis: vk, preis: vk,
+          link: part.link || undefined, ek: part.ek, artikelnummer: part.artikelnummer || undefined,
+        });
+        setPendingImport(null);
+        importStarted.current = false;
+        setTab('offerten');
+        // The bookmarklet opened this tab just for the import: hand the user
+        // back to the shop page once the toast was readable. Never closes a
+        // tab that has been navigated in.
+        if (fromBookmarklet && window.history.length <= 1) setTimeout(() => window.close(), 1800);
+      } catch (e) {
+        console.warn('[Import] direct import failed, falling back to the import sheet:', e);
+        openSheet(payload);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingImport, token, loading]);
 
   // Open detail sheets hold a snapshot; re-point them at fresh rows after a background refresh.
   // Keep the old snapshot if the row vanished (deleted elsewhere) so the sheet doesn't blank out mid-view.
@@ -181,7 +251,7 @@ export default function App() {
   // So: reload the instant it's safe (nothing open), and the instant it becomes
   // safe again if a new version lands while something is.
   const anySheetOpen = showNC || showNO || showNOff || showNR || !!afterSave
-    || !!selC || !!editC || !!selO || !!selOff || !!editOff || !!selR || !!editR || !!importPayload;
+    || !!selC || !!editC || !!selO || !!selOff || !!editOff || !!selR || !!editR || !!importPayload || !!pendingImport;
   const reloadTriggered = useRef(false);
   useEffect(() => {
     if (!updateAvailable || anySheetOpen || reloadTriggered.current) return;
@@ -312,7 +382,8 @@ export default function App() {
     const totalArbeit = positionen.filter((p) => p.typ === 'arbeit').reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
     const totalMaterial = positionen.filter((p) => p.typ === 'material').reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
     await updateOfferte({ ...off, positionen, totalArbeit: totalArbeit.toFixed(2), totalMaterial: totalMaterial.toFixed(2), totalBetrag: (totalArbeit + totalMaterial).toFixed(2) });
-    showToast(`Teil zu Offerte #${off.offertNumber} hinzugefügt`, 'success');
+    setActiveOfferteId(off.id);
+    showToast(`Teil direkt zu Offerte #${off.offertNumber} hinzugefügt`, 'success');
   }
   function handleStartNewOfferteFromImport(position: MaterialPosition, customerId?: string) {
     setPrefillMat(position);
@@ -459,6 +530,7 @@ export default function App() {
             payload={importPayload}
             customers={customers}
             offerten={offerten}
+            defaultOfferteId={importTargetId}
             onClose={() => setImportPayload(null)}
             onAddToOfferte={handleAddImportedPartToOfferte}
             onStartNewOfferte={handleStartNewOfferteFromImport}

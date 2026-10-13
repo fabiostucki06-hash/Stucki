@@ -374,7 +374,8 @@ export default function SettingsView({ currentWallpaper, onWallpaperChange, bgMo
         <p className="cf-label" style={{ marginTop: 20, marginBottom: 6 }}>Teile per Desktop-Browser importieren</p>
         <p style={{ fontSize: 12, color: 'var(--label2)', lineHeight: 1.5, margin: '0 0 10px' }}>
           Dieses Lesezeichen liest Titel, Preis und Artikelnummer direkt von der geöffneten Autodoc/ATP-Produktseite
-          und öffnet GarageOS damit vorausgefüllt.
+          und öffnet GarageOS damit vorausgefüllt. Ist eine Offerte aktiv (zuletzt geöffnet oder im Offerten-Tab
+          gewählt), landet das Teil direkt darin und der Tab schliesst sich wieder – sonst erscheint der Import-Dialog.
         </p>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>

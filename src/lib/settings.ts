@@ -7,9 +7,26 @@ const ACTIVE_OFFERTE_KEY = 'garage_active_offerte';
 export const getIban = (): string => localStorage.getItem(IBAN_KEY) ?? '';
 export const setIban = (iban: string): void => localStorage.setItem(IBAN_KEY, iban);
 
-/** Offerte the quick-add on the Offerten tab last added parts to. */
+/** Offerte being worked on: the one last opened, edited or picked in the
+    quick-add on the Offerten tab. Imported parts (bookmarklet / share sheet)
+    go straight into it. Kept in localStorage so the tab a bookmarklet opens
+    sees it too. */
 export const getActiveOfferteId = (): string => localStorage.getItem(ACTIVE_OFFERTE_KEY) ?? '';
-export const setActiveOfferteId = (id: string): void => localStorage.setItem(ACTIVE_OFFERTE_KEY, id);
+const activeOfferteListeners = new Set<() => void>();
+export const setActiveOfferteId = (id: string): void => {
+  localStorage.setItem(ACTIVE_OFFERTE_KEY, id);
+  activeOfferteListeners.forEach((l) => l());
+};
+/** For `useSyncExternalStore`; also fires when another tab changes it. */
+export function subscribeActiveOfferteId(listener: () => void): () => void {
+  const onStorage = (e: StorageEvent) => { if (e.key === ACTIVE_OFFERTE_KEY) listener(); };
+  activeOfferteListeners.add(listener);
+  window.addEventListener('storage', onStorage);
+  return () => {
+    activeOfferteListeners.delete(listener);
+    window.removeEventListener('storage', onStorage);
+  };
+}
 
 /** Default retail margin (%) applied to imported part purchase prices (EK -> VK). */
 export const getMargin = (): number => {

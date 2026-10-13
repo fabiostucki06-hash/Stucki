@@ -6,6 +6,9 @@
     popup-blocked depending on the browser's heuristics for bookmarklet-
     triggered calls, so a synthetic `<a target="_blank">` click is the
     fallback; neither path ever navigates the current tab away.
+    The shop page can't read GarageOS's storage (other origin), so which
+    Offerte is active is decided in the opened tab; `import_src=bookmarklet`
+    lets that tab close itself again once the part went straight into it.
     NOTE: no `//` line comments inside the `code` template below — whitespace
     collapse below turns a trailing newline into a space, which would make an
     unterminated `//` comment swallow the rest of the script. */
@@ -23,7 +26,8 @@ export function buildImportBookmarklet(origin: string): string {
     var q='import_url='+encodeURIComponent(location.href)
       +'&import_title='+encodeURIComponent(t.trim())
       +'&import_price='+encodeURIComponent(p)
-      +'&import_artnr='+encodeURIComponent(a);
+      +'&import_artnr='+encodeURIComponent(a)
+      +'&import_src=bookmarklet';
     var u='${origin}/?'+q;
     var w=window.open(u,'_blank','noopener,noreferrer');
     if(!w){
