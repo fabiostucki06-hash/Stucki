@@ -1,7 +1,7 @@
 import { SFChevron } from '../Icons';
 import { exportOffertePDF } from '../../lib/pdf-offerte';
 import { formatDateCH } from '../../lib/utils';
-import { ActiveOfferteBadge } from './ActiveOfferte';
+import { ActiveOfferteBadge, ActiveOfferteToggle } from './ActiveOfferte';
 import { useActiveOfferte } from '../../hooks/useActiveOfferte';
 import type { Customer, Offerte, OfferteStatus } from '../../types';
 
@@ -60,6 +60,7 @@ export default function OfferteList({ offerten, customers, onOfferteClick, onEdi
                       <div style={{ fontSize: 13, color: 'var(--label2)', marginTop: 1 }}>{c ? `${c.vorname} ${c.nachname}` : 'Kein Kunde'}</div>
                       {off.totalBetrag && <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--blue)', marginTop: 1 }}>CHF {off.totalBetrag}</div>}
                     </div>
+                    <ActiveOfferteToggle offerte={off} />
                     <button onClick={(e) => { e.stopPropagation(); exportOffertePDF(off, c); }} className="excel-btn" title="PDF herunterladen">PDF</button>
                     <button onClick={(e) => { e.stopPropagation(); onEdit(off); }} className="excel-btn" style={{ background: 'rgba(0,122,255,0.12)', color: 'var(--blue)', border: '1px solid rgba(0,122,255,0.25)' }} title="Bearbeiten">✎</button>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, marginLeft: 4 }}>

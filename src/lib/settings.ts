@@ -7,8 +7,8 @@ const ACTIVE_OFFERTE_KEY = 'garage_active_offerte';
 export const getIban = (): string => localStorage.getItem(IBAN_KEY) ?? '';
 export const setIban = (iban: string): void => localStorage.setItem(IBAN_KEY, iban);
 
-/** Offerte being worked on: the one last opened, edited, created or picked
-    in the nav-bar pill. Imported parts (bookmarklet / share sheet)
+/** Offerte the user explicitly marked as active (nav-bar pill, list toggle
+    or the banner in its detail / edit sheet). Opening one never changes it. Imported parts (bookmarklet / share sheet)
     go straight into it. Kept in localStorage so the tab a bookmarklet opens
     sees it too. */
 export const getActiveOfferteId = (): string => localStorage.getItem(ACTIVE_OFFERTE_KEY) ?? '';

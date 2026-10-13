@@ -176,15 +176,10 @@ export default function App() {
     }
   }, []);
 
-  // Opening or editing an Offerte makes it the active one (see getActiveOfferteId).
-  // Looking at an accepted/rejected one leaves the current selection alone,
-  // since it can't take imported parts anyway.
-  const openOff = selOff ?? editOff;
-  const openOfferteId = openOff && isOpenOfferte(openOff) ? openOff.id : undefined;
-  useEffect(() => { if (openOfferteId) setActiveOfferteId(openOfferteId); }, [openOfferteId]);
-
   // Once the data is loaded, a captured import goes straight into the active
   // Offerte (or the one named by ?offerte_id=) when the part is fully known:
+  // The active Offerte is only ever set by an explicit user choice (nav-bar
+  // pill, list toggle, banner button), never by opening or saving one.
   // title plus EK. Without such an Offerte, or with anything missing, the
   // import sheet opens instead so the user can complete and place it by hand.
   const importStarted = useRef(false);
@@ -306,9 +301,7 @@ export default function App() {
 
   /* ── Offerte handlers ── */
   async function handleAddOfferte(data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>) {
-    const created = await addOfferte(data);
-    setActiveOfferteId(created.id);
-    setShowNOff(false); setTab('offerten');
+    await addOfferte(data); setShowNOff(false); setTab('offerten');
   }
   async function handleUpdateOfferte(upd: Offerte) {
     const saved = await updateOfferte(upd); setSelOff(saved);
@@ -390,7 +383,6 @@ export default function App() {
     const totalArbeit = positionen.filter((p) => p.typ === 'arbeit').reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
     const totalMaterial = positionen.filter((p) => p.typ === 'material').reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
     await updateOfferte({ ...off, positionen, totalArbeit: totalArbeit.toFixed(2), totalMaterial: totalMaterial.toFixed(2), totalBetrag: (totalArbeit + totalMaterial).toFixed(2) });
-    setActiveOfferteId(off.id);
     showToast(`Teil direkt zu Offerte #${off.offertNumber} hinzugefügt`, 'success');
   }
   function handleStartNewOfferteFromImport(position: MaterialPosition, customerId?: string) {
