@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
+import { FormCard, FormBar, VehicleChips, onEnterNextRow } from '../ui/DocForm';
 import { SFPlus, SFXmark } from '../Icons';
 import type { Customer, Order } from '../../types';
 
@@ -17,16 +19,36 @@ export default function OrderForm({ customers, customerId: preCid, onSave, onCan
   const [cid,     setCid]     = useState(preCid ?? '');
   const [bs,      setBs]      = useState(['']);
   const [notizen, setNotizen] = useState('');
+  const [savingLocal, setSavingLocal] = useState(false);
+  const busy = saving || savingLocal;
+  const listRef = useRef<HTMLDivElement>(null);
+  // A freshly added row takes focus, so the list can be typed top to bottom.
+  const focusNew = useRef(false);
 
-  const addB = () => setBs((p) => [...p, '']);
+  useEffect(() => {
+    if (!focusNew.current) return;
+    focusNew.current = false;
+    const inputs = listRef.current?.querySelectorAll<HTMLInputElement>('[data-df-desc]');
+    inputs?.[inputs.length - 1]?.focus();
+  }, [bs.length]);
+
+  const addB = () => { focusNew.current = true; setBs((p) => [...p, '']); };
   const updB = (i: number, v: string) => setBs((p) => { const n = [...p]; n[i] = v; return n; });
   const remB = (i: number) => setBs((p) => p.filter((_, j) => j !== i));
 
-  function submit() {
+  async function submit() {
+    if (busy) return;
     if (!cid) { showToast('Bitte einen Kunden auswählen', 'error'); return; }
     const b = bs.filter((x) => x.trim());
     if (!b.length) { showToast('Mindestens eine Beanstandung eingeben', 'error'); return; }
-    onSave({ customerId: cid, beanstandungen: b, notizen });
+    setSavingLocal(true);
+    try {
+      await onSave({ customerId: cid, beanstandungen: b, notizen });
+    } catch (e) {
+      console.error('[Auftrag] save failed:', e);
+    } finally {
+      setSavingLocal(false);
+    }
   }
 
   const selectedCustomer = customers.find((c) => c.id === cid) ?? null;
@@ -35,111 +57,76 @@ export default function OrderForm({ customers, customerId: preCid, onSave, onCan
        selectedCustomer.km ? selectedCustomer.km + ' km' : ''].filter(Boolean)
     : [];
 
-  /* ── shared style tokens ── */
-  const gc: React.CSSProperties = {
-    background: 'rgba(255,255,255,0.10)',
-    backdropFilter: 'blur(64px) saturate(240%)',
-    WebkitBackdropFilter: 'blur(64px) saturate(240%)',
-    border: '1px solid rgba(255,255,255,0.20)',
-    borderRadius: 18,
-    padding: '10px 12px',
-    marginBottom: 24,
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.65), 0 4px 24px rgba(0,0,0,0.06)',
-  };
-  const gcHdr: React.CSSProperties = {
-    fontSize: 11, fontWeight: 700, color: 'var(--label2)',
-    textTransform: 'uppercase', letterSpacing: '0.08em',
-    marginBottom: 9, display: 'block',
-    textShadow: '0 1px 3px rgba(0,0,0,0.30)',
-  };
+  const filled = bs.filter((x) => x.trim()).length;
 
   return (
-    <div>
+    <div className="df">
 
-      {/* ── Section 1: Kunde (only when not pre-filled) ── */}
-      {!preCid && (
-        <div style={gc}>
-          <span style={gcHdr}>Kunde</span>
-          <div className="cf-field">
+      {/* ── 1: Kunde & Fahrzeug ── */}
+      <FormCard title="Kunde & Fahrzeug">
+        <div className="df-grid">
+          <div className="cf-field df-span2">
             <label className="cf-label">Kunde *</label>
-            <select
-              className="cf-select"
-              value={cid}
-              onChange={(e) => setCid(e.target.value)}
-              style={{ color: cid ? 'var(--label)' : 'var(--label3)' }}
-            >
-              <option value="">Kunde auswählen…</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>{c.vorname} {c.nachname} – {c.kennzeichen}</option>
-              ))}
-            </select>
-          </div>
-          {vehicleChips.length > 0 && (
-            <div className="mf-chips" style={{ marginTop: 10 }}>
-              <span style={{ fontSize: 11 }}>🚗</span>
-              {vehicleChips.map((v, i) => <span key={i} className="mf-chip">{v}</span>)}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Vehicle chips when customer is pre-filled */}
-      {preCid && vehicleChips.length > 0 && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          padding: '10px 14px', marginBottom: 18,
-          background: 'rgba(255,255,255,0.08)',
-          backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
-          border: '1px solid rgba(255,255,255,0.16)',
-          borderRadius: 12,
-        }}>
-          <span style={{ fontSize: 14, flexShrink: 0 }}>🚗</span>
-          <div className="mf-chips" style={{ padding: 0 }}>
-            {vehicleChips.map((v, i) => <span key={i} className="mf-chip">{v}</span>)}
-          </div>
-        </div>
-      )}
-
-      {/* ── Section 2: Beanstandungen ── */}
-      <div style={gc}>
-        <span style={gcHdr}>Beanstandungen</span>
-        {bs.map((b, i) => (
-          <div key={i} className="mf-bean-row">
-            <span className="mf-bean-idx">{i + 1}</span>
-            <input
-              className="mf-bean-inp"
-              value={b}
-              onChange={(e) => updB(i, e.target.value)}
-              placeholder={`Beanstandung ${i + 1}…`}
-            />
-            {bs.length > 1 && (
-              <button className="mf-bean-del" onClick={() => remB(i)}><SFXmark /></button>
+            {preCid && selectedCustomer ? (
+              <div className="cf-input">{selectedCustomer.vorname} {selectedCustomer.nachname}</div>
+            ) : (
+              <select
+                className="cf-select"
+                value={cid}
+                onChange={(e) => setCid(e.target.value)}
+                style={{ color: cid ? 'var(--input-text)' : 'var(--input-placeholder)' }}
+              >
+                <option value="">Kunde auswählen…</option>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>{c.vorname} {c.nachname} – {c.kennzeichen}</option>
+                ))}
+              </select>
             )}
           </div>
-        ))}
-        <button className="mf-add-bean" onClick={addB}><SFPlus size={12} /> Beanstandung hinzufügen</button>
-      </div>
+          {vehicleChips.length > 0 && <div className="df-span2"><VehicleChips chips={vehicleChips} /></div>}
+        </div>
+      </FormCard>
 
-      {/* ── Section 3: Notizen ── */}
-      <div style={gc}>
-        <span style={gcHdr}>Notizen</span>
+      {/* ── 2: Beanstandungen ── */}
+      <FormCard title="Beanstandungen" hint="Enter fügt die nächste Zeile hinzu">
+        <div ref={listRef}>
+          {bs.map((b, i) => (
+            <div key={i} className="df-line df-bean" onKeyDown={(e) => onEnterNextRow(e, i === bs.length - 1, addB)}>
+              <span className="df-idx">{i + 1}</span>
+              <input
+                className="df-inp" data-df-desc="bean"
+                value={b}
+                onChange={(e) => updB(i, e.target.value)}
+                placeholder={`Beanstandung ${i + 1}…`}
+              />
+              {bs.length > 1
+                ? <button type="button" className="mf-bean-del" onClick={() => remB(i)} aria-label="Beanstandung entfernen"><SFXmark /></button>
+                : <span />}
+            </div>
+          ))}
+        </div>
+        <button type="button" className="mf-add-bean" onClick={addB}><SFPlus size={12} /> Beanstandung</button>
+      </FormCard>
+
+      {/* ── 3: Notizen ── */}
+      <FormCard title="Notizen">
         <textarea
           className="cf-textarea"
           value={notizen}
           onChange={(e) => setNotizen(e.target.value)}
           placeholder="Interne Notizen zum Auftrag…"
           rows={3}
-          style={{ marginBottom: 0 }}
         />
-      </div>
+      </FormCard>
 
-      {/* ── Actions: right-aligned pills ── */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 8, paddingBottom: 6 }}>
-        <button className="mf-btn-cancel" onClick={onCancel}>Abbrechen</button>
-        <button className="mf-btn-save" onClick={submit} disabled={saving}>
-          {saving ? 'Wird gespeichert…' : 'Auftrag erstellen'}
+      <FormBar label="Beanstandungen" value={String(filled)}>
+        <button className="mf-btn-cancel" onClick={onCancel} disabled={busy}>Abbrechen</button>
+        <button className="mf-btn-save" onClick={submit} disabled={busy}>
+          {busy
+            ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Spinner size={12} /> Speichern…</span>
+            : 'Auftrag erstellen'}
         </button>
-      </div>
+      </FormBar>
 
     </div>
   );

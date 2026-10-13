@@ -1,12 +1,10 @@
 import { useState } from 'react';
 import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
-import { SFPlus, SFXmark } from '../Icons';
+import { FormCard, FormBar, SummaryRow, VehicleChips, PositionenEditor, fCHF, type ArbeitRow, type MaterialRow } from '../ui/DocForm';
 import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../lib/rechnung-totals';
 import type { Customer, Order, Offerte, ArbeitPosition, MaterialPosition, Rechnung, RechnungKategorie } from '../../types';
 
-type ArbeitRow   = ArbeitPosition  & { zeLoading: boolean; zeHint: string };
-type MaterialRow = MaterialPosition;
 type RechnungData = Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>;
 
 interface RechnungFormProps {
@@ -53,7 +51,6 @@ const KATEGORIE_OPTS: [RechnungKategorie, string][] = [
 
 const newArbeit   = (): ArbeitRow   => ({ typ: 'arbeit',   beschreibung: '', ze: '', stundenansatz: '80', preis: '', zeKI: false, zeLoading: false, zeHint: '' });
 const newMaterial = (): MaterialRow => ({ typ: 'material', beschreibung: '', menge: '1', stueckpreis: '', preis: '' });
-const fCHF = (n: number) => 'CHF ' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, "'");
 
 function calcFaelligAm(days: string): string {
   const n = parseInt(days);
@@ -63,12 +60,11 @@ function calcFaelligAm(days: string): string {
   return d.toISOString().split('T')[0];
 }
 
-export default function RechnungForm({ customers, orders, offerten, onSave, onCancel, initial }: RechnungFormProps) {
+export default function RechnungForm({ customers, orders, offerten, onSave, onCancel, saving: savingProp, initial }: RechnungFormProps) {
   const [selectedAuftragId, setSelectedAuftragId] = useState(initial?.auftragId ?? '');
   const [selectedOfferteId, setSelectedOfferteId] = useState('');
   const [cid,          setCid]          = useState(initial?.customerId ?? '');
   const [titel,        setTitel]        = useState(initial?.titel ?? '');
-  const [tab,          setTab]          = useState<'arbeit' | 'material'>('arbeit');
   const [arbeit,       setArbeit]       = useState<ArbeitRow[]>(() => {
     const ap = (initial?.positionen ?? []).filter((p): p is ArbeitPosition => p.typ === 'arbeit');
     return ap.length ? ap.map((p) => ({ ...p, zeLoading: false, zeHint: p.zeHint ?? '' })) : [newArbeit()];
@@ -84,6 +80,9 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
   const [faelligAm,    setFaelligAm]    = useState(
     () => initial?.faelligAm ?? calcFaelligAm(initial?.zahlungsFrist ?? '10')
   );
+
+  const [savingLocal, setSavingLocal] = useState(false);
+  const busy = savingProp || savingLocal;
 
   const selectedCustomer = customers.find((c) => c.id === cid) ?? null;
   const vehicleChips = selectedCustomer
@@ -116,8 +115,6 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
       });
     setArbeit(arbeitRows.length ? arbeitRows : [newArbeit()]);
     setMaterial(materialRows.length ? materialRows : [newMaterial()]);
-    if (arbeitRows.length > 0) setTab('arbeit');
-    else if (materialRows.length > 0) setTab('material');
   }
 
   function onOfferteSelect(offerteId: string) {
@@ -143,8 +140,6 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
       });
     setArbeit(arbeitRows.length ? arbeitRows : [newArbeit()]);
     setMaterial(materialRows.length ? materialRows : [newMaterial()]);
-    if (arbeitRows.length > 0) setTab('arbeit');
-    else if (materialRows.length > 0) setTab('material');
   }
 
   function handleZahlungsFristChange(val: string) {
@@ -199,44 +194,29 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
   const { totalMaterial: totM, totalArbeit: totA, totalZE: totZE, rechnungstotal, kleinteilApplied } =
     computeRechnungTotals([...ap, ...mp], kategorie || undefined, kleinteilManuell);
 
-  function submit() {
+  /** `draft` saves whatever is there so far (only the customer is required);
+      a new Rechnung starts out as "Entwurf" either way. */
+  async function submit(draft: boolean) {
+    if (busy) return;
     if (!cid) { showToast('Bitte einen Kunden auswählen', 'error'); return; }
-    if (!ap.length && !mp.length) { showToast('Mindestens eine Position eingeben', 'error'); return; }
-    onSave({
-      customerId: cid, titel, positionen: [...ap, ...mp], notizen,
-      zahlungsFrist, faelligAm,
-      kategorie: kategorie || undefined, kleinteilManuell,
-      totalBetrag: rechnungstotal.toFixed(2), totalArbeit: totA.toFixed(2),
-      totalMaterial: totM.toFixed(2), totalZE: totZE,
-      auftragId: selectedAuftragId || undefined,
-    });
+    if (!draft && !ap.length && !mp.length) { showToast('Mindestens eine Position eingeben', 'error'); return; }
+    setSavingLocal(true);
+    try {
+      // Awaited so a rejected write keeps the sheet (and the user's input) open.
+      await onSave({
+        customerId: cid, titel, positionen: [...ap, ...mp], notizen,
+        zahlungsFrist, faelligAm,
+        kategorie: kategorie || undefined, kleinteilManuell,
+        totalBetrag: rechnungstotal.toFixed(2), totalArbeit: totA.toFixed(2),
+        totalMaterial: totM.toFixed(2), totalZE: totZE,
+        auftragId: selectedAuftragId || undefined,
+      });
+    } catch (e) {
+      console.error('[Rechnung] save failed:', e);
+    } finally {
+      setSavingLocal(false);
+    }
   }
-
-  /* ── shared style tokens ── */
-  const gc: React.CSSProperties = {
-    background: 'rgba(255,255,255,0.10)',
-    backdropFilter: 'blur(64px) saturate(240%)',
-    WebkitBackdropFilter: 'blur(64px) saturate(240%)',
-    border: '1px solid rgba(255,255,255,0.20)',
-    borderRadius: 18,
-    padding: '10px 12px',
-    marginBottom: 24,
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.65), 0 4px 24px rgba(0,0,0,0.06)',
-  };
-  const gcHdr: React.CSSProperties = {
-    fontSize: 11, fontWeight: 700, color: 'var(--label2)',
-    textTransform: 'uppercase', letterSpacing: '0.08em',
-    marginBottom: 9, display: 'block',
-    textShadow: '0 1px 3px rgba(0,0,0,0.30)',
-  };
-  const hdrTxt: React.CSSProperties = {
-    fontSize: 9, fontWeight: 700, color: 'var(--label2)',
-    textTransform: 'uppercase', letterSpacing: '0.08em',
-    textShadow: '0 1px 3px rgba(0,0,0,0.30)',
-  };
-
-  const arbeitCount   = arbeit.filter((p) => p.beschreibung).length;
-  const materialCount = material.filter((p) => p.beschreibung).length;
 
   /* import status summary */
   const importActive = selectedAuftragId || selectedOfferteId;
@@ -247,21 +227,28 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
     : [];
   const importACount = importPos.filter((p) => p.typ === 'arbeit').length;
   const importMCount = importPos.filter((p) => p.typ === 'material').length;
+  const importHint = importActive
+    ? (importACount + importMCount > 0
+        ? `${importACount} Arbeits- + ${importMCount} Materialpos. übernommen`
+        : 'Kunde übernommen, keine Positionen')
+    : 'Optional: aus Auftrag oder Offerte übernehmen';
+
+  const totArbeitBase = totA - (kleinteilApplied ? KLEINTEIL_BETRAG : 0);
+  const rundung = rechnungstotal - (totA + totM);
 
   return (
-    <div>
+    <div className="df">
 
-      {/* ── Section 1: Import aus Auftrag / Offerte ── */}
-      <div style={gc}>
-        <span style={gcHdr}>Aus bestehendem Dokument befüllen</span>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      {/* ── 1: Kunde & Details ── */}
+      <FormCard title="Kunde & Details" hint={importHint}>
+        <div className="df-grid">
           <div className="cf-field">
             <label className="cf-label">Aus Auftrag</label>
             <select
               className="cf-select"
               value={selectedAuftragId}
               onChange={(e) => onAuftragSelect(e.target.value)}
-              style={{ color: selectedAuftragId ? 'var(--label)' : 'var(--label3)' }}
+              style={{ color: selectedAuftragId ? 'var(--input-text)' : 'var(--input-placeholder)' }}
             >
               <option value="">Auftrag wählen…</option>
               {sortedAuftraege.map((o) => {
@@ -276,12 +263,12 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
             </select>
           </div>
           <div className="cf-field">
-            <label className="cf-label">Aus Offerte (optional)</label>
+            <label className="cf-label">Aus Offerte</label>
             <select
               className="cf-select"
               value={selectedOfferteId}
               onChange={(e) => onOfferteSelect(e.target.value)}
-              style={{ color: selectedOfferteId ? 'var(--label)' : 'var(--label3)' }}
+              style={{ color: selectedOfferteId ? 'var(--input-text)' : 'var(--input-placeholder)' }}
             >
               <option value="">Offerte wählen…</option>
               {sortedOfferten.map((off) => {
@@ -294,30 +281,13 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
               })}
             </select>
           </div>
-        </div>
-        {importActive && (
-          <div style={{ marginTop: 10, fontSize: 11, fontWeight: 600, color: 'var(--blue)', padding: '7px 10px', background: 'rgba(0,122,255,0.10)', borderRadius: 8, border: '1px solid rgba(0,122,255,0.20)' }}>
-            {selectedAuftragId ? 'Auftrag' : 'Offerte'} importiert —{' '}
-            {importACount + importMCount > 0
-              ? `${importACount} Arbeits- + ${importMCount} Materialpos. übernommen`
-              : 'Kunde übernommen, keine Positionen'}
-          </div>
-        )}
-      </div>
-
-      {/* ── Section 2: Kunde & Details ── */}
-      <div style={gc}>
-        <span style={gcHdr}>Kunde &amp; Details</span>
-
-        {/* 2/3 Kunde + 1/3 Fällig am */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10, marginBottom: 10 }}>
-          <div className="cf-field">
+          <div className="cf-field df-span2">
             <label className="cf-label">Kunde *</label>
             <select
               className="cf-select"
               value={cid}
               onChange={(e) => setCid(e.target.value)}
-              style={{ color: cid ? 'var(--label)' : 'var(--label3)' }}
+              style={{ color: cid ? 'var(--input-text)' : 'var(--input-placeholder)' }}
             >
               <option value="">Auswählen…</option>
               {customers.map((c) => (
@@ -325,241 +295,102 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
               ))}
             </select>
           </div>
+          {vehicleChips.length > 0 && <div className="df-span2"><VehicleChips chips={vehicleChips} /></div>}
+          <div className="cf-field">
+            <label className="cf-label">Betreff</label>
+            <input className="cf-input" value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="z.B. Inspektion, Reparatur…" />
+          </div>
+          <div className="cf-field">
+            <label className="cf-label">Auftragsart</label>
+            <select
+              className="cf-select"
+              value={kategorie}
+              onChange={(e) => setKategorie(e.target.value as RechnungKategorie | '')}
+              style={{ color: kategorie ? 'var(--input-text)' : 'var(--input-placeholder)' }}
+            >
+              <option value="">Keine Angabe</option>
+              {KATEGORIE_OPTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </select>
+          </div>
+          <div className="cf-field">
+            <label className="cf-label">Zahlungsfrist (Tage)</label>
+            <input className="cf-input" type="number" inputMode="numeric" min={1} value={zahlungsFrist} onChange={(e) => handleZahlungsFristChange(e.target.value)} placeholder="30" />
+          </div>
           <div className="cf-field">
             <label className="cf-label">Fällig am</label>
             <input className="cf-input" type="date" value={faelligAm} onChange={(e) => setFaelligAm(e.target.value)} />
           </div>
         </div>
+      </FormCard>
 
-        {vehicleChips.length > 0 && (
-          <div className="mf-chips" style={{ marginBottom: 10 }}>
-            <span style={{ fontSize: 11 }}>🚗</span>
-            {vehicleChips.map((v, i) => <span key={i} className="mf-chip">{v}</span>)}
-          </div>
-        )}
-
-        <div className="cf-field" style={{ marginBottom: 12 }}>
-          <label className="cf-label">Betreff</label>
-          <input className="cf-input" value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="z.B. Inspektion, Reparatur…" />
-        </div>
-
-        <div className="cf-field" style={{ marginBottom: 12 }}>
-          <label className="cf-label">Auftragsart</label>
-          <select
-            className="cf-select"
-            value={kategorie}
-            onChange={(e) => setKategorie(e.target.value as RechnungKategorie | '')}
-            style={{ color: kategorie ? 'var(--label)' : 'var(--label3)' }}
-          >
-            <option value="">Keine Angabe</option>
-            {KATEGORIE_OPTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-          </select>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <label className="cf-label" style={{ marginBottom: 0, whiteSpace: 'nowrap' }}>Zahlungsfrist</label>
-          <input
-            className="cf-input"
-            type="number"
-            value={zahlungsFrist}
-            onChange={(e) => handleZahlungsFristChange(e.target.value)}
-            placeholder="30"
-            min={1}
-            style={{ width: 72, flex: 'none' }}
-          />
-          <span style={{ fontSize: 13, color: 'var(--label2)', whiteSpace: 'nowrap' }}>Tage</span>
-        </div>
-      </div>
-
-      {/* ── Section 3: Positionen ── */}
-      <div style={gc}>
-        <span style={gcHdr}>Positionen</span>
-
-        {/* iOS Segmented Control */}
-        <div className="seg-ctrl" style={{ marginBottom: 10 }}>
-          {(['arbeit', 'material'] as const).map((t) => {
-            const cnt = t === 'arbeit' ? arbeitCount : materialCount;
-            const isActive = tab === t;
-            return (
-              <button
-                key={t}
-                className={`seg-item${isActive ? ' active' : ''}`}
-                onClick={() => setTab(t)}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-              >
-                {t === 'arbeit' ? (
-                  <svg width={12} height={12} viewBox="0 0 15 15" fill="none" aria-hidden="true">
-                    <path d="M9.5 3.5a3.5 3.5 0 01-4.9 4.9L2 11a1.2 1.2 0 001.7 1.7L6.2 10A3.5 3.5 0 019.5 3.5zm.7-.7l-2 2 .8.8 2-2-.8-.8z" stroke="currentColor" strokeWidth={1.2} strokeLinejoin="round" strokeLinecap="round" />
-                  </svg>
-                ) : (
-                  <svg width={12} height={12} viewBox="0 0 15 15" fill="none" aria-hidden="true">
-                    <rect x={2} y={4} width={11} height={9} rx={1.5} stroke="currentColor" strokeWidth={1.2} />
-                    <path d="M5 4V3a2 2 0 014 0v1" stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" />
-                  </svg>
-                )}
-                {t === 'arbeit' ? 'Arbeit' : 'Material'}
-                {cnt > 0 && (
-                  <span style={{
-                    background: isActive ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.18)',
-                    borderRadius: 9, minWidth: 18, height: 18, fontSize: 10, fontWeight: 700,
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px',
-                  }}>
-                    {cnt}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Arbeit rows */}
-        {tab === 'arbeit' && (
-          <>
-            <div className="mf-pos-hdr">
-              <span style={{ width: 18, flexShrink: 0 }} />
-              <span style={{ ...hdrTxt, flex: 1 }}>Beschreibung</span>
-              <span style={{ ...hdrTxt, width: 42, textAlign: 'right' }}>ZE</span>
-              <span style={{ width: 28, flexShrink: 0 }} />
-              <span style={{ ...hdrTxt, width: 50, textAlign: 'right' }}>CHF/h</span>
-              <span style={{ ...hdrTxt, width: 68, textAlign: 'right' }}>Total</span>
-              <span style={{ width: 22, flexShrink: 0 }} />
-            </div>
-            {arbeit.map((pos, i) => (
-              <div key={i} className="mf-pos-row">
-                <span className="mf-pos-idx">{i + 1}</span>
-                <input className="mf-pos-desc" value={pos.beschreibung} onChange={(e) => updA(i, 'beschreibung', e.target.value)} placeholder="Arbeitsschritt…" />
-                <input
-                  className="mf-pos-num"
-                  style={{ width: 42, color: pos.zeKI ? 'var(--teal)' : undefined, fontWeight: pos.zeKI ? 700 : undefined }}
-                  type="number" value={pos.ze} onChange={(e) => updA(i, 'ze', e.target.value)}
-                  placeholder="—" min={0} title={pos.zeHint || undefined}
-                />
-                <button
-                  className={`mf-pos-ki${pos.zeKI ? ' ki-active' : ''}`}
-                  style={{ width: 28 }}
-                  onClick={() => kiZE(i)}
-                  disabled={pos.zeLoading || !pos.beschreibung.trim()}
-                  title="KI-Schätzung anfordern"
-                >
-                  {pos.zeLoading ? <Spinner size={10} /> : '✦'}
-                </button>
-                <input className="mf-pos-num" style={{ width: 50 }} type="number" value={pos.stundenansatz} onChange={(e) => updA(i, 'stundenansatz', e.target.value)} placeholder="80" />
-                <span className="mf-pos-total" style={{ color: 'var(--blue)', width: 68 }}>
-                  {pos.preis ? fCHF(parseFloat(pos.preis)) : '—'}
-                </span>
-                {arbeit.length > 1
-                  ? <button className="mf-pos-del" onClick={() => remA(i)}><SFXmark /></button>
-                  : <span style={{ width: 22 }} />}
-              </div>
-            ))}
-            <button className="mf-add-pos" onClick={addA}><SFPlus size={12} /> Arbeitsposition</button>
-          </>
-        )}
-
-        {/* Material rows */}
-        {tab === 'material' && (
-          <>
-            <div className="mf-pos-hdr">
-              <span style={{ width: 18, flexShrink: 0 }} />
-              <span style={{ ...hdrTxt, flex: 1 }}>Beschreibung</span>
-              <span style={{ ...hdrTxt, width: 44, textAlign: 'right' }}>Menge</span>
-              <span style={{ ...hdrTxt, width: 64, textAlign: 'right' }}>Stk. CHF</span>
-              <span style={{ ...hdrTxt, width: 68, textAlign: 'right' }}>Total</span>
-              <span style={{ width: 22, flexShrink: 0 }} />
-            </div>
-            {material.map((pos, i) => (
-              <div key={i} className="mf-pos-row">
-                <span className="mf-pos-idx">{i + 1}</span>
-                <input className="mf-pos-desc" value={pos.beschreibung} onChange={(e) => updM(i, 'beschreibung', e.target.value)} placeholder="Ersatzteil / Material…" />
-                <input className="mf-pos-num" style={{ width: 44 }} type="number" value={pos.menge} onChange={(e) => updM(i, 'menge', e.target.value)} min={1} />
-                <input className="mf-pos-num" style={{ width: 64 }} type="number" value={pos.stueckpreis} onChange={(e) => updM(i, 'stueckpreis', e.target.value)} placeholder="0.00" />
-                <span className="mf-pos-total" style={{ color: 'var(--green)', width: 68 }}>
-                  {pos.preis ? fCHF(parseFloat(pos.preis)) : '—'}
-                </span>
-                {material.length > 1
-                  ? <button className="mf-pos-del" onClick={() => remM(i)}><SFXmark /></button>
-                  : <span style={{ width: 22 }} />}
-              </div>
-            ))}
-            <button className="mf-add-pos green" onClick={addM}><SFPlus size={12} /> Materialposition</button>
-          </>
-        )}
-
-        {/* ── Kleinteilepauschale: manual override ── */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          marginTop: 10, paddingTop: 10, borderTop: '0.5px solid var(--sep)',
-        }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={kleinteilApplied}
-              onChange={(e) => setKleinteilManuell(e.target.checked)}
-              style={{ width: 16, height: 16, accentColor: 'var(--blue)' }}
-            />
-            <span style={{ fontSize: 13 }}>
-              {KLEINTEIL_LABEL} hinzufügen <span style={{ color: 'var(--label3)' }}>(CHF {fCHF(KLEINTEIL_BETRAG)})</span>
-            </span>
-          </label>
-          {kleinteilManuell != null && (
-            <button
-              type="button"
-              onClick={() => setKleinteilManuell(null)}
-              className="pill-btn pill-btn-inactive"
-              style={{ fontSize: 11, padding: '4px 10px' }}
-            >
-              Automatisch
-            </button>
-          )}
-        </div>
-
-        {/* ── Totals summary ── */}
-        <div style={{
-          display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8,
-          marginTop: 10, paddingTop: 10,
-          borderTop: '0.5px solid var(--sep)',
-        }}>
-          {([
-            ['Arbeit',   fCHF(totA),           totZE ? `${totZE} ZE` : null, 'var(--blue)'],
-            ['Material', fCHF(totM),           null,                          'var(--green)'],
-            ['Total',    fCHF(rechnungstotal), null,                          'var(--indigo)'],
-          ] as [string, string, string | null, string][]).map(([l, v, sub, c]) => (
-            <div key={l} style={{
-              textAlign: 'center', padding: '6px 5px',
-              background: 'rgba(255,255,255,0.07)',
-              backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
-              border: '1px solid rgba(255,255,255,0.14)',
-              borderRadius: 12,
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35)',
-            }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--label2)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3, textShadow: '0 1px 3px rgba(0,0,0,0.30)' }}>{l}</div>
-              <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.25px', color: c, textShadow: '0 1px 3px rgba(0,0,0,0.20)', whiteSpace: 'nowrap' }}>{v}</div>
-              {sub && <div style={{ fontSize: 9, fontWeight: 600, color: 'var(--label2)', marginTop: 2 }}>{sub}</div>}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Section 4: Notizen ── */}
-      <div style={gc}>
-        <span style={gcHdr}>Notizen</span>
-        <textarea
-          className="cf-textarea"
-          value={notizen}
-          onChange={(e) => setNotizen(e.target.value)}
-          placeholder="Interne Notizen zur Rechnung…"
-          rows={3}
-          style={{ marginBottom: 0 }}
+      {/* ── 2: Positionen ── */}
+      <FormCard title="Positionen" hint="Enter fügt die nächste Zeile hinzu">
+        <PositionenEditor
+          arbeit={arbeit} material={material}
+          onArbeitChange={updA} onArbeitAdd={addA} onArbeitRemove={remA} onKiZE={kiZE}
+          onMaterialChange={updM} onMaterialAdd={addM} onMaterialRemove={remM}
         />
-      </div>
+      </FormCard>
 
-      {/* ── Actions: right-aligned pills ── */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 8, paddingBottom: 6 }}>
-        <button className="mf-btn-cancel" onClick={onCancel}>Abbrechen</button>
-        <button className="mf-btn-save" onClick={submit}>
-          {initial ? 'Änderungen speichern' : 'Rechnung erstellen'}
+      {/* ── 3: Zusammenfassung ── */}
+      <FormCard title="Zusammenfassung">
+        <div className="df-split">
+          <div className="cf-field">
+            <label className="cf-label">Notizen</label>
+            <textarea
+              className="cf-textarea"
+              value={notizen}
+              onChange={(e) => setNotizen(e.target.value)}
+              placeholder="Interne Notizen zur Rechnung…"
+              rows={4}
+            />
+          </div>
+          <div>
+            <SummaryRow label="Arbeit" sub={totZE ? `${totZE} ZE` : null} value={fCHF(totArbeitBase)} />
+            <SummaryRow label="Material" value={fCHF(totM)} />
+            {/* Kleinteilepauschale: manual override of the per-Auftragsart default */}
+            <SummaryRow
+              label={
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={kleinteilApplied}
+                      onChange={(e) => setKleinteilManuell(e.target.checked)}
+                      style={{ width: 16, height: 16, accentColor: 'var(--blue)' }}
+                    />
+                    {KLEINTEIL_LABEL}
+                  </label>
+                  {kleinteilManuell != null && (
+                    <button
+                      type="button"
+                      onClick={() => setKleinteilManuell(null)}
+                      className="pill-btn pill-btn-inactive"
+                      style={{ fontSize: 11, padding: '3px 10px' }}
+                    >
+                      Automatisch
+                    </button>
+                  )}
+                </span>
+              }
+              value={kleinteilApplied ? fCHF(KLEINTEIL_BETRAG) : '—'}
+            />
+            {Math.abs(rundung) >= 0.005 && <SummaryRow label="Rappenrundung" value={fCHF(rundung)} />}
+            <SummaryRow label="Total" value={fCHF(rechnungstotal)} total />
+          </div>
+        </div>
+      </FormCard>
+
+      <FormBar label="Total" value={fCHF(rechnungstotal)}>
+        {initial
+          ? <button className="mf-btn-cancel" onClick={onCancel} disabled={busy}>Abbrechen</button>
+          : <button className="mf-btn-cancel" onClick={() => submit(true)} disabled={busy}>Als Entwurf speichern</button>}
+        <button className="mf-btn-save" onClick={() => submit(false)} disabled={busy}>
+          {busy
+            ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Spinner size={12} /> Speichern…</span>
+            : initial ? 'Änderungen speichern' : 'Rechnung erstellen'}
         </button>
-      </div>
+      </FormBar>
 
     </div>
   );

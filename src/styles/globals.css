@@ -474,3 +474,80 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .mf-btn-cancel{height:34px;border-radius:980px;padding:0 14px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;letter-spacing:-0.2px;color:var(--label2);border:1px solid rgba(255,255,255,0.22);background:rgba(255,255,255,0.12);-webkit-backdrop-filter:blur(40px);backdrop-filter:blur(40px);transition:background 0.15s,color 0.15s}
 .mf-btn-cancel:hover{background:rgba(255,255,255,0.24);color:var(--label)}
 
+
+/* ── DOCUMENT FORMS (Offerte / Rechnung / Auftrag) ──
+   Colors come from the theme variables (--label*, --sep, --card-*) that
+   applyBgTheme() flips per wallpaper, so these work on dark and light glass. */
+.df{display:flex;flex-direction:column;gap:16px;width:100%;max-width:880px;margin:0 auto}
+.df-card{background:var(--fill4);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--card-border);border-radius:16px;padding:18px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.28),0 8px 32px rgba(0,0,0,0.10)}
+.df-card-hdr{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:2px 10px;margin-bottom:14px}
+.df-title{white-space:nowrap;font-size:15px;font-weight:700;letter-spacing:-0.2px;color:var(--label)}
+.df-hint{font-size:12px;font-weight:500;color:var(--label3);text-align:right}
+.df-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 12px}
+.df-span2{grid-column:1/-1}
+.df-split{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.df .cf-label{text-shadow:none;margin-bottom:6px}
+.df .cf-input,.df .cf-select,.df .cf-textarea,.df-inp{border:1px solid rgba(255,255,255,0.18);border-radius:10px;padding:9px 11px}
+.df .cf-input:focus,.df .cf-select:focus,.df .cf-textarea:focus{border-color:var(--input-border-focus)}
+.df-vehicle{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;font-weight:600;color:var(--label2)}
+.df-vehicle .mf-chips{padding:0}
+
+.df-group-hdr{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--label2);margin-bottom:8px}
+.df-group-hdr:not(:first-child){margin-top:22px}
+.df-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.df-group-sum{margin-left:auto;font-size:13px;letter-spacing:-0.1px;text-transform:none;color:var(--label);font-variant-numeric:tabular-nums}
+.df-cols,.df-line{display:grid;gap:8px;align-items:center}
+.df-arbeit{grid-template-columns:minmax(0,1fr) 66px 30px 74px 104px 26px;grid-template-areas:"desc ze ki rate total del"}
+.df-material{grid-template-columns:minmax(0,1fr) 66px 96px 104px 26px;grid-template-areas:"desc qty price total del"}
+.df-bean{grid-template-columns:22px minmax(0,1fr) 26px}
+.df-cols{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--label3);padding-bottom:6px}
+.df-cols .r{text-align:right}
+.df-line{padding:6px 0;border-top:1px solid var(--sep)}
+.df-c-desc{grid-area:desc}.df-c-ze{grid-area:ze}.df-c-ki{grid-area:ki}.df-c-rate{grid-area:rate}.df-c-qty{grid-area:qty}.df-c-price{grid-area:price}.df-c-total{grid-area:total}.df-c-del{grid-area:del}
+.df-inp{background:var(--input-bg);color:var(--input-text);font-family:inherit;font-weight:500;letter-spacing:-0.2px;outline:none;width:100%;min-width:0;transition:border-color 0.15s,box-shadow 0.15s,background 0.15s}
+.df-inp:hover{border-color:rgba(255,255,255,0.34)}
+.df-inp:focus{background:var(--input-bg-focus);border-color:var(--input-border-focus);box-shadow:0 0 0 3px rgb(var(--accent-rgb) / 0.35)}
+.df-inp::placeholder{color:var(--input-placeholder)}
+.df-inp.num{text-align:right;font-variant-numeric:tabular-nums}
+.df-inp[type=number]::-webkit-inner-spin-button,.df-inp[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.df-inp[type=number]{-moz-appearance:textfield}
+.df-cell{display:block;min-width:0}
+.df-cell-lbl{display:none;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--label3);margin-bottom:4px}
+.df-total{font-size:14px;font-weight:700;letter-spacing:-0.2px;text-align:right;white-space:nowrap;color:var(--label);font-variant-numeric:tabular-nums}
+.df-idx{font-size:12px;font-weight:700;color:var(--label3);text-align:center}
+.df .mf-add-pos,.df .mf-add-bean{padding:7px 12px;font-size:13px;margin-top:10px}
+
+.df-sum-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;font-size:14px;font-weight:500;color:var(--label2)}
+.df-sum-row+.df-sum-row{border-top:1px solid var(--sep)}
+.df-sum-sub{font-size:12px;color:var(--label3);margin-left:6px}
+.df-sum-val{font-weight:600;color:var(--label);white-space:nowrap;font-variant-numeric:tabular-nums}
+.df-sum-row.total{font-size:16px;font-weight:700;color:var(--label);padding-top:12px}
+.df-sum-row.total .df-sum-val{font-size:20px;font-weight:800;letter-spacing:-0.4px;color:var(--blue)}
+
+.df-bar{position:sticky;bottom:0;z-index:5;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;margin-bottom:-8px;background:var(--card-bg);-webkit-backdrop-filter:blur(28px) saturate(180%);backdrop-filter:blur(28px) saturate(180%);border:1px solid var(--card-border);border-radius:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.30),0 -6px 28px rgba(0,0,0,0.16)}
+.df-bar-total{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.df-bar-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--label2)}
+.df-bar-val{font-size:20px;font-weight:800;letter-spacing:-0.4px;color:var(--label);white-space:nowrap;font-variant-numeric:tabular-nums}
+.df-bar-actions{display:flex;gap:8px;justify-content:flex-end}
+.df-bar .mf-btn-save,.df-bar .mf-btn-cancel{height:40px;font-size:14px;padding:0 18px;white-space:nowrap}
+.df-bar .mf-btn-cancel:disabled{opacity:0.5;cursor:default}
+
+@media(max-width:640px){
+  .df-card{padding:14px}
+  .df-split{grid-template-columns:minmax(0,1fr)}
+  .df-cols{display:none}
+  .df-cell-lbl{display:block}
+  .df-line{align-items:end;padding:10px 0}
+  .df-line.df-arbeit{grid-template-columns:minmax(0,1fr) 30px minmax(0,1fr) minmax(0,1.2fr) 26px;grid-template-areas:"desc desc desc desc del" "ze ki rate total total"}
+  .df-line.df-material{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr) 26px;grid-template-areas:"desc desc desc del" "qty price total total"}
+  .df-line.df-bean{align-items:center}
+  .df-c-ki,.df-c-total{padding-bottom:10px}
+  .df-c-del{align-self:center}
+}
+@media(max-width:480px){
+  .df-bar{gap:8px}
+  .df-bar-total{flex:none;width:100%;flex-direction:row;align-items:baseline;justify-content:space-between}
+  .df-bar-actions{width:100%}
+  .df-bar-actions>button{flex:1;padding:0 10px!important}
+}
+.df .cf-select{padding-right:30px}
