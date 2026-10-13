@@ -1,16 +1,19 @@
 import { ASSETS } from '../lib/supabase';
 import { hardReload } from '../lib/reload';
 import { SFCloud, SFMenu, SFRefresh } from './Icons';
-import type { SyncStatus } from '../types';
+import { ActiveOffertePill } from './offerten/ActiveOfferte';
+import type { Customer, Offerte, SyncStatus } from '../types';
 
 interface NavBarProps {
   syncStatus: SyncStatus;
   todosCount: number;
+  offerten: Offerte[];
+  customers: Customer[];
   onMenuToggle: () => void;
   onLogoClick: () => void;
 }
 
-export default function NavBar({ syncStatus, todosCount, onMenuToggle, onLogoClick }: NavBarProps) {
+export default function NavBar({ syncStatus, todosCount, offerten, customers, onMenuToggle, onLogoClick }: NavBarProps) {
   const cloudClass = [
     'cloud-idle',
     syncStatus === 'saving' && 'cloud-saving',
@@ -52,6 +55,7 @@ export default function NavBar({ syncStatus, todosCount, onMenuToggle, onLogoCli
 
         {/* Right side: sync indicator + todo badge */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
+          <ActiveOffertePill offerten={offerten} customers={customers} />
           <button
             onClick={hardReload}
             className="bar-btn"

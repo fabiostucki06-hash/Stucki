@@ -4,6 +4,7 @@ import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
 import { SFPlus, SFXmark } from '../Icons';
 import { PartLink } from '../ui/DocForm';
+import { ActiveOfferteBanner } from './ActiveOfferte';
 import { exportOffertePDF } from '../../lib/pdf-offerte';
 import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../lib/utils';
 import type { Customer, Offerte, OfferteStatus, Position, ArbeitPosition, MaterialPosition } from '../../types';
@@ -219,6 +220,8 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
       full
       barRight={<button onClick={() => onEdit(offerte)} className="bar-btn">Bearbeiten</button>}
     >
+      <ActiveOfferteBanner offerte={offerte} customer={customer} />
+
       <div className="glass-panel" style={{ padding: 16, marginBottom: 16 }}>
         <div style={{ fontSize: 13, color: 'var(--label2)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Status</div>
         <div style={{ fontSize: 24, fontWeight: 700, color: sc.c, letterSpacing: '0.34px' }}>{sc.l}</div>

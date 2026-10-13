@@ -28,6 +28,8 @@ import OrderDetail from './components/auftraege/OrderDetail';
 import OfferteList from './components/offerten/OfferteList';
 import OfferteForm from './components/offerten/OfferteForm';
 import OfferteDetail from './components/offerten/OfferteDetail';
+import { ActiveOfferteBanner } from './components/offerten/ActiveOfferte';
+import { isOpenOfferte } from './hooks/useActiveOfferte';
 import ImportPartSheet, { type ImportPayload } from './components/offerten/ImportPartSheet';
 import StatistikDashboard from './components/statistiken/StatistikDashboard';
 import SettingsView from './components/einstellungen/SettingsView';
@@ -175,7 +177,10 @@ export default function App() {
   }, []);
 
   // Opening or editing an Offerte makes it the active one (see getActiveOfferteId).
-  const openOfferteId = selOff?.id ?? editOff?.id;
+  // Looking at an accepted/rejected one leaves the current selection alone,
+  // since it can't take imported parts anyway.
+  const openOff = selOff ?? editOff;
+  const openOfferteId = openOff && isOpenOfferte(openOff) ? openOff.id : undefined;
   useEffect(() => { if (openOfferteId) setActiveOfferteId(openOfferteId); }, [openOfferteId]);
 
   // Once the data is loaded, a captured import goes straight into the active
@@ -188,7 +193,7 @@ export default function App() {
     importStarted.current = true;
     const { payload, offerteId, fromBookmarklet } = pendingImport;
     const wanted = offerteId || getActiveOfferteId();
-    const target = offerten.find((o) => o.id === wanted && (o.status === 'entwurf' || o.status === 'versendet'));
+    const target = offerten.find((o) => o.id === wanted && isOpenOfferte(o));
     const openSheet = (p: ImportPayload) => {
       setImportTargetId(target?.id);
       setImportPayload(p);
@@ -301,7 +306,9 @@ export default function App() {
 
   /* ── Offerte handlers ── */
   async function handleAddOfferte(data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>) {
-    await addOfferte(data); setShowNOff(false); setTab('offerten');
+    const created = await addOfferte(data);
+    setActiveOfferteId(created.id);
+    setShowNOff(false); setTab('offerten');
   }
   async function handleUpdateOfferte(upd: Offerte) {
     const saved = await updateOfferte(upd); setSelOff(saved);
@@ -316,6 +323,7 @@ export default function App() {
   }
   async function handleDeleteOfferte(id: string) {
     await deleteOfferte(id); setSelOff(null);
+    if (getActiveOfferteId() === id) setActiveOfferteId('');
   }
   async function handleDuplicateOfferte(offerte: Offerte) {
     const { id, offertNumber, status, createdAt, ...rest } = offerte;
@@ -427,7 +435,7 @@ export default function App() {
         )}
       </div>
 
-      <NavBar syncStatus={syncStatus} todosCount={todos.length} onMenuToggle={() => setSidebarOpen((p) => !p)} onLogoClick={() => setTab('dashboard')} />
+      <NavBar syncStatus={syncStatus} todosCount={todos.length} offerten={offerten} customers={customers} onMenuToggle={() => setSidebarOpen((p) => !p)} onLogoClick={() => setTab('dashboard')} />
 
       <Sidebar
         open={sidebarOpen}
@@ -440,7 +448,7 @@ export default function App() {
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 0 8px' }}>
         {tab === 'dashboard'   && <Dashboard customers={customers} orders={orders} onOrderClick={(o) => { setSelOInEdit(false); setSelO(o); }} />}
         {tab === 'auftraege'   && <OrderList orders={orders} customers={customers} onOrderClick={(o) => { setSelOInEdit(false); setSelO(o); }} onEditClick={(o) => { setSelOInEdit(true); setSelO(o); }} onNew={() => { setNewOCid(null); setShowNO(true); }} />}
-        {tab === 'offerten'    && <OfferteList offerten={offerten} customers={customers} onOfferteClick={setSelOff} onEdit={(off) => setEditOff(off)} onNew={() => setShowNOff(true)} onAddPart={handleAddImportedPartToOfferte} />}
+        {tab === 'offerten'    && <OfferteList offerten={offerten} customers={customers} onOfferteClick={setSelOff} onEdit={(off) => setEditOff(off)} onNew={() => setShowNOff(true)} />}
         {tab === 'rechnungen'  && <RechnungenList rechnungen={rechnungen} customers={customers} onRechnungClick={setSelR} onEdit={(r) => setEditR(r)} onNew={() => setShowNR(true)} />}
         {tab === 'kunden'      && <CustomerList customers={customers} orders={orders} onCustomerClick={setSelC} onNew={() => setShowNC(true)} />}
         {tab === 'statistiken'   && <StatistikDashboard orders={orders} offerten={offerten} rechnungen={rechnungen} customers={customers} />}
@@ -564,6 +572,7 @@ export default function App() {
       {editOff && (
         <Sheet title={`Offerte #${editOff.offertNumber} bearbeiten`} onClose={() => setEditOff(null)} full
           barRight={<button onClick={() => setEditOff(null)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
+          <ActiveOfferteBanner offerte={editOff} customer={customers.find((c) => c.id === editOff.customerId)} />
           <OfferteForm key={editOff.id} customers={customers} initial={editOff} onSave={handleSaveEditOfferte} onCancel={() => setEditOff(null)} />
         </Sheet>
       )}

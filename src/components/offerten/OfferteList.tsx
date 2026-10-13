@@ -1,8 +1,9 @@
 import { SFChevron } from '../Icons';
 import { exportOffertePDF } from '../../lib/pdf-offerte';
 import { formatDateCH } from '../../lib/utils';
-import QuickAddPart from './QuickAddPart';
-import type { Customer, MaterialPosition, Offerte, OfferteStatus } from '../../types';
+import { ActiveOfferteBadge } from './ActiveOfferte';
+import { useActiveOfferte } from '../../hooks/useActiveOfferte';
+import type { Customer, Offerte, OfferteStatus } from '../../types';
 
 interface OfferteListProps {
   offerten: Offerte[];
@@ -10,16 +11,13 @@ interface OfferteListProps {
   onOfferteClick: (o: Offerte) => void;
   onEdit: (o: Offerte) => void;
   onNew: () => void;
-  onAddPart: (offerteId: string, position: MaterialPosition) => Promise<void>;
 }
 
 const STATUS_LABELS: Record<OfferteStatus, string> = { entwurf: 'Entwurf', versendet: 'Versendet', angenommen: 'Angenommen', abgelehnt: 'Abgelehnt' };
 const STATUS_COLORS: Record<OfferteStatus, string> = { entwurf: 'var(--label2)', versendet: 'var(--orange)', angenommen: 'var(--green)', abgelehnt: 'var(--red)' };
 
-export default function OfferteList({ offerten, customers, onOfferteClick, onEdit, onNew, onAddPart }: OfferteListProps) {
-  const openOfferten = offerten
-    .filter((o) => o.status === 'entwurf' || o.status === 'versendet')
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+export default function OfferteList({ offerten, customers, onOfferteClick, onEdit, onNew }: OfferteListProps) {
+  const active = useActiveOfferte(offerten);
 
   const sortByName = (a: Offerte, b: Offerte) => {
     const ca = customers.find((x) => x.id === a.customerId);
@@ -35,8 +33,6 @@ export default function OfferteList({ offerten, customers, onOfferteClick, onEdi
         <h1 className="sf-title1" style={{ paddingTop: 8 }}>Offerten</h1>
         <button onClick={onNew} className="btn-tinted">+ Neue</button>
       </div>
-
-      <QuickAddPart offerten={openOfferten} customers={customers} onAdd={onAddPart} />
 
       {!offerten.length && (
         <div className="glass-panel" style={{ padding: 40, textAlign: 'center' }}>
@@ -55,9 +51,12 @@ export default function OfferteList({ offerten, customers, onOfferteClick, onEdi
               {grp.map((off) => {
                 const c = customers.find((x) => x.id === off.customerId);
                 return (
-                  <div key={off.id} className="list-row" onClick={() => onOfferteClick(off)}>
+                  <div key={off.id} className={`list-row${off.id === active?.id ? ' ao-active' : ''}`} onClick={() => onOfferteClick(off)}>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, fontSize: 16 }}>Offerte #{off.offertNumber}</div>
+                      <div style={{ fontWeight: 600, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        Offerte #{off.offertNumber}
+                        {off.id === active?.id && <ActiveOfferteBadge />}
+                      </div>
                       <div style={{ fontSize: 13, color: 'var(--label2)', marginTop: 1 }}>{c ? `${c.vorname} ${c.nachname}` : 'Kein Kunde'}</div>
                       {off.totalBetrag && <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--blue)', marginTop: 1 }}>CHF {off.totalBetrag}</div>}
                     </div>

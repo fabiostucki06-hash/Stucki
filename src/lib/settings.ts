@@ -7,14 +7,17 @@ const ACTIVE_OFFERTE_KEY = 'garage_active_offerte';
 export const getIban = (): string => localStorage.getItem(IBAN_KEY) ?? '';
 export const setIban = (iban: string): void => localStorage.setItem(IBAN_KEY, iban);
 
-/** Offerte being worked on: the one last opened, edited or picked in the
-    quick-add on the Offerten tab. Imported parts (bookmarklet / share sheet)
+/** Offerte being worked on: the one last opened, edited, created or picked
+    in the nav-bar pill. Imported parts (bookmarklet / share sheet)
     go straight into it. Kept in localStorage so the tab a bookmarklet opens
     sees it too. */
 export const getActiveOfferteId = (): string => localStorage.getItem(ACTIVE_OFFERTE_KEY) ?? '';
 const activeOfferteListeners = new Set<() => void>();
+/** Pass '' to deselect. */
 export const setActiveOfferteId = (id: string): void => {
-  localStorage.setItem(ACTIVE_OFFERTE_KEY, id);
+  if (id === getActiveOfferteId()) return;
+  if (id) localStorage.setItem(ACTIVE_OFFERTE_KEY, id);
+  else localStorage.removeItem(ACTIVE_OFFERTE_KEY);
   activeOfferteListeners.forEach((l) => l());
 };
 /** For `useSyncExternalStore`; also fires when another tab changes it. */
