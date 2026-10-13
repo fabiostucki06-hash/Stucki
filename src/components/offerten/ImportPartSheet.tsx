@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
 import { getMargin } from '../../lib/settings';
+import { cleanPartTitle } from '../../lib/partTitle';
 import type { Customer, MaterialPosition, Offerte, MaterialCatalogItem } from '../../types';
 
 export interface ImportPayload {
@@ -61,7 +62,7 @@ export default function ImportPartSheet({ payload, customers, offerten, onClose,
     // JS-rendered product page — more reliable than a server-side re-fetch (which
     // sees raw HTML and can hit anti-bot blocks), so use it directly.
     if (payload.title || payload.price) {
-      setBeschreibung(payload.title || '');
+      setBeschreibung(cleanPartTitle(payload.title || ''));
       setEk(payload.price || '');
       setArtikelnummer(payload.artikelnummer || '');
       if (payload.price) setStueckpreis(round2(parseFloat(payload.price) * (1 + margin / 100)));
@@ -79,7 +80,7 @@ export default function ImportPartSheet({ payload, customers, offerten, onClose,
         });
         const data: ParsedPart = await r.json();
         if (cancelled) return;
-        setBeschreibung(data.title || '');
+        setBeschreibung(cleanPartTitle(data.title || ''));
         setEk(data.ek || '');
         setArtikelnummer(data.artikelnummer || '');
         if (data.quelle) setQuelle(data.quelle);
