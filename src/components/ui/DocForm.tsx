@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from 'react';
 import Spinner from './Spinner';
 import { SFPlus, SFXmark } from '../Icons';
 import { parsePartLink } from '../../lib/utils';
+import { cleanPartTitle, partNameFromUrl } from '../../lib/partTitle';
+import { getMargin } from '../../lib/settings';
 import type { ArbeitPosition, MaterialPosition } from '../../types';
 
 /* Shared building blocks for the Offerte / Rechnung / Auftrag creation forms
@@ -124,6 +126,52 @@ export function PositionenEditor({
   // Indexes shift when a row is removed, so the manual open-state is dropped.
   const removeMaterial = (i: number) => { setOpenLinks(new Set()); onMaterialRemove(i); };
 
+  // Rows can be added or removed while a pasted link is still resolving, so the
+  // result is matched against the latest rows rather than the pasted-into index.
+  const materialRef = useRef(material);
+  materialRef.current = material;
+  const [resolving, setResolving] = useState<Set<string>>(new Set());
+
+  /** A shop link pasted into a material description becomes the row's link
+      instead of its name: the name is taken from the URL right away and then
+      replaced by the product title (plus EK + margin, if no price was entered)
+      via /api/import-part. Text already typed in the field is left alone. */
+  async function onMaterialPaste(e: ClipboardEvent<HTMLInputElement>, i: number) {
+    const raw = e.clipboardData.getData('text').trim();
+    const link = /^(https?:\/\/|www\.)\S+$/i.test(raw) ? parsePartLink(raw) : null;
+    if (!link) return;
+    e.preventDefault();
+
+    const el = e.currentTarget;
+    const rest = el.value.slice(0, el.selectionStart ?? 0) + el.value.slice(el.selectionEnd ?? el.value.length);
+    const placeholder = partNameFromUrl(link.href) ?? `Teil von ${link.host}`;
+    if (!rest.trim()) onMaterialChange(i, 'beschreibung', placeholder);
+    onMaterialChange(i, 'link', link.href);
+
+    setResolving((s) => new Set(s).add(link.href));
+    try {
+      const r = await fetch('/api/import-part', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: link.href }),
+      });
+      const data: { title?: string; ek?: string } = await r.json();
+      const row = materialRef.current.findIndex((m) => m.link === link.href);
+      if (row < 0) return;
+      const pos = materialRef.current[row];
+      if (data.title && pos.beschreibung === placeholder) onMaterialChange(row, 'beschreibung', cleanPartTitle(data.title));
+      const ek = parseFloat(data.ek ?? '');
+      if (Number.isFinite(ek) && ek > 0 && !(parseFloat(pos.stueckpreis) > 0)) {
+        onMaterialChange(row, 'stueckpreis', (ek * (1 + getMargin() / 100)).toFixed(2));
+      }
+    } catch (err) {
+      // Shop unreachable / blocked: the row keeps the name read from the URL.
+      console.warn('[DocForm] could not resolve link:', err);
+    } finally {
+      setResolving((s) => { const n = new Set(s); n.delete(link.href); return n; });
+    }
+  }
+
   const addArbeit   = () => { pendingFocus.current = 'arbeit';   onArbeitAdd(); };
   const addMaterial = () => { pendingFocus.current = 'material'; onMaterialAdd(); };
 
@@ -189,6 +237,7 @@ export function PositionenEditor({
           <input
             className="df-inp df-c-desc" data-df-desc="material"
             value={pos.beschreibung} onChange={(e) => onMaterialChange(i, 'beschreibung', e.target.value)}
+            onPaste={(e) => onMaterialPaste(e, i)}
             placeholder="Ersatzteil / Material…" aria-label="Beschreibung Material"
           />
           <label className="df-cell df-c-qty">
@@ -212,9 +261,11 @@ export function PositionenEditor({
             onClick={() => toggleLink(i)} title="Autodoc-Link" aria-label="Autodoc-Link"
             aria-expanded={openLinks.has(i) || !!pos.link}
           >
-            <svg width={14} height={14} viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path d="M6.5 9.5a3 3 0 004.2 0l2.3-2.3a3 3 0 00-4.2-4.2l-.8.8M9.5 6.5a3 3 0 00-4.2 0L3 8.8a3 3 0 004.2 4.2l.8-.8" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-            </svg>
+            {pos.link && resolving.has(pos.link) ? <Spinner size={10} /> : (
+              <svg width={14} height={14} viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M6.5 9.5a3 3 0 004.2 0l2.3-2.3a3 3 0 00-4.2-4.2l-.8.8M9.5 6.5a3 3 0 00-4.2 0L3 8.8a3 3 0 004.2 4.2l.8-.8" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+              </svg>
+            )}
           </button>
           {material.length > 1
             ? <button type="button" className="mf-pos-del df-c-del" onClick={() => removeMaterial(i)} aria-label="Position entfernen"><SFXmark /></button>

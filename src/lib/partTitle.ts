@@ -53,6 +53,34 @@ const MATERIAL_WORDS = new Set(['aluminium', 'alu', 'stahl', 'stahlblech', 'edel
 
 const words = (s: string) => s.toLowerCase().split(/\s+/).filter(Boolean);
 
+const BRAND_SLUGS = new Set(BRANDS.map((b) => b.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-')));
+const GENERIC_SLUGS = new Set(['autoteile', 'ersatzteile', 'ersatzteil', 'teile', 'part', 'parts', 'product', 'produkt', 'artikel', 'p', 'shop']);
+
+/** Rough part name from a shop URL's path, for when the page itself can't be
+    read: "autodoc.ch/autoteile/bremsscheibe-10132" -> "Bremsscheibe". Null when
+    the path only holds a brand and an article id ("/ridex/8095160"). */
+export function partNameFromUrl(href: string): string | null {
+  let segments: string[];
+  try {
+    segments = new URL(href).pathname.split('/').filter(Boolean);
+  } catch {
+    return null;
+  }
+  for (const raw of segments) {
+    let seg = raw;
+    try { seg = decodeURIComponent(raw); } catch { /* keep the raw segment */ }
+    // Trailing article id / SKU: "bremsscheibe-10132", "querlenker-vorne-273c0325".
+    const tokens = seg.toLowerCase().replace(/\.html?$/, '').split(/[-_]+/).filter(Boolean);
+    while (tokens.length > 1 && (/^\d+$/.test(tokens[tokens.length - 1]) || isSku(tokens[tokens.length - 1]))) tokens.pop();
+    seg = tokens.join('-');
+    // Skips locale prefixes ("de", "de-ch"), brands, shop sections and bare ids.
+    if (/^[a-z]{2}(-[a-z]{2})?$/.test(seg) || BRAND_SLUGS.has(seg) || GENERIC_SLUGS.has(seg) || !/\p{L}{3,}/u.test(seg) || isSku(seg)) continue;
+    const name = tokens.join(' ');
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  }
+  return null;
+}
+
 export function cleanPartTitle(raw: string): string {
   let t = raw.replace(/\s+/g, ' ').trim();
   for (const re of SEO_RES) t = t.replace(re, ' ');
