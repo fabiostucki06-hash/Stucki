@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from 'react';
 import Spinner from './Spinner';
+import { showToast } from './Toast';
 import { SFPlus, SFXmark } from '../Icons';
-import { parsePartLink } from '../../lib/utils';
+import { findPartLink, parsePartLink } from '../../lib/utils';
 import { cleanPartTitle, partNameFromUrl } from '../../lib/partTitle';
 import { getMargin } from '../../lib/settings';
 import type { ArbeitPosition, MaterialPosition } from '../../types';
@@ -115,60 +116,74 @@ export function PositionenEditor({
     pendingFocus.current = null;
   }, [arbeit.length, material.length]);
 
-  // Rows whose link field was opened by hand; a row that already has a link
-  // always shows it.
-  const [openLinks, setOpenLinks] = useState<Set<number>>(new Set());
-  const toggleLink = (i: number) => setOpenLinks((s) => {
-    const n = new Set(s);
-    if (n.has(i)) n.delete(i); else n.add(i);
-    return n;
-  });
-  // Indexes shift when a row is removed, so the manual open-state is dropped.
-  const removeMaterial = (i: number) => { setOpenLinks(new Set()); onMaterialRemove(i); };
-
-  // Rows can be added or removed while a pasted link is still resolving, so the
-  // result is matched against the latest rows rather than the pasted-into index.
+  // Rows can be added or removed while a link is still resolving, so the
+  // result is matched against the latest rows rather than the original index.
   const materialRef = useRef(material);
   materialRef.current = material;
   const [resolving, setResolving] = useState<Set<string>>(new Set());
 
-  /** A shop link pasted into a material description becomes the row's link
-      instead of its name: the name is taken from the URL right away and then
-      replaced by the product title (plus EK + margin, if no price was entered)
-      via /api/import-part. Text already typed in the field is left alone. */
-  async function onMaterialPaste(e: ClipboardEvent<HTMLInputElement>, i: number) {
-    const raw = e.clipboardData.getData('text').trim();
-    const link = /^(https?:\/\/|www\.)\S+$/i.test(raw) ? parsePartLink(raw) : null;
-    if (!link) return;
-    e.preventDefault();
+  const vkFromEk = (ek: number) => (ek * (1 + getMargin() / 100)).toFixed(2);
 
-    const el = e.currentTarget;
-    const rest = el.value.slice(0, el.selectionStart ?? 0) + el.value.slice(el.selectionEnd ?? el.value.length);
+  /** A shop link in a material description is resolved in place: the row is
+      named from the URL right away and then gets the product title, the VK
+      (EK + margin) and EK / article number via /api/import-part. Text entered
+      next to the link stays as the description. Returns false for ordinary text. */
+  function resolveMaterialLink(i: number, text: string): boolean {
+    const link = findPartLink(text);
+    if (!link) return false;
+
+    const prev = materialRef.current[i];
     const placeholder = partNameFromUrl(link.href) ?? `Teil von ${link.host}`;
-    if (!rest.trim()) onMaterialChange(i, 'beschreibung', placeholder);
+    onMaterialChange(i, 'beschreibung', link.rest || placeholder);
     onMaterialChange(i, 'link', link.href);
+    // A price that still is the previous link's untouched VK belongs to that part.
+    const prevEk = parseFloat(prev.ek ?? '');
+    if (prev.link !== link.href && prevEk > 0 && prev.stueckpreis === vkFromEk(prevEk)) onMaterialChange(i, 'stueckpreis', '');
 
     setResolving((s) => new Set(s).add(link.href));
-    try {
-      const r = await fetch('/api/import-part', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: link.href }),
-      });
-      const data: { title?: string; ek?: string } = await r.json();
-      const row = materialRef.current.findIndex((m) => m.link === link.href);
-      if (row < 0) return;
-      const pos = materialRef.current[row];
-      if (data.title && pos.beschreibung === placeholder) onMaterialChange(row, 'beschreibung', cleanPartTitle(data.title));
-      const ek = parseFloat(data.ek ?? '');
-      if (Number.isFinite(ek) && ek > 0 && !(parseFloat(pos.stueckpreis) > 0)) {
-        onMaterialChange(row, 'stueckpreis', (ek * (1 + getMargin() / 100)).toFixed(2));
+    (async () => {
+      try {
+        const r = await fetch('/api/import-part', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: link.href }),
+        });
+        const data: { title?: string; ek?: string; artikelnummer?: string } = await r.json();
+        const row = materialRef.current.findIndex((m) => m.link === link.href);
+        if (row < 0) return;
+        const pos = materialRef.current[row];
+        if (data.title && pos.beschreibung === placeholder) onMaterialChange(row, 'beschreibung', cleanPartTitle(data.title));
+        onMaterialChange(row, 'ek', data.ek ?? '');
+        onMaterialChange(row, 'artikelnummer', data.artikelnummer ?? '');
+        const ek = parseFloat(data.ek ?? '');
+        const hasEk = Number.isFinite(ek) && ek > 0;
+        if (hasEk && !(parseFloat(pos.stueckpreis) > 0)) onMaterialChange(row, 'stueckpreis', vkFromEk(ek));
+        if (!data.title || !hasEk) showToast('Link nicht vollständig erkannt – bitte Bezeichnung und Preis prüfen', 'info');
+      } catch (err) {
+        // Shop unreachable / blocked: the row keeps the name read from the URL.
+        console.warn('[DocForm] could not resolve link:', err);
+        showToast('Link konnte nicht geladen werden – bitte Bezeichnung und Preis prüfen', 'info');
+      } finally {
+        setResolving((s) => { const n = new Set(s); n.delete(link.href); return n; });
       }
-    } catch (err) {
-      // Shop unreachable / blocked: the row keeps the name read from the URL.
-      console.warn('[DocForm] could not resolve link:', err);
-    } finally {
-      setResolving((s) => { const n = new Set(s); n.delete(link.href); return n; });
+    })();
+    return true;
+  }
+
+  function onMaterialPaste(e: ClipboardEvent<HTMLInputElement>, i: number) {
+    const el = e.currentTarget;
+    const start = el.selectionStart ?? el.value.length;
+    const text = el.value.slice(0, start) + e.clipboardData.getData('text') + el.value.slice(el.selectionEnd ?? start);
+    if (resolveMaterialLink(i, text)) e.preventDefault();
+  }
+
+  function onMaterialDescChange(i: number, value: string) {
+    onMaterialChange(i, 'beschreibung', value);
+    // An emptied row starts over, so the next part doesn't inherit this one's link.
+    if (!value.trim() && materialRef.current[i]?.link) {
+      onMaterialChange(i, 'link', '');
+      onMaterialChange(i, 'ek', '');
+      onMaterialChange(i, 'artikelnummer', '');
     }
   }
 
@@ -230,16 +245,23 @@ export function PositionenEditor({
         <span className="df-group-sum">{fCHF(sum(material))}</span>
       </div>
       <div className="df-cols df-material">
-        <span>Beschreibung</span><span className="r">Menge</span><span className="r">Stk. CHF</span><span className="r">Total</span><span /><span />
+        <span>Beschreibung</span><span className="r">Menge</span><span className="r">Stk. CHF</span><span className="r">Total</span><span />
       </div>
-      {material.map((pos, i) => (
+      {material.map((pos, i) => {
+        const busy = !!pos.link && resolving.has(pos.link);
+        return (
         <div key={i} className="df-line df-material" onKeyDown={(e) => onEnterNextRow(e, i === material.length - 1, addMaterial)}>
-          <input
-            className="df-inp df-c-desc" data-df-desc="material"
-            value={pos.beschreibung} onChange={(e) => onMaterialChange(i, 'beschreibung', e.target.value)}
-            onPaste={(e) => onMaterialPaste(e, i)}
-            placeholder="Ersatzteil / Material…" aria-label="Beschreibung Material"
-          />
+          <div className="df-c-desc df-desc" aria-busy={busy}>
+            <input
+              className="df-inp" data-df-desc="material"
+              value={pos.beschreibung} onChange={(e) => onMaterialDescChange(i, e.target.value)}
+              onPaste={(e) => onMaterialPaste(e, i)}
+              // Links that were typed, dropped or autofilled rather than pasted.
+              onBlur={(e) => resolveMaterialLink(i, e.target.value)}
+              placeholder="Ersatzteil / Material…" aria-label="Beschreibung Material"
+            />
+            {busy && <span className="df-desc-busy" role="status" aria-label="Link wird geladen"><Spinner size={12} /></span>}
+          </div>
           <label className="df-cell df-c-qty">
             <span className="df-cell-lbl">Menge</span>
             <input
@@ -256,32 +278,12 @@ export function PositionenEditor({
             />
           </label>
           <span className="df-total df-c-total">{pos.preis ? fCHF(parseFloat(pos.preis)) : '—'}</span>
-          <button
-            type="button" className={`mf-pos-ki df-c-lnk${pos.link ? ' df-lnk-active' : ''}`}
-            onClick={() => toggleLink(i)} title="Autodoc-Link" aria-label="Autodoc-Link"
-            aria-expanded={openLinks.has(i) || !!pos.link}
-          >
-            {pos.link && resolving.has(pos.link) ? <Spinner size={10} /> : (
-              <svg width={14} height={14} viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M6.5 9.5a3 3 0 004.2 0l2.3-2.3a3 3 0 00-4.2-4.2l-.8.8M9.5 6.5a3 3 0 00-4.2 0L3 8.8a3 3 0 004.2 4.2l.8-.8" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
-              </svg>
-            )}
-          </button>
           {material.length > 1
-            ? <button type="button" className="mf-pos-del df-c-del" onClick={() => removeMaterial(i)} aria-label="Position entfernen"><SFXmark /></button>
+            ? <button type="button" className="mf-pos-del df-c-del" onClick={() => onMaterialRemove(i)} aria-label="Position entfernen"><SFXmark /></button>
             : <span className="df-c-del" />}
-          {(openLinks.has(i) || !!pos.link) && (
-            <div className="df-c-link">
-              <input
-                className="df-inp" type="url" inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false}
-                value={pos.link ?? ''} onChange={(e) => onMaterialChange(i, 'link', e.target.value)}
-                placeholder="Autodoc-Link (optional) – https://www.autodoc.ch/…" aria-label="Autodoc-Link"
-              />
-              <PartLink url={pos.link} />
-            </div>
-          )}
         </div>
-      ))}
+        );
+      })}
       <button type="button" className="mf-add-pos green" onClick={addMaterial}><SFPlus size={12} /> Material</button>
     </div>
   );
