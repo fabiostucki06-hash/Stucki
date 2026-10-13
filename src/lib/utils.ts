@@ -35,13 +35,13 @@ export function parsePartLink(raw?: string): { href: string; host: string } | nu
   }
 }
 
-// A bare domain only counts as a link with a TLD shops actually use, so
-// "inkl.MwSt" or "M12x1.5" stay plain text.
-const LINK_TOKEN_RE = /^(?:https?:\/\/|www\.)\S+$|^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:ch|de|at|li|fr|it|com|net|org|eu|shop)(?:[/?#]\S*)?$/i;
+// Only a complete URL counts as a link: with scheme, or "www." plus a path.
+// A bare domain ("auto-doc.ch", "Teil von auto-doc.ch") stays plain text.
+const LINK_TOKEN_RE = /^https?:\/\/\S+$|^www\.[^\s/]+\.[a-z]{2,}\/\S+$/i;
 
-/** Finds a shop link in a material description — typed or pasted, with or
-    without scheme ("https://www.autodoc.ch/…", "atp-autoteile.de/…"). `rest`
-    is the text around it. Null when the text is an ordinary description. */
+/** Finds a shop link in a material description ("https://www.autodoc.ch/…",
+    "www.autodoc.ch/de/…"). `rest` is the text around it. Null when the text
+    is an ordinary description. */
 export function findPartLink(text: string): { href: string; host: string; rest: string } | null {
   const tokens = text.trim().split(/\s+/);
   for (let i = 0; i < tokens.length; i++) {

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from 'react';
 import Spinner from './Spinner';
-import { showToast } from './Toast';
 import { SFPlus, SFXmark } from '../Icons';
 import { findPartLink, parsePartLink } from '../../lib/utils';
 import { cleanPartTitle, partNameFromUrl } from '../../lib/partTitle';
@@ -158,11 +157,9 @@ export function PositionenEditor({
         const ek = parseFloat(data.ek ?? '');
         const hasEk = Number.isFinite(ek) && ek > 0;
         if (hasEk && !(parseFloat(pos.stueckpreis) > 0)) onMaterialChange(row, 'stueckpreis', vkFromEk(ek));
-        if (!data.title || !hasEk) showToast('Link nicht vollständig erkannt – bitte Bezeichnung und Preis prüfen', 'info');
       } catch (err) {
-        // Shop unreachable / blocked: the row keeps the name read from the URL.
+        // Shop unreachable / blocked: the row silently keeps the name read from the URL.
         console.warn('[DocForm] could not resolve link:', err);
-        showToast('Link konnte nicht geladen werden – bitte Bezeichnung und Preis prüfen', 'info');
       } finally {
         setResolving((s) => { const n = new Set(s); n.delete(link.href); return n; });
       }
@@ -256,7 +253,8 @@ export function PositionenEditor({
               className="df-inp" data-df-desc="material"
               value={pos.beschreibung} onChange={(e) => onMaterialDescChange(i, e.target.value)}
               onPaste={(e) => onMaterialPaste(e, i)}
-              // Links that were typed, dropped or autofilled rather than pasted.
+              // Full URLs that were typed, dropped or autofilled rather than pasted
+              // (Enter moves focus to the next row, so it lands here too).
               onBlur={(e) => resolveMaterialLink(i, e.target.value)}
               placeholder="Ersatzteil / Material…" aria-label="Beschreibung Material"
             />
