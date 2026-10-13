@@ -3,6 +3,7 @@ import Sheet from '../ui/Sheet';
 import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
 import { SFPlus, SFXmark } from '../Icons';
+import { PartLink } from '../ui/DocForm';
 import { exportRechnungPDF } from '../../lib/pdf-rechnung';
 import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../lib/rechnung-totals';
 import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../lib/utils';
@@ -301,7 +302,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
                 {pos.beschreibung}
               </div>
               <div style={{ fontSize: 10, color: 'var(--label3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>
-                {pos.typ === 'arbeit' ? 'Arbeit' : 'Material'}
+                {pos.typ === 'arbeit' ? 'Arbeit' : <>Material <PartLink url={pos.link} /></>}
               </div>
             </div>
 

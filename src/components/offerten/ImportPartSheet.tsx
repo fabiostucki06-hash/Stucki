@@ -134,7 +134,7 @@ export default function ImportPartSheet({ payload, customers, offerten, onClose,
     const sp = parseFloat(stueckpreis) || 0;
     const mg = parseFloat(menge) || 1;
     if (!beschreibung.trim() || !sp) return null;
-    return { typ: 'material', beschreibung: beschreibung.trim(), menge: String(mg), stueckpreis: stueckpreis, preis: (sp * mg).toFixed(2) };
+    return { typ: 'material', beschreibung: beschreibung.trim(), menge: String(mg), stueckpreis: stueckpreis, preis: (sp * mg).toFixed(2), link: quelle || undefined };
   }
 
   async function handleAddToOfferte() {

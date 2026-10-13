@@ -3,6 +3,7 @@ import Sheet from '../ui/Sheet';
 import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
 import { SFPlus, SFXmark } from '../Icons';
+import { PartLink } from '../ui/DocForm';
 import { exportOffertePDF } from '../../lib/pdf-offerte';
 import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../lib/utils';
 import type { Customer, Offerte, OfferteStatus, Position, ArbeitPosition, MaterialPosition } from '../../types';
@@ -323,7 +324,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="sf-subhead" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pos.beschreibung}</div>
                   <div style={{ fontSize: 11, color: 'var(--label3)', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    {pos.typ === 'arbeit' ? 'Arbeit' : 'Material'}
+                    {pos.typ === 'arbeit' ? 'Arbeit' : <>Material <PartLink url={pos.link} /></>}
                   </div>
                 </div>
 

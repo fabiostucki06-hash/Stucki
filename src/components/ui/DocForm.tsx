@@ -1,6 +1,7 @@
-import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import Spinner from './Spinner';
 import { SFPlus, SFXmark } from '../Icons';
+import { parsePartLink } from '../../lib/utils';
 import type { ArbeitPosition, MaterialPosition } from '../../types';
 
 /* Shared building blocks for the Offerte / Rechnung / Auftrag creation forms
@@ -41,6 +42,19 @@ export function SummaryRow({ label, sub, value, total }: { label: ReactNode; sub
       <span>{label}{sub && <span className="df-sum-sub">{sub}</span>}</span>
       <span className="df-sum-val">{value}</span>
     </div>
+  );
+}
+
+/** Clickable shop link of a material position ("autodoc.ch ↗"). Internal
+    reference, so it's excluded from print. Renders nothing for an empty or
+    unusable URL. */
+export function PartLink({ url }: { url?: string }) {
+  const link = parsePartLink(url);
+  if (!link) return null;
+  return (
+    <a className="df-link no-print" href={link.href} target="_blank" rel="noopener noreferrer" title={link.href}>
+      {link.host} ↗
+    </a>
   );
 }
 
@@ -98,6 +112,17 @@ export function PositionenEditor({
     inputs?.[inputs.length - 1]?.focus();
     pendingFocus.current = null;
   }, [arbeit.length, material.length]);
+
+  // Rows whose link field was opened by hand; a row that already has a link
+  // always shows it.
+  const [openLinks, setOpenLinks] = useState<Set<number>>(new Set());
+  const toggleLink = (i: number) => setOpenLinks((s) => {
+    const n = new Set(s);
+    if (n.has(i)) n.delete(i); else n.add(i);
+    return n;
+  });
+  // Indexes shift when a row is removed, so the manual open-state is dropped.
+  const removeMaterial = (i: number) => { setOpenLinks(new Set()); onMaterialRemove(i); };
 
   const addArbeit   = () => { pendingFocus.current = 'arbeit';   onArbeitAdd(); };
   const addMaterial = () => { pendingFocus.current = 'material'; onMaterialAdd(); };
@@ -157,7 +182,7 @@ export function PositionenEditor({
         <span className="df-group-sum">{fCHF(sum(material))}</span>
       </div>
       <div className="df-cols df-material">
-        <span>Beschreibung</span><span className="r">Menge</span><span className="r">Stk. CHF</span><span className="r">Total</span><span />
+        <span>Beschreibung</span><span className="r">Menge</span><span className="r">Stk. CHF</span><span className="r">Total</span><span /><span />
       </div>
       {material.map((pos, i) => (
         <div key={i} className="df-line df-material" onKeyDown={(e) => onEnterNextRow(e, i === material.length - 1, addMaterial)}>
@@ -182,9 +207,28 @@ export function PositionenEditor({
             />
           </label>
           <span className="df-total df-c-total">{pos.preis ? fCHF(parseFloat(pos.preis)) : '—'}</span>
+          <button
+            type="button" className={`mf-pos-ki df-c-lnk${pos.link ? ' df-lnk-active' : ''}`}
+            onClick={() => toggleLink(i)} title="Autodoc-Link" aria-label="Autodoc-Link"
+            aria-expanded={openLinks.has(i) || !!pos.link}
+          >
+            <svg width={14} height={14} viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M6.5 9.5a3 3 0 004.2 0l2.3-2.3a3 3 0 00-4.2-4.2l-.8.8M9.5 6.5a3 3 0 00-4.2 0L3 8.8a3 3 0 004.2 4.2l.8-.8" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+            </svg>
+          </button>
           {material.length > 1
-            ? <button type="button" className="mf-pos-del df-c-del" onClick={() => onMaterialRemove(i)} aria-label="Position entfernen"><SFXmark /></button>
+            ? <button type="button" className="mf-pos-del df-c-del" onClick={() => removeMaterial(i)} aria-label="Position entfernen"><SFXmark /></button>
             : <span className="df-c-del" />}
+          {(openLinks.has(i) || !!pos.link) && (
+            <div className="df-c-link">
+              <input
+                className="df-inp" type="url" inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false}
+                value={pos.link ?? ''} onChange={(e) => onMaterialChange(i, 'link', e.target.value)}
+                placeholder="Autodoc-Link (optional) – https://www.autodoc.ch/…" aria-label="Autodoc-Link"
+              />
+              <PartLink url={pos.link} />
+            </div>
+          )}
         </div>
       ))}
       <button type="button" className="mf-add-pos green" onClick={addMaterial}><SFPlus size={12} /> Material</button>

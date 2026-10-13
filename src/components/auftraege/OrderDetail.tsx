@@ -3,6 +3,7 @@ import Sheet from '../ui/Sheet';
 import Badge from '../ui/Badge';
 import Spinner from '../ui/Spinner';
 import { SFPlus, SFXmark } from '../Icons';
+import { PartLink } from '../ui/DocForm';
 import { isOverdue, daysSince, hoursSince, formatDateCH } from '../../lib/utils';
 import { SC, SO } from '../../constants/statuses';
 import { exportOrderPDF } from '../../lib/pdf-auftrag';
@@ -164,6 +165,7 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
                         ? `Arbeit${ap.ze ? ` · ${ap.ze} ZE` : ''}${ap.stundenansatz ? ` · CHF ${ap.stundenansatz}/Std` : ''}`
                         : `Material${mp?.menge ? ` · ${mp.menge}×` : ''}${mp?.stueckpreis ? ` · CHF ${mp.stueckpreis}/Stk` : ''}`
                       }
+                      {mp && <> <PartLink url={mp.link} /></>}
                     </div>
                   </div>
                   <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--label)', flexShrink: 0 }}>

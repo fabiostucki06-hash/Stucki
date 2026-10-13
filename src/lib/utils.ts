@@ -19,6 +19,22 @@ export function printWithFilename(filename: string): void {
   window.print();
 }
 
+/** Validates a user-entered shop link for use as an href: http(s) only (so a
+    pasted "javascript:…" can never become clickable), scheme added if missing.
+    Returns the short host for display, or null when it isn't a usable URL. */
+export function parsePartLink(raw?: string): { href: string; host: string } | null {
+  const v = raw?.trim();
+  if (!v) return null;
+  try {
+    const u = new URL(/^[a-z][a-z0-9+.-]*:/i.test(v) ? v : `https://${v}`);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    if (!u.hostname.includes('.')) return null;
+    return { href: u.toString(), host: u.hostname.replace(/^www\./, '') };
+  } catch {
+    return null;
+  }
+}
+
 export const daysSince = (d?: string): number =>
   d ? Math.floor((Date.now() - new Date(d).getTime()) / 86_400_000) : 0;
 

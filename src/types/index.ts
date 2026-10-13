@@ -71,6 +71,8 @@ export interface MaterialPosition {
   menge: string;
   stueckpreis: string;
   preis: string;
+  /** Shop page the part was sourced from (e.g. Autodoc). Internal reference only — never printed on customer documents. */
+  link?: string;
 }
 
 export type Position = ArbeitPosition | MaterialPosition;
