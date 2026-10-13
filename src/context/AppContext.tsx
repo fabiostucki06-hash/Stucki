@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
-import { auth, db, setAuthHandlers } from '../lib/supabase';
+import { auth, db, setAuthHandlers, tokenUserId } from '../lib/supabase';
+import { startSettingsSync, whenSettingsLoaded } from '../lib/settingsSync';
 import { showToast } from '../components/ui/Toast';
 import type { Customer, Order, Offerte, Rechnung, MaterialCatalogItem, SyncStatus } from '../types';
 
@@ -98,6 +99,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  /* Settings (background, active Offerte, …) live in the user's database row
+     and follow them across devices. Keyed on the user id, not the token, so an
+     hourly token refresh doesn't tear the realtime connection down. Declared
+     before the data load below, which waits for the first settings read. */
+  const userId = token ? tokenUserId(token) : null;
+  useEffect(() => {
+    if (!userId || !authChecked) return;
+    return startSettingsSync(userId);
+  }, [userId, authChecked]);
+
   /* Load on open/login, then silently revalidate whenever the tab regains
      focus or becomes visible again (throttled), so data edited on another
      device shows up without a manual reload. */
@@ -140,7 +151,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     (async () => {
-      try { await sync(); } catch (e) { console.error(e); }
+      try { await Promise.all([sync(), whenSettingsLoaded()]); } catch (e) { console.error(e); }
       if (!cancelled) setLoading(false);
     })();
 

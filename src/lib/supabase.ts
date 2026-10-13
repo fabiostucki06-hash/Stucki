@@ -1,6 +1,6 @@
 export const SUPA_URL = 'https://xpggpkmqwescbcrnnpod.supabase.co';
 
-const SUPA_KEY =
+export const SUPA_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhwZ2dwa21xd2VzY2Jjcm5ucG9kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NjIxMjIsImV4cCI6MjA5NjEzODEyMn0.egPJ4OYOegRKIBV6PHUz_VfRib8g7sVIcNNy_7bFxjg';
 
 export const ASSETS = {
@@ -78,6 +78,17 @@ function isExpiringSoon(token: string, marginSec = 30): boolean {
   return Date.now() / 1000 >= exp - marginSec;
 }
 
+/** The signed-in user's id (the JWT's `sub`), or null for a malformed token. */
+export function tokenUserId(token: string): string | null {
+  try {
+    const payload = token.split('.')[1];
+    const sub = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))).sub;
+    return typeof sub === 'string' ? sub : null;
+  } catch {
+    return null;
+  }
+}
+
 let refreshing: Promise<string | null> | null = null;
 
 async function doRefresh(): Promise<string | null> {
@@ -102,6 +113,14 @@ async function doRefresh(): Promise<string | null> {
     })();
   }
   return refreshing;
+}
+
+/** The stored access token, refreshed first if it is about to expire. For
+    long-lived consumers (the realtime socket) that outlive a single token. */
+export async function getFreshToken(): Promise<string | null> {
+  const token = localStorage.getItem('garage_token');
+  if (!token || !isExpiringSoon(token, 60)) return token;
+  return (await doRefresh()) ?? token;
 }
 
 function isJwtExpiredBody(body: unknown): boolean {

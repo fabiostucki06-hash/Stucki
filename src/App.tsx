@@ -4,7 +4,8 @@ import { showToast } from './components/ui/Toast';
 import { ASSETS } from './lib/supabase';
 import { needsAttention, decodeMaybeDouble } from './lib/utils';
 import { sampleImageColor, applyBgTheme, hexToRgb, type WallpaperThemeId } from './lib/theme';
-import { getBgMode, setBgMode as persistBgMode, getBgColor, setBgColor as persistBgColor, getActiveOfferteId, setActiveOfferteId, getMargin, type BgMode } from './lib/settings';
+import { updateSettings, getActiveOfferteId, setActiveOfferteId, getMargin } from './lib/settings';
+import { useSettings } from './hooks/useSettings';
 import { cleanPartTitle } from './lib/partTitle';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { hardReload } from './lib/reload';
@@ -56,12 +57,9 @@ export default function App() {
   const [tab, setTab] = useState<TabId>('dashboard');
   const [fabOpen, setFabOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [wallpaper, setWallpaper] = useState<string>(
-    () => localStorage.getItem('garage_wallpaper') || ASSETS.wallpaper
-  );
+  // Synced per user: a change on another device re-renders the background here.
+  const { wallpaper, bgMode, bgColor } = useSettings();
   const [bgSrc, setBgSrc] = useState(wallpaper);
-  const [bgMode, setBgMode] = useState<BgMode>(() => getBgMode());
-  const [bgColor, setBgColor] = useState<string>(() => getBgColor());
   const prevBlobRef = useRef<string>('');
 
   useEffect(() => {
@@ -96,17 +94,11 @@ export default function App() {
   }, [bgMode, bgColor]);
 
   function handleWallpaperChange(url: string) {
-    setWallpaper(url);
-    localStorage.setItem('garage_wallpaper', url);
-    setBgMode('image');
-    persistBgMode('image');
+    updateSettings({ wallpaper: url, bgMode: 'image' });
   }
 
   function handleBgColorChange(hex: string) {
-    setBgColor(hex);
-    persistBgColor(hex);
-    setBgMode('color');
-    persistBgMode('color');
+    updateSettings({ bgColor: hex, bgMode: 'color' });
   }
 
   const [showNC,   setShowNC]   = useState(false);

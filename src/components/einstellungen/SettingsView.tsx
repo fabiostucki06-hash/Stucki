@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ASSETS } from '../../lib/supabase';
-import { getIban, setIban, getMargin, setMargin, type BgMode } from '../../lib/settings';
+import { setIban, setMargin, type BgMode } from '../../lib/settings';
+import { useSettings } from '../../hooks/useSettings';
 import { buildImportBookmarklet } from '../../lib/bookmarklet';
 import { SFCheckmark } from '../Icons';
 
@@ -32,8 +33,7 @@ interface SettingsViewProps {
 
 export default function SettingsView({ currentWallpaper, onWallpaperChange, bgMode, bgColor, onBgColorChange }: SettingsViewProps) {
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
-  const [iban, setIbanValue] = useState<string>(() => getIban());
-  const [margin, setMarginValue] = useState<number>(() => getMargin());
+  const { iban, margin } = useSettings();
   const [bgTab, setBgTab] = useState<'bilder' | 'unifarben'>(bgMode === 'color' ? 'unifarben' : 'bilder');
   const bookmarklet = buildImportBookmarklet(window.location.origin);
   // Separate draft buffer: the hex text field must let the user type freely
@@ -54,14 +54,12 @@ export default function SettingsView({ currentWallpaper, onWallpaperChange, bgMo
   }, [bgMode, bgColor]);
 
   function handleIbanChange(v: string) {
-    setIbanValue(v);
     setIban(v);
   }
 
   function handleMarginChange(v: string) {
     const n = parseFloat(v);
     const pct = Number.isFinite(n) ? n : 0;
-    setMarginValue(pct);
     setMargin(pct);
   }
 
