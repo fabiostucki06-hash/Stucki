@@ -521,6 +521,12 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .df-idx{font-size:12px;font-weight:700;color:var(--label3);text-align:center}
 .df .mf-add-pos,.df .mf-add-bean{padding:7px 12px;font-size:13px;margin-top:10px}
 
+.qa{margin-bottom:8px}
+.qa-row{display:grid;grid-template-columns:minmax(0,1fr) 130px auto;gap:8px;align-items:center}
+.qa .mf-btn-save{height:42px;padding:0 18px;font-size:14px;white-space:nowrap}
+.qa .df-inp:disabled{opacity:0.6}
+@media(max-width:640px){.qa-row{grid-template-columns:minmax(0,1fr) minmax(0,1.6fr)}.qa-text{grid-column:1/-1}.qa .mf-btn-save{padding:0 10px}}
+
 .df-sum-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;font-size:14px;font-weight:500;color:var(--label2)}
 .df-sum-row+.df-sum-row{border-top:1px solid var(--sep)}
 .df-sum-sub{font-size:12px;color:var(--label3);margin-left:6px}

@@ -2,9 +2,14 @@ const IBAN_KEY = 'garage_iban';
 const MARGIN_KEY = 'garage_margin';
 const BG_MODE_KEY = 'garage_bg_mode';
 const BG_COLOR_KEY = 'garage_bg_color';
+const ACTIVE_OFFERTE_KEY = 'garage_active_offerte';
 
 export const getIban = (): string => localStorage.getItem(IBAN_KEY) ?? '';
 export const setIban = (iban: string): void => localStorage.setItem(IBAN_KEY, iban);
+
+/** Offerte the quick-add on the Offerten tab last added parts to. */
+export const getActiveOfferteId = (): string => localStorage.getItem(ACTIVE_OFFERTE_KEY) ?? '';
+export const setActiveOfferteId = (id: string): void => localStorage.setItem(ACTIVE_OFFERTE_KEY, id);
 
 /** Default retail margin (%) applied to imported part purchase prices (EK -> VK). */
 export const getMargin = (): number => {

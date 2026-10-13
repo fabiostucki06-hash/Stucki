@@ -1,7 +1,8 @@
 import { SFChevron } from '../Icons';
 import { exportOffertePDF } from '../../lib/pdf-offerte';
 import { formatDateCH } from '../../lib/utils';
-import type { Customer, Offerte, OfferteStatus } from '../../types';
+import QuickAddPart from './QuickAddPart';
+import type { Customer, MaterialPosition, Offerte, OfferteStatus } from '../../types';
 
 interface OfferteListProps {
   offerten: Offerte[];
@@ -9,12 +10,17 @@ interface OfferteListProps {
   onOfferteClick: (o: Offerte) => void;
   onEdit: (o: Offerte) => void;
   onNew: () => void;
+  onAddPart: (offerteId: string, position: MaterialPosition) => Promise<void>;
 }
 
 const STATUS_LABELS: Record<OfferteStatus, string> = { entwurf: 'Entwurf', versendet: 'Versendet', angenommen: 'Angenommen', abgelehnt: 'Abgelehnt' };
 const STATUS_COLORS: Record<OfferteStatus, string> = { entwurf: 'var(--label2)', versendet: 'var(--orange)', angenommen: 'var(--green)', abgelehnt: 'var(--red)' };
 
-export default function OfferteList({ offerten, customers, onOfferteClick, onEdit, onNew }: OfferteListProps) {
+export default function OfferteList({ offerten, customers, onOfferteClick, onEdit, onNew, onAddPart }: OfferteListProps) {
+  const openOfferten = offerten
+    .filter((o) => o.status === 'entwurf' || o.status === 'versendet')
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
   const sortByName = (a: Offerte, b: Offerte) => {
     const ca = customers.find((x) => x.id === a.customerId);
     const cb = customers.find((x) => x.id === b.customerId);
@@ -29,6 +35,8 @@ export default function OfferteList({ offerten, customers, onOfferteClick, onEdi
         <h1 className="sf-title1" style={{ paddingTop: 8 }}>Offerten</h1>
         <button onClick={onNew} className="btn-tinted">+ Neue</button>
       </div>
+
+      <QuickAddPart offerten={openOfferten} customers={customers} onAdd={onAddPart} />
 
       {!offerten.length && (
         <div className="glass-panel" style={{ padding: 40, textAlign: 'center' }}>
