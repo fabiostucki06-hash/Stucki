@@ -54,7 +54,8 @@ export default function App() {
   } = useApp();
 
   const updateAvailable = useVersionCheck();
-  const [tab, setTab] = useState<TabId>('dashboard');
+  // A Shortcut may open /offerten?import_url=… instead of the root; land on that tab.
+  const [tab, setTab] = useState<TabId>(() => (window.location.pathname.replace(/\/+$/, '') === '/offerten' ? 'offerten' : 'dashboard'));
   const [fabOpen, setFabOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // Synced per user: a change on another device re-renders the background here.
@@ -375,7 +376,7 @@ export default function App() {
     const totalArbeit = positionen.filter((p) => p.typ === 'arbeit').reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
     const totalMaterial = positionen.filter((p) => p.typ === 'material').reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
     await updateOfferte({ ...off, positionen, totalArbeit: totalArbeit.toFixed(2), totalMaterial: totalMaterial.toFixed(2), totalBetrag: (totalArbeit + totalMaterial).toFixed(2) });
-    showToast(`Teil direkt zu Offerte #${off.offertNumber} hinzugefügt`, 'success');
+    showToast(`Teil erfolgreich zu Offerte #${off.offertNumber} hinzugefügt!`, 'success');
   }
   function handleStartNewOfferteFromImport(position: MaterialPosition, customerId?: string) {
     setPrefillMat(position);
