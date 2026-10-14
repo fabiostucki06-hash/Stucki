@@ -63,12 +63,11 @@ export default function ShortcutKeySection() {
       )}
 
       <ol style={{ fontSize: 12, color: 'var(--label2)', lineHeight: 1.6, margin: '0', paddingLeft: 18 }}>
-        <li>Kurzbefehl wie oben anlegen, aber statt „URL öffnen&quot; die Aktion „Inhalte von URL abrufen&quot; verwenden mit der URL<br />
-          <code style={codeStyle}>{window.location.origin}/api/import-shortcut</code>
+        <li>Kurzbefehl wie oben anlegen, aber statt „URL öffnen&quot; die Aktion „Inhalte von URL abrufen&quot; verwenden. Als URL genau diesen Text, dahinter den Schlüssel von oben:<br />
+          <code style={codeStyle}>{window.location.origin}/api/import-shortcut?token=</code>
         </li>
-        <li>Methode „POST&quot;, Anfragetext „JSON&quot; mit den Feldern <code style={codeStyle}>token</code> (Schlüssel von oben) und{' '}
-          <code style={codeStyle}>import_url</code> (Variable „Kurzbefehl-Eingabe&quot;). Optional{' '}
-          <code style={codeStyle}>active_offerte_id</code> für eine bestimmte Offerte.</li>
+        <li>Direkt danach <code style={codeStyle}>&amp;import_url=</code> anhängen und über das blaue <strong>＋</strong> die Variable „Kurzbefehl-Eingabe&quot; einfügen (unter „Formatieren&quot; → „URL-codieren&quot;). Optional{' '}
+          <code style={codeStyle}>&amp;active_offerte_id=…</code> für eine bestimmte Offerte. Methode „GET&quot; reicht.</li>
         <li>Aktion „Wörterbuchwert abrufen&quot; für <code style={codeStyle}>message</code> und danach „Mitteilung anzeigen&quot;.</li>
         <li>Optional: Ist <code style={codeStyle}>open_url</code> vorhanden (keine aktive Offerte, Preis nicht erkannt), diese mit „URL öffnen&quot; öffnen – dann erscheint der Import-Dialog.</li>
       </ol>

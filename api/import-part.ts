@@ -3,6 +3,8 @@
 // app via an iOS Shortcut, see Settings -> Teile-Import) into part metadata, so the
 // mobile import view can prefill title / purchase price / article number.
 
+import { runShortcutImport } from './import-shortcut.js';
+
 export interface ImportRequestBody {
   url?: string;
   text?: string;
@@ -23,6 +25,8 @@ export interface ImportResult {
 export interface VercelLikeRequest {
   method?: string;
   body?: unknown;
+  query?: Record<string, string | string[] | undefined>;
+  headers?: Record<string, string | string[] | undefined>;
 }
 
 export interface VercelLikeResponse {
@@ -316,6 +320,14 @@ export async function extractPart(body: ImportRequestBody | undefined): Promise<
 }
 
 export default async function handler(req: VercelLikeRequest, res: VercelLikeResponse) {
+  // GET ?import_url=…&token=… is a Shortcut's background import ("Inhalte von
+  // URL abrufen" defaults to GET): parse AND save into the active Offerte.
+  // POST stays the app's parse-only lookup for the import sheet.
+  if (req.method === 'GET') {
+    const { status, json } = await runShortcutImport(req);
+    res.status(status).json(json);
+    return;
+  }
   if (req.method !== 'POST') {
     res.status(405).json({ ok: false, title: '', ek: '', artikelnummer: '', quelle: '', error: 'Method not allowed' });
     return;
