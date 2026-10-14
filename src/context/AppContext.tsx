@@ -40,6 +40,8 @@ const AppContext = createContext<AppContextValue | null>(null);
 
 /** Min gap between focus/visibility-triggered refetches (focus + visibilitychange often fire together). */
 const REVALIDATE_MIN_MS = 10_000;
+/** Background poll while the tab is visible, so parts a Shortcut appends server-side show up in an open Offerte. */
+const POLL_MS = 30_000;
 
 function parseRows(arr: unknown[]) {
   return arr.map((r: unknown) => {
@@ -155,10 +157,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!cancelled) setLoading(false);
     })();
 
+    const poll = window.setInterval(onWake, POLL_MS);
     document.addEventListener('visibilitychange', onWake);
     window.addEventListener('focus', onWake);
     return () => {
       cancelled = true;
+      window.clearInterval(poll);
       document.removeEventListener('visibilitychange', onWake);
       window.removeEventListener('focus', onWake);
     };

@@ -37,10 +37,10 @@ interface RpcResult {
   vk?: string;
 }
 
-/** English `error` (stable, for logs/automation) and German `message` (shown on the iPhone). */
+/** `error` (stable, for logs/automation) and German `message` (shown on the iPhone). */
 const ERRORS: Record<ErrorCode, { error: string; message: string }> = {
   unauthorized: { error: 'Invalid or missing shortcut key', message: 'Ungültiger Kurzbefehl-Schlüssel. Bitte in GarageOS → Einstellungen neu erzeugen.' },
-  no_active_offerte: { error: 'No active offer selected', message: 'Keine aktive Offerte gewählt – Teil bitte in GarageOS zuordnen.' },
+  no_active_offerte: { error: 'Keine aktive Offerte gewählt', message: 'Keine aktive Offerte gewählt – Teil bitte in GarageOS zuordnen.' },
   offerte_not_found: { error: 'Active offer not found', message: 'Die gewählte Offerte existiert nicht mehr.' },
   offerte_closed: { error: 'Active offer is no longer open', message: 'Die aktive Offerte ist bereits angenommen oder abgelehnt.' },
   incomplete_part: { error: 'Could not read title or price', message: 'Titel oder Preis nicht erkannt – Teil bitte in GarageOS ergänzen.' },
@@ -79,6 +79,15 @@ function appImportUrl(req: VercelLikeRequest, input: ShortcutInput): string {
   if (input.import_text) q.set('import_text', input.import_text);
   if (input.active_offerte_id) q.set('offerte_id', input.active_offerte_id);
   return `${proto}://${host}/?${q}`;
+}
+
+/** Shop host ("autodoc.ch") the part came from; the app groups orders by it (src/lib/suppliers.ts). */
+function supplierDomain(link: string | undefined): string | undefined {
+  try {
+    return link ? new URL(/^https?:\/\//i.test(link) ? link : `https://${link}`).hostname.replace(/^www\./, '') : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 const fail = (status: number, code: ErrorCode, extra: Json = {}) => ({
@@ -129,8 +138,9 @@ export async function runShortcutImport(req: VercelLikeRequest): Promise<{ statu
       status: 200,
       json: {
         success: true, ok: true,
-        offertNumber: result.offertNumber, beschreibung: result.beschreibung, ek: part.ek, vk: result.vk, quelle: part.quelle,
-        message: `Teil erfolgreich zu Offerte #${result.offertNumber} hinzugefügt!`,
+        offertNumber: result.offertNumber, beschreibung: result.beschreibung, artikelnummer: part.artikelnummer, ek: part.ek, vk: result.vk,
+        quelle: part.quelle, lieferant: supplierDomain(part.quelle || input.import_url),
+        message: 'Teil zu Offerte hinzugefügt',
       },
     };
   }
