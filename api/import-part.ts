@@ -3,12 +3,12 @@
 // app via an iOS Shortcut, see Settings -> Teile-Import) into part metadata, so the
 // mobile import view can prefill title / purchase price / article number.
 
-interface ImportRequestBody {
+export interface ImportRequestBody {
   url?: string;
   text?: string;
 }
 
-interface ImportResult {
+export interface ImportResult {
   ok: boolean;
   title: string;
   ek: string;
@@ -20,12 +20,12 @@ interface ImportResult {
   error?: string;
 }
 
-interface VercelLikeRequest {
+export interface VercelLikeRequest {
   method?: string;
   body?: unknown;
 }
 
-interface VercelLikeResponse {
+export interface VercelLikeResponse {
   status(code: number): VercelLikeResponse;
   json(body: unknown): void;
 }
@@ -266,13 +266,9 @@ function merge(a: Partial<ImportResult>, b: Partial<ImportResult>): Omit<ImportR
   };
 }
 
-export default async function handler(req: VercelLikeRequest, res: VercelLikeResponse) {
-  if (req.method !== 'POST') {
-    res.status(405).json({ ok: false, title: '', ek: '', artikelnummer: '', quelle: '', error: 'Method not allowed' });
-    return;
-  }
-
-  const body = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body) as ImportRequestBody | undefined;
+/** Scrapes/parses a shared link or text into part metadata. Shared with
+    import-shortcut.ts, which writes the result straight into an Offerte. */
+export async function extractPart(body: ImportRequestBody | undefined): Promise<ImportResult> {
   // Defense in depth: the client already decodes query params (see App.tsx's
   // decodeMaybeDouble), but decode again here too in case this endpoint is ever
   // called directly with a still-encoded value.
@@ -312,9 +308,19 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
     console.warn('[import-part] received an unresolved Shortcuts placeholder instead of real data:', { url: body?.url, text: body?.text });
   }
 
-  res.status(200).json({
+  return {
     ok: found,
     ...merged,
     error: !found ? (sawPlaceholder ? 'Shortcut-Variable wurde nicht ersetzt (Platzhalter erhalten statt echtem Wert)' : fetchError) : undefined,
-  });
+  };
+}
+
+export default async function handler(req: VercelLikeRequest, res: VercelLikeResponse) {
+  if (req.method !== 'POST') {
+    res.status(405).json({ ok: false, title: '', ek: '', artikelnummer: '', quelle: '', error: 'Method not allowed' });
+    return;
+  }
+
+  const body = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body) as ImportRequestBody | undefined;
+  res.status(200).json(await extractPart(body));
 }

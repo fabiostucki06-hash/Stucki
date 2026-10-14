@@ -4,6 +4,7 @@ import { setIban, setMargin, type BgMode } from '../../lib/settings';
 import { useSettings } from '../../hooks/useSettings';
 import { buildImportBookmarklet } from '../../lib/bookmarklet';
 import { SFCheckmark } from '../Icons';
+import ShortcutKeySection from './ShortcutKeySection';
 
 const WALLPAPERS = [
   { id: 'wp1', label: 'Wallpaper 1', url: ASSETS.wallpaper1 },
@@ -368,6 +369,8 @@ export default function SettingsView({ currentWallpaper, onWallpaperChange, bgMo
           <li>Unter „Details&quot; → „Im Freigabe-Sheet anzeigen&quot; aktivieren und Autodoc als zulässige App erlauben.</li>
           <li>In der Autodoc-App auf Teilen tippen und den neuen Kurzbefehl auswählen – GarageOS öffnet sich mit dem erkannten Teil.</li>
         </ol>
+
+        <ShortcutKeySection />
 
         <p className="cf-label" style={{ marginTop: 20, marginBottom: 6 }}>Teile per Desktop-Browser importieren</p>
         <p style={{ fontSize: 12, color: 'var(--label2)', lineHeight: 1.5, margin: '0 0 10px' }}>
