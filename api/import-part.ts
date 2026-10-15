@@ -4,10 +4,18 @@
 // mobile import view can prefill title / purchase price / article number.
 
 import { runShortcutImport } from './import-shortcut.js';
+import { partNameFromUrl } from '../src/lib/partTitle.js';
 
 export interface ImportRequestBody {
   url?: string;
   text?: string;
+  /** Already read on the device (bookmarklet, or a Shortcut running JavaScript
+      on the Safari page): used as-is, and the shop isn't fetched when title and
+      price are both present. Shops behind a bot challenge (auto-doc.ch) can't
+      be read server-side at all. */
+  title?: string;
+  price?: string;
+  artnr?: string;
 }
 
 export interface ImportResult {
@@ -190,10 +198,19 @@ function extractIndirectRedirect(html: string): string | undefined {
   return undefined;
 }
 
+// Full navigation header set of iOS Safari. Helps with shops that only check
+// headers; a Cloudflare JS challenge (auto-doc.ch) still blocks any server fetch.
 const BROWSER_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+  'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1',
   Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-  'Accept-Language': 'de-CH,de;q=0.9,en;q=0.8',
+  'Accept-Language': 'de-CH,de-DE;q=0.9,de;q=0.8,en;q=0.6',
+  'Cache-Control': 'no-cache',
+  Pragma: 'no-cache',
+  'Upgrade-Insecure-Requests': '1',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Sec-Fetch-User': '?1',
 };
 
 async function fetchHtml(url: string, signal: AbortSignal): Promise<{ html: string; status: number }> {
@@ -209,10 +226,13 @@ async function parseUrl(rawUrl: string): Promise<Partial<ImportResult>> {
     let { html, status } = await fetchHtml(url, controller.signal);
     let finalUrl = url;
 
-    const redirect = extractIndirectRedirect(html);
+    // Only chase a refresh/canonical link when this page has no product data:
+    // re-requesting a page we can already read just risks a rate-limit block.
+    const redirect = !extractFromJsonLd(html).price && !metaContent(html, 'property', 'og:title') ? extractIndirectRedirect(html) : undefined;
     if (redirect) {
       try {
         const resolved = new URL(redirect, url).toString();
+        if (resolved === url) throw new Error('same page');
         const next = await fetchHtml(resolved, controller.signal);
         html = next.html; status = next.status; finalUrl = resolved;
       } catch {
@@ -303,10 +323,15 @@ export async function extractPart(body: ImportRequestBody | undefined): Promise<
   // regex read of the shared text itself is still the best data we have,
   // rather than discarding it and reporting nothing found.
   const textResult = rawText ? parseText(rawText) : {};
+  const provided: Partial<ImportResult> = {
+    title: body?.title?.trim() || undefined,
+    ek: body?.price?.trim() ? normalizePrice(body.price.trim()) : undefined,
+    artikelnummer: body?.artnr?.trim() || undefined,
+  };
 
   let fetchResult: Partial<ImportResult> = {};
   let fetchError: string | undefined;
-  if (targetUrl) {
+  if (targetUrl && !(provided.title && provided.ek)) {
     try {
       fetchResult = await parseUrl(targetUrl);
     } catch (e) {
@@ -314,8 +339,11 @@ export async function extractPart(body: ImportRequestBody | undefined): Promise<
     }
   }
 
-  const merged = merge(fetchResult, textResult);
-  if (!merged.quelle && targetUrl) merged.quelle = targetUrl;
+  const merged = merge(provided, merge(fetchResult, textResult));
+  if (!merged.quelle && targetUrl) merged.quelle = sanitizeUrl(targetUrl);
+  // Blocked or unreadable page: the URL slug often still names the part
+  // ("…/autoteile/bremsscheibe-10132" -> "Bremsscheibe"), better than nothing.
+  if (!merged.title && merged.quelle) merged.title = partNameFromUrl(merged.quelle) ?? '';
   const found = Boolean(merged.title || merged.ek || merged.artikelnummer);
 
   if (sawPlaceholder) {
