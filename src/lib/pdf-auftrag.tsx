@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf';
+import { PAGE_TOP, PAGE_BOTTOM, addPageNumbers } from './pdf-paging';
 import { formatDateCH, buildDocumentFilename } from './utils';
 import type { ArbeitPosition, Customer, Order } from '../types';
 
@@ -75,6 +76,8 @@ function drawDoc(doc: jsPDF, order: Order, customer: Customer | undefined) {
   };
 
   let y = 12;
+  const fits = (h: number) => y + h <= PAGE_BOTTOM;
+  const newPage = () => { doc.addPage('a4', 'portrait'); y = PAGE_TOP; };
 
   // ── HEADER ────────────────────────────────────────────────────────────────
   bold(); fs(15); rgb(0, 0, 0);
@@ -123,20 +126,24 @@ function drawDoc(doc: jsPDF, order: Order, customer: Customer | undefined) {
   y += RH_S;
   lw(0.4); drgb(0, 0, 0); doc.line(TL, y, TR, y);
 
-  // ── TABLE HEADER: Arbeiten | ZE ───────────────────────────────────────────
-  frgb(22, 22, 22); doc.rect(TL, y, TW, RH_H, 'F');
-  const thY = y + RH_H * BL;
-  bold(); fs(8.5); rgb(255, 255, 255);
-  tL('Arbeiten', x0 + PAD, thY);
-  tR('ZE',       TR - PAD, thY);
-  rgb(0, 0, 0);
-  y += RH_H;
+  // ── TABLE HEADER: Arbeiten | ZE (repeated on every page the table continues on)
+  const tableHeader = () => {
+    frgb(22, 22, 22); doc.rect(TL, y, TW, RH_H, 'F');
+    const thY = y + RH_H * BL;
+    bold(); fs(8.5); rgb(255, 255, 255);
+    tL('Arbeiten', x0 + PAD, thY);
+    tR('ZE',       TR - PAD, thY);
+    rgb(0, 0, 0);
+    y += RH_H;
+    norm(); fs(8.5);
+  };
+  // column divider spanning header + rows of the current page
+  let segTop = y;
+  tableHeader();
 
   // ── WORK ROWS (min 15) ────────────────────────────────────────────────────
-  const posY0 = y;
-  norm(); fs(8.5);
-
   for (const row of allRows) {
+    if (!fits(RH)) { vLine(x1, segTop, y, 0.15); newPage(); segTop = y; tableHeader(); }
     const ty = y + RH * BL;
     rgb(0, 0, 0);
     tL(clip(row.text, wArb - PAD * 2), x0 + PAD, ty);
@@ -144,15 +151,14 @@ function drawDoc(doc: jsPDF, order: Order, customer: Customer | undefined) {
     hLine(y + RH, TL, TR, 0.1);
     y += RH;
   }
-  for (let i = allRows.length; i < 15; i++) {
+  for (let i = allRows.length; i < 15 && fits(RH); i++) {
     hLine(y + RH, TL, TR, 0.1);
     y += RH;
   }
-
-  // column divider spanning header + rows
-  vLine(x1, posY0 - RH_H, y, 0.15);
+  vLine(x1, segTop, y, 0.15);
 
   // ── ZE-TOTAL ──────────────────────────────────────────────────────────────
+  if (!fits(RH_T)) newPage();
   lw(0.3); drgb(0, 0, 0); doc.line(TL, y, TR, y);
   frgb(22, 22, 22); doc.rect(TL, y, TW, RH_T, 'F');
   const totY = y + RH_T * BL;
@@ -166,17 +172,24 @@ function drawDoc(doc: jsPDF, order: Order, customer: Customer | undefined) {
 
   // ── NOTES ─────────────────────────────────────────────────────────────────
   y += 6;
+  if (!fits(0)) newPage();
   fs(7.5); rgb(130, 130, 130);
   tL('* ZE basieren auf einer reibungslosen Reparatur', TL, y);
   if (order.notizen) {
     y += 6;
+    if (!fits(4)) newPage();
     bold(); fs(8.5); rgb(0, 0, 0); tL('Notizen:', TL, y); norm(); y += 4;
     const lines = doc.splitTextToSize(order.notizen, TW);
-    for (const line of lines as string[]) { tL(line, TL, y); y += 4; }
+    for (const line of lines as string[]) {
+      if (!fits(0)) { newPage(); norm(); fs(8.5); rgb(0, 0, 0); }
+      tL(line, TL, y); y += 4;
+    }
   }
   rgb(0, 0, 0);
 
   // ── DATES ─────────────────────────────────────────────────────────────────
+  // Dates, location and payment terms stay together.
+  if (!fits(10 + 7 + 5 + 10 + 5)) newPage();
   y += 10;
   const col2 = TL + VL;
   fs(8.5);
@@ -194,6 +207,7 @@ export async function exportOrderPDF(order: Order, customer: Customer | undefine
   try {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     drawDoc(doc, order, customer);
+    addPageNumbers(doc, TR);
     doc.save(`${buildDocumentFilename(customer, 'Auftrag', order.orderNumber ?? '')}.pdf`);
   } catch (err) {
     alert(`PDF-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);

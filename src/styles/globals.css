@@ -254,13 +254,26 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
   margin:15mm 12mm;
 }
 @media print{
-  html,body{margin:0}
+  /* Let long documents run over several pages: no fixed viewport heights, and
+     undo the open sheet's scroll lock (Sheet.tsx sets body position:fixed +
+     overflow:hidden inline), which would clip the print to one page. */
+  html,body{margin:0;height:auto!important;min-height:0!important;overflow:visible!important}
+  body{position:static!important;top:auto!important}
+  /* Everything that neither holds nor sits inside the sheet takes no space,
+     so the hidden app behind it can't add blank pages. */
+  body:has(.sheet-content) *:not(:has(.sheet-content)):not(.sheet-content):not(.sheet-content *){display:none!important}
   .no-print{display:none!important}
   body *{visibility:hidden}
   .sheet-content,.sheet-content *{visibility:visible}
   .sheet-backdrop,.sheet-handle,.sheet-nav{display:none!important}
-  .sheet-container{position:absolute;top:0;left:0;right:auto;bottom:auto;width:100%;max-height:none;box-shadow:none;border:none;background:#fff;-webkit-backdrop-filter:none;backdrop-filter:none;animation:none}
-  .sheet-content{position:static;overflow:visible;padding:0;background:#fff}
+  /* max-height with !important: Sheet.tsx sets 92/96dvh inline. Block layout
+     instead of flex so the browser can split it across pages. */
+  .sheet-container{position:absolute;top:0;left:0;right:auto;bottom:auto;width:100%;height:auto;max-height:none!important;display:block;overflow:visible;box-shadow:none;border:none;background:#fff;-webkit-backdrop-filter:none;backdrop-filter:none;animation:none}
+  .sheet-content{position:static;overflow:visible;padding:0;background:#fff;flex:none;height:auto;max-height:none}
+  .sheet-content .inset-grouped-list,.sheet-content .glass-panel,.sheet-content .card,.sheet-content .form-section,.sheet-content .pos-tbl-wrap,.sheet-content .mf-card{overflow:visible!important}
+  /* Keep each position / row whole; keep a section title with what follows it. */
+  .sheet-content .list-row,.sheet-content tr{break-inside:avoid;page-break-inside:avoid}
+  .sheet-content .section-header{break-after:avoid;page-break-after:avoid}
   .sheet-content button{display:none!important}
   .sheet-content *{background:none!important;box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;color:#000!important;text-shadow:none!important}
 }

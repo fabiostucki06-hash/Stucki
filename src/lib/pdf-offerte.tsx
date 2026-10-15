@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { formatDateCH, buildDocumentFilename } from './utils';
+import { PAGE_TOP, PAGE_BOTTOM, addPageNumbers } from './pdf-paging';
 import type { ArbeitPosition, Customer, MaterialPosition, Offerte } from '../types';
 
 const CO_NAME  = 'Fabio Stucki';
@@ -79,6 +80,8 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined) {
   };
 
   let y = 12;
+  const fits = (h: number) => y + h <= PAGE_BOTTOM;
+  const newPage = () => { doc.addPage('a4', 'portrait'); y = PAGE_TOP; };
 
   // ── HEADER ────────────────────────────────────────────────────────────────
   bold(); fs(15); rgb(0, 0, 0);
@@ -127,23 +130,33 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined) {
   y += RH_S;
   lw(0.4); drgb(0, 0, 0); doc.line(TL, y, TR, y);
 
-  // ── TABLE HEADER ──────────────────────────────────────────────────────────
-  frgb(22, 22, 22); doc.rect(TL, y, TW, RH_H, 'F');
-  const thY = y + RH_H * BL;
-  bold(); fs(8.5); rgb(255, 255, 255);
-  tL('Bezeichnung',   x0 + PAD,  thY);
-  tR('Menge',         x2 - PAD,  thY);
-  tR('Stk.Preis',     x3 - PAD,  thY);
-  tR('Preis (CHF)',   x4 - PAD,  thY);
-  tR('ZE',            TR - PAD,  thY);
-  rgb(0, 0, 0);
-  y += RH_H;
+  // ── TABLE HEADER (repeated on every page the table continues on) ─────────
+  const tableHeader = () => {
+    frgb(22, 22, 22); doc.rect(TL, y, TW, RH_H, 'F');
+    const thY = y + RH_H * BL;
+    bold(); fs(8.5); rgb(255, 255, 255);
+    tL('Bezeichnung',   x0 + PAD,  thY);
+    tR('Menge',         x2 - PAD,  thY);
+    tR('Stk.Preis',     x3 - PAD,  thY);
+    tR('Preis (CHF)',   x4 - PAD,  thY);
+    tR('ZE',            TR - PAD,  thY);
+    rgb(0, 0, 0);
+    y += RH_H;
+    norm(); fs(8.5);
+  };
+  // vertical column dividers spanning header + rows of the current page
+  let segTop = y;
+  const dividers = (bottom: number) => {
+    vLine(x1, segTop, bottom, 0.15);
+    vLine(x2, segTop, bottom, 0.15);
+    vLine(x3, segTop, bottom, 0.15);
+    vLine(x4, segTop, bottom, 0.15);
+  };
+  tableHeader();
 
   // ── POSITION ROWS (min 15) ────────────────────────────────────────────────
-  const posY0 = y;
-  norm(); fs(8.5);
-
   for (const p of filteredPos) {
+    if (!fits(RH)) { dividers(y); newPage(); segTop = y; tableHeader(); }
     const mp = p.typ === 'material' ? (p as MaterialPosition) : null;
     const ap = p.typ === 'arbeit'   ? (p as ArbeitPosition)   : null;
     const ty = y + RH * BL;
@@ -160,19 +173,15 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined) {
     hLine(y + RH, TL, TR, 0.1);
     y += RH;
   }
-  for (let i = filteredPos.length; i < 15; i++) {
+  for (let i = filteredPos.length; i < 15 && fits(RH); i++) {
     hLine(y + RH, TL, TR, 0.1);
     y += RH;
   }
-
-  // vertical column dividers spanning header + rows
-  const tableBottom = y;
-  vLine(x1, posY0 - RH_H, tableBottom, 0.15);
-  vLine(x2, posY0 - RH_H, tableBottom, 0.15);
-  vLine(x3, posY0 - RH_H, tableBottom, 0.15);
-  vLine(x4, posY0 - RH_H, tableBottom, 0.15);
+  dividers(y);
 
   // ── SUMME ─────────────────────────────────────────────────────────────────
+  // Summe, Kleinteil and Total stay together on one page.
+  if (!fits(RH_S + (kleinteilAmt > 0 ? 4 : 0) + RH_T)) newPage();
   lw(0.3); drgb(0, 0, 0); doc.line(TL, y, TR, y);
   frgb(247, 247, 247); doc.rect(TL, y, TW, RH_S, 'F');
   const sumY = y + RH_S * BL;
@@ -206,19 +215,26 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined) {
 
   // ── NOTES ─────────────────────────────────────────────────────────────────
   y += 6;
+  if (!fits(4)) newPage();
   fs(7.5); rgb(130, 130, 130);
   tL('* ZE basieren auf einer reibungslosen Reparatur', TL, y);
   y += 4;
   tL('* Kleinmaterial-Pauschale wird bei über 100 ZE automatisch hinzugefügt', TL, y);
   if (offerte.notizen) {
     y += 6;
+    if (!fits(8)) newPage();
     bold(); fs(8.5); rgb(0, 0, 0); tL('Notizen:', TL, y); norm(); y += 4;
     const lines = doc.splitTextToSize(offerte.notizen, TW);
-    for (const line of lines as string[]) { tL(line, TL, y); y += 4; }
+    for (const line of lines as string[]) {
+      if (!fits(0)) { newPage(); norm(); fs(8.5); rgb(0, 0, 0); }
+      tL(line, TL, y); y += 4;
+    }
   }
   rgb(0, 0, 0);
 
   // ── DATE / LOCATION ───────────────────────────────────────────────────────
+  // Date, location and payment terms (≈ 30 mm) stay together.
+  if (!fits(10 + 5 + 10 + 5)) newPage();
   y += 10;
   const col2 = TL + VL;
   fs(8.5);
@@ -235,6 +251,7 @@ export async function exportOffertePDF(offerte: Offerte, customer: Customer | un
   try {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     drawDoc(doc, offerte, customer);
+    addPageNumbers(doc, TR);
     doc.save(`${buildDocumentFilename(customer, 'Offerte', offerte.offertNumber ?? '')}.pdf`);
   } catch (err) {
     alert(`PDF-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);
