@@ -285,6 +285,16 @@ export async function extractPart(body: ImportRequestBody | undefined): Promise<
   const sawPlaceholder = isPlaceholder(rawUrl) || isPlaceholder(rawText);
   if (isPlaceholder(rawUrl)) rawUrl = undefined;
   if (isPlaceholder(rawText)) rawText = undefined;
+  // A Shortcut often passes the whole share-sheet text as import_url
+  // ("Bremsscheibe – 29.90 CHF https://…"): pull the link out of it and keep
+  // the full string as text so title/price can still be read from it.
+  if (rawUrl && !/^https?:\/\/\S+$/i.test(rawUrl)) {
+    const link = extractLink(rawUrl);
+    if (link || /\s/.test(rawUrl)) {
+      rawText ??= rawUrl;
+      rawUrl = link;
+    }
+  }
   const linkInText = !rawUrl && rawText ? extractLink(rawText) : undefined;
   const targetUrl = rawUrl || linkInText;
 
