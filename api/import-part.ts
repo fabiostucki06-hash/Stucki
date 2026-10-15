@@ -320,7 +320,7 @@ export async function extractPart(body: ImportRequestBody | undefined): Promise<
 }
 
 export default async function handler(req: VercelLikeRequest, res: VercelLikeResponse) {
-  // GET ?import_url=…&token=… is a Shortcut's background import ("Inhalte von
+  // GET ?import_url=… (no key needed) is a Shortcut's background import ("Inhalte von
   // URL abrufen" defaults to GET): parse AND save into the active Offerte.
   // POST stays the app's parse-only lookup for the import sheet.
   if (req.method === 'GET') {

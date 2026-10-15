@@ -1,11 +1,10 @@
 // Vercel Node serverless function (not part of the Vite app bundle / tsc -b build).
 // Background part import for an iOS Shortcut ("Inhalte von URL abrufen"), either
-//   GET  /api/import-shortcut?import_url=<link>&token=<key>[&active_offerte_id=<id>]
-//   POST /api/import-shortcut  { "token", "import_url", "active_offerte_id"? }
-// (GET /api/import-part?… lands here too). The key may also come as
-// "Authorization: Bearer <key>". A Shortcut has no login session, so the
-// Kurzbefehl key from Settings is what identifies the user and their active
-// Offerte. Scrapes the part like /api/import-part, then appends it through the
+//   GET  /api/import-shortcut?import_url=<link>[&active_offerte_id=<id>]
+//   POST /api/import-shortcut  { "import_url", "active_offerte_id"? }
+// (GET /api/import-part?… lands here too). No key is required: the part goes
+// into the active Offerte. An optional legacy `token` (or "Authorization:
+// Bearer <key>") still picks that user's settings when valid. Scrapes the part like /api/import-part, then appends it through the
 // shortcut_add_part() RPC (supabase/migrations/…_shortcut_import.sql) and only
 // answers success once that write has committed. The JSON carries `success`,
 // a German `message` for "Mitteilung anzeigen", `error` on failure and, when the
@@ -15,7 +14,7 @@ import { extractPart, type VercelLikeRequest, type VercelLikeResponse } from './
 import { cleanPartTitle } from '../src/lib/partTitle.js';
 
 const SUPA_URL = 'https://xpggpkmqwescbcrnnpod.supabase.co';
-// Public anon key (same as in src/lib/supabase.ts); the RPC does its own auth via the token.
+// Public anon key (same as in src/lib/supabase.ts); the RPC is open to anon.
 const SUPA_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhwZ2dwa21xd2VzY2Jjcm5ucG9kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NjIxMjIsImV4cCI6MjA5NjEzODEyMn0.egPJ4OYOegRKIBV6PHUz_VfRib8g7sVIcNNy_7bFxjg';
 
@@ -27,7 +26,7 @@ interface ShortcutInput {
   active_offerte_id?: string;
 }
 
-type ErrorCode = 'unauthorized' | 'no_active_offerte' | 'offerte_not_found' | 'offerte_closed' | 'incomplete_part';
+type ErrorCode = 'no_active_offerte' | 'offerte_not_found' | 'offerte_closed' | 'incomplete_part';
 
 interface RpcResult {
   ok: boolean;
@@ -39,7 +38,6 @@ interface RpcResult {
 
 /** `error` (stable, for logs/automation) and German `message` (shown on the iPhone). */
 const ERRORS: Record<ErrorCode, { error: string; message: string }> = {
-  unauthorized: { error: 'Invalid or missing shortcut key', message: 'Ungültiger Kurzbefehl-Schlüssel. Bitte in GarageOS → Einstellungen neu erzeugen.' },
   no_active_offerte: { error: 'Keine aktive Offerte gewählt', message: 'Keine aktive Offerte gewählt – Teil bitte in GarageOS zuordnen.' },
   offerte_not_found: { error: 'Active offer not found', message: 'Die gewählte Offerte existiert nicht mehr.' },
   offerte_closed: { error: 'Active offer is no longer open', message: 'Die aktive Offerte ist bereits angenommen oder abgelehnt.' },
@@ -98,7 +96,6 @@ const fail = (status: number, code: ErrorCode, extra: Json = {}) => ({
 export async function runShortcutImport(req: VercelLikeRequest): Promise<{ status: number; json: Json }> {
   const input = readInput(req);
   if (!input) return { status: 400, json: { success: false, ok: false, error: 'Invalid JSON body', message: 'Ungültiges JSON.' } };
-  if (!input.token) return fail(401, 'unauthorized');
   if (!input.import_url && !input.import_text) {
     return { status: 400, json: { success: false, ok: false, error: 'Missing import_url', message: 'Kein Link erhalten (import_url fehlt).' } };
   }
@@ -113,7 +110,7 @@ export async function runShortcutImport(req: VercelLikeRequest): Promise<{ statu
       method: 'POST',
       headers: { 'Content-Type': 'application/json', apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` },
       body: JSON.stringify({
-        p_token: input.token,
+        p_token: input.token ?? null,
         p_offerte_id: input.active_offerte_id ?? null,
         p_beschreibung: cleanPartTitle(part.title ?? ''),
         p_ek: ek > 0 ? ek : null,
@@ -146,9 +143,9 @@ export async function runShortcutImport(req: VercelLikeRequest): Promise<{ statu
   }
   const code = result.code ?? 'incomplete_part';
   console.warn('[import-shortcut] not saved:', code);
-  const extra: Json = code === 'unauthorized' ? {} : { open_url: appImportUrl(req, input) };
+  const extra: Json = { open_url: appImportUrl(req, input) };
   if (code === 'incomplete_part' && part.blocked) extra.message = `${ERRORS[code].message} (Shop hat die Abfrage blockiert.)`;
-  return fail(code === 'unauthorized' ? 401 : 422, code, extra);
+  return fail(422, code, extra);
 }
 
 export default async function handler(req: VercelLikeRequest, res: VercelLikeResponse) {
