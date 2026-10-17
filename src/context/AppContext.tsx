@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useRef, ReactNode } fro
 import { auth, db, setAuthHandlers, tokenUserId } from '../lib/supabase';
 import { startSettingsSync, whenSettingsLoaded } from '../lib/settingsSync';
 import { showToast } from '../components/ui/Toast';
+import { offerteNr } from '../lib/offerte-docs';
 import type { Customer, Order, Offerte, Rechnung, MaterialCatalogItem, SyncStatus } from '../types';
 
 interface AppContextValue {
@@ -25,7 +26,7 @@ interface AppContextValue {
   addOrder: (data: Pick<Order, 'customerId' | 'beanstandungen' | 'notizen' | 'positionen' | 'offertId'>) => Promise<void>;
   updateOrder: (upd: Order, cp: Partial<Customer> | null) => Promise<void>;
   deleteOrder: (id: string) => Promise<void>;
-  addOfferte: (data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>) => Promise<Offerte>;
+  addOfferte: (data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>, opts?: { offertNumber?: number }) => Promise<Offerte>;
   updateOfferte: (upd: Offerte) => Promise<Offerte>;
   deleteOfferte: (id: string) => Promise<void>;
   addRechnung: (data: Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>) => Promise<void>;
@@ -230,18 +231,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setOrders((p) => p.filter((o) => o.id !== id));
   }
 
-  async function addOfferte(data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>): Promise<Offerte> {
+  // opts.offertNumber reuses an existing number for a new version (e.g. "12_v2").
+  async function addOfferte(data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>, opts?: { offertNumber?: number }): Promise<Offerte> {
     // offertNum can lag behind the loaded rows (e.g. the offerten fetch failed on
     // startup), which would hand out a number that already exists — take both maxima.
-    const num = Math.max(offertNum, ...offerten.map((o) => o.offertNumber ?? 0)) + 1;
+    const num = opts?.offertNumber ?? Math.max(offertNum, ...offerten.map((o) => o.offertNumber ?? 0)) + 1;
     const newOff: Offerte = { id: `off_${Date.now()}`, offertNumber: num, status: 'entwurf', createdAt: new Date().toISOString(), ...data };
     let saved = newOff;
     await syncOk(async () => {
       const rows = await db.upsert('offerten', { id: newOff.id, data: newOff }, token!);
       saved = pickRow<Offerte>(rows) ?? newOff;
     });
-    setOfferten((p) => [...p, saved]); setOffertNum(saved.offertNumber ?? num);
-    showToast(`Offerte #${saved.offertNumber ?? num} gespeichert`, 'success');
+    setOfferten((p) => [...p, saved]); setOffertNum((p) => Math.max(p, saved.offertNumber ?? num));
+    showToast(`Offerte #${offerteNr(saved)} gespeichert`, 'success');
     return saved;
   }
 

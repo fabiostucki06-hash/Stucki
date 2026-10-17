@@ -8,6 +8,7 @@ import { updateSettings, getActiveOfferteId, setActiveOfferteId, getMargin } fro
 import { useSettings } from './hooks/useSettings';
 import { cleanPartTitle } from './lib/partTitle';
 import { useVersionCheck } from './hooks/useVersionCheck';
+import { offerteNr, nextVersion, sumPositions, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_BEDINGUNG, ANZAHLUNG_PROZENT } from './lib/offerte-docs';
 import { hardReload } from './lib/reload';
 
 import Spinner from './components/ui/Spinner';
@@ -38,7 +39,7 @@ import RechnungenList from './components/rechnungen/RechnungenList';
 import RechnungForm from './components/rechnungen/RechnungForm';
 import RechnungDetail from './components/rechnungen/RechnungDetail';
 
-import type { ArbeitPosition, MaterialPosition, Customer, Order, Offerte, Rechnung, TabId } from './types';
+import type { ArbeitPosition, MaterialPosition, Customer, Order, Offerte, Position, Rechnung, TabId } from './types';
 
 export default function App() {
   const {
@@ -312,16 +313,70 @@ export default function App() {
     if (getActiveOfferteId() === id) setActiveOfferteId('');
   }
   async function handleDuplicateOfferte(offerte: Offerte) {
-    const { id, offertNumber, status, createdAt, ...rest } = offerte;
+    // A duplicate is a fresh Offerte: new number, no version / AB carried over.
+    const { id, offertNumber, status, createdAt, version, basisOffertId, ab, ...rest } = offerte;
     const dup = await addOfferte(rest);
     setSelOff(dup);
+  }
+  async function handleCreateMaterialofferte(offerte: Offerte, positionen: Position[]) {
+    // Reine Materialofferte: same offertNumber, next version, only the material
+    // positions, and the 50% Vorkasse terms as default remarks.
+    const mat = positionen
+      .filter((p): p is MaterialPosition => p.typ === 'material')
+      .map(({ bestellt, ...p }) => p);
+    const t = sumPositions(mat);
+    const { id, offertNumber, status, createdAt, ab, materialStatus, ...rest } = offerte;
+    const baseTitel = (offerte.titel ?? '').replace(/^Materialofferte( – )?/, '');
+    const created = await addOfferte({
+      ...rest,
+      art: 'material',
+      version: nextVersion(offerte, offerten),
+      basisOffertId: offerte.id,
+      titel: baseTitel ? `Materialofferte – ${baseTitel}` : 'Materialofferte',
+      positionen: mat,
+      totalArbeit: '0.00',
+      totalMaterial: t.totalMaterial.toFixed(2),
+      totalBetrag: t.total.toFixed(2),
+      totalZE: 0,
+      zahlungsbedingung: VORKASSE_BEDINGUNG,
+      zusatznotiz: SCHLUSSRECHNUNG_NOTIZ,
+    }, { offertNumber: offerte.offertNumber });
+    setSelOff(created);
+  }
+  async function handleCreateAnzahlung(offerte: Offerte, total: number) {
+    const nr = offerteNr(offerte);
+    const betrag = roundToRappen(total * ANZAHLUNG_PROZENT / 100).toFixed(2);
+    await addRechnung({
+      customerId: offerte.customerId,
+      offertId: offerte.id,
+      art: 'anzahlung',
+      titel: `Anzahlungsrechnung – Offerte #${nr}`,
+      positionen: [{
+        typ: 'material',
+        beschreibung: `Anzahlung ${ANZAHLUNG_PROZENT}% gemäss Offerte Nr. ${nr}`,
+        menge: '1',
+        stueckpreis: betrag,
+        preis: betrag,
+      }],
+      notizen: `Gesamtbetrag gemäss Offerte / Auftragsbestätigung Nr. ${nr}: CHF ${total.toFixed(2)}. Anzahlung ${ANZAHLUNG_PROZENT}%: CHF ${betrag}. Die Schlussrechnung (50%) ist zahlbar innert 10 Tagen netto.`,
+      // Vorkasse: due before work starts, so no "Tage netto" due date.
+      zahlungsFrist: '0',
+      zahlungsbedingung: ANZAHLUNG_BEDINGUNG,
+      kleinteilManuell: false,
+      totalBetrag: betrag,
+      totalArbeit: '0.00',
+      totalMaterial: betrag,
+      totalZE: 0,
+    });
+    setSelOff(null);
+    setTab('rechnungen');
   }
   async function handleCreateAuftragFromOfferte(offerte: Offerte, acceptedIndices: number[]) {
     // Copy every accepted position individually — no grouping or merging
     const positions = (offerte.positionen ?? []).filter((_, i) => acceptedIndices.includes(i));
     const offerteLabel = offerte.titel
-      ? `Offerte #${offerte.offertNumber}: ${offerte.titel}`
-      : `Offerte #${offerte.offertNumber}`;
+      ? `Offerte #${offerteNr(offerte)}: ${offerte.titel}`
+      : `Offerte #${offerteNr(offerte)}`;
     // Each accepted arbeit description becomes its own beanstandung entry
     const arbeitBeans = positions
       .filter((p) => p.typ === 'arbeit')
@@ -376,7 +431,7 @@ export default function App() {
     const totalArbeit = positionen.filter((p) => p.typ === 'arbeit').reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
     const totalMaterial = positionen.filter((p) => p.typ === 'material').reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
     await updateOfferte({ ...off, positionen, totalArbeit: totalArbeit.toFixed(2), totalMaterial: totalMaterial.toFixed(2), totalBetrag: (totalArbeit + totalMaterial).toFixed(2) });
-    showToast(`Teil erfolgreich zu Offerte #${off.offertNumber} hinzugefügt!`, 'success');
+    showToast(`Teil erfolgreich zu Offerte #${offerteNr(off)} hinzugefügt!`, 'success');
   }
   function handleStartNewOfferteFromImport(position: MaterialPosition, customerId?: string) {
     setPrefillMat(position);
@@ -551,11 +606,13 @@ export default function App() {
           onDuplicate={handleDuplicateOfferte}
           onCreateAuftrag={handleCreateAuftragFromOfferte}
           onCreateRechnung={handleCreateRechnungFromOfferte}
+          onCreateMaterialofferte={handleCreateMaterialofferte}
+          onCreateAnzahlung={handleCreateAnzahlung}
         />
       )}
 
       {editOff && (
-        <Sheet title={`Offerte #${editOff.offertNumber} bearbeiten`} onClose={() => setEditOff(null)} full
+        <Sheet title={`Offerte #${offerteNr(editOff)} bearbeiten`} onClose={() => setEditOff(null)} full
           barRight={<button onClick={() => setEditOff(null)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
           <ActiveOfferteBanner offerte={editOff} customer={customers.find((c) => c.id === editOff.customerId)} />
           <OfferteForm key={editOff.id} customers={customers} initial={editOff} onSave={handleSaveEditOfferte} onCancel={() => setEditOff(null)} />

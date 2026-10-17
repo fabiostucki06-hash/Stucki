@@ -79,6 +79,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
 
   const sc = ST_META[rechnung.status] ?? ST_META.entwurf;
   const faelligAm = calcFaelligAm(rechnung.createdAt, zahlungsFrist);
+  const isAnzahlung = rechnung.art === 'anzahlung';
 
   const isOverdue = faelligAm
     && rechnung.status === 'versendet'
@@ -238,6 +239,14 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
         </div>
       )}
 
+      {isAnzahlung ? (
+        <div className="glass-panel doc-terms">
+          <div className="ab-panel-title">Anzahlungsrechnung · 50% Vorkasse</div>
+          <div className="sf-subhead" style={{ color: 'var(--label2)' }}>
+            {rechnung.zahlungsbedingung || 'Vorkasse (Bar, TWINT, E-Banking)'}
+          </div>
+        </div>
+      ) : (<>
       <p className="section-header">Auftragsart</p>
       <div className="h-scroll" style={{ marginBottom: 16 }}>
         {KATEGORIE_OPTS.map(([k, l]) => (
@@ -267,6 +276,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
         />
         <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--green)' }}>Tage netto</span>
       </div>
+      </>)}
 
       {/* ── Positionen – inline editable ── */}
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 0 }}>
@@ -535,7 +545,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
         PDF speichern
       </button>
       <button
-        onClick={() => printWithFilename(buildDocumentFilename(customer, 'Rechnung', rechnung.rechnungNumber ?? ''))}
+        onClick={() => printWithFilename(buildDocumentFilename(customer, isAnzahlung ? 'Anzahlungsrechnung' : 'Rechnung', rechnung.rechnungNumber ?? ''))}
         className="btn-system btn-secondary"
         style={{ marginBottom: 12 }}
       >

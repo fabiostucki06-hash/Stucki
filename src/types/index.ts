@@ -87,9 +87,28 @@ export type MaterialStatus = 'offen' | 'teilweise' | 'bestellt';
 
 export type Position = ArbeitPosition | MaterialPosition;
 
+/** Auftragsbestätigung data captured on an accepted Offerte. The AB itself is
+    the Offerte rendered with these fields — same positions and payment terms. */
+export interface AuftragsBestaetigung {
+  /** Ungefährer Zeitpunkt der Fertigstellung (free text, e.g. "KW 44" or a date). */
+  fertigstellung?: string;
+  ort?: string;
+  /** ISO date (yyyy-mm-dd). */
+  datum?: string;
+  name?: string;
+  /** Hand-drawn signature as PNG data URL. */
+  unterschrift?: string;
+}
+
 export interface Offerte {
   id: string;
   offertNumber: number;
+  /** Version within the same offertNumber; shown as "<nr>_v<version>" from 2 on. */
+  version?: number;
+  /** 'material' = reine Materialofferte derived from another Offerte. */
+  art?: 'standard' | 'material';
+  /** The Offerte this version was derived from. */
+  basisOffertId?: string;
   customerId: string;
   status: OfferteStatus;
   createdAt: string;
@@ -103,6 +122,10 @@ export interface Offerte {
   totalMaterial?: string;
   totalZE?: number;
   materialStatus?: MaterialStatus;
+  /** Free-text payment terms; replace "<zahlungsziel> Tage netto" when set. */
+  zahlungsbedingung?: string;
+  zusatznotiz?: string;
+  ab?: AuftragsBestaetigung;
 }
 
 export type RechnungStatus = 'entwurf' | 'versendet' | 'bezahlt' | 'storniert';
@@ -128,6 +151,11 @@ export interface Rechnung {
   kategorie?: RechnungKategorie;
   /** Manual Kleinteilepauschale override: true=erzwingen, false=unterdrücken, undefined/null=automatisch (nach Kategorie). */
   kleinteilManuell?: boolean | null;
+  /** 'anzahlung' = 50% Vorkasse invoice generated from an Offerte / AB. */
+  art?: 'standard' | 'anzahlung';
+  offertId?: string;
+  /** Free-text payment terms; replace "<zahlungsFrist> Tage netto" when set. */
+  zahlungsbedingung?: string;
 }
 
 export interface MaterialCatalogItem {

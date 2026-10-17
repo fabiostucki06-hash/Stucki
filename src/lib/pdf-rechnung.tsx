@@ -93,7 +93,7 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
 
   // ── HEADER ────────────────────────────────────────────────────────────────
   bold(); fs(15); rgb(0, 0, 0);
-  tL('Rechnung', TL, y + 7);
+  tL(rechnung.art === 'anzahlung' ? 'Anzahlungsrechnung' : 'Rechnung', TL, y + 7);
 
   norm(); fs(8); rgb(120, 120, 120);
   tL('Rechnungsnummer', TL, y + 13);
@@ -223,7 +223,9 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
   y += 6;
   if (!fits(0)) newPage();
   fs(7.5); rgb(130, 130, 130);
-  tL('* Kleinmaterial-Pauschale wird bei <100 ZE hinzugefügt', TL, y);
+  tL(rechnung.art === 'anzahlung'
+    ? '* Die restlichen 50% werden mit der Schlussrechnung verrechnet (10 Tage netto)'
+    : '* Kleinmaterial-Pauschale wird bei <100 ZE hinzugefügt', TL, y);
   if (rechnung.notizen) {
     y += 6;
     if (!fits(4)) newPage();
@@ -237,18 +239,23 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
   rgb(0, 0, 0);
 
   // ── DATE / LOCATION ───────────────────────────────────────────────────────
-  // Date, location and payment terms stay together.
-  if (!fits(10 + 5 + 10 + 5)) newPage();
-  y += 10;
   const col2 = TL + VL;
   fs(8.5);
+  const payLines: string[] = rechnung.zahlungsbedingung?.trim()
+    ? doc.splitTextToSize(rechnung.zahlungsbedingung.trim(), TR - col2)
+    : [rechnung.zahlungsFrist ? `${rechnung.zahlungsFrist} Tage netto` : '10 Tage netto'];
+  // Date, location and payment terms stay together.
+  if (!fits(10 + 5 + 10 + payLines.length * 4.5 + 5)) newPage();
+  y += 10;
   rgb(100, 100, 100); tL('Datum', TL, y); bold(); rgb(0, 0, 0); tL(todayCH(), col2, y); norm(); y += 5;
   rgb(100, 100, 100); tL('Ort',   TL, y); bold(); rgb(0, 0, 0); tL(CO_LOC,   col2, y); norm();
 
   // ── PAYMENT ───────────────────────────────────────────────────────────────
   y += 10;
   rgb(100, 100, 100); tL('Zahlungskonditionen', TL, y);
-  bold(); rgb(0, 0, 0); tL(rechnung.zahlungsFrist ? `${rechnung.zahlungsFrist} Tage netto` : '10 Tage netto', col2, y); norm();
+  bold(); rgb(0, 0, 0);
+  payLines.forEach((l, i) => { if (i > 0) y += 4.5; tL(l, col2, y); });
+  norm();
   y += 5;
   rgb(100, 100, 100); tL('Rechnungstellung', TL, y); norm(); rgb(0, 0, 0);
 
@@ -264,7 +271,7 @@ async function renderQrBillImage(rechnung: Rechnung, amount: number): Promise<{ 
     const svg = new SwissQRBill({
       currency: 'CHF',
       amount,
-      message: `Rechnung #${rechnung.rechnungNumber}`,
+      message: `${rechnung.art === 'anzahlung' ? 'Anzahlungsrechnung' : 'Rechnung'} #${rechnung.rechnungNumber}`,
       creditor: {
         name: CO_NAME,
         address: CO_ADDR,
@@ -317,7 +324,7 @@ export async function exportRechnungPDF(rechnung: Rechnung, customer: Customer |
       doc.setTextColor(0, 0, 0);
     }
 
-    doc.save(`${buildDocumentFilename(customer, 'Rechnung', rechnung.rechnungNumber ?? '')}.pdf`);
+    doc.save(`${buildDocumentFilename(customer, rechnung.art === 'anzahlung' ? 'Anzahlungsrechnung' : 'Rechnung', rechnung.rechnungNumber ?? '')}.pdf`);
   } catch (err) {
     alert(`PDF-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);
   }

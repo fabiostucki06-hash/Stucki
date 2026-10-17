@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { showToast } from '../ui/Toast';
 import { getActiveOfferteId, setActiveOfferteId, subscribeActiveOfferteId } from '../../lib/settings';
 import { isOpenOfferte, useActiveOfferte } from '../../hooks/useActiveOfferte';
+import { offerteNr } from '../../lib/offerte-docs';
 import type { Customer, Offerte } from '../../types';
 
 const customerName = (c: Customer | undefined) => (c ? `${c.vorname} ${c.nachname}` : 'Kein Kunde');
@@ -16,7 +17,7 @@ export function ActiveOfferteBadge() {
     explicit click. Merely opening or editing an Offerte never changes it. */
 function toggleActive(offerte: Offerte, isActive: boolean) {
   setActiveOfferteId(isActive ? '' : offerte.id);
-  showToast(isActive ? `Offerte #${offerte.offertNumber} abgewählt` : `Offerte #${offerte.offertNumber} ist jetzt aktiv`, isActive ? 'info' : 'success');
+  showToast(isActive ? `Offerte #${offerteNr(offerte)} abgewählt` : `Offerte #${offerteNr(offerte)} ist jetzt aktiv`, isActive ? 'info' : 'success');
 }
 
 /** Compact activate/deactivate button for an Offerte's row in the list.
@@ -57,7 +58,7 @@ export function ActiveOfferteBanner({ offerte, customer }: ActiveOfferteBannerPr
       <span aria-hidden="true">🎯</span>
       {isActive ? (
         <span className="ao-banner-txt">
-          Aktive Offerte: <strong>#{offerte.offertNumber} – {customerName(customer)}</strong>
+          Aktive Offerte: <strong>#{offerteNr(offerte)} – {customerName(customer)}</strong>
           <span className="ao-banner-hint">Importierte Teile landen hier</span>
         </span>
       ) : (
@@ -112,7 +113,7 @@ export function ActiveOffertePill({ offerten, customers }: ActiveOffertePillProp
       >
         <span aria-hidden="true">🎯</span>
         {active
-          ? <span><span className="ao-long">Offerte </span>#{active.offertNumber}<span className="ao-long"> aktiv</span></span>
+          ? <span><span className="ao-long">Offerte </span>#{offerteNr(active)}<span className="ao-long"> aktiv</span></span>
           : <span>Keine<span className="ao-long"> Offerte aktiv</span></span>}
       </button>
 
@@ -131,7 +132,7 @@ export function ActiveOffertePill({ offerten, customers }: ActiveOffertePillProp
                 className={`context-item${o.id === active?.id ? ' ao-current' : ''}`}
                 onClick={() => pick(o.id)}
               >
-                <span className="ao-menu-lbl">#{o.offertNumber} – {customerName(customers.find((c) => c.id === o.customerId))}</span>
+                <span className="ao-menu-lbl">#{offerteNr(o)} – {customerName(customers.find((c) => c.id === o.customerId))}</span>
                 {o.id === active?.id && <ActiveOfferteBadge />}
               </button>
             ))}

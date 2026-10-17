@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { formatDateCH, buildDocumentFilename } from './utils';
 import { PAGE_TOP, PAGE_BOTTOM, addPageNumbers } from './pdf-paging';
+import { offerteNr, offerteZahlungszeilen } from './offerte-docs';
 import type { ArbeitPosition, Customer, MaterialPosition, Offerte } from '../types';
 
 const CO_NAME  = 'Fabio Stucki';
@@ -37,10 +38,16 @@ const x3 = x2 + wStk;   // 140 – Preis left
 const x4 = x3 + wPre;   // 170 – ZE left
 // TR = 195 = x4 + wZE
 
-function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined) {
+/** 'ab' renders the same document as Auftragsbestätigung with completion date and signature block. */
+type DocMode = 'offerte' | 'ab';
+
+function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, mode: DocMode) {
   const vehicle = [customer?.marke, customer?.modell].filter(Boolean).join(' ');
   const owner   = customer ? `${customer.vorname} ${customer.nachname}` : '';
-  const date    = todayCH();
+  const isAB    = mode === 'ab';
+  const ab      = offerte.ab ?? {};
+  const date    = isAB && ab.datum ? formatDateCH(ab.datum) : todayCH();
+  const title   = isAB ? 'Auftragsbestätigung' : offerte.art === 'material' ? 'Materialofferte' : 'Budget Offerte';
 
   const allPos       = offerte.positionen ?? [];
   const kleinteilPos = allPos.find(
@@ -85,12 +92,12 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined) {
 
   // ── HEADER ────────────────────────────────────────────────────────────────
   bold(); fs(15); rgb(0, 0, 0);
-  tL('Budget Offerte', TL, y + 7);
+  tL(title, TL, y + 7);
 
   norm(); fs(8); rgb(120, 120, 120);
-  tL('Offertennummer', TL, y + 13);
+  tL(isAB ? 'Gemäss Offerte' : 'Offertennummer', TL, y + 13);
   bold(); fs(8.5); rgb(0, 0, 0);
-  tL(String(offerte.offertNumber ?? ''), TL + 37, y + 13);
+  tL(offerteNr(offerte), TL + 37, y + 13);
   norm();
 
   bold(); fs(9); rgb(0, 0, 0);
@@ -206,7 +213,7 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined) {
   frgb(22, 22, 22); doc.rect(TL, y, TW, RH_T, 'F');
   const totY = y + RH_T * BL;
   bold(); fs(9); rgb(255, 255, 255);
-  tL('Offertentotal', x0 + PAD, totY);
+  tL(isAB ? 'Auftragstotal' : 'Offertentotal', x0 + PAD, totY);
   tR(chf(totalBetrag), TR - PAD, totY);
   rgb(0, 0, 0);
   y += RH_T;
@@ -217,9 +224,13 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined) {
   y += 6;
   if (!fits(4)) newPage();
   fs(7.5); rgb(130, 130, 130);
-  tL('* ZE basieren auf einer reibungslosen Reparatur', TL, y);
-  y += 4;
-  tL('* Kleinmaterial-Pauschale wird bei über 100 ZE automatisch hinzugefügt', TL, y);
+  if (allPos.some((p) => p.typ === 'arbeit')) {
+    tL('* ZE basieren auf einer reibungslosen Reparatur', TL, y);
+    y += 4;
+    tL('* Kleinmaterial-Pauschale wird bei über 100 ZE automatisch hinzugefügt', TL, y);
+  } else {
+    tL('* Materialpreise gemäss aktuellem Lieferantenpreis', TL, y);
+  }
   if (offerte.notizen) {
     y += 6;
     if (!fits(8)) newPage();
@@ -233,27 +244,65 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined) {
   rgb(0, 0, 0);
 
   // ── DATE / LOCATION ───────────────────────────────────────────────────────
-  // Date, location and payment terms (≈ 30 mm) stay together.
-  if (!fits(10 + 5 + 10 + 5)) newPage();
-  y += 10;
   const col2 = TL + VL;
   fs(8.5);
+  const payLines = offerteZahlungszeilen(offerte)
+    .flatMap((l) => doc.splitTextToSize(l, TR - col2) as string[]);
+  // Date, location and payment terms stay together.
+  if (!fits(10 + 5 + 10 + payLines.length * 4.5 + 5)) newPage();
+  y += 10;
   rgb(100, 100, 100); tL('Datum', TL, y); bold(); rgb(0, 0, 0); tL(date,   col2, y); norm(); y += 5;
-  rgb(100, 100, 100); tL('Ort',   TL, y); bold(); rgb(0, 0, 0); tL(CO_LOC, col2, y); norm();
+  rgb(100, 100, 100); tL('Ort',   TL, y); bold(); rgb(0, 0, 0); tL(isAB && ab.ort ? ab.ort : CO_LOC, col2, y); norm();
 
   // ── PAYMENT ───────────────────────────────────────────────────────────────
   y += 10;
-  rgb(100, 100, 100); tL('Zahlungskonditionen', TL, y); bold(); rgb(0, 0, 0); tL(`${offerte.zahlungsziel ?? '10'} Tage netto`, col2, y); norm(); y += 5;
+  rgb(100, 100, 100); tL('Zahlungskonditionen', TL, y);
+  bold(); rgb(0, 0, 0);
+  payLines.forEach((l, i) => { if (i > 0) y += 4.5; tL(l, col2, y); });
+  norm(); y += 5;
   rgb(100, 100, 100); tL('Rechnungstellung',    TL, y); norm(); rgb(0, 0, 0);
+
+  if (!isAB) return;
+
+  // ── AB: FERTIGSTELLUNG + UNTERSCHRIFT ─────────────────────────────────────
+  // The whole block stays on one page.
+  const SIG_H = 18;
+  if (!fits(10 + 10 + 5 + 5 + 8 + SIG_H + 6)) newPage();
+  y += 10;
+  rgb(100, 100, 100); tL('Ungefähre Fertigstellung', TL, y);
+  bold(); rgb(0, 0, 0); tL(ab.fertigstellung?.trim() || '–', col2, y); norm();
+
+  y += 10;
+  bold(); fs(8.5); tL('Auftrag bestätigt', TL, y); norm(); y += 5;
+  rgb(100, 100, 100); tL('Ort, Datum', TL, y);
+  rgb(0, 0, 0); bold(); tL([ab.ort || CO_LOC, date].filter(Boolean).join(', '), col2, y); norm(); y += 5;
+  rgb(100, 100, 100); tL('Name', TL, y);
+  rgb(0, 0, 0); bold(); tL(ab.name?.trim() || owner || '', col2, y); norm(); y += 8;
+
+  rgb(100, 100, 100); tL('Unterschrift', TL, y + SIG_H - 1);
+  if (ab.unterschrift?.startsWith('data:image/png')) {
+    try { doc.addImage(ab.unterschrift, 'PNG', col2, y, SIG_H * 3, SIG_H); } catch { /* unreadable image: leave the line blank */ }
+  }
+  hLine(y + SIG_H, col2, col2 + 80, 0.3);
+  rgb(0, 0, 0);
 }
 
-export async function exportOffertePDF(offerte: Offerte, customer: Customer | undefined) {
+function exportDoc(offerte: Offerte, customer: Customer | undefined, mode: DocMode) {
+  const docType = mode === 'ab' ? 'Auftragsbestätigung' : offerte.art === 'material' ? 'Materialofferte' : 'Offerte';
   try {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    drawDoc(doc, offerte, customer);
+    drawDoc(doc, offerte, customer, mode);
     addPageNumbers(doc, TR);
-    doc.save(`${buildDocumentFilename(customer, 'Offerte', offerte.offertNumber ?? '')}.pdf`);
+    doc.save(`${buildDocumentFilename(customer, docType, offerteNr(offerte))}.pdf`);
   } catch (err) {
     alert(`PDF-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);
   }
+}
+
+export async function exportOffertePDF(offerte: Offerte, customer: Customer | undefined) {
+  exportDoc(offerte, customer, 'offerte');
+}
+
+export async function exportAuftragsbestaetigungPDF(offerte: Offerte, customer: Customer | undefined) {
+  exportDoc(offerte, customer, 'ab');
 }

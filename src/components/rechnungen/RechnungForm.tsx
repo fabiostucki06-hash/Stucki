@@ -3,6 +3,7 @@ import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
 import { FormCard, FormBar, SummaryRow, VehicleChips, PositionenEditor, fCHF, type ArbeitRow, type MaterialRow } from '../ui/DocForm';
 import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../lib/rechnung-totals';
+import { offerteNr } from '../../lib/offerte-docs';
 import type { Customer, Order, Offerte, ArbeitPosition, MaterialPosition, Rechnung, RechnungKategorie } from '../../types';
 
 type RechnungData = Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>;
@@ -124,7 +125,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
     const off = offerten.find((o) => o.id === offerteId);
     if (!off) return;
     setCid(off.customerId);
-    if (!initial?.titel) setTitel(off.titel ?? `Offerte #${off.offertNumber}`);
+    if (!initial?.titel) setTitel(off.titel ?? `Offerte #${offerteNr(off)}`);
     const positions = off.positionen ?? [];
     const arbeitRows: ArbeitRow[] = positions
       .filter((p): p is ArbeitPosition => p.typ === 'arbeit')
@@ -275,7 +276,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
                 const c = customers.find((cu) => cu.id === off.customerId);
                 return (
                   <option key={off.id} value={off.id}>
-                    #{off.offertNumber}{off.titel ? ` – ${off.titel}` : ''} · {c ? `${c.vorname} ${c.nachname}` : '?'} · CHF {parseFloat(off.totalBetrag || '0').toFixed(2)}
+                    #{offerteNr(off)}{off.titel ? ` – ${off.titel}` : ''} · {c ? `${c.vorname} ${c.nachname}` : '?'} · CHF {parseFloat(off.totalBetrag || '0').toFixed(2)}
                   </option>
                 );
               })}

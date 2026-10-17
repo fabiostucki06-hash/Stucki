@@ -3,6 +3,7 @@ import { exportOffertePDF } from '../../lib/pdf-offerte';
 import { formatDateCH } from '../../lib/utils';
 import { ActiveOfferteBadge, ActiveOfferteToggle } from './ActiveOfferte';
 import { useActiveOfferte } from '../../hooks/useActiveOfferte';
+import { offerteNr } from '../../lib/offerte-docs';
 import type { Customer, Offerte, OfferteStatus } from '../../types';
 
 interface OfferteListProps {
@@ -54,7 +55,7 @@ export default function OfferteList({ offerten, customers, onOfferteClick, onEdi
                   <div key={off.id} className={`list-row${off.id === active?.id ? ' ao-active' : ''}`} onClick={() => onOfferteClick(off)}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                        Offerte #{off.offertNumber}
+                        {off.art === 'material' ? 'Materialofferte' : 'Offerte'} #{offerteNr(off)}
                         {off.id === active?.id && <ActiveOfferteBadge />}
                       </div>
                       <div style={{ fontSize: 13, color: 'var(--label2)', marginTop: 1 }}>{c ? `${c.vorname} ${c.nachname}` : 'Kein Kunde'}</div>

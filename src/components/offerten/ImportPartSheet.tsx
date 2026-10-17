@@ -3,6 +3,7 @@ import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
 import { getMargin } from '../../lib/settings';
 import { cleanPartTitle } from '../../lib/partTitle';
+import { offerteNr } from '../../lib/offerte-docs';
 import type { Customer, MaterialPosition, Offerte, MaterialCatalogItem } from '../../types';
 
 export interface ImportPayload {
@@ -270,7 +271,7 @@ export default function ImportPartSheet({ payload, customers, offerten, defaultO
                 {openDrafts.map((o) => {
                   const c = customers.find((x) => x.id === o.customerId);
                   const statusLabel = o.status === 'entwurf' ? 'Entwurf' : 'Versendet';
-                  return <option key={o.id} value={o.id}>#{o.offertNumber} – {o.titel || (c ? `${c.vorname} ${c.nachname}` : 'Offerte')} ({statusLabel})</option>;
+                  return <option key={o.id} value={o.id}>#{offerteNr(o)} – {o.titel || (c ? `${c.vorname} ${c.nachname}` : 'Offerte')} ({statusLabel})</option>;
                 })}
               </select>
             </div>

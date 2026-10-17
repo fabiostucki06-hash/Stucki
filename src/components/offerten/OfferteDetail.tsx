@@ -6,9 +6,11 @@ import { SFPlus, SFXmark } from '../Icons';
 import { PartLink } from '../ui/DocForm';
 import { ActiveOfferteBanner } from './ActiveOfferte';
 import PartsOrder from '../teile/PartsOrder';
-import { exportOffertePDF } from '../../lib/pdf-offerte';
+import SignaturePad from '../ui/SignaturePad';
+import { exportOffertePDF, exportAuftragsbestaetigungPDF } from '../../lib/pdf-offerte';
 import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../lib/utils';
-import type { Customer, Offerte, OfferteStatus, Position, ArbeitPosition, MaterialPosition } from '../../types';
+import { offerteNr, sumPositions, todayISO, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_PROZENT } from '../../lib/offerte-docs';
+import type { AuftragsBestaetigung, Customer, Offerte, OfferteStatus, Position, ArbeitPosition, MaterialPosition } from '../../types';
 
 interface OfferteDetailProps {
   offerte: Offerte;
@@ -20,6 +22,10 @@ interface OfferteDetailProps {
   onDuplicate: (offerte: Offerte) => Promise<void>;
   onCreateAuftrag?: (offerte: Offerte, acceptedIndices: number[]) => Promise<void>;
   onCreateRechnung?: (offerte: Offerte, acceptedIndices: number[]) => Promise<void>;
+  /** Creates a reine Materialofferte as next version of this Offerte from the given positions. */
+  onCreateMaterialofferte?: (offerte: Offerte, positionen: Position[]) => Promise<void>;
+  /** Creates a 50% Vorkasse invoice over `total`. */
+  onCreateAnzahlung?: (offerte: Offerte, total: number) => Promise<void>;
 }
 
 const HDR: React.CSSProperties = {
@@ -37,7 +43,7 @@ const ST_META: Record<OfferteStatus, StatusMeta> = {
   abgelehnt:  { c: 'var(--red)',    l: 'Abgelehnt'  },
 };
 
-export default function OfferteDetail({ offerte, customer, onClose, onUpdate, onDelete, onEdit, onDuplicate, onCreateAuftrag, onCreateRechnung }: OfferteDetailProps) {
+export default function OfferteDetail({ offerte, customer, onClose, onUpdate, onDelete, onEdit, onDuplicate, onCreateAuftrag, onCreateRechnung, onCreateMaterialofferte, onCreateAnzahlung }: OfferteDetailProps) {
   const [saving, setSaving] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
   const [creatingAuftrag, setCreatingAuftrag] = useState(false);
@@ -45,6 +51,11 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   const [positionen, setPositionen] = useState<Position[]>(() => offerte.positionen ?? []);
   const [posAccepted, setPosAccepted] = useState<boolean[]>(() => (offerte.positionen ?? []).map(() => true));
   const [zahlungsziel, setZahlungsziel] = useState(offerte.zahlungsziel ?? '10');
+  const [zahlungsbedingung, setZahlungsbedingung] = useState(offerte.zahlungsbedingung ?? '');
+  const [zusatznotiz, setZusatznotiz] = useState(offerte.zusatznotiz ?? '');
+  const [ab, setAb] = useState<AuftragsBestaetigung>(() => offerte.ab ?? {});
+  const [creatingMat, setCreatingMat] = useState(false);
+  const [creatingAnz, setCreatingAnz] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [posSaving, setPosSaving] = useState(false);
 
@@ -59,7 +70,10 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
     setPositionen(pos);
     setPosAccepted(pos.map(() => true));
     setZahlungsziel(offerte.zahlungsziel ?? '10');
-  }, [dirty, offerte.id, offerte.positionen, offerte.zahlungsziel]);
+    setZahlungsbedingung(offerte.zahlungsbedingung ?? '');
+    setZusatznotiz(offerte.zusatznotiz ?? '');
+    setAb(offerte.ab ?? {});
+  }, [dirty, offerte.id, offerte.positionen, offerte.zahlungsziel, offerte.zahlungsbedingung, offerte.zusatznotiz, offerte.ab]);
 
   const [addingTyp, setAddingTyp] = useState<'arbeit' | 'material' | null>(null);
   const [newBeschreibung, setNewBeschreibung] = useState('');
@@ -86,9 +100,36 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   const acceptedMaterial = positionen.filter((p, i) => posAccepted[i] && p.typ === 'material')
     .reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
   const acceptedTotal = acceptedArbeit + acceptedMaterial;
+  const acceptedMatPos = positionen.filter((p, i) => posAccepted[i] && p.typ === 'material');
+  const hasTerms = !!(zahlungsbedingung || zusatznotiz);
+  const nr = offerteNr(offerte);
+  const docName = offerte.art === 'material' ? 'Materialofferte' : 'Offerte';
+  const busy = creatingAuftrag || creatingRechnung || creatingMat || creatingAnz;
+
+  /* AB fields: name / ort / datum default to the customer, workshop and today. */
+  const abName = ab.name ?? (customer ? `${customer.vorname} ${customer.nachname}` : '');
+  const abOrt = ab.ort ?? 'Thalheim AG';
+  const abDatum = ab.datum ?? todayISO();
 
   function handleZahlungszielChange(val: string) {
     setZahlungsziel(val);
+    setDirty(true);
+  }
+
+  function updAb(key: keyof AuftragsBestaetigung, val: string) {
+    setAb((prev) => ({ ...prev, [key]: val }));
+    setDirty(true);
+  }
+
+  function applyVorkasse() {
+    setZahlungsbedingung(VORKASSE_BEDINGUNG);
+    setZusatznotiz(SCHLUSSRECHNUNG_NOTIZ);
+    setDirty(true);
+  }
+
+  function removeTerms() {
+    setZahlungsbedingung('');
+    setZusatznotiz('');
     setDirty(true);
   }
 
@@ -168,16 +209,20 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
       totalMaterial: totalMaterial.toFixed(2),
       totalZE,
       zahlungsziel,
+      zahlungsbedingung: zahlungsbedingung || undefined,
+      zusatznotiz: zusatznotiz || undefined,
+      // AB data only exists once the Offerte was accepted (or already has some).
+      ab: offerte.status === 'angenommen' || offerte.ab ? { ...ab, name: abName, ort: abOrt, datum: abDatum } : undefined,
       ...patch,
     };
   }
 
-  async function savePositionen() {
+  async function savePositionen(msg = 'Positionen gespeichert') {
     setPosSaving(true);
     try {
       await onUpdate(buildPayload());
       setDirty(false);
-      showToast('Positionen gespeichert', 'success');
+      showToast(msg, 'success');
     } catch {
       // onUpdate already toasted the concrete reason; keep the edits marked dirty.
     } finally {
@@ -204,6 +249,44 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
     }
   }
 
+  /* The AB shows exactly what was accepted: same positions, totals and terms. */
+  function abPayload(): Offerte {
+    const pos = positionen.filter((_, i) => posAccepted[i]);
+    const t = sumPositions(pos);
+    return buildPayload({
+      positionen: pos,
+      totalArbeit: t.totalArbeit.toFixed(2),
+      totalMaterial: t.totalMaterial.toFixed(2),
+      totalBetrag: t.total.toFixed(2),
+      totalZE: t.totalZE,
+    });
+  }
+
+  async function handleExportAB() {
+    if (dirty) await savePositionen('Auftragsbestätigung gespeichert');
+    exportAuftragsbestaetigungPDF(abPayload(), customer);
+  }
+
+  async function handleCreateMaterialofferte() {
+    if (!onCreateMaterialofferte || acceptedMatPos.length === 0) return;
+    setCreatingMat(true);
+    try {
+      await onCreateMaterialofferte(offerte, acceptedMatPos);
+    } finally {
+      setCreatingMat(false);
+    }
+  }
+
+  async function handleCreateAnzahlung() {
+    if (!onCreateAnzahlung || acceptedTotal <= 0) return;
+    setCreatingAnz(true);
+    try {
+      await onCreateAnzahlung(offerte, acceptedTotal);
+    } finally {
+      setCreatingAnz(false);
+    }
+  }
+
   async function handleCreateRechnung() {
     if (!onCreateRechnung || acceptedCount === 0) return;
     setCreatingRechnung(true);
@@ -216,7 +299,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
 
   return (
     <Sheet
-      title={`Offerte #${offerte.offertNumber}`}
+      title={`${docName} #${nr}`}
       onClose={onClose}
       full
       barRight={<button onClick={() => onEdit(offerte)} className="bar-btn">Bearbeiten</button>}
@@ -227,6 +310,11 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
         <div style={{ fontSize: 13, color: 'var(--label2)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Status</div>
         <div style={{ fontSize: 24, fontWeight: 700, color: sc.c, letterSpacing: '0.34px' }}>{sc.l}</div>
         {offerte.titel && <div style={{ fontSize: 15, color: 'var(--label2)', marginTop: 4 }}>{offerte.titel}</div>}
+        {(offerte.version ?? 1) > 1 && (
+          <div style={{ fontSize: 13, color: 'var(--label3)', marginTop: 4 }}>
+            Version {offerte.version}{offerte.art === 'material' ? ' · reine Materialofferte' : ''} · basiert auf Offerte #{offerte.offertNumber}
+          </div>
+        )}
       </div>
 
       {isExpired && offerte.status === 'versendet' && (
@@ -277,7 +365,23 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
         </div>
       )}
 
-      <div style={{ background: 'rgba(52,199,89,0.09)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, border: '0.5px solid rgba(52,199,89,0.22)' }}>
+      {hasTerms ? (
+        <div className="glass-panel doc-terms">
+          <div className="ab-panel-title">Zahlungsbedingungen</div>
+          <div className="cf-field">
+            <label className="cf-label">Bemerkung / Zahlungsbedingung</label>
+            <textarea className="cf-textarea" rows={2} value={zahlungsbedingung} onChange={(e) => { setZahlungsbedingung(e.target.value); setDirty(true); }} />
+          </div>
+          <div className="cf-field">
+            <label className="cf-label">Zusatznotiz</label>
+            <textarea className="cf-textarea" rows={2} value={zusatznotiz} onChange={(e) => { setZusatznotiz(e.target.value); setDirty(true); }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+            <button onClick={removeTerms} className="mf-btn-cancel">Standard (Tage netto) verwenden</button>
+          </div>
+        </div>
+      ) : (
+      <div style={{ background: 'rgba(52,199,89,0.09)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, border: '0.5px solid rgba(52,199,89,0.22)', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 16, color: 'var(--green)' }}>✓</span>
         <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--green)' }}>Zahlungsziel:</span>
         <input
@@ -292,14 +396,16 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
           }}
         />
         <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--green)' }}>Tage netto</span>
+        <button onClick={applyVorkasse} className="mf-btn-cancel" style={{ marginLeft: 'auto' }}>50% Vorkasse</button>
       </div>
+      )}
 
       {/* ── Positionen – inline editable mit Accept/Reject ── */}
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 0 }}>
         <p className="section-header" style={{ margin: 0 }}>Positionen</p>
         {dirty && (
           <button
-            onClick={savePositionen}
+            onClick={() => savePositionen()}
             disabled={posSaving}
             className="mf-btn-save"
             style={{ marginRight: 20, display: 'flex', alignItems: 'center', gap: 5 }}
@@ -499,7 +605,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
 
       {offerte.status === 'angenommen' && (
         <PartsOrder
-          docLabel={`Offerte #${offerte.offertNumber}`}
+          docLabel={`${docName} #${nr}`}
           positionen={positionen}
           onSave={async (pos, materialStatus) => {
             await onUpdate(buildPayload({ positionen: pos, materialStatus }));
@@ -515,7 +621,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
           {onCreateAuftrag && (
             <button
               onClick={handleCreateAuftrag}
-              disabled={creatingAuftrag || creatingRechnung || acceptedCount === 0}
+              disabled={busy || acceptedCount === 0}
               className="btn-system"
               style={{
                 flex: 1,
@@ -534,7 +640,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
           {onCreateRechnung && (
             <button
               onClick={handleCreateRechnung}
-              disabled={creatingAuftrag || creatingRechnung || acceptedCount === 0}
+              disabled={busy || acceptedCount === 0}
               className="btn-system btn-green"
               style={{
                 flex: 1,
@@ -550,15 +656,75 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
         </div>
       )}
 
+      {/* ── Auftragsbestätigung (nur bei angenommener Offerte) ── */}
+      {offerte.status === 'angenommen' && positionen.length > 0 && (
+        <div className="glass-panel ab-panel">
+          <div className="ab-panel-title">Auftragsbestätigung</div>
+          <div className="sf-subhead" style={{ color: 'var(--label2)', marginBottom: 12 }}>
+            Gleicher Inhalt und Zahlungsbedingungen wie {docName} #{nr} · {acceptedCount} Positionen · CHF {acceptedTotal.toFixed(2)}
+          </div>
+          <div className="cf-field" style={{ marginBottom: 10 }}>
+            <label className="cf-label">Ungefährer Zeitpunkt der Fertigstellung</label>
+            <input className="cf-input" value={ab.fertigstellung ?? ''} onChange={(e) => updAb('fertigstellung', e.target.value)} placeholder="z.B. KW 45 / Ende November" />
+          </div>
+          <div className="cf-grid-2" style={{ marginBottom: 10 }}>
+            <div className="cf-field">
+              <label className="cf-label">Ort</label>
+              <input className="cf-input" value={abOrt} onChange={(e) => updAb('ort', e.target.value)} />
+            </div>
+            <div className="cf-field">
+              <label className="cf-label">Datum</label>
+              <input className="cf-input" type="date" value={abDatum} onChange={(e) => updAb('datum', e.target.value)} />
+            </div>
+          </div>
+          <div className="cf-field" style={{ marginBottom: 10 }}>
+            <label className="cf-label">Name</label>
+            <input className="cf-input" value={abName} onChange={(e) => updAb('name', e.target.value)} placeholder="Vorname Nachname" />
+          </div>
+          <div className="cf-field">
+            <label className="cf-label">Persönliche Unterschrift</label>
+            <SignaturePad value={ab.unterschrift} onChange={(url) => updAb('unterschrift', url)} />
+          </div>
+          <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+            {dirty && (
+              <button onClick={() => savePositionen('Auftragsbestätigung gespeichert')} disabled={posSaving} className="btn-system btn-secondary" style={{ flex: 1 }}>
+                {posSaving ? <><Spinner size={13} />&nbsp; Speichern…</> : 'AB speichern'}
+              </button>
+            )}
+            <button onClick={handleExportAB} disabled={posSaving || acceptedCount === 0} className="btn-system" style={{ flex: 1 }}>
+              AB als PDF
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Folgedokumente: Materialofferte / Anzahlungsrechnung ── */}
+      {positionen.length > 0 && (onCreateMaterialofferte || onCreateAnzahlung) && (
+        <div className="doc-actions">
+          {onCreateMaterialofferte && acceptedMatPos.length > 0 && (
+            <button onClick={handleCreateMaterialofferte} disabled={busy} className="btn-system btn-secondary">
+              {creatingMat ? <><Spinner size={13} />&nbsp; Wird erstellt…</> : `Materialofferte erstellen (${acceptedMatPos.length} Pos.)`}
+            </button>
+          )}
+          {onCreateAnzahlung && (
+            <button onClick={handleCreateAnzahlung} disabled={busy || acceptedTotal <= 0} className="btn-system btn-green" style={{ opacity: acceptedTotal <= 0 ? 0.4 : 1 }}>
+              {creatingAnz
+                ? <><Spinner size={13} />&nbsp; Wird erstellt…</>
+                : `Anzahlungsrechnung ${ANZAHLUNG_PROZENT}% · CHF ${roundToRappen(acceptedTotal * ANZAHLUNG_PROZENT / 100).toFixed(2)}`}
+            </button>
+          )}
+        </div>
+      )}
+
       {offerte.notizen && <div style={{ background: 'var(--fill3)', borderRadius: 12, padding: '12px 14px', fontSize: 15, color: 'var(--label2)', marginBottom: 16 }}>{offerte.notizen}</div>}
 
-      <button onClick={() => exportOffertePDF(offerte, customer)} className="btn-system btn-green" style={{ marginBottom: 12 }}>PDF speichern</button>
-      <button onClick={() => printWithFilename(buildDocumentFilename(customer, 'Offerte', offerte.offertNumber ?? ''))} className="btn-system btn-secondary" style={{ marginBottom: 12 }}>Drucken</button>
+      <button onClick={() => exportOffertePDF(buildPayload(), customer)} className="btn-system btn-green" style={{ marginBottom: 12 }}>PDF speichern</button>
+      <button onClick={() => printWithFilename(buildDocumentFilename(customer, docName, nr))} className="btn-system btn-secondary" style={{ marginBottom: 12 }}>Drucken</button>
       <button onClick={handleDuplicate} disabled={duplicating} className="btn-system btn-secondary" style={{ marginBottom: 12 }}>
-        {duplicating ? <><Spinner size={13} />&nbsp; Wird dupliziert…</> : 'Offerte duplizieren'}
+        {duplicating ? <><Spinner size={13} />&nbsp; Wird dupliziert…</> : `${docName} duplizieren`}
       </button>
       <button onClick={async () => { if (window.confirm('Offerte löschen?')) await onDelete(offerte.id); }} className="btn-system btn-destructive">Offerte löschen</button>
-      <div style={{ marginTop: 16, fontSize: 13, color: 'var(--label3)', textAlign: 'center' }}>Erstellt: {formatDateCH(offerte.createdAt)} · Offerte #{offerte.offertNumber}</div>
+      <div style={{ marginTop: 16, fontSize: 13, color: 'var(--label3)', textAlign: 'center' }}>Erstellt: {formatDateCH(offerte.createdAt)} · {docName} #{nr}</div>
     </Sheet>
   );
 }
