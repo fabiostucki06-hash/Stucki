@@ -259,6 +259,7 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .doc-actions{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
 .ab-sig-grid{display:grid;grid-template-columns:1fr;gap:14px}
 @media (min-width:640px){.ab-sig-grid{grid-template-columns:1fr 1fr}}
+.ab-sig-block{display:flex;flex-direction:column;padding:12px;border-radius:12px;background:var(--fill4);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--card-border);box-shadow:inset 0 1px 0 rgba(255,255,255,0.28),0 8px 32px rgba(0,0,0,0.10)}
 .ab-sig-role{font-size:12px;font-weight:700;color:var(--label3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px}
 .ab-sig-name{font-size:15px;font-weight:600;color:var(--label);padding:6px 0}
 .ab-sig-own{display:block;width:100%;aspect-ratio:3/1;height:auto;margin-top:4px;object-fit:contain;border-radius:10px;background:rgba(255,255,255,0.7);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.5);box-shadow:inset 0 1px 0 rgba(255,255,255,0.6),0 8px 32px 0 rgba(0,0,0,0.1)}
@@ -296,6 +297,7 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
   .sheet-content .sig-pad-foot{display:none!important}
   /* AB: Auftragnehmer and Kunde signatures side by side, each with its line. */
   .sheet-content .ab-sig-grid{grid-template-columns:1fr 1fr;gap:8mm}
+  .sheet-content .ab-sig-block{padding:3mm;border:0.5pt solid #999;border-radius:0;break-inside:avoid;page-break-inside:avoid}
   .sheet-content .ab-sig-own{border:0.5pt solid #999;border-radius:0}
   .sheet-content .ab-sig-missing{color:transparent!important}
   .sheet-content button{display:none!important}

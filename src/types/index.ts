@@ -92,9 +92,14 @@ export type Position = ArbeitPosition | MaterialPosition;
 export interface AuftragsBestaetigung {
   /** Ungefährer Zeitpunkt der Fertigstellung (free text, e.g. "KW 44" or a date). */
   fertigstellung?: string;
+  /** Ort / Datum of the Auftragnehmer (Werkstatt) block; datum is also the document date. */
   ort?: string;
   /** ISO date (yyyy-mm-dd). */
   datum?: string;
+  /** Ort / Datum of the Kunde block; default to the Auftragnehmer values. */
+  kundeOrt?: string;
+  /** ISO date (yyyy-mm-dd). */
+  kundeDatum?: string;
   name?: string;
   /** Hand-drawn signature as PNG data URL. */
   unterschrift?: string;

@@ -266,32 +266,35 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
 
   // ── AB: FERTIGSTELLUNG + UNTERSCHRIFT ─────────────────────────────────────
   // The whole block stays on one page.
-  // Two signature boxes side by side: Auftragnehmer (own signature from the
-  // settings) left, Kunde (name + drawn signature) right.
+  // Two equal signature blocks side by side, each with its own Ort, Datum,
+  // Name and Unterschrift: Auftragnehmer (own signature from the settings)
+  // left, Kunde (name + drawn signature) right.
   const SIG_H = 18, SIG_W = 80;
   const colK = TL + TW / 2 + 5;
-  if (!fits(10 + 10 + 5 + 9 + 4.5 + 3 + SIG_H + 5)) newPage();
+  if (!fits(10 + 10 + 5 + 13.5 + 3 + SIG_H + 5)) newPage();
   y += 10;
   rgb(100, 100, 100); tL('Ungefähre Fertigstellung', TL, y);
   bold(); rgb(0, 0, 0); tL(ab.fertigstellung?.trim() || '–', col2, y); norm();
 
   y += 10;
   bold(); fs(8.5); tL('Auftrag bestätigt', TL, y); norm(); y += 5;
-  rgb(100, 100, 100); tL('Ort, Datum', TL, y);
-  rgb(0, 0, 0); bold(); tL([ab.ort || CO_LOC, date].filter(Boolean).join(', '), col2, y); norm(); y += 9;
 
-  const sigBox = (x: number, role: string, name: string, img: string | undefined) => {
-    fs(7.5); rgb(100, 100, 100); tL(role, x, y);
-    fs(8.5); bold(); rgb(0, 0, 0); tL(clip(name, SIG_W), x, y + 4.5); norm();
-    const top = y + 7.5;
+  const sigBox = (x: number, role: string, ort: string, datum: string, name: string, img: string | undefined) => {
+    fs(7.5); bold(); rgb(100, 100, 100); tL(role.toUpperCase(), x, y); norm();
+    fs(8.5); rgb(100, 100, 100); tL('Ort, Datum', x, y + 4.5);
+    rgb(0, 0, 0); tL(clip([ort, datum].filter(Boolean).join(', '), SIG_W - 20), x + 20, y + 4.5);
+    rgb(100, 100, 100); tL('Name', x, y + 9);
+    bold(); rgb(0, 0, 0); tL(clip(name, SIG_W - 20), x + 20, y + 9); norm();
+    const top = y + 12;
     if (img?.startsWith('data:image/png')) {
       try { doc.addImage(img, 'PNG', x, top, SIG_H * 3, SIG_H); } catch { /* unreadable image: leave the line blank */ }
     }
     hLine(top + SIG_H, x, x + SIG_W, 0.3);
-    fs(7.5); rgb(100, 100, 100); tL(`Unterschrift ${role}`, x, top + SIG_H + 4);
+    fs(7.5); rgb(100, 100, 100); tL(`Unterschrift ${role.split(' / ').pop()}`, x, top + SIG_H + 4);
   };
-  sigBox(TL, 'Auftragnehmer', CO_NAME, ownSignature);
-  sigBox(colK, 'Kunde', ab.name?.trim() || owner || '', ab.unterschrift);
+  const kundeDate = ab.kundeDatum ? formatDateCH(ab.kundeDatum) : date;
+  sigBox(TL, 'Auftragnehmer / Werkstatt', ab.ort || CO_LOC, date, CO_NAME, ownSignature);
+  sigBox(colK, 'Auftraggeber / Kunde', ab.kundeOrt || ab.ort || CO_LOC, kundeDate, ab.name?.trim() || owner || '', ab.unterschrift);
   fs(8.5); rgb(0, 0, 0);
 }
 
