@@ -18,6 +18,22 @@ export const SFDoc = () => (
   </svg>
 );
 
+/** Package (Materialofferten). */
+export const SFBox = () => (
+  <svg width={25} height={25} viewBox="0 0 25 25" fill="none">
+    <path d="M12.5 3l8.5 4.5v10L12.5 22 4 17.5v-10L12.5 3z" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round"/>
+    <path d="M4 7.5l8.5 4.5L21 7.5M12.5 12v10M8.25 5.25l8.5 4.5" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+/** Document with checkmark (Auftragsbestätigungen). */
+export const SFDocCheck = () => (
+  <svg width={25} height={25} viewBox="0 0 25 25" fill="none">
+    <path d="M6 3h8l5 5v14a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round"/>
+    <path d="M14 3v5h5M8.5 15l2.5 2.5 5-5" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 export const SFPerson = () => (
   <svg width={25} height={25} viewBox="0 0 25 25" fill="none">
     <circle cx={12.5} cy={8} r={4} stroke="currentColor" strokeWidth={1.5}/>

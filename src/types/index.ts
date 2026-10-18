@@ -168,5 +168,5 @@ export interface MaterialCatalogItem {
   createdAt: string;
 }
 
-export type TabId = 'dashboard' | 'auftraege' | 'offerten' | 'rechnungen' | 'kunden' | 'statistiken' | 'einstellungen';
+export type TabId = 'dashboard' | 'auftraege' | 'offerten' | 'materialofferten' | 'auftragsbestaetigungen' | 'rechnungen' | 'kunden' | 'statistiken' | 'einstellungen';
 export type SyncStatus = 'idle' | 'saving' | 'ok' | 'error';

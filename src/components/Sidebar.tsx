@@ -1,10 +1,12 @@
-import { SFHouse, SFWrench, SFDoc, SFReceipt, SFPerson, SFChart, SFXmark, SFGear } from './Icons';
+import { SFHouse, SFWrench, SFDoc, SFBox, SFDocCheck, SFReceipt, SFPerson, SFChart, SFXmark, SFGear } from './Icons';
 import type { TabId } from '../types';
 
 const SIDEBAR_ITEMS: { id: TabId; icon: React.ReactNode; label: string }[] = [
   { id: 'dashboard',   icon: <SFHouse />,  label: 'Home'      },
   { id: 'auftraege',   icon: <SFWrench />, label: 'Aufträge'  },
   { id: 'offerten',    icon: <SFDoc />,     label: 'Offerten'   },
+  { id: 'materialofferten',       icon: <SFBox />,      label: 'Materialofferten'      },
+  { id: 'auftragsbestaetigungen', icon: <SFDocCheck />, label: 'Auftragsbestätigungen' },
   { id: 'rechnungen', icon: <SFReceipt />, label: 'Rechnungen' },
   { id: 'kunden',     icon: <SFPerson />,  label: 'Kunden'     },
   { id: 'statistiken',   icon: <SFChart />,  label: 'Statistik'     },
@@ -45,7 +47,7 @@ export default function Sidebar({ open, activeTab, onTabChange, onClose, onLogou
           top: 0,
           left: 0,
           bottom: 0,
-          width: 272,
+          width: 292,
           zIndex: 400,
           background: 'rgba(255,255,255,0.10)',
           backdropFilter: 'blur(80px) saturate(280%)',
@@ -80,7 +82,7 @@ export default function Sidebar({ open, activeTab, onTabChange, onClose, onLogou
         </div>
 
         {/* Navigation Items */}
-        <nav style={{ flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <nav style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 3 }}>
           {SIDEBAR_ITEMS.map((item) => {
             const active = activeTab === item.id;
             return (

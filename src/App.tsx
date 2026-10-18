@@ -494,6 +494,8 @@ export default function App() {
         {tab === 'dashboard'   && <Dashboard customers={customers} orders={orders} onOrderClick={(o) => { setSelOInEdit(false); setSelO(o); }} />}
         {tab === 'auftraege'   && <OrderList orders={orders} customers={customers} onOrderClick={(o) => { setSelOInEdit(false); setSelO(o); }} onEditClick={(o) => { setSelOInEdit(true); setSelO(o); }} onNew={() => { setNewOCid(null); setShowNO(true); }} />}
         {tab === 'offerten'    && <OfferteList offerten={offerten} customers={customers} onOfferteClick={setSelOff} onEdit={(off) => setEditOff(off)} onNew={() => setShowNOff(true)} />}
+        {tab === 'materialofferten'       && <OfferteList key="material" variant="material" offerten={offerten} customers={customers} onOfferteClick={setSelOff} onEdit={(off) => setEditOff(off)} onNew={() => setShowNOff(true)} />}
+        {tab === 'auftragsbestaetigungen' && <OfferteList key="ab" variant="ab" offerten={offerten} customers={customers} onOfferteClick={setSelOff} onEdit={(off) => setEditOff(off)} onNew={() => setShowNOff(true)} />}
         {tab === 'rechnungen'  && <RechnungenList rechnungen={rechnungen} customers={customers} onRechnungClick={setSelR} onEdit={(r) => setEditR(r)} onNew={() => setShowNR(true)} />}
         {tab === 'kunden'      && <CustomerList customers={customers} orders={orders} onCustomerClick={setSelC} onNew={() => setShowNC(true)} />}
         {tab === 'statistiken'   && <StatistikDashboard orders={orders} offerten={offerten} rechnungen={rechnungen} customers={customers} />}
