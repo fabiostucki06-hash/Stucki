@@ -7,10 +7,10 @@ export const ANZAHLUNG_PROZENT = 50;
 
 const fN = (v?: string | number) => parseFloat(String(v ?? '0')) || 0;
 
-/** "12" for the original, "12_v2" for later versions. */
+/** "12" for the original, "12-2" for later versions (plain number suffix). */
 export function offerteNr(o: Pick<Offerte, 'offertNumber' | 'version'>): string {
   const n = String(o.offertNumber ?? '');
-  return o.version && o.version > 1 ? `${n}_v${o.version}` : n;
+  return o.version && o.version > 1 ? `${n}-${o.version}` : n;
 }
 
 /** Next free version for the offertNumber of `base` (the original counts as v1). */

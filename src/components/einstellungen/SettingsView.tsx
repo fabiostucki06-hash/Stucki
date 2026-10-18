@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { ASSETS } from '../../lib/supabase';
-import { setIban, setMargin, type BgMode } from '../../lib/settings';
+import { setIban, setMargin, setSignature, type BgMode } from '../../lib/settings';
+import { signatureFromFile } from '../../lib/signature';
 import { useSettings } from '../../hooks/useSettings';
+import SignaturePad from '../ui/SignaturePad';
+import { showToast } from '../ui/Toast';
 import { buildImportBookmarklet } from '../../lib/bookmarklet';
 import { SFCheckmark } from '../Icons';
 import ShortcutKeySection from './ShortcutKeySection';
@@ -34,7 +37,8 @@ interface SettingsViewProps {
 
 export default function SettingsView({ currentWallpaper, onWallpaperChange, bgMode, bgColor, onBgColorChange }: SettingsViewProps) {
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
-  const { iban, margin } = useSettings();
+  const { iban, margin, signature } = useSettings();
+  const [sigLoading, setSigLoading] = useState(false);
   const [bgTab, setBgTab] = useState<'bilder' | 'unifarben'>(bgMode === 'color' ? 'unifarben' : 'bilder');
   const bookmarklet = buildImportBookmarklet(window.location.origin);
   // Separate draft buffer: the hex text field must let the user type freely
@@ -56,6 +60,21 @@ export default function SettingsView({ currentWallpaper, onWallpaperChange, bgMo
 
   function handleIbanChange(v: string) {
     setIban(v);
+  }
+
+  async function handleSignatureUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setSigLoading(true);
+    try {
+      setSignature(await signatureFromFile(file));
+      showToast('Unterschrift gespeichert', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Bild konnte nicht gelesen werden', 'error');
+    } finally {
+      setSigLoading(false);
+    }
   }
 
   function handleMarginChange(v: string) {
@@ -313,6 +332,38 @@ export default function SettingsView({ currentWallpaper, onWallpaperChange, bgMo
         </div>
         <p style={{ fontSize: 12, color: 'var(--label3)', marginTop: 8 }}>
           Wird für den Swiss QR-Code auf der Rechnung verwendet.
+        </p>
+      </div>
+
+      {/* Eigene Unterschrift */}
+      <div style={{
+        background: 'rgba(255,255,255,0.70)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255,255,255,0.5)',
+        boxShadow: '0 8px 32px 0 rgba(0,0,0,0.10)',
+        borderRadius: 18,
+        padding: '18px 18px 22px',
+        marginBottom: 20,
+      }}>
+        <p style={{
+          fontSize: 13,
+          fontWeight: 600,
+          letterSpacing: 0.3,
+          textTransform: 'uppercase',
+          color: 'var(--label2)',
+          marginBottom: 16,
+        }}>
+          Eigene Unterschrift
+        </p>
+
+        <SignaturePad value={signature} onChange={setSignature} />
+        <label className="btn-system btn-secondary" style={{ marginTop: 12, height: 44, fontSize: 15 }}>
+          {sigLoading ? 'Wird geladen…' : 'Bild hochladen'}
+          <input type="file" accept="image/*" onChange={handleSignatureUpload} disabled={sigLoading} style={{ display: 'none' }} />
+        </label>
+        <p style={{ fontSize: 12, color: 'var(--label3)', marginTop: 8 }}>
+          Einmal zeichnen oder als Bild hochladen – wird automatisch auf jeder Auftragsbestätigung eingesetzt.
         </p>
       </div>
 

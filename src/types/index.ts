@@ -103,7 +103,7 @@ export interface AuftragsBestaetigung {
 export interface Offerte {
   id: string;
   offertNumber: number;
-  /** Version within the same offertNumber; shown as "<nr>_v<version>" from 2 on. */
+  /** Version within the same offertNumber; shown as "<nr>-<version>" from 2 on. */
   version?: number;
   /** 'material' = reine Materialofferte derived from another Offerte. */
   art?: 'standard' | 'material';

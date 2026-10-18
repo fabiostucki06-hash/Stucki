@@ -20,6 +20,9 @@ export interface Settings {
   iban: string;
   /** Default retail margin (%) applied to imported part purchase prices (EK -> VK). */
   margin: number;
+  /** Own signature as PNG data URL (transparent background), stored once and
+      placed on every Auftragsbestätigung; '' when none. */
+  signature: string;
 }
 
 const KEYS: Record<keyof Settings, string> = {
@@ -29,6 +32,7 @@ const KEYS: Record<keyof Settings, string> = {
   activeOfferteId: 'garage_active_offerte',
   iban: 'garage_iban',
   margin: 'garage_margin',
+  signature: 'garage_signature',
 };
 const SETTING_NAMES = Object.keys(KEYS) as (keyof Settings)[];
 
@@ -42,6 +46,7 @@ function readLocal(): Settings {
     activeOfferteId: localStorage.getItem(KEYS.activeOfferteId) ?? '',
     iban: localStorage.getItem(KEYS.iban) ?? '',
     margin: Number.isFinite(margin) ? margin : 30,
+    signature: localStorage.getItem(KEYS.signature) ?? '',
   };
 }
 
@@ -105,3 +110,6 @@ export const subscribeActiveOfferteId = subscribeSettings;
 
 export const getMargin = (): number => state.margin;
 export const setMargin = (pct: number): void => updateSettings({ margin: pct });
+
+/** Pass '' to remove the stored signature. */
+export const setSignature = (dataUrl: string): void => updateSettings({ signature: dataUrl });

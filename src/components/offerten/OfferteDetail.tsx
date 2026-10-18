@@ -7,7 +7,8 @@ import { PartLink } from '../ui/DocForm';
 import { ActiveOfferteBanner } from './ActiveOfferte';
 import PartsOrder from '../teile/PartsOrder';
 import SignaturePad from '../ui/SignaturePad';
-import { exportOffertePDF, exportAuftragsbestaetigungPDF } from '../../lib/pdf-offerte';
+import { exportOffertePDF, exportAuftragsbestaetigungPDF, CO_NAME } from '../../lib/pdf-offerte';
+import { useSettings } from '../../hooks/useSettings';
 import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../lib/utils';
 import { offerteNr, sumPositions, todayISO, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_PROZENT } from '../../lib/offerte-docs';
 import type { AuftragsBestaetigung, Customer, Offerte, OfferteStatus, Position, ArbeitPosition, MaterialPosition } from '../../types';
@@ -54,6 +55,8 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   const [zahlungsbedingung, setZahlungsbedingung] = useState(offerte.zahlungsbedingung ?? '');
   const [zusatznotiz, setZusatznotiz] = useState(offerte.zusatznotiz ?? '');
   const [ab, setAb] = useState<AuftragsBestaetigung>(() => offerte.ab ?? {});
+  /** Own signature, stored once in the settings; placed on every AB. */
+  const { signature } = useSettings();
   const [creatingMat, setCreatingMat] = useState(false);
   const [creatingAnz, setCreatingAnz] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -264,7 +267,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
 
   async function handleExportAB() {
     if (dirty) await savePositionen('Auftragsbestätigung gespeichert');
-    exportAuftragsbestaetigungPDF(abPayload(), customer);
+    exportAuftragsbestaetigungPDF(abPayload(), customer, signature);
   }
 
   async function handleCreateMaterialofferte() {
@@ -677,13 +680,31 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
               <input className="cf-input" type="date" value={abDatum} onChange={(e) => updAb('datum', e.target.value)} />
             </div>
           </div>
-          <div className="cf-field" style={{ marginBottom: 10 }}>
-            <label className="cf-label">Name</label>
-            <input className="cf-input" value={abName} onChange={(e) => updAb('name', e.target.value)} placeholder="Vorname Nachname" />
-          </div>
-          <div className="cf-field">
-            <label className="cf-label">Persönliche Unterschrift</label>
-            <SignaturePad value={ab.unterschrift} onChange={(url) => updAb('unterschrift', url)} />
+          <div className="ab-sig-grid">
+            <div className="ab-sig-block">
+              <div className="ab-sig-role">Kunde</div>
+              <div className="cf-field" style={{ marginBottom: 10 }}>
+                <label className="cf-label">Name des Kunden</label>
+                <input className="cf-input" value={abName} onChange={(e) => updAb('name', e.target.value)} placeholder="Vorname Nachname" />
+              </div>
+              <div className="cf-field">
+                <label className="cf-label">Unterschrift Kunde</label>
+                <SignaturePad value={ab.unterschrift} onChange={(url) => updAb('unterschrift', url)} />
+              </div>
+            </div>
+            <div className="ab-sig-block">
+              <div className="ab-sig-role">Auftragnehmer</div>
+              <div className="cf-field" style={{ marginBottom: 10 }}>
+                <label className="cf-label">Name</label>
+                <div className="ab-sig-name">{CO_NAME}</div>
+              </div>
+              <div className="cf-field">
+                <label className="cf-label">Unterschrift Auftragnehmer</label>
+                {signature
+                  ? <img src={signature} alt="Eigene Unterschrift" className="ab-sig-own" />
+                  : <div className="ab-sig-own ab-sig-missing">Noch keine Unterschrift hinterlegt – unter Einstellungen › Eigene Unterschrift einmalig erfassen.</div>}
+              </div>
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
             {dirty && (

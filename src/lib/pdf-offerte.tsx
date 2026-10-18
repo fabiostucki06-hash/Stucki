@@ -4,7 +4,7 @@ import { PAGE_TOP, PAGE_BOTTOM, addPageNumbers } from './pdf-paging';
 import { offerteNr, offerteZahlungszeilen } from './offerte-docs';
 import type { ArbeitPosition, Customer, MaterialPosition, Offerte } from '../types';
 
-const CO_NAME  = 'Fabio Stucki';
+export const CO_NAME  = 'Fabio Stucki';
 const CO_ADDR  = 'Polenstrasse 245';
 const CO_CITY  = '5112 Thalheim AG';
 const CO_PHONE = '079 850 18 63';
@@ -41,7 +41,7 @@ const x4 = x3 + wPre;   // 170 – ZE left
 /** 'ab' renders the same document as Auftragsbestätigung with completion date and signature block. */
 type DocMode = 'offerte' | 'ab';
 
-function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, mode: DocMode) {
+function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, mode: DocMode, ownSignature?: string) {
   const vehicle = [customer?.marke, customer?.modell].filter(Boolean).join(' ');
   const owner   = customer ? `${customer.vorname} ${customer.nachname}` : '';
   const isAB    = mode === 'ab';
@@ -266,8 +266,11 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
 
   // ── AB: FERTIGSTELLUNG + UNTERSCHRIFT ─────────────────────────────────────
   // The whole block stays on one page.
-  const SIG_H = 18;
-  if (!fits(10 + 10 + 5 + 5 + 8 + SIG_H + 6)) newPage();
+  // Two signature boxes side by side: Auftragnehmer (own signature from the
+  // settings) left, Kunde (name + drawn signature) right.
+  const SIG_H = 18, SIG_W = 80;
+  const colK = TL + TW / 2 + 5;
+  if (!fits(10 + 10 + 5 + 9 + 4.5 + 3 + SIG_H + 5)) newPage();
   y += 10;
   rgb(100, 100, 100); tL('Ungefähre Fertigstellung', TL, y);
   bold(); rgb(0, 0, 0); tL(ab.fertigstellung?.trim() || '–', col2, y); norm();
@@ -275,23 +278,28 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
   y += 10;
   bold(); fs(8.5); tL('Auftrag bestätigt', TL, y); norm(); y += 5;
   rgb(100, 100, 100); tL('Ort, Datum', TL, y);
-  rgb(0, 0, 0); bold(); tL([ab.ort || CO_LOC, date].filter(Boolean).join(', '), col2, y); norm(); y += 5;
-  rgb(100, 100, 100); tL('Name', TL, y);
-  rgb(0, 0, 0); bold(); tL(ab.name?.trim() || owner || '', col2, y); norm(); y += 8;
+  rgb(0, 0, 0); bold(); tL([ab.ort || CO_LOC, date].filter(Boolean).join(', '), col2, y); norm(); y += 9;
 
-  rgb(100, 100, 100); tL('Unterschrift', TL, y + SIG_H - 1);
-  if (ab.unterschrift?.startsWith('data:image/png')) {
-    try { doc.addImage(ab.unterschrift, 'PNG', col2, y, SIG_H * 3, SIG_H); } catch { /* unreadable image: leave the line blank */ }
-  }
-  hLine(y + SIG_H, col2, col2 + 80, 0.3);
-  rgb(0, 0, 0);
+  const sigBox = (x: number, role: string, name: string, img: string | undefined) => {
+    fs(7.5); rgb(100, 100, 100); tL(role, x, y);
+    fs(8.5); bold(); rgb(0, 0, 0); tL(clip(name, SIG_W), x, y + 4.5); norm();
+    const top = y + 7.5;
+    if (img?.startsWith('data:image/png')) {
+      try { doc.addImage(img, 'PNG', x, top, SIG_H * 3, SIG_H); } catch { /* unreadable image: leave the line blank */ }
+    }
+    hLine(top + SIG_H, x, x + SIG_W, 0.3);
+    fs(7.5); rgb(100, 100, 100); tL(`Unterschrift ${role}`, x, top + SIG_H + 4);
+  };
+  sigBox(TL, 'Auftragnehmer', CO_NAME, ownSignature);
+  sigBox(colK, 'Kunde', ab.name?.trim() || owner || '', ab.unterschrift);
+  fs(8.5); rgb(0, 0, 0);
 }
 
-function exportDoc(offerte: Offerte, customer: Customer | undefined, mode: DocMode) {
+function exportDoc(offerte: Offerte, customer: Customer | undefined, mode: DocMode, ownSignature?: string) {
   const docType = mode === 'ab' ? 'Auftragsbestätigung' : offerte.art === 'material' ? 'Materialofferte' : 'Offerte';
   try {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    drawDoc(doc, offerte, customer, mode);
+    drawDoc(doc, offerte, customer, mode, ownSignature);
     addPageNumbers(doc, TR);
     doc.save(`${buildDocumentFilename(customer, docType, offerteNr(offerte))}.pdf`);
   } catch (err) {
@@ -303,6 +311,7 @@ export async function exportOffertePDF(offerte: Offerte, customer: Customer | un
   exportDoc(offerte, customer, 'offerte');
 }
 
-export async function exportAuftragsbestaetigungPDF(offerte: Offerte, customer: Customer | undefined) {
-  exportDoc(offerte, customer, 'ab');
+/** ownSignature: the Auftragnehmer signature stored once in the settings. */
+export async function exportAuftragsbestaetigungPDF(offerte: Offerte, customer: Customer | undefined, ownSignature?: string) {
+  exportDoc(offerte, customer, 'ab', ownSignature);
 }
