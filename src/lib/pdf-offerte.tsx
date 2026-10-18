@@ -267,8 +267,8 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
   // ── AB: FERTIGSTELLUNG + UNTERSCHRIFT ─────────────────────────────────────
   // The whole block stays on one page.
   // Two equal signature blocks side by side: Werkstatt (Ort, Datum, Name and
-  // own signature from the settings) left, Kunde right with only the name
-  // filled in; Ort, Datum and Unterschrift stay blank lines for the customer.
+  // own signature from the settings) left, Kunde right with every field
+  // all blank: Ort, Datum, Name and Unterschrift are lines for the customer.
   const SIG_H = 18, SIG_W = 80;
   const colK = TL + TW / 2 + 5;
   if (!fits(10 + 10 + 5 + 13.5 + 3 + SIG_H + 5)) newPage();
@@ -286,7 +286,8 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
     if (ortDatum) { rgb(0, 0, 0); tL(clip(ortDatum, SIG_W - 20), x + 20, y + 4.5); }
     else hLine(y + 5.5, x + 20, x + SIG_W, 0.3);
     rgb(100, 100, 100); tL('Name', x, y + 9);
-    bold(); rgb(0, 0, 0); tL(clip(name, SIG_W - 20), x + 20, y + 9); norm();
+    if (name) { bold(); rgb(0, 0, 0); tL(clip(name, SIG_W - 20), x + 20, y + 9); norm(); }
+    else hLine(y + 10, x + 20, x + SIG_W, 0.3);
     const top = y + 12;
     if (img?.startsWith('data:image/png')) {
       try { doc.addImage(img, 'PNG', x, top, SIG_H * 3, SIG_H); } catch { /* unreadable image: leave the line blank */ }
@@ -295,7 +296,7 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
     fs(7.5); rgb(100, 100, 100); tL(`Unterschrift ${role.split(' / ').pop()}`, x, top + SIG_H + 4);
   };
   sigBox(TL, 'Auftragnehmer / Werkstatt', ab.ort || CO_LOC, date, CO_NAME, ownSignature);
-  sigBox(colK, 'Auftraggeber / Kunde', '', '', ab.name?.trim() || owner || '', undefined);
+  sigBox(colK, 'Auftraggeber / Kunde', '', '', '', undefined);
   fs(8.5); rgb(0, 0, 0);
 }
 

@@ -670,8 +670,8 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
             <input className="cf-input" value={ab.fertigstellung ?? ''} onChange={(e) => updAb('fertigstellung', e.target.value)} placeholder="z.B. KW 45 / Ende November" />
           </div>
           {/* Signature blocks: hidden on screen, printed only (same layout as the PDF).
-              Werkstatt is filled from the settings; the Kunde block keeps Ort, Datum
-              and Unterschrift blank to be filled in and signed by hand. */}
+              Werkstatt is filled from the settings; the Kunde block keeps Ort, Datum,
+              Name and Unterschrift blank to be filled in and signed by hand. */}
           <div className="ab-sig-print" aria-hidden="true">
             <div className="ab-sig-block">
               <div className="ab-sig-role">Auftragnehmer / Werkstatt</div>
@@ -683,7 +683,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
             <div className="ab-sig-block">
               <div className="ab-sig-role">Auftraggeber / Kunde</div>
               <div className="ab-sig-row"><span className="ab-sig-lbl">Ort, Datum</span><span className="ab-sig-val ab-sig-blank" /></div>
-              <div className="ab-sig-row"><span className="ab-sig-lbl">Name</span><span className="ab-sig-val ab-sig-strong">{abName}</span></div>
+              <div className="ab-sig-row"><span className="ab-sig-lbl">Name</span><span className="ab-sig-val ab-sig-blank" /></div>
               <div className="ab-sig-area" />
               <div className="ab-sig-caption">Unterschrift Kunde</div>
             </div>
