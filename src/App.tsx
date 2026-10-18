@@ -313,9 +313,14 @@ export default function App() {
     if (getActiveOfferteId() === id) setActiveOfferteId('');
   }
   async function handleDuplicateOfferte(offerte: Offerte) {
-    // A duplicate is a fresh Offerte: new number, no version / AB carried over.
-    const { id, offertNumber, status, createdAt, version, basisOffertId, ab, ...rest } = offerte;
-    const dup = await addOfferte(rest);
+    // A copy based on an existing Offerte is its next version ("12_2"),
+    // same number; status, AB and material order state are not carried over.
+    const { id, offertNumber, status, createdAt, ab, materialStatus, ...rest } = offerte;
+    const dup = await addOfferte({
+      ...rest,
+      version: nextVersion(offerte, offerten),
+      basisOffertId: offerte.id,
+    }, { offertNumber: offerte.offertNumber });
     setSelOff(dup);
   }
   async function handleCreateMaterialofferte(offerte: Offerte, positionen: Position[]) {

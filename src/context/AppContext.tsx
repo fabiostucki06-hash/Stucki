@@ -231,7 +231,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setOrders((p) => p.filter((o) => o.id !== id));
   }
 
-  // opts.offertNumber reuses an existing number for a new version (e.g. "12-2").
+  // opts.offertNumber reuses an existing number for a new version (e.g. "12_2").
   async function addOfferte(data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>, opts?: { offertNumber?: number }): Promise<Offerte> {
     // offertNum can lag behind the loaded rows (e.g. the offerten fetch failed on
     // startup), which would hand out a number that already exists — take both maxima.
