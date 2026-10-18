@@ -266,9 +266,9 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
 
   // ── AB: FERTIGSTELLUNG + UNTERSCHRIFT ─────────────────────────────────────
   // The whole block stays on one page.
-  // Two equal signature blocks side by side, each with its own Ort, Datum,
-  // Name and Unterschrift: Auftragnehmer (own signature from the settings)
-  // left, Kunde (name + drawn signature) right.
+  // Two equal signature blocks side by side: Werkstatt (Ort, Datum, Name and
+  // own signature from the settings) left, Kunde right with only the name
+  // filled in; Ort, Datum and Unterschrift stay blank lines for the customer.
   const SIG_H = 18, SIG_W = 80;
   const colK = TL + TW / 2 + 5;
   if (!fits(10 + 10 + 5 + 13.5 + 3 + SIG_H + 5)) newPage();
@@ -282,7 +282,9 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
   const sigBox = (x: number, role: string, ort: string, datum: string, name: string, img: string | undefined) => {
     fs(7.5); bold(); rgb(100, 100, 100); tL(role.toUpperCase(), x, y); norm();
     fs(8.5); rgb(100, 100, 100); tL('Ort, Datum', x, y + 4.5);
-    rgb(0, 0, 0); tL(clip([ort, datum].filter(Boolean).join(', '), SIG_W - 20), x + 20, y + 4.5);
+    const ortDatum = [ort, datum].filter(Boolean).join(', ');
+    if (ortDatum) { rgb(0, 0, 0); tL(clip(ortDatum, SIG_W - 20), x + 20, y + 4.5); }
+    else hLine(y + 5.5, x + 20, x + SIG_W, 0.3);
     rgb(100, 100, 100); tL('Name', x, y + 9);
     bold(); rgb(0, 0, 0); tL(clip(name, SIG_W - 20), x + 20, y + 9); norm();
     const top = y + 12;
@@ -292,9 +294,8 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
     hLine(top + SIG_H, x, x + SIG_W, 0.3);
     fs(7.5); rgb(100, 100, 100); tL(`Unterschrift ${role.split(' / ').pop()}`, x, top + SIG_H + 4);
   };
-  const kundeDate = ab.kundeDatum ? formatDateCH(ab.kundeDatum) : date;
   sigBox(TL, 'Auftragnehmer / Werkstatt', ab.ort || CO_LOC, date, CO_NAME, ownSignature);
-  sigBox(colK, 'Auftraggeber / Kunde', ab.kundeOrt || ab.ort || CO_LOC, kundeDate, ab.name?.trim() || owner || '', ab.unterschrift);
+  sigBox(colK, 'Auftraggeber / Kunde', '', '', ab.name?.trim() || owner || '', undefined);
   fs(8.5); rgb(0, 0, 0);
 }
 

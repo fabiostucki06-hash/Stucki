@@ -6,7 +6,6 @@ import { SFPlus, SFXmark } from '../Icons';
 import { PartLink } from '../ui/DocForm';
 import { ActiveOfferteBanner } from './ActiveOfferte';
 import PartsOrder from '../teile/PartsOrder';
-import SignaturePad from '../ui/SignaturePad';
 import { exportOffertePDF, exportAuftragsbestaetigungPDF, CO_NAME } from '../../lib/pdf-offerte';
 import { useSettings } from '../../hooks/useSettings';
 import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../lib/utils';
@@ -113,8 +112,6 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   const abName = ab.name ?? (customer ? `${customer.vorname} ${customer.nachname}` : '');
   const abOrt = ab.ort ?? 'Thalheim AG';
   const abDatum = ab.datum ?? todayISO();
-  const abKundeOrt = ab.kundeOrt ?? abOrt;
-  const abKundeDatum = ab.kundeDatum ?? abDatum;
 
   function handleZahlungszielChange(val: string) {
     setZahlungsziel(val);
@@ -217,7 +214,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
       zahlungsbedingung: zahlungsbedingung || undefined,
       zusatznotiz: zusatznotiz || undefined,
       // AB data only exists once the Offerte was accepted (or already has some).
-      ab: offerte.status === 'angenommen' || offerte.ab ? { ...ab, name: abName, ort: abOrt, datum: abDatum, kundeOrt: abKundeOrt, kundeDatum: abKundeDatum } : undefined,
+      ab: offerte.status === 'angenommen' || offerte.ab ? { ...ab, name: abName, ort: abOrt, datum: abDatum } : undefined,
       ...patch,
     };
   }
@@ -672,52 +669,23 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
             <label className="cf-label">Ungefährer Zeitpunkt der Fertigstellung</label>
             <input className="cf-input" value={ab.fertigstellung ?? ''} onChange={(e) => updAb('fertigstellung', e.target.value)} placeholder="z.B. KW 45 / Ende November" />
           </div>
-          {/* Two equal blocks, each with its own Ort / Datum / Name / Unterschrift:
-              Auftragnehmer (filled from the settings) left, Kunde right — same order as the PDF. */}
-          <div className="ab-sig-grid">
+          {/* Signature blocks: hidden on screen, printed only (same layout as the PDF).
+              Werkstatt is filled from the settings; the Kunde block keeps Ort, Datum
+              and Unterschrift blank to be filled in and signed by hand. */}
+          <div className="ab-sig-print" aria-hidden="true">
             <div className="ab-sig-block">
               <div className="ab-sig-role">Auftragnehmer / Werkstatt</div>
-              <div className="cf-grid-2" style={{ marginBottom: 10 }}>
-                <div className="cf-field">
-                  <label className="cf-label">Ort</label>
-                  <input className="cf-input" value={abOrt} onChange={(e) => updAb('ort', e.target.value)} />
-                </div>
-                <div className="cf-field">
-                  <label className="cf-label">Datum</label>
-                  <input className="cf-input" type="date" value={abDatum} onChange={(e) => updAb('datum', e.target.value)} />
-                </div>
-              </div>
-              <div className="cf-field" style={{ marginBottom: 10 }}>
-                <label className="cf-label">Name</label>
-                <div className="ab-sig-name">{CO_NAME}</div>
-              </div>
-              <div className="cf-field">
-                <label className="cf-label">Unterschrift Auftragnehmer</label>
-                {signature
-                  ? <img src={signature} alt="Eigene Unterschrift" className="ab-sig-own" />
-                  : <div className="ab-sig-own ab-sig-missing">Noch keine Unterschrift hinterlegt – unter Einstellungen › Eigene Unterschrift einmalig erfassen.</div>}
-              </div>
+              <div className="ab-sig-row"><span className="ab-sig-lbl">Ort, Datum</span><span className="ab-sig-val">{abOrt}, {formatDateCH(abDatum)}</span></div>
+              <div className="ab-sig-row"><span className="ab-sig-lbl">Name</span><span className="ab-sig-val ab-sig-strong">{CO_NAME}</span></div>
+              <div className="ab-sig-area">{signature && <img src={signature} alt="" />}</div>
+              <div className="ab-sig-caption">Unterschrift Werkstatt</div>
             </div>
             <div className="ab-sig-block">
               <div className="ab-sig-role">Auftraggeber / Kunde</div>
-              <div className="cf-grid-2" style={{ marginBottom: 10 }}>
-                <div className="cf-field">
-                  <label className="cf-label">Ort</label>
-                  <input className="cf-input" value={abKundeOrt} onChange={(e) => updAb('kundeOrt', e.target.value)} />
-                </div>
-                <div className="cf-field">
-                  <label className="cf-label">Datum</label>
-                  <input className="cf-input" type="date" value={abKundeDatum} onChange={(e) => updAb('kundeDatum', e.target.value)} />
-                </div>
-              </div>
-              <div className="cf-field" style={{ marginBottom: 10 }}>
-                <label className="cf-label">Name des Kunden</label>
-                <input className="cf-input" value={abName} onChange={(e) => updAb('name', e.target.value)} placeholder="Vorname Nachname" />
-              </div>
-              <div className="cf-field">
-                <label className="cf-label">Unterschrift Kunde</label>
-                <SignaturePad value={ab.unterschrift} onChange={(url) => updAb('unterschrift', url)} />
-              </div>
+              <div className="ab-sig-row"><span className="ab-sig-lbl">Ort, Datum</span><span className="ab-sig-val ab-sig-blank" /></div>
+              <div className="ab-sig-row"><span className="ab-sig-lbl">Name</span><span className="ab-sig-val ab-sig-strong">{abName}</span></div>
+              <div className="ab-sig-area" />
+              <div className="ab-sig-caption">Unterschrift Kunde</div>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>

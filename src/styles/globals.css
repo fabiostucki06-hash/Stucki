@@ -257,13 +257,8 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .sig-pad-canvas{display:block;width:100%;aspect-ratio:3/1;height:auto;touch-action:none;cursor:crosshair;border-radius:10px;background:rgba(255,255,255,0.7);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.5);box-shadow:inset 0 1px 0 rgba(255,255,255,0.6),0 8px 32px 0 rgba(0,0,0,0.1)}
 .sig-pad-foot{display:flex;align-items:center;justify-content:space-between;margin-top:6px;font-size:12px;color:var(--label3)}
 .doc-actions{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
-.ab-sig-grid{display:grid;grid-template-columns:1fr;gap:14px}
-@media (min-width:640px){.ab-sig-grid{grid-template-columns:1fr 1fr}}
-.ab-sig-block{display:flex;flex-direction:column;padding:12px;border-radius:12px;background:var(--fill4);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--card-border);box-shadow:inset 0 1px 0 rgba(255,255,255,0.28),0 8px 32px rgba(0,0,0,0.10)}
-.ab-sig-role{font-size:12px;font-weight:700;color:var(--label3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px}
-.ab-sig-name{font-size:15px;font-weight:600;color:var(--label);padding:6px 0}
-.ab-sig-own{display:block;width:100%;aspect-ratio:3/1;height:auto;margin-top:4px;object-fit:contain;border-radius:10px;background:rgba(255,255,255,0.7);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.5);box-shadow:inset 0 1px 0 rgba(255,255,255,0.6),0 8px 32px 0 rgba(0,0,0,0.1)}
-.ab-sig-missing{display:flex;align-items:center;justify-content:center;text-align:center;padding:10px 14px;font-size:12px;line-height:1.35;color:var(--label3)}
+/* AB signature blocks exist only on paper (see @media print); the screen never shows them. */
+.ab-sig-print{display:none}
 
 /* ── PRINT ── hide app chrome, show only the sheet content ── */
 @page{
@@ -295,11 +290,18 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
   .sheet-content .doc-terms,.sheet-content .ab-panel{break-inside:avoid;page-break-inside:avoid}
   .sheet-content .sig-pad-canvas{border:0.5pt solid #999;border-radius:0}
   .sheet-content .sig-pad-foot{display:none!important}
-  /* AB: Auftragnehmer and Kunde signatures side by side, each with its line. */
-  .sheet-content .ab-sig-grid{grid-template-columns:1fr 1fr;gap:8mm}
-  .sheet-content .ab-sig-block{padding:3mm;border:0.5pt solid #999;border-radius:0;break-inside:avoid;page-break-inside:avoid}
-  .sheet-content .ab-sig-own{border:0.5pt solid #999;border-radius:0}
-  .sheet-content .ab-sig-missing{color:transparent!important}
+  /* AB: Werkstatt and Kunde signature blocks side by side, print only. The
+     Kunde block keeps Ort, Datum and Unterschrift blank for the handwritten entry. */
+  .sheet-content .ab-sig-print{display:grid;grid-template-columns:1fr 1fr;gap:10mm;margin-top:6mm;break-inside:avoid;page-break-inside:avoid}
+  .sheet-content .ab-sig-role{font-size:7.5pt;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:2mm}
+  .sheet-content .ab-sig-row{display:flex;align-items:flex-end;gap:2mm;font-size:9pt;min-height:6mm}
+  .sheet-content .ab-sig-lbl{flex:none;width:20mm;color:#666!important}
+  .sheet-content .ab-sig-val{flex:1;min-width:0}
+  .sheet-content .ab-sig-strong{font-weight:700}
+  .sheet-content .ab-sig-blank{height:5mm;border-bottom:0.5pt solid #000}
+  .sheet-content .ab-sig-area{height:18mm;margin-top:2mm;border-bottom:0.5pt solid #000}
+  .sheet-content .ab-sig-area img{display:block;height:100%;width:auto;max-width:100%;object-fit:contain}
+  .sheet-content .ab-sig-caption{font-size:7.5pt;color:#666!important;margin-top:1mm}
   .sheet-content button{display:none!important}
   .sheet-content *{background:none!important;box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;color:#000!important;text-shadow:none!important}
 }
