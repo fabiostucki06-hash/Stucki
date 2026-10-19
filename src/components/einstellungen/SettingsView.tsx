@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ASSETS } from '../../lib/supabase';
-import { setIban, setMargin, setSignature, type BgMode } from '../../lib/settings';
+import { setIban, setMargin, setSignature, setDriveFolderId, type BgMode } from '../../lib/settings';
+import { parseDriveFolderId, isDriveFolderId, testDriveFolder } from '../../lib/drive';
 import { signatureFromFile } from '../../lib/signature';
 import { useSettings } from '../../hooks/useSettings';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
@@ -120,11 +121,15 @@ interface SettingsViewProps {
 
 export default function SettingsView({ currentWallpaper, onWallpaperChange, bgMode, bgColor, onBgColorChange, syncStatus, userEmail }: SettingsViewProps) {
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
-  const { iban, margin, signature } = useSettings();
+  const { iban, margin, signature, driveFolderId } = useSettings();
   const isDesktop = useIsDesktop();
   const [section, setSection] = useState<SectionId>(readSection);
   const [sigLoading, setSigLoading] = useState(false);
   const [drive, setDrive] = useState<DriveState>('checking');
+  // Raw text of the folder field (may be a pasted URL); only a valid ID is stored.
+  const [folderDraft, setFolderDraft] = useState(driveFolderId);
+  const [driveTest, setDriveTest] = useState<{ state: 'idle' | 'running' | 'ok' | 'error'; message?: string }>({ state: 'idle' });
+  const folderValid = isDriveFolderId(parseDriveFolderId(folderDraft));
   const [bgTab, setBgTab] = useState<'bilder' | 'unifarben'>(bgMode === 'color' ? 'unifarben' : 'bilder');
   const bookmarklet = buildImportBookmarklet(window.location.origin);
   // Separate draft buffer: the hex text field must let the user type freely
@@ -148,6 +153,27 @@ export default function SettingsView({ currentWallpaper, onWallpaperChange, bgMo
   useEffect(() => {
     setHexDraft(bgMode === 'color' ? bgColor : '');
   }, [bgMode, bgColor]);
+
+  // Adopt a folder ID changed on another device (keep a pasted URL that resolves to it).
+  useEffect(() => {
+    setFolderDraft((d) => (parseDriveFolderId(d) === driveFolderId ? d : driveFolderId));
+  }, [driveFolderId]);
+
+  function handleFolderInput(v: string) {
+    setFolderDraft(v);
+    setDriveTest({ state: 'idle' });
+    const id = parseDriveFolderId(v);
+    if (!id) setDriveFolderId('');
+    else if (isDriveFolderId(id)) setDriveFolderId(id);
+  }
+
+  async function handleDriveTest() {
+    setDriveTest({ state: 'running' });
+    const r = await testDriveFolder(folderValid ? parseDriveFolderId(folderDraft) : '');
+    setDriveTest(r.ok
+      ? { state: 'ok', message: `Verbindung OK – Zielordner: „${r.name}“` }
+      : { state: 'error', message: r.error });
+  }
 
   function handleIbanChange(v: string) {
     setIban(v);
@@ -341,14 +367,68 @@ export default function SettingsView({ currentWallpaper, onWallpaperChange, bgMo
             label="Status"
             value={
               drive === 'checking' ? 'Wird geprüft…'
-              : drive === 'on' ? <><StatusDot color="#34C759" />Verbunden</>
+              : drive === 'on' ? <><StatusDot color="#34C759" />Eingerichtet</>
               : drive === 'off' ? <><StatusDot color="#FF9500" />Nicht eingerichtet</>
               : <><StatusDot color="#8E8E93" />Nicht verfügbar</>
             }
           />
-          <InfoRow label="Ablage" value="GarageOS / Typ / Jahr" />
+          <InfoRow label="Ablage" value={`${driveFolderId ? 'Eigener Ordner' : 'GarageOS'} / Typ / Jahr`} />
+
+          <div className="cf-field" style={{ marginTop: 16 }}>
+            <label className="cf-label" htmlFor="drive-folder">Google Drive Ordner-ID</label>
+            <input
+              id="drive-folder"
+              className="cf-input"
+              value={folderDraft}
+              onChange={(e) => handleFolderInput(e.target.value)}
+              placeholder="z.B. 1AbCdEfGhIjKlMnOpQrStUvWxYz"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              inputMode="url"
+              style={{ fontFamily: 'monospace', fontSize: 14 }}
+            />
+          </div>
+          {folderDraft.trim() && !folderValid ? (
+            <p style={{ fontSize: 12, color: '#FF3B30', marginTop: 8 }}>Keine gültige Ordner-ID – bitte ID oder Ordner-Link einfügen.</p>
+          ) : (
+            <Hint>
+              Ordner in Google Drive öffnen und die ID aus der Adresse kopieren:{' '}
+              <span style={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>drive.google.com/drive/folders/<strong>&lt;ID&gt;</strong></span>.
+              Der ganze Link darf auch eingefügt werden. Leer lassen = Standardordner „GarageOS“.
+            </Hint>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, flexWrap: 'wrap' }}>
+            <button
+              className="mf-btn-save"
+              style={{ height: 40, padding: '0 20px', fontSize: 14 }}
+              onClick={handleDriveTest}
+              disabled={driveTest.state === 'running' || (!!folderDraft.trim() && !folderValid)}
+            >
+              {driveTest.state === 'running' ? 'Wird getestet…' : 'Verbindung testen'}
+            </button>
+            {driveFolderId && (
+              <a
+                href={`https://drive.google.com/drive/folders/${driveFolderId}`}
+                target="_blank"
+                rel="noreferrer"
+                style={{ fontSize: 13, color: 'var(--blue)', fontWeight: 600 }}
+              >
+                Ordner öffnen ↗
+              </a>
+            )}
+          </div>
+          {(driveTest.state === 'ok' || driveTest.state === 'error') && (
+            <p role="status" style={{ fontSize: 13, marginTop: 10, color: 'var(--label)', lineHeight: 1.45 }}>
+              <StatusDot color={driveTest.state === 'ok' ? '#34C759' : '#FF3B30'} />
+              {driveTest.message}
+            </p>
+          )}
+
           <Hint>
             Jedes exportierte PDF (Offerten, Auftragsbestätigungen, Rechnungen …) wird automatisch als Archivkopie auf Google Drive gespeichert.
+            Die Google-Zugangsdaten liegen aus Sicherheitsgründen nur auf dem Server (Vercel) – der Ordner muss für dieses Google-Konto beschreibbar sein.
           </Hint>
         </Card>
 

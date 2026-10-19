@@ -30,6 +30,7 @@ function toRow(p: Partial<Settings>): Row {
   if (p.iban !== undefined) row.iban = p.iban;
   if (p.margin !== undefined) row.margin = p.margin;
   if (p.signature !== undefined) row.signature = p.signature;
+  if (p.driveFolderId !== undefined) row.drive_folder_id = p.driveFolderId;
   return row;
 }
 
@@ -42,6 +43,7 @@ function fromRow(row: Row): Partial<Settings> {
   if (typeof row.active_offerte_id === 'string') p.activeOfferteId = row.active_offerte_id;
   if (typeof row.iban === 'string') p.iban = row.iban;
   if (typeof row.signature === 'string') p.signature = row.signature;
+  if (typeof row.drive_folder_id === 'string') p.driveFolderId = row.drive_folder_id;
   if (row.margin != null && Number.isFinite(Number(row.margin))) p.margin = Number(row.margin);
   return p;
 }

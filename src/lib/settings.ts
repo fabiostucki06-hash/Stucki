@@ -23,6 +23,8 @@ export interface Settings {
   /** Own signature as PNG data URL (transparent background), stored once and
       placed on every Auftragsbestätigung; '' when none. */
   signature: string;
+  /** Google Drive folder the PDF archive goes to; '' = server default. */
+  driveFolderId: string;
 }
 
 const KEYS: Record<keyof Settings, string> = {
@@ -33,6 +35,7 @@ const KEYS: Record<keyof Settings, string> = {
   iban: 'garage_iban',
   margin: 'garage_margin',
   signature: 'garage_signature',
+  driveFolderId: 'garage_drive_folder',
 };
 const SETTING_NAMES = Object.keys(KEYS) as (keyof Settings)[];
 
@@ -47,6 +50,7 @@ function readLocal(): Settings {
     iban: localStorage.getItem(KEYS.iban) ?? '',
     margin: Number.isFinite(margin) ? margin : 30,
     signature: localStorage.getItem(KEYS.signature) ?? '',
+    driveFolderId: localStorage.getItem(KEYS.driveFolderId) ?? '',
   };
 }
 
@@ -113,3 +117,6 @@ export const setMargin = (pct: number): void => updateSettings({ margin: pct });
 
 /** Pass '' to remove the stored signature. */
 export const setSignature = (dataUrl: string): void => updateSettings({ signature: dataUrl });
+
+/** Pass '' to fall back to the server's default folder. */
+export const setDriveFolderId = (id: string): void => updateSettings({ driveFolderId: id });

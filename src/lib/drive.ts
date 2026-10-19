@@ -1,5 +1,6 @@
 import type { jsPDF } from 'jspdf';
 import { getFreshToken } from './supabase';
+import { getSettings } from './settings';
 import { showToast } from '../components/ui/Toast';
 
 /** Drive folder per document type: GarageOS/<Typ>/<Jahr>/<Dateiname>.pdf */
@@ -26,6 +27,7 @@ export async function archiveToDrive(doc: jsPDF, docType: DriveDocType, filename
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
+        rootFolderId: getSettings().driveFolderId || undefined,
         folder: [docType, String(new Date().getFullYear())],
         filename: `${filename}.pdf`,
         data: toBase64(doc.output('arraybuffer')),
@@ -38,5 +40,37 @@ export async function archiveToDrive(doc: jsPDF, docType: DriveDocType, filename
     else showToast(`Google Drive: ${j.error ?? `Fehler ${r.status}`}`, 'error');
   } catch (err) {
     showToast(`Google Drive: ${err instanceof Error ? err.message : 'Upload fehlgeschlagen'}`, 'error');
+  }
+}
+
+/** Accepts a bare folder ID or a pasted Drive URL
+    (…/drive/folders/<id>, …/open?id=<id>) and returns the ID; '' when none. */
+export function parseDriveFolderId(input: string): string {
+  const s = input.trim();
+  const m = s.match(/\/folders\/([A-Za-z0-9_-]+)/) ?? s.match(/[?&]id=([A-Za-z0-9_-]+)/);
+  return m ? m[1] : s;
+}
+
+/** Plausible Drive file/folder ID (what the server accepts). */
+export const isDriveFolderId = (id: string): boolean => /^[A-Za-z0-9_-]{10,100}$/.test(id);
+
+export type DriveTestResult = { ok: true; name: string } | { ok: false; error: string };
+
+/** Asks the server whether the folder ('' = default target) exists and is
+    writable for the Drive account the uploads use. */
+export async function testDriveFolder(folderId: string): Promise<DriveTestResult> {
+  try {
+    const token = await getFreshToken();
+    if (!token) return { ok: false, error: 'Nicht angemeldet' };
+    const r = await fetch('/api/drive-upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ test: true, rootFolderId: folderId || undefined }),
+    });
+    if (r.status === 404) return { ok: false, error: 'Server-Funktion nicht verfügbar (lokale Entwicklung)' };
+    const j = (await r.json().catch(() => ({}))) as { ok?: boolean; name?: string; error?: string };
+    return r.ok && j.ok ? { ok: true, name: j.name ?? '' } : { ok: false, error: j.error ?? `Fehler ${r.status}` };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Verbindung fehlgeschlagen' };
   }
 }

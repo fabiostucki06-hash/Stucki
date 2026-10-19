@@ -1,6 +1,7 @@
 // Vercel Node serverless function (not part of the Vite app bundle / tsc -b build).
 // Stores a generated PDF in Google Drive:
-//   POST /api/drive-upload  { folder: string[], filename, data: <base64 PDF> }
+//   POST /api/drive-upload  { rootFolderId?, folder: string[], filename, data: <base64 PDF> }
+//   POST /api/drive-upload  { test: true, rootFolderId? } → { name } of the reachable target folder
 //   GET  /api/drive-upload  → { configured } (status shown in Einstellungen)
 //   Authorization: Bearer <Supabase access token of the signed-in user>
 // Files land in <root>/<folder…>/<filename>; missing folders are created and a
@@ -29,6 +30,10 @@ const ROOT_NAME = 'GarageOS';
 const MAX_BYTES = 4 * 1024 * 1024; // Vercel caps request bodies at 4.5 MB
 
 interface UploadBody {
+  /** Target folder chosen in Einstellungen; overrides GOOGLE_DRIVE_FOLDER_ID. */
+  rootFolderId?: unknown;
+  /** true: only check that the target folder is reachable, upload nothing. */
+  test?: unknown;
   folder?: unknown;
   filename?: unknown;
   data?: unknown;
@@ -95,6 +100,22 @@ async function ensureFolder(gToken: string, name: string, parent: string): Promi
   return created.id;
 }
 
+const FOLDER_ID_RE = /^[A-Za-z0-9_-]{10,100}$/;
+
+/** The folder exists, is not trashed and the Drive account may add files to it; returns its name. */
+async function checkFolder(gToken: string, id: string): Promise<string> {
+  const r = await fetch(`${DRIVE}/${encodeURIComponent(id)}?fields=name,mimeType,trashed,capabilities(canAddChildren)&supportsAllDrives=true`, {
+    headers: { Authorization: `Bearer ${gToken}` },
+  });
+  if (r.status === 404) throw new Error('Ordner nicht gefunden oder kein Zugriff für das Drive-Konto');
+  if (!r.ok) throw new Error(`Google Drive ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  const f = (await r.json()) as { name?: string; mimeType?: string; trashed?: boolean; capabilities?: { canAddChildren?: boolean } };
+  if (f.mimeType !== FOLDER_MIME) throw new Error('Die ID gehört nicht zu einem Ordner');
+  if (f.trashed) throw new Error('Der Ordner liegt im Papierkorb');
+  if (f.capabilities?.canAddChildren === false) throw new Error('Keine Schreibrechte für diesen Ordner');
+  return f.name ?? id;
+}
+
 async function uploadPdf(gToken: string, parent: string, filename: string, pdf: Uint8Array<ArrayBuffer>): Promise<{ id: string; webViewLink?: string }> {
   const existing = await findOne(gToken, `name=${q(filename)} and ${q(parent)} in parents and mimeType='application/pdf'`);
   const boundary = `garageos${Date.now().toString(36)}`;
@@ -132,6 +153,22 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
   } catch {
     return res.status(400).json({ ok: false, error: 'Ungültiges JSON' });
   }
+  const rootFolderId = typeof body.rootFolderId === 'string' ? body.rootFolderId.trim() : '';
+  if (rootFolderId && !FOLDER_ID_RE.test(rootFolderId)) return res.status(400).json({ ok: false, error: 'Ungültige Ordner-ID' });
+
+  if (body.test === true) {
+    try {
+      const gToken = await googleAccessToken();
+      const id = rootFolderId || process.env.GOOGLE_DRIVE_FOLDER_ID;
+      if (id) return res.status(200).json({ ok: true, name: await checkFolder(gToken, id) });
+      // Default target: "GarageOS" in My Drive, created on the first upload.
+      const found = await findOne(gToken, `name=${q(ROOT_NAME)} and mimeType=${q(FOLDER_MIME)} and 'root' in parents`);
+      return res.status(200).json({ ok: true, name: found ? ROOT_NAME : `${ROOT_NAME} (wird beim ersten Upload angelegt)` });
+    } catch (err) {
+      return res.status(422).json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
   const folder = Array.isArray(body.folder) ? body.folder.filter((s): s is string => typeof s === 'string').map(cleanName).filter(Boolean).slice(0, 4) : [];
   const rawName = typeof body.filename === 'string' ? cleanName(body.filename) : '';
   const filename = rawName && !/\.pdf$/i.test(rawName) ? `${rawName}.pdf` : rawName;
@@ -149,7 +186,8 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
 
   try {
     const gToken = await googleAccessToken();
-    let parent = process.env.GOOGLE_DRIVE_FOLDER_ID || (await ensureFolder(gToken, ROOT_NAME, 'root'));
+    if (rootFolderId) await checkFolder(gToken, rootFolderId);
+    let parent = rootFolderId || process.env.GOOGLE_DRIVE_FOLDER_ID || (await ensureFolder(gToken, ROOT_NAME, 'root'));
     for (const name of folder) parent = await ensureFolder(gToken, name, parent);
     const file = await uploadPdf(gToken, parent, filename, pdf);
     return res.status(200).json({ ok: true, id: file.id, webViewLink: file.webViewLink, path: [...folder, filename].join('/') });
