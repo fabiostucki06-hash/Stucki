@@ -637,6 +637,7 @@ export default function App() {
           onCreateRechnung={handleCreateRechnungFromOfferte}
           onCreateMaterialofferte={handleCreateMaterialofferte}
           onCreateAnzahlung={handleCreateAnzahlung}
+          view={tab === 'auftragsbestaetigungen' ? 'ab' : undefined}
         />
       )}
 

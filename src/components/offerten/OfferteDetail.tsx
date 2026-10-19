@@ -27,6 +27,9 @@ interface OfferteDetailProps {
   onCreateMaterialofferte?: (offerte: Offerte, positionen: Position[]) => Promise<void>;
   /** Creates a 50% Vorkasse invoice listing the given (accepted) positions. */
   onCreateAnzahlung?: (offerte: Offerte, positionen: Position[]) => Promise<void>;
+  /** 'ab' when opened from the Auftragsbestätigungen list: the sheet is then about
+      the AB, so "Dokumente" offers only the AB PDF and prints as AB. */
+  view?: 'ab';
 }
 
 const HDR: React.CSSProperties = {
@@ -44,7 +47,7 @@ const ST_META: Record<OfferteStatus, StatusMeta> = {
   abgelehnt:  { c: 'var(--red)',    l: 'Abgelehnt'  },
 };
 
-export default function OfferteDetail({ offerte, customer, onClose, onUpdate, onDelete, onEdit, onDuplicate, onCreateAuftrag, onCreateRechnung, onCreateMaterialofferte, onCreateAnzahlung }: OfferteDetailProps) {
+export default function OfferteDetail({ offerte, customer, onClose, onUpdate, onDelete, onEdit, onDuplicate, onCreateAuftrag, onCreateRechnung, onCreateMaterialofferte, onCreateAnzahlung, view }: OfferteDetailProps) {
   const [saving, setSaving] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
   const [creatingAuftrag, setCreatingAuftrag] = useState(false);
@@ -108,6 +111,15 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   const nr = offerteNr(offerte);
   const docName = offerte.art === 'material' ? 'Materialofferte' : 'Offerte';
   const busy = creatingAuftrag || creatingRechnung || creatingMat || creatingAnz;
+
+  /* "Dokumente" only offers the document this sheet is about: the AB in the AB
+     view; a reine Materialofferte only itself; a Haupt-Offerte itself plus its
+     AB once accepted. Drucken names the printout after that same document. */
+  const isAbView = view === 'ab';
+  const hasAb = offerte.status === 'angenommen' && positionen.length > 0;
+  const showDocPdf = !isAbView;
+  const showAbPdf = hasAb && (isAbView || offerte.art !== 'material');
+  const printName = isAbView ? 'Auftragsbestätigung' : docName;
 
   /* AB fields: name / ort / datum default to the customer, workshop and today. */
   const abName = ab.name ?? (customer ? `${customer.vorname} ${customer.nachname}` : '');
@@ -671,16 +683,18 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
       <div className="glass-panel doc-group no-print">
         <div className="ab-panel-title">Dokumente</div>
         <div className="doc-btn-grid">
-          <button onClick={() => exportOffertePDF(buildPayload(), customer)} className="btn-system btn-primary">
-            {docName} als PDF
-          </button>
-          {offerte.status === 'angenommen' && positionen.length > 0 && (
-            <button onClick={handleExportAB} disabled={posSaving || acceptedCount === 0} className="btn-system btn-primary">
+          {showDocPdf && (
+            <button onClick={() => exportOffertePDF(buildPayload(), customer)} className={`btn-system btn-primary${showAbPdf ? '' : ' doc-btn-full'}`}>
+              {docName} als PDF
+            </button>
+          )}
+          {showAbPdf && (
+            <button onClick={handleExportAB} disabled={posSaving || acceptedCount === 0} className={`btn-system btn-primary${showDocPdf ? '' : ' doc-btn-full'}`}>
               AB als PDF
             </button>
           )}
-          <button onClick={() => printWithFilename(buildDocumentFilename(customer, docName, nr))} className="btn-system btn-secondary doc-btn-full">
-            Drucken
+          <button onClick={() => printWithFilename(buildDocumentFilename(customer, printName, nr))} className="btn-system btn-secondary doc-btn-full">
+            {isAbView ? 'AB drucken' : `${docName} drucken`}
           </button>
         </div>
         <div className="doc-group-hint">PDFs werden zusätzlich auf Google Drive abgelegt (GarageOS / Dokumenttyp / Jahr).</div>

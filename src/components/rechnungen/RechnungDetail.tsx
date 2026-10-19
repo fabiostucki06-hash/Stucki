@@ -80,6 +80,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
   const sc = ST_META[rechnung.status] ?? ST_META.entwurf;
   const faelligAm = calcFaelligAm(rechnung.createdAt, zahlungsFrist);
   const isAnzahlung = rechnung.art === 'anzahlung';
+  const docName = isAnzahlung ? 'Anzahlungsrechnung' : 'Rechnung';
 
   const isOverdue = faelligAm
     && rechnung.status === 'versendet'
@@ -551,25 +552,27 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
         </div>
       )}
 
+      {/* PDF / Druck: only this invoice's own document. */}
+      <div className="glass-panel doc-group no-print">
+        <div className="ab-panel-title">Dokumente</div>
+        <div className="doc-btn-grid">
+          <button onClick={() => exportRechnungPDF(rechnung, customer)} className="btn-system btn-green doc-btn-full">
+            {docName} als PDF
+          </button>
+          <button
+            onClick={() => printWithFilename(buildDocumentFilename(customer, docName, rechnung.rechnungNumber ?? ''))}
+            className="btn-system btn-secondary doc-btn-full"
+          >
+            {docName} drucken
+          </button>
+        </div>
+        <div className="doc-group-hint">PDFs werden zusätzlich auf Google Drive abgelegt (GarageOS / Dokumenttyp / Jahr).</div>
+      </div>
       <button
-        onClick={() => exportRechnungPDF(rechnung, customer)}
-        className="btn-system btn-green"
-        style={{ marginBottom: 12 }}
-      >
-        PDF speichern
-      </button>
-      <button
-        onClick={() => printWithFilename(buildDocumentFilename(customer, isAnzahlung ? 'Anzahlungsrechnung' : 'Rechnung', rechnung.rechnungNumber ?? ''))}
-        className="btn-system btn-secondary"
-        style={{ marginBottom: 12 }}
-      >
-        Drucken
-      </button>
-      <button
-        onClick={async () => { if (window.confirm('Rechnung löschen?')) await onDelete(rechnung.id); }}
+        onClick={async () => { if (window.confirm(`${docName} löschen?`)) await onDelete(rechnung.id); }}
         className="btn-system btn-destructive"
       >
-        Rechnung löschen
+        {docName} löschen
       </button>
       <div style={{ marginTop: 16, fontSize: 13, color: 'var(--label3)', textAlign: 'center' }}>
         Erstellt: {formatDateCH(rechnung.createdAt)} · {isAnzahlung ? 'Anzahlungsrechnung' : 'Rechnung'} #{rechnung.rechnungNumber}
