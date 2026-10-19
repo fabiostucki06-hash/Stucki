@@ -4,17 +4,10 @@ import { SwissQRBill } from 'swissqrbill/svg';
 import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from './rechnung-totals';
 import { formatDateCH, buildDocumentFilename } from './utils';
 import { getIban } from './settings';
+import { CO_NAME, CO_ADDR, CO_CITY, CO_PHONE, CO_LOC, CO_ZIP, CO_CITY_NAME, STD_SATZ } from './company';
 import { archiveToDrive } from './drive';
 import type { ArbeitPosition, Customer, MaterialPosition, Position, Rechnung } from '../types';
 
-const CO_NAME      = 'Fabio Stucki';
-const CO_ADDR      = 'Polenstrasse 245';
-const CO_CITY      = '5112 Thalheim AG';
-const CO_PHONE     = '079 850 18 63';
-const CO_LOC       = 'Thalheim AG';
-const CO_ZIP       = 5112;
-const CO_CITY_NAME = 'Thalheim AG';
-const STD_SATZ = '80.00';
 const MIN_ROWS = 15;
 
 const todayCH = () => formatDateCH(new Date());

@@ -1,5 +1,6 @@
 import { SFHouse, SFWrench, SFDoc, SFBox, SFDocCheck, SFReceipt, SFReceiptHalf, SFPerson, SFChart, SFXmark, SFGear } from './Icons';
 import type { TabId } from '../types';
+import { BUILD_LABEL } from '../lib/buildInfo';
 
 const SIDEBAR_ITEMS: { id: TabId; icon: React.ReactNode; label: string }[] = [
   { id: 'dashboard',   icon: <SFHouse />,  label: 'Home'      },
@@ -13,8 +14,6 @@ const SIDEBAR_ITEMS: { id: TabId; icon: React.ReactNode; label: string }[] = [
   { id: 'statistiken',   icon: <SFChart />,  label: 'Statistik'     },
   { id: 'einstellungen', icon: <SFGear />,  label: 'Einstellungen' },
 ];
-
-const BUILD_LABEL = `Build: ${new Date(__BUILD_TIME__).toLocaleString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Zurich' })}${__BUILD_SHA__ ? ` · ${__BUILD_SHA__}` : ''}`;
 
 interface SidebarProps {
   open: boolean;

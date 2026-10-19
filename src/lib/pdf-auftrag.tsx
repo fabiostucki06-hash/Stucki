@@ -1,14 +1,8 @@
 import { jsPDF } from 'jspdf';
 import { PAGE_TOP, PAGE_BOTTOM, addPageNumbers } from './pdf-paging';
 import { formatDateCH, buildDocumentFilename } from './utils';
+import { CO_NAME, CO_ADDR, CO_CITY, CO_PHONE, CO_LOC, STD_SATZ } from './company';
 import type { ArbeitPosition, Customer, Order } from '../types';
-
-const CO_NAME  = 'Fabio Stucki';
-const CO_ADDR  = 'Polenstrasse 245';
-const CO_CITY  = '5112 Thalheim AG';
-const CO_PHONE = '079 850 18 63';
-const CO_LOC   = 'Thalheim AG';
-const STD_SATZ = '80.00';
 
 const dateCH = (iso?: string) => iso ? formatDateCH(iso) : '';
 const fN = (v?: string | number) => parseFloat(String(v ?? '0')) || 0;

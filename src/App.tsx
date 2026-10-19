@@ -526,6 +526,8 @@ export default function App() {
             bgMode={bgMode}
             bgColor={bgColor}
             onBgColorChange={handleBgColorChange}
+            syncStatus={syncStatus}
+            userEmail={userEmail}
           />
         )}
       </main>

@@ -1,6 +1,7 @@
 // Vercel Node serverless function (not part of the Vite app bundle / tsc -b build).
 // Stores a generated PDF in Google Drive:
 //   POST /api/drive-upload  { folder: string[], filename, data: <base64 PDF> }
+//   GET  /api/drive-upload  → { configured } (status shown in Einstellungen)
 //   Authorization: Bearer <Supabase access token of the signed-in user>
 // Files land in <root>/<folder…>/<filename>; missing folders are created and a
 // file with the same name in the target folder is replaced (new revision), so a
@@ -115,9 +116,11 @@ async function uploadPdf(gToken: string, parent: string, filename: string, pdf: 
 }
 
 export default async function handler(req: VercelLikeRequest, res: VercelLikeResponse) {
-  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Nur POST' });
-
   const configured = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REFRESH_TOKEN);
+  // GET: status probe for Einstellungen → Integrationen (reveals nothing but the flag).
+  if (req.method === 'GET') return res.status(200).json({ ok: true, configured });
+  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Nur GET/POST' });
+
   if (!configured) return res.status(501).json({ ok: false, configured: false, error: 'Google Drive ist nicht eingerichtet' });
 
   const token = header(req, 'authorization')?.replace(/^Bearer\s+/i, '');
