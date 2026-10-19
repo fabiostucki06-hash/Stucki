@@ -1,8 +1,8 @@
 // Vercel Node serverless function (not part of the Vite app bundle / tsc -b build).
 // Stores a generated PDF in Google Drive:
 //   POST /api/drive-upload  { rootFolderId?, folder: string[], filename, data: <base64 PDF> }
-//   POST /api/drive-upload  { test: true, rootFolderId? } → { name } of the reachable target folder
-//   GET  /api/drive-upload  → { configured } (status shown in Einstellungen)
+//   POST /api/drive-upload  { test: true, rootFolderId? } → { name, account } or the exact failure reason
+//   GET  /api/drive-upload  → { configured, missing: env var names } (status shown in Einstellungen)
 //   Authorization: Bearer <Supabase access token of the signed-in user>
 // Files land in <root>/<folder…>/<filename>; missing folders are created and a
 // file with the same name in the target folder is replaced (new revision), so a
@@ -12,7 +12,7 @@
 // have no storage quota in a personal "Meine Ablage"). Environment variables:
 //   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN  (required)
 //   GOOGLE_DRIVE_FOLDER_ID  (optional root folder; default: "GarageOS" in My Drive)
-// Without them the endpoint answers 501 { configured: false } and the app skips the upload.
+// Without them the endpoint answers 501 { configured: false, missing } and the app skips the upload.
 
 import type { VercelLikeRequest, VercelLikeResponse } from './import-part.js';
 
@@ -72,14 +72,41 @@ async function googleAccessToken(): Promise<string> {
       grant_type: 'refresh_token',
     }).toString(),
   });
-  const j = (await r.json()) as { access_token?: string; error?: string };
-  if (!r.ok || !j.access_token) throw new Error(`Google-Anmeldung fehlgeschlagen (${j.error ?? r.status})`);
-  return j.access_token;
+  const j = (await r.json().catch(() => ({}))) as { access_token?: string; error?: string; error_description?: string };
+  if (r.ok && j.access_token) return j.access_token;
+  const reason =
+    j.error === 'invalid_grant' ? 'GOOGLE_REFRESH_TOKEN ist ungültig, widerrufen oder abgelaufen – neuen Refresh-Token erzeugen und in Vercel ersetzen'
+    : j.error === 'invalid_client' ? 'GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET stimmen nicht (invalid_client)'
+    : j.error === 'unauthorized_client' ? 'Refresh-Token gehört zu einem anderen OAuth-Client als GOOGLE_CLIENT_ID (unauthorized_client)'
+    : `${j.error ?? `HTTP ${r.status}`}${j.error_description ? `: ${j.error_description}` : ''}`;
+  throw new Error(`Google-Anmeldung fehlgeschlagen – ${reason}`);
+}
+
+/** Readable reason for a failed Drive API call (403 / 404 / quota …). */
+async function driveError(r: Response): Promise<Error> {
+  const j = (await r.json().catch(() => ({}))) as { error?: { message?: string; errors?: { reason?: string }[] } };
+  const reason = j.error?.errors?.[0]?.reason ?? '';
+  const msg = j.error?.message ?? '';
+  if (reason === 'accessNotConfigured' || /has not been used|is disabled/i.test(msg))
+    return new Error('Google Drive API ist im Google-Cloud-Projekt nicht aktiviert (403) – unter „APIs & Dienste“ aktivieren');
+  if (reason === 'insufficientPermissions' || /insufficient.*scope/i.test(msg))
+    return new Error('Zugriff verweigert (403): Refresh-Token hat keinen Drive-Zugriff – mit Scope https://www.googleapis.com/auth/drive neu erzeugen');
+  if (reason === 'storageQuotaExceeded') return new Error('Google-Drive-Speicher voll (403)');
+  if (r.status === 403) return new Error(`Zugriff verweigert (403)${msg ? `: ${msg}` : ''}`);
+  if (r.status === 404) return new Error('Ordner nicht gefunden (404) – ID prüfen oder den Ordner für das Google-Konto der App freigeben (Bearbeiter)');
+  return new Error(`Google Drive ${r.status}${msg ? `: ${msg}` : ''}`);
+}
+
+/** Email of the Google account the uploads run as (to know whom to share a folder with). */
+async function driveAccount(gToken: string): Promise<string> {
+  const r = await fetch('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)', { headers: { Authorization: `Bearer ${gToken}` } });
+  if (!r.ok) throw await driveError(r);
+  return ((await r.json()) as { user?: { emailAddress?: string } }).user?.emailAddress ?? '';
 }
 
 async function driveJson<T>(url: string, gToken: string, init: RequestInit = {}): Promise<T> {
   const r = await fetch(url, { ...init, headers: { Authorization: `Bearer ${gToken}`, ...(init.headers ?? {}) } });
-  if (!r.ok) throw new Error(`Google Drive ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  if (!r.ok) throw await driveError(r);
   return (await r.json()) as T;
 }
 
@@ -100,19 +127,20 @@ async function ensureFolder(gToken: string, name: string, parent: string): Promi
   return created.id;
 }
 
-const FOLDER_ID_RE = /^[A-Za-z0-9_-]{10,100}$/;
+const REQUIRED_ENV = ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REFRESH_TOKEN'] as const;
+
+const FOLDER_ID_RE =/^[A-Za-z0-9_-]{10,100}$/;
 
 /** The folder exists, is not trashed and the Drive account may add files to it; returns its name. */
 async function checkFolder(gToken: string, id: string): Promise<string> {
   const r = await fetch(`${DRIVE}/${encodeURIComponent(id)}?fields=name,mimeType,trashed,capabilities(canAddChildren)&supportsAllDrives=true`, {
     headers: { Authorization: `Bearer ${gToken}` },
   });
-  if (r.status === 404) throw new Error('Ordner nicht gefunden oder kein Zugriff für das Drive-Konto');
-  if (!r.ok) throw new Error(`Google Drive ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  if (!r.ok) throw await driveError(r);
   const f = (await r.json()) as { name?: string; mimeType?: string; trashed?: boolean; capabilities?: { canAddChildren?: boolean } };
   if (f.mimeType !== FOLDER_MIME) throw new Error('Die ID gehört nicht zu einem Ordner');
   if (f.trashed) throw new Error('Der Ordner liegt im Papierkorb');
-  if (f.capabilities?.canAddChildren === false) throw new Error('Keine Schreibrechte für diesen Ordner');
+  if (f.capabilities?.canAddChildren === false) throw new Error('Keine Schreibrechte – Ordner für das Google-Konto der App als „Bearbeiter“ freigeben');
   return f.name ?? id;
 }
 
@@ -137,15 +165,22 @@ async function uploadPdf(gToken: string, parent: string, filename: string, pdf: 
 }
 
 export default async function handler(req: VercelLikeRequest, res: VercelLikeResponse) {
-  const configured = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REFRESH_TOKEN);
-  // GET: status probe for Einstellungen → Integrationen (reveals nothing but the flag).
-  if (req.method === 'GET') return res.status(200).json({ ok: true, configured });
+  // Names (never values) of the required variables that are not set.
+  const missing = REQUIRED_ENV.filter((k) => !process.env[k]?.trim());
+  const configured = missing.length === 0;
+  // GET: status probe for Einstellungen → Integrationen.
+  if (req.method === 'GET') return res.status(200).json({ ok: true, configured, missing });
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Nur GET/POST' });
-
-  if (!configured) return res.status(501).json({ ok: false, configured: false, error: 'Google Drive ist nicht eingerichtet' });
 
   const token = header(req, 'authorization')?.replace(/^Bearer\s+/i, '');
   if (!token || !(await supabaseUserOk(token))) return res.status(401).json({ ok: false, error: 'Nicht angemeldet' });
+
+  if (!configured) {
+    return res.status(501).json({
+      ok: false, configured: false, missing,
+      error: `Google Drive ist nicht eingerichtet – in Vercel fehlen die Umgebungsvariablen: ${missing.join(', ')}`,
+    });
+  }
 
   let body: UploadBody;
   try {
@@ -159,11 +194,12 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
   if (body.test === true) {
     try {
       const gToken = await googleAccessToken();
+      const account = await driveAccount(gToken);
       const id = rootFolderId || process.env.GOOGLE_DRIVE_FOLDER_ID;
-      if (id) return res.status(200).json({ ok: true, name: await checkFolder(gToken, id) });
+      if (id) return res.status(200).json({ ok: true, account, name: await checkFolder(gToken, id) });
       // Default target: "GarageOS" in My Drive, created on the first upload.
       const found = await findOne(gToken, `name=${q(ROOT_NAME)} and mimeType=${q(FOLDER_MIME)} and 'root' in parents`);
-      return res.status(200).json({ ok: true, name: found ? ROOT_NAME : `${ROOT_NAME} (wird beim ersten Upload angelegt)` });
+      return res.status(200).json({ ok: true, account, name: found ? ROOT_NAME : `${ROOT_NAME} (wird beim ersten Upload angelegt)` });
     } catch (err) {
       return res.status(422).json({ ok: false, error: err instanceof Error ? err.message : String(err) });
     }

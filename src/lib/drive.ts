@@ -54,7 +54,9 @@ export function parseDriveFolderId(input: string): string {
 /** Plausible Drive file/folder ID (what the server accepts). */
 export const isDriveFolderId = (id: string): boolean => /^[A-Za-z0-9_-]{10,100}$/.test(id);
 
-export type DriveTestResult = { ok: true; name: string } | { ok: false; error: string };
+export type DriveTestResult =
+  | { ok: true; name: string; account: string }
+  | { ok: false; error: string; /** Required Vercel env vars that are not set. */ missing?: string[] };
 
 /** Asks the server whether the folder ('' = default target) exists and is
     writable for the Drive account the uploads use. */
@@ -68,8 +70,10 @@ export async function testDriveFolder(folderId: string): Promise<DriveTestResult
       body: JSON.stringify({ test: true, rootFolderId: folderId || undefined }),
     });
     if (r.status === 404) return { ok: false, error: 'Server-Funktion nicht verfügbar (lokale Entwicklung)' };
-    const j = (await r.json().catch(() => ({}))) as { ok?: boolean; name?: string; error?: string };
-    return r.ok && j.ok ? { ok: true, name: j.name ?? '' } : { ok: false, error: j.error ?? `Fehler ${r.status}` };
+    const j = (await r.json().catch(() => ({}))) as { ok?: boolean; name?: string; account?: string; error?: string; missing?: string[] };
+    return r.ok && j.ok
+      ? { ok: true, name: j.name ?? '', account: j.account ?? '' }
+      : { ok: false, error: j.error ?? `Fehler ${r.status}`, missing: j.missing };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Verbindung fehlgeschlagen' };
   }
