@@ -195,7 +195,7 @@ export default function CustomerDetail({ customer, orders, onClose, onEdit, onNe
         {docs.length > 0 && (
           <div className="inset-grouped-list" style={{ margin: 0 }}>
             {docs.map((doc) => (
-              <div key={doc.path} className="list-row" onClick={() => openViewer(doc)}>
+              <div key={doc.path} className="list-row" tabIndex={0} onClick={() => openViewer(doc)}>
                 <span className="list-row-icon" style={{ background: 'rgb(var(--accent-rgb) / 0.12)', color: 'var(--blue)' }}>
                   <SFPaperclip size={16} />
                 </span>
@@ -230,7 +230,7 @@ export default function CustomerDetail({ customer, orders, onClose, onEdit, onNe
       {!cos.length && <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--label3)', fontSize: 15 }}>Noch keine Aufträge.</div>}
       <div className="inset-grouped-list">
         {cos.map((o) => (
-          <div key={o.id} className="list-row" onClick={() => onOrderClick(o)}>
+          <div key={o.id} className="list-row" tabIndex={0} onClick={() => onOrderClick(o)}>
             <div style={{ flex: 1 }}>
               {isOverdue(o) && <div style={{ fontSize: 11, color: 'var(--red)', fontWeight: 600, marginBottom: 2 }}>Frist überschritten</div>}
               <div className="sf-subhead" style={{ fontWeight: 600 }}>Auftrag #{o.orderNumber}</div>

@@ -269,6 +269,59 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 /* AB signature blocks exist only on paper (see @media print); the screen never shows them. */
 .ab-sig-print{display:none}
 
+/* ── RESPONSIVE LAYOUT ── touch (phone / tablet) vs. laptop / desktop.
+   The edge (1024px) matches Tailwind's lg: and useIsDesktop(). Every rule here
+   is screen-only, so the print / PDF styles below are untouched. */
+.app-main{display:block;max-width:900px;margin:0 auto;padding:0 0 8px}
+.dash-cols{display:block}
+.doc-table-head{display:none}
+.list-row:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+
+/* Touch: big thumb targets; full-size sheets open as full-screen overlays on phones. */
+@media screen and (pointer:coarse){
+  .list-row{min-height:56px}
+  .pill-btn{min-height:40px}
+  .excel-btn{min-height:40px;min-width:44px}
+}
+@media screen and (max-width:640px){
+  .sheet-container.sheet-full{height:100dvh;max-height:100dvh!important;border-radius:0;padding-top:env(safe-area-inset-top)}
+  .sheet-container.sheet-full .sheet-handle{display:none}
+}
+
+/* Desktop: docked sidebar, wide multi-column content, centered dialogs, table lists. */
+@keyframes dialog-in{from{opacity:0;transform:translateY(12px) scale(0.98)}to{opacity:1;transform:none}}
+@media screen and (min-width:1024px){
+  .app-shell.is-desktop{padding-bottom:16px!important}
+  .is-desktop .tab-bar{display:none}
+  .is-desktop .nav-bar-inner{max-width:none;padding:0 24px}
+  .is-desktop .app-main{max-width:none;margin:0 0 0 260px;padding:8px 24px 16px}
+  .is-desktop .app-main>*{max-width:1240px;margin-left:auto;margin-right:auto}
+  .sidebar-docked{box-shadow:inset -1px 0 0 rgba(255,255,255,0.35)!important}
+
+  .stat-grid{grid-template-columns:repeat(4,1fr);gap:14px}
+  .dash-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:0 24px;align-items:start}
+
+  /* Lists as tables: Dokument | Betrag | Kunde on one line, column labels on top. */
+  .doc-row-main{display:flex;align-items:center;gap:16px;min-width:0}
+  .doc-row-main>*{margin-top:0!important}
+  .doc-row-title{flex:0 0 260px;order:0;min-width:0}
+  .doc-row-amount{flex:0 0 130px;order:1;text-align:right}
+  .doc-row-sub{flex:1 1 auto;order:2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .doc-row-extra{order:3;white-space:nowrap}
+  .doc-table-head{display:flex;gap:16px;padding:8px 20px;border-bottom:0.5px solid var(--sep);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--label3)}
+  .list-row{padding:10px 20px;min-height:44px}
+
+  /* Sheets become centered dialogs above content and sidebar. */
+  .sheet-container{left:0;right:0;top:4dvh;bottom:auto;margin:0 auto;width:min(720px,calc(100vw - 64px));max-height:92dvh!important;border-radius:20px;border:1px solid var(--card-border);padding-bottom:0;box-shadow:0 24px 80px rgba(0,0,0,0.28),inset 0 1px 0 rgba(255,255,255,0.65);animation:dialog-in 0.22s cubic-bezier(0.32,0.72,0,1)}
+  .sheet-container.sheet-full{width:min(1040px,calc(100vw - 64px))}
+  .sheet-handle{display:none}
+  .sheet-content{padding:24px 28px}
+
+  /* Compact action bars. */
+  .doc-btn-grid{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+  .doc-btn-grid>.btn-system{height:44px;font-size:15px}
+}
+
 /* ── PRINT ── hide app chrome, show only the sheet content ── */
 @page{
   size:auto;

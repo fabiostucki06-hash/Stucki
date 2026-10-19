@@ -8,6 +8,7 @@ import { updateSettings, getActiveOfferteId, setActiveOfferteId, getMargin } fro
 import { useSettings } from './hooks/useSettings';
 import { cleanPartTitle } from './lib/partTitle';
 import { useVersionCheck } from './hooks/useVersionCheck';
+import { useIsDesktop } from './hooks/useIsDesktop';
 import { offerteNr, nextVersion, sumPositions, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_BEDINGUNG, ANZAHLUNG_PROZENT } from './lib/offerte-docs';
 import { hardReload } from './lib/reload';
 
@@ -59,6 +60,23 @@ export default function App() {
   const [tab, setTab] = useState<TabId>(() => (window.location.pathname.replace(/\/+$/, '') === '/offerten' ? 'offerten' : 'dashboard'));
   const [fabOpen, setFabOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Laptop / desktop: docked sidebar, centered dialogs, table lists (see globals.css).
+  const isDesktop = useIsDesktop();
+
+  /* Keyboard: clickable list rows are focusable (tabIndex); Enter or Space on a
+     focused row opens it like a click. */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const el = e.target as HTMLElement | null;
+      if (!el?.classList?.contains('list-row') || el.tabIndex < 0) return;
+      e.preventDefault();
+      el.click();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
   // Synced per user: a change on another device re-renders the background here.
   const { wallpaper, bgMode, bgColor } = useSettings();
   const [bgSrc, setBgSrc] = useState(wallpaper);
@@ -463,7 +481,7 @@ export default function App() {
   }
 
   return (
-    <div style={{ minHeight: '100dvh', paddingBottom: 'calc(55px + env(safe-area-inset-bottom))' }}>
+    <div className={`app-shell${isDesktop ? ' is-desktop' : ''}`} style={{ minHeight: '100dvh', paddingBottom: 'calc(55px + env(safe-area-inset-bottom))' }}>
       {sessionExpired && <ReauthModal email={userEmail} onResolved={updateToken} />}
 
       {/* Background */}
@@ -480,17 +498,18 @@ export default function App() {
         )}
       </div>
 
-      <NavBar syncStatus={syncStatus} todosCount={todos.length} offerten={offerten} customers={customers} onMenuToggle={() => setSidebarOpen((p) => !p)} onLogoClick={() => setTab('dashboard')} />
+      <NavBar syncStatus={syncStatus} todosCount={todos.length} offerten={offerten} customers={customers} onMenuToggle={isDesktop ? undefined : () => setSidebarOpen((p) => !p)} onLogoClick={() => setTab('dashboard')} />
 
       <Sidebar
         open={sidebarOpen}
+        docked={isDesktop}
         activeTab={tab}
         onTabChange={setTab}
         onClose={() => setSidebarOpen(false)}
         onLogout={handleLogout}
       />
 
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 0 8px' }}>
+      <main className="app-main">
         {tab === 'dashboard'   && <Dashboard customers={customers} orders={orders} onOrderClick={(o) => { setSelOInEdit(false); setSelO(o); }} />}
         {tab === 'auftraege'   && <OrderList orders={orders} customers={customers} onOrderClick={(o) => { setSelOInEdit(false); setSelO(o); }} onEditClick={(o) => { setSelOInEdit(true); setSelO(o); }} onNew={() => { setNewOCid(null); setShowNO(true); }} />}
         {tab === 'offerten'    && <OfferteList offerten={offerten} customers={customers} onOfferteClick={setSelOff} onEdit={(off) => setEditOff(off)} onNew={() => setShowNOff(true)} />}
@@ -509,7 +528,7 @@ export default function App() {
             onBgColorChange={handleBgColorChange}
           />
         )}
-      </div>
+      </main>
 
       {/* FAB context menu backdrop */}
       {fabOpen && <div onClick={() => setFabOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 498 }} />}

@@ -70,7 +70,7 @@ export default function OrderList({ orders, customers, onOrderClick, onEditClick
                 const c = customers.find((x) => x.id === o.customerId);
                 const ov = isOverdue(o); const dv = daysSince(o.statusChangedAt);
                 return (
-                  <div key={o.id} className="list-row" onClick={() => onOrderClick(o)} style={{ background: ov ? 'rgba(255,59,48,0.06)' : 'transparent' }}>
+                  <div key={o.id} className="list-row" tabIndex={0} onClick={() => onOrderClick(o)} style={{ background: ov ? 'rgba(255,59,48,0.06)' : 'transparent' }}>
                     <div style={{ flex: 1 }}>
                       {ov && <div style={{ fontSize: 11, color: 'var(--red)', fontWeight: 600, marginBottom: 2 }}>Frist überschritten</div>}
                       <div style={{ fontWeight: 600, fontSize: 16 }}>#{o.orderNumber} – {c?.vorname ?? ''} {c?.nachname ?? ''}</div>
@@ -96,7 +96,7 @@ export default function OrderList({ orders, customers, onOrderClick, onEditClick
             {done.map((o) => {
               const c = customers.find((x) => x.id === o.customerId);
               return (
-                <div key={o.id} className="list-row" onClick={() => onOrderClick(o)} style={{ opacity: 0.65 }}>
+                <div key={o.id} className="list-row" tabIndex={0} onClick={() => onOrderClick(o)} style={{ opacity: 0.65 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 500, fontSize: 15 }}>#{o.orderNumber} – {c?.vorname ?? ''} {c?.nachname ?? ''}</div>
                     <div style={{ fontSize: 12, color: 'var(--label3)' }}>{formatDateCH(o.createdAt)}</div>

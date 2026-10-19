@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useRef } from 'react';
 
 interface SheetProps {
   title: string;
@@ -9,7 +9,14 @@ interface SheetProps {
   barRight?: ReactNode;
 }
 
+/* Touch: bottom sheet sliding up from the edge. Desktop (≥1024px, see
+   globals.css): the same markup renders as a centered dialog. Escape closes
+   the topmost sheet on both. */
 export default function Sheet({ title, onClose, children, full, barLeft, barRight }: SheetProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     // Plain `overflow:hidden` doesn't block background scroll on iOS Safari.
     // Pin the body in place instead and restore the scroll position on close.
@@ -29,10 +36,23 @@ export default function Sheet({ title, onClose, children, full, barLeft, barRigh
     };
   }, []);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      // Only the topmost (last rendered) sheet reacts.
+      const all = document.querySelectorAll('.sheet-container');
+      if (all[all.length - 1] !== containerRef.current) return;
+      e.preventDefault();
+      onCloseRef.current();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
     <>
       <div className="sheet-backdrop" style={{ animation: 'fade-in 0.2s ease' }} onClick={onClose} />
-      <div className="sheet-container" style={{ maxHeight: full ? '96dvh' : '92dvh' }}>
+      <div ref={containerRef} className={`sheet-container${full ? ' sheet-full' : ''}`} role="dialog" aria-modal="true" aria-label={title} style={{ maxHeight: full ? '96dvh' : '92dvh' }}>
         <div className="sheet-handle" />
         <div className="sheet-nav">
           {barLeft ?? <div style={{ minWidth: 60 }} />}

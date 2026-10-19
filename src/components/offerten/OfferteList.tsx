@@ -81,19 +81,21 @@ export default function OfferteList({ offerten, customers, onOfferteClick, onEdi
           <div key={key}>
             <p className="section-header" style={{ paddingLeft: 0, color }}>{label} ({grp.length})</p>
             <div className="inset-grouped-list" style={{ marginBottom: 4 }}>
+              {/* Column labels for the desktop table layout (hidden on touch). */}
+              <div className="doc-table-head" aria-hidden="true"><span className="doc-row-title">Dokument</span><span className="doc-row-sub">Kunde</span><span className="doc-row-amount">Betrag</span></div>
               {grp.map((off) => {
                 const c = customers.find((x) => x.id === off.customerId);
                 const docName = isAB ? 'Auftragsbestätigung' : off.art === 'material' ? 'Materialofferte' : 'Offerte';
                 return (
-                  <div key={off.id} className={`list-row${off.id === active?.id ? ' ao-active' : ''}`} onClick={() => onOfferteClick(off)}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div key={off.id} className={`list-row${off.id === active?.id ? ' ao-active' : ''}`} tabIndex={0} onClick={() => onOfferteClick(off)}>
+                    <div className="doc-row-main" style={{ flex: 1 }}>
+                      <div className="doc-row-title" style={{ fontWeight: 600, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
                         {docName} #{offerteNr(off)}
                         {off.id === active?.id && <ActiveOfferteBadge />}
                       </div>
-                      <div style={{ fontSize: 13, color: 'var(--label2)', marginTop: 1 }}>{c ? `${c.vorname} ${c.nachname}` : 'Kein Kunde'}</div>
-                      {isAB && off.ab?.fertigstellung && <div style={{ fontSize: 13, color: 'var(--label2)', marginTop: 1 }}>Fertigstellung: {off.ab.fertigstellung}</div>}
-                      {off.totalBetrag && <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--blue)', marginTop: 1 }}>CHF {off.totalBetrag}</div>}
+                      <div className="doc-row-sub" style={{ fontSize: 13, color: 'var(--label2)', marginTop: 1 }}>{c ? `${c.vorname} ${c.nachname}` : 'Kein Kunde'}</div>
+                      {isAB && off.ab?.fertigstellung && <div className="doc-row-extra" style={{ fontSize: 13, color: 'var(--label2)', marginTop: 1 }}>Fertigstellung: {off.ab.fertigstellung}</div>}
+                      {off.totalBetrag && <div className="doc-row-amount" style={{ fontSize: 13, fontWeight: 600, color: 'var(--blue)', marginTop: 1 }}>CHF {off.totalBetrag}</div>}
                     </div>
                     {!isAB && <ActiveOfferteToggle offerte={off} />}
                     <button

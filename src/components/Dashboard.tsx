@@ -35,14 +35,16 @@ export default function Dashboard({ customers, orders, onOrderClick }: Dashboard
           ))}
         </div>
 
+        {/* Desktop: Nachzuhaken and Aktive Aufträge side by side. */}
+        <div className="dash-cols">
         {todos.length > 0 && (
-          <>
+          <section>
             <p className="section-header" style={{ paddingLeft: 0 }}>Nachzuhaken</p>
             <div className="inset-grouped-list">
               {todos.map((o) => {
                 const c = customers.find((x) => x.id === o.customerId);
                 return (
-                  <div key={o.id} className="list-row" onClick={() => onOrderClick(o)}>
+                  <div key={o.id} className="list-row" tabIndex={0} onClick={() => onOrderClick(o)}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: 16 }}>{c?.vorname ?? ''} {c?.nachname ?? ''}</div>
                       <div style={{ fontSize: 13, color: 'var(--red)', fontWeight: 600, marginTop: 1 }}>
@@ -57,9 +59,10 @@ export default function Dashboard({ customers, orders, onOrderClick }: Dashboard
                 );
               })}
             </div>
-          </>
+          </section>
         )}
 
+        <section>
         <p className="section-header" style={{ paddingLeft: 0 }}>Aktive Aufträge ({activeOrders.length})</p>
         {activeOrders.length === 0 ? (
           <div className="glass-panel" style={{ padding: 24, textAlign: 'center', color: 'var(--label3)', fontSize: 15 }}>
@@ -71,7 +74,7 @@ export default function Dashboard({ customers, orders, onOrderClick }: Dashboard
               const c = customers.find((x) => x.id === o.customerId);
               const dv = daysSince(o.statusChangedAt);
               return (
-                <div key={o.id} className="list-row" onClick={() => onOrderClick(o)} style={{ background: isOverdue(o) ? 'rgba(255,59,48,0.06)' : 'transparent' }}>
+                <div key={o.id} className="list-row" tabIndex={0} onClick={() => onOrderClick(o)} style={{ background: isOverdue(o) ? 'rgba(255,59,48,0.06)' : 'transparent' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: 16 }}>{c?.vorname ?? ''} {c?.nachname ?? ''}</div>
                     <div style={{ fontSize: 13, color: 'var(--label3)', marginTop: 1 }}>#{o.orderNumber} · {dv < 1 ? 'heute' : `${dv}T`}</div>
@@ -83,6 +86,8 @@ export default function Dashboard({ customers, orders, onOrderClick }: Dashboard
             })}
           </div>
         )}
+        </section>
+        </div>
       </div>
     </div>
   );

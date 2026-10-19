@@ -9,7 +9,8 @@ interface NavBarProps {
   todosCount: number;
   offerten: Offerte[];
   customers: Customer[];
-  onMenuToggle: () => void;
+  /** Omitted on desktop, where the sidebar is docked and needs no toggle. */
+  onMenuToggle?: () => void;
   onLogoClick: () => void;
 }
 
@@ -29,15 +30,17 @@ export default function NavBar({ syncStatus, todosCount, offerten, customers, on
   return (
     <div className="nav-bar">
       <div className="nav-bar-inner">
-        {/* Hamburger */}
-        <button
-          onClick={onMenuToggle}
-          className="bar-btn"
-          style={{ color: 'var(--label)', marginRight: 8 }}
-          aria-label="Menü öffnen"
-        >
-          <SFMenu />
-        </button>
+        {/* Hamburger (touch layout only) */}
+        {onMenuToggle && (
+          <button
+            onClick={onMenuToggle}
+            className="bar-btn"
+            style={{ color: 'var(--label)', marginRight: 8 }}
+            aria-label="Menü öffnen"
+          >
+            <SFMenu />
+          </button>
+        )}
 
         {/* Logo */}
         <button onClick={onLogoClick} style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>

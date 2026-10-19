@@ -20,13 +20,16 @@ interface SidebarProps {
   onTabChange: (tab: TabId) => void;
   onClose: () => void;
   onLogout: () => void;
+  /** Desktop: permanently visible next to the content, no backdrop or close button. */
+  docked?: boolean;
 }
 
-export default function Sidebar({ open, activeTab, onTabChange, onClose, onLogout }: SidebarProps) {
+export default function Sidebar({ open: openProp, activeTab, onTabChange, onClose, onLogout, docked }: SidebarProps) {
+  const open = docked || openProp;
   return (
     <>
       {/* Backdrop */}
-      <div
+      {!docked && <div
         onClick={onClose}
         style={{
           position: 'fixed',
@@ -39,30 +42,32 @@ export default function Sidebar({ open, activeTab, onTabChange, onClose, onLogou
           pointerEvents: open ? 'auto' : 'none',
           transition: 'opacity 0.25s ease',
         }}
-      />
+      />}
 
       {/* Sidebar Panel */}
       <div
+        className={docked ? 'sidebar-docked no-print' : 'no-print'}
         style={{
           position: 'fixed',
-          top: 0,
+          top: docked ? 'calc(60px + env(safe-area-inset-top))' : 0,
           left: 0,
           bottom: 0,
-          width: 292,
-          zIndex: 400,
+          width: docked ? 260 : 292,
+          zIndex: docked ? 150 : 400,
           background: 'rgba(255,255,255,0.10)',
           backdropFilter: 'blur(80px) saturate(280%)',
           WebkitBackdropFilter: 'blur(80px) saturate(280%)',
           borderRight: '1px solid rgba(255,255,255,0.20)',
           boxShadow: open ? '6px 0 48px rgba(0,0,0,0.08), inset -1px 0 0 rgba(255,255,255,0.50)' : 'none',
           transform: open ? 'translateX(0)' : 'translateX(-100%)',
-          transition: 'transform 0.30s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+          transition: docked ? 'none' : 'transform 0.30s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
           display: 'flex',
           flexDirection: 'column',
-          paddingTop: 'env(safe-area-inset-top)',
+          paddingTop: docked ? 0 : 'env(safe-area-inset-top)',
         }}
       >
-        {/* Header */}
+        {/* Header (overlay only; the docked sidebar sits under the nav bar) */}
+        {!docked && (
         <div style={{
           height: 60,
           display: 'flex',
@@ -81,6 +86,7 @@ export default function Sidebar({ open, activeTab, onTabChange, onClose, onLogou
             <SFXmark />
           </button>
         </div>
+        )}
 
         {/* Navigation Items */}
         <nav style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -89,6 +95,7 @@ export default function Sidebar({ open, activeTab, onTabChange, onClose, onLogou
             return (
               <button
                 key={item.id}
+                aria-current={active ? 'page' : undefined}
                 onClick={() => { onTabChange(item.id); onClose(); }}
                 style={{
                   display: 'flex',

@@ -67,17 +67,19 @@ export default function RechnungenList({ rechnungen: all, customers, onRechnungC
               {STATUS_LABELS[st]} ({grp.length})
             </p>
             <div className="inset-grouped-list" style={{ marginBottom: 4 }}>
+              {/* Column labels for the desktop table layout (hidden on touch). */}
+              <div className="doc-table-head" aria-hidden="true"><span className="doc-row-title">Dokument</span><span className="doc-row-sub">Kunde</span><span className="doc-row-amount">Betrag</span></div>
               {grp.map((rec) => {
                 const c = customers.find((x) => x.id === rec.customerId);
                 return (
-                  <div key={rec.id} className="list-row" onClick={() => onRechnungClick(rec)}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, fontSize: 16 }}>{docLabel} #{rec.rechnungNumber}</div>
-                      <div style={{ fontSize: 13, color: 'var(--label2)', marginTop: 1 }}>
+                  <div key={rec.id} className="list-row" tabIndex={0} onClick={() => onRechnungClick(rec)}>
+                    <div className="doc-row-main" style={{ flex: 1 }}>
+                      <div className="doc-row-title" style={{ fontWeight: 600, fontSize: 16 }}>{docLabel} #{rec.rechnungNumber}</div>
+                      <div className="doc-row-sub" style={{ fontSize: 13, color: 'var(--label2)', marginTop: 1 }}>
                         {c ? `${c.vorname} ${c.nachname}` : 'Kein Kunde'}
                       </div>
                       {rec.totalBetrag && (
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--blue)', marginTop: 1 }}>
+                        <div className="doc-row-amount" style={{ fontSize: 13, fontWeight: 600, color: 'var(--blue)', marginTop: 1 }}>
                           CHF {rec.totalBetrag}
                         </div>
                       )}

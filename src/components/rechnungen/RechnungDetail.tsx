@@ -452,7 +452,11 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
               <button onClick={() => setAddingTyp('material')} className="mf-add-pos green"><SFPlus size={12} /> Materialposition</button>
             </div>
           ) : (
-            <div>
+            <div onKeyDown={(e) => {
+              // Keyboard entry: Enter adds the position, Escape cancels it.
+              if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') { e.preventDefault(); addPosition(); }
+              else if (e.key === 'Escape') { e.preventDefault(); resetNewPos(); }
+            }}>
               <div className="cf-field" style={{ marginBottom: 8 }}>
                 <label className="cf-label">Bezeichnung</label>
                 <input
