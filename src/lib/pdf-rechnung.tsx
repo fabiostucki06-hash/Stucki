@@ -4,6 +4,7 @@ import { SwissQRBill } from 'swissqrbill/svg';
 import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from './rechnung-totals';
 import { formatDateCH, buildDocumentFilename } from './utils';
 import { getIban } from './settings';
+import { archiveToDrive } from './drive';
 import type { ArbeitPosition, Customer, MaterialPosition, Position, Rechnung } from '../types';
 
 const CO_NAME      = 'Fabio Stucki';
@@ -48,8 +49,9 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
   const vehicle = [customer?.marke, customer?.modell].filter(Boolean).join(' ');
   const owner   = customer ? `${customer.vorname} ${customer.nachname}` : '';
 
-  const { totalMaterial: totM, totalArbeit: totA, zwischensumme: total, rechnungstotal, kleinteilApplied } =
-    computeRechnungTotals(rechnung.positionen ?? [], rechnung.kategorie, rechnung.kleinteilManuell);
+  const anzProzent = rechnung.anzahlungProzent;
+  const { totalMaterial: totM, totalArbeit: totA, zwischensumme: total, gesamttotal, rechnungstotal, kleinteilApplied } =
+    computeRechnungTotals(rechnung.positionen ?? [], rechnung.kategorie, rechnung.kleinteilManuell, anzProzent);
 
   const rows: (Position | undefined)[] = [...(rechnung.positionen ?? [])];
   if (kleinteilApplied) {
@@ -191,7 +193,7 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
 
   // ── SUMME: Material total in Preis(CHF) col, Arbeit total in ZE col ───────
   // Summe, Zwischensumme and Rechnungstotal stay together on one page.
-  if (!fits(RH_S + RH_S + RH_T)) newPage();
+  if (!fits(RH_S + RH_S + (anzProzent ? RH_S : 0) + RH_T)) newPage();
   lw(0.4); drgb(0, 0, 0); doc.line(TL, y, TR, y);
   const sumY = y + RH_S * BL;
   norm(); fs(8.5); rgb(100, 100, 100); tL('Summe', x0 + PAD, sumY);
@@ -208,12 +210,21 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
   bold(); rgb(0, 0, 0); tR(chf(total), TR - PAD, zwY); norm();
   y += RH_S;
 
+  // ── ANZAHLUNG: full amount of all positions, of which the share is due now ─
+  if (anzProzent) {
+    lw(0.3); drgb(180, 180, 180); doc.line(TL, y, TR, y); drgb(0, 0, 0);
+    const gY = y + RH_S * BL;
+    rgb(100, 100, 100); tL('Gesamtbetrag gemäss Offerte', x0 + PAD, gY);
+    bold(); rgb(0, 0, 0); tR(chf(gesamttotal), TR - PAD, gY); norm();
+    y += RH_S;
+  }
+
   // ── RECHNUNGSTOTAL — Swiss-rounded to 5 Rappen ────────────────────────────
   lw(0.5); drgb(0, 0, 0); doc.line(TL, y, TR, y);
   frgb(229, 229, 229); doc.rect(TL, y, TW, RH_T, 'F');
   const totY = y + RH_T * BL;
   bold(); fs(9); rgb(0, 0, 0);
-  tL('Rechnungstotal', x0 + PAD, totY);
+  tL(anzProzent ? `Anzahlung ${anzProzent}% (zu bezahlen)` : 'Rechnungstotal', x0 + PAD, totY);
   tR(chf(rechnungstotal), TR - PAD, totY);
   y += RH_T;
   lw(0.5); drgb(0, 0, 0); doc.line(TL, y, TR, y);
@@ -324,7 +335,10 @@ export async function exportRechnungPDF(rechnung: Rechnung, customer: Customer |
       doc.setTextColor(0, 0, 0);
     }
 
-    doc.save(`${buildDocumentFilename(customer, rechnung.art === 'anzahlung' ? 'Anzahlungsrechnung' : 'Rechnung', rechnung.rechnungNumber ?? '')}.pdf`);
+    const isAnz = rechnung.art === 'anzahlung';
+    const filename = buildDocumentFilename(customer, isAnz ? 'Anzahlungsrechnung' : 'Rechnung', rechnung.rechnungNumber ?? '');
+    doc.save(`${filename}.pdf`);
+    void archiveToDrive(doc, isAnz ? 'Anzahlungsrechnungen' : 'Rechnungen', filename);
   } catch (err) {
     alert(`PDF-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);
   }

@@ -8,7 +8,10 @@ interface RechnungenListProps {
   customers: Customer[];
   onRechnungClick: (r: Rechnung) => void;
   onEdit: (r: Rechnung) => void;
-  onNew: () => void;
+  onNew?: () => void;
+  /** 'anzahlung' lists only the 50% Vorkasse invoices (own menu item);
+      the default list shows every other invoice. */
+  variant?: 'standard' | 'anzahlung';
 }
 
 const STATUS_LABELS: Record<RechnungStatus, string> = {
@@ -24,7 +27,10 @@ const STATUS_COLORS: Record<RechnungStatus, string> = {
   storniert: 'var(--red)',
 };
 
-export default function RechnungenList({ rechnungen, customers, onRechnungClick, onEdit, onNew }: RechnungenListProps) {
+export default function RechnungenList({ rechnungen: all, customers, onRechnungClick, onEdit, onNew, variant = 'standard' }: RechnungenListProps) {
+  const isAnz = variant === 'anzahlung';
+  const docLabel = isAnz ? 'Anzahlungsrechnung' : 'Rechnung';
+  const rechnungen = all.filter((r) => (r.art === 'anzahlung') === isAnz);
   const sortByName = (a: Rechnung, b: Rechnung) => {
     const ca = customers.find((x) => x.id === a.customerId);
     const cb = customers.find((x) => x.id === b.customerId);
@@ -36,14 +42,19 @@ export default function RechnungenList({ rechnungen, customers, onRechnungClick,
   return (
     <div style={{ padding: '16px 16px 0' }}>
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 12 }}>
-        <h1 className="sf-title1" style={{ paddingTop: 8 }}>Rechnungen</h1>
-        <button onClick={onNew} className="btn-tinted">+ Neue</button>
+        <h1 className="sf-title1" style={{ paddingTop: 8 }}>{isAnz ? 'Anzahlungsrechnungen' : 'Rechnungen'}</h1>
+        {onNew && <button onClick={onNew} className="btn-tinted">+ Neue</button>}
       </div>
 
       {!rechnungen.length && (
         <div className="glass-panel" style={{ padding: 40, textAlign: 'center' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🧾</div>
-          <div style={{ fontSize: 16, color: 'var(--label2)' }}>Noch keine Rechnungen.</div>
+          <div style={{ fontSize: 16, color: 'var(--label2)' }}>Noch keine {isAnz ? 'Anzahlungsrechnungen' : 'Rechnungen'}.</div>
+          {isAnz && (
+            <div style={{ fontSize: 13, color: 'var(--label3)', marginTop: 6 }}>
+              Anzahlungsrechnungen werden in einer angenommenen Offerte erstellt.
+            </div>
+          )}
         </div>
       )}
 
@@ -61,7 +72,7 @@ export default function RechnungenList({ rechnungen, customers, onRechnungClick,
                 return (
                   <div key={rec.id} className="list-row" onClick={() => onRechnungClick(rec)}>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, fontSize: 16 }}>Rechnung #{rec.rechnungNumber}</div>
+                      <div style={{ fontWeight: 600, fontSize: 16 }}>{docLabel} #{rec.rechnungNumber}</div>
                       <div style={{ fontSize: 13, color: 'var(--label2)', marginTop: 1 }}>
                         {c ? `${c.vorname} ${c.nachname}` : 'Kein Kunde'}
                       </div>

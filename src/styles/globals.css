@@ -256,7 +256,16 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .sig-pad{margin-top:4px}
 .sig-pad-canvas{display:block;width:100%;aspect-ratio:3/1;height:auto;touch-action:none;cursor:crosshair;border-radius:10px;background:rgba(255,255,255,0.7);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.5);box-shadow:inset 0 1px 0 rgba(255,255,255,0.6),0 8px 32px 0 rgba(0,0,0,0.1)}
 .sig-pad-foot{display:flex;align-items:center;justify-content:space-between;margin-top:6px;font-size:12px;color:var(--label3)}
-.doc-actions{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
+/* Offerte detail: actions grouped in glass panels (Dokumente / Weiterverarbeiten / Verwalten). */
+.doc-group{padding:14px;margin-bottom:16px}
+.doc-btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.doc-btn-grid>.btn-system{min-width:0;padding:0 12px;font-size:16px}
+.doc-btn-grid>.doc-btn-full,.doc-btn-grid>.btn-system:only-child{grid-column:1/-1}
+@media (max-width:420px){.doc-btn-grid{grid-template-columns:1fr}}
+.doc-group-hint{margin-top:10px;font-size:12px;color:var(--label3);text-align:center}
+.btn-system.btn-primary{background:linear-gradient(to bottom,#54a4ff 0%,#007aff 50%,#0056b3 100%);border:1px solid #004fb0;box-shadow:inset 0 1px 0 rgba(255,255,255,0.6),inset 0 -1px 2px rgba(0,0,0,0.2),0 4px 6px rgba(0,0,0,0.15);text-shadow:0 -1px 0 rgba(0,0,0,0.3)}
+.btn-system.btn-primary:hover{background:linear-gradient(to bottom,#68c6ff 0%,#1a88ff 50%,#0062c8 100%);transform:translateY(-1px)}
+.btn-system.btn-primary:active{transform:scale(0.98);box-shadow:inset 0 1px 2px rgba(0,0,0,0.25),0 1px 3px rgba(0,0,0,0.10)}
 /* AB signature blocks exist only on paper (see @media print); the screen never shows them. */
 .ab-sig-print{display:none}
 

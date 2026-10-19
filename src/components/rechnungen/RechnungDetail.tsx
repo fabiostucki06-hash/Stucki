@@ -106,8 +106,9 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
   }
 
   /* ── live totals from local state ── */
-  const { totalMaterial: totM, totalArbeit: totA, totalZE: totZE, zwischensumme: total, rechnungstotal, kleinteilApplied } =
-    computeRechnungTotals(positionen, kategorie || undefined, kleinteilManuell);
+  const anzProzent = rechnung.anzahlungProzent;
+  const { totalMaterial: totM, totalArbeit: totA, totalZE: totZE, zwischensumme: total, gesamttotal, rechnungstotal, kleinteilApplied } =
+    computeRechnungTotals(positionen, kategorie || undefined, kleinteilManuell, anzProzent);
 
   function updPos(i: number, key: string, val: string) {
     setPositionen((prev) => {
@@ -190,7 +191,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
 
   return (
     <Sheet
-      title={`Rechnung #${rechnung.rechnungNumber}`}
+      title={`${isAnzahlung ? 'Anzahlungsrechnung' : 'Rechnung'} #${rechnung.rechnungNumber}`}
       onClose={onClose}
       full
       barRight={<button onClick={() => onEdit(rechnung)} className="bar-btn">Bearbeiten</button>}
@@ -241,7 +242,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
 
       {isAnzahlung ? (
         <div className="glass-panel doc-terms">
-          <div className="ab-panel-title">Anzahlungsrechnung · 50% Vorkasse</div>
+          <div className="ab-panel-title">Anzahlungsrechnung · {anzProzent ?? 50}% Vorkasse</div>
           <div className="sf-subhead" style={{ color: 'var(--label2)' }}>
             {rechnung.zahlungsbedingung || 'Vorkasse (Bar, TWINT, E-Banking)'}
           </div>
@@ -518,10 +519,18 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
             <div style={{ fontSize: 13, fontWeight: 600 }}>CHF {fCHF(total)}</div>
           </div>
 
+          {/* Anzahlung: full amount of all positions, of which the share below is due now */}
+          {anzProzent ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 16px', borderBottom: '0.5px solid var(--sep)' }}>
+              <div style={{ fontSize: 13, color: 'var(--label2)' }}>Gesamtbetrag gemäss Offerte</div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>CHF {fCHF(gesamttotal)}</div>
+            </div>
+          ) : null}
+
           {/* Row 3: Rechnungstotal (Swiss-rounded to 0.05 CHF) */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(0,122,255,0.06)' }}>
             <div>
-              <div className="sf-headline">Rechnungstotal</div>
+              <div className="sf-headline">{anzProzent ? `Anzahlung ${anzProzent}%` : 'Rechnungstotal'}</div>
               <div style={{ fontSize: 10, color: 'var(--label3)', marginTop: 1 }}>gerundet auf 5 Rp.</div>
             </div>
             <div style={{ fontWeight: 800, fontSize: 22, color: 'var(--blue)', letterSpacing: '-0.5px' }}>
@@ -558,7 +567,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
         Rechnung löschen
       </button>
       <div style={{ marginTop: 16, fontSize: 13, color: 'var(--label3)', textAlign: 'center' }}>
-        Erstellt: {formatDateCH(rechnung.createdAt)} · Rechnung #{rechnung.rechnungNumber}
+        Erstellt: {formatDateCH(rechnung.createdAt)} · {isAnzahlung ? 'Anzahlungsrechnung' : 'Rechnung'} #{rechnung.rechnungNumber}
       </div>
     </Sheet>
   );

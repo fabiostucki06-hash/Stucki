@@ -348,33 +348,33 @@ export default function App() {
     }, { offertNumber: offerte.offertNumber });
     setSelOff(created);
   }
-  async function handleCreateAnzahlung(offerte: Offerte, total: number) {
+  /* The Anzahlungsrechnung lists every accepted position of the Offerte; the
+     amount due is ANZAHLUNG_PROZENT of their sum (see computeRechnungTotals). */
+  async function handleCreateAnzahlung(offerte: Offerte, positionen: Position[]) {
     const nr = offerteNr(offerte);
-    const betrag = roundToRappen(total * ANZAHLUNG_PROZENT / 100).toFixed(2);
+    const pos = positionen.map((p) => (p.typ === 'material' ? (({ bestellt, ...m }) => m)(p) : p));
+    const t = sumPositions(pos);
+    const total = roundToRappen(t.total);
+    const betrag = roundToRappen(t.total * ANZAHLUNG_PROZENT / 100).toFixed(2);
     await addRechnung({
       customerId: offerte.customerId,
       offertId: offerte.id,
       art: 'anzahlung',
+      anzahlungProzent: ANZAHLUNG_PROZENT,
       titel: `Anzahlungsrechnung – Offerte #${nr}`,
-      positionen: [{
-        typ: 'material',
-        beschreibung: `Anzahlung ${ANZAHLUNG_PROZENT}% gemäss Offerte Nr. ${nr}`,
-        menge: '1',
-        stueckpreis: betrag,
-        preis: betrag,
-      }],
-      notizen: `Gesamtbetrag gemäss Offerte / Auftragsbestätigung Nr. ${nr}: CHF ${total.toFixed(2)}. Anzahlung ${ANZAHLUNG_PROZENT}%: CHF ${betrag}. Die Schlussrechnung (50%) ist zahlbar innert 10 Tagen netto.`,
+      positionen: pos,
+      notizen: `Gesamtbetrag gemäss Offerte / Auftragsbestätigung Nr. ${nr}: CHF ${total.toFixed(2)}. Anzahlung ${ANZAHLUNG_PROZENT}%: CHF ${betrag}. Die Schlussrechnung (${100 - ANZAHLUNG_PROZENT}%) ist zahlbar innert 10 Tagen netto.`,
       // Vorkasse: due before work starts, so no "Tage netto" due date.
       zahlungsFrist: '0',
       zahlungsbedingung: ANZAHLUNG_BEDINGUNG,
       kleinteilManuell: false,
       totalBetrag: betrag,
-      totalArbeit: '0.00',
-      totalMaterial: betrag,
-      totalZE: 0,
+      totalArbeit: t.totalArbeit.toFixed(2),
+      totalMaterial: t.totalMaterial.toFixed(2),
+      totalZE: t.totalZE,
     });
     setSelOff(null);
-    setTab('rechnungen');
+    setTab('anzahlungsrechnungen');
   }
   async function handleCreateAuftragFromOfferte(offerte: Offerte, acceptedIndices: number[]) {
     // Copy every accepted position individually — no grouping or merging
@@ -497,6 +497,7 @@ export default function App() {
         {tab === 'materialofferten'       && <OfferteList key="material" variant="material" offerten={offerten} customers={customers} onOfferteClick={setSelOff} onEdit={(off) => setEditOff(off)} onNew={() => setShowNOff(true)} />}
         {tab === 'auftragsbestaetigungen' && <OfferteList key="ab" variant="ab" offerten={offerten} customers={customers} onOfferteClick={setSelOff} onEdit={(off) => setEditOff(off)} onNew={() => setShowNOff(true)} />}
         {tab === 'rechnungen'  && <RechnungenList rechnungen={rechnungen} customers={customers} onRechnungClick={setSelR} onEdit={(r) => setEditR(r)} onNew={() => setShowNR(true)} />}
+        {tab === 'anzahlungsrechnungen' && <RechnungenList key="anzahlung" variant="anzahlung" rechnungen={rechnungen} customers={customers} onRechnungClick={setSelR} onEdit={(r) => setEditR(r)} />}
         {tab === 'kunden'      && <CustomerList customers={customers} orders={orders} onCustomerClick={setSelC} onNew={() => setShowNC(true)} />}
         {tab === 'statistiken'   && <StatistikDashboard orders={orders} offerten={offerten} rechnungen={rechnungen} customers={customers} />}
         {tab === 'einstellungen' && (

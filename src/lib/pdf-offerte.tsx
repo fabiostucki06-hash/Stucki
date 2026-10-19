@@ -2,6 +2,7 @@ import { jsPDF } from 'jspdf';
 import { formatDateCH, buildDocumentFilename } from './utils';
 import { PAGE_TOP, PAGE_BOTTOM, addPageNumbers } from './pdf-paging';
 import { offerteNr, offerteZahlungszeilen } from './offerte-docs';
+import { archiveToDrive } from './drive';
 import type { ArbeitPosition, Customer, MaterialPosition, Offerte } from '../types';
 
 export const CO_NAME  = 'Fabio Stucki';
@@ -306,7 +307,9 @@ function exportDoc(offerte: Offerte, customer: Customer | undefined, mode: DocMo
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     drawDoc(doc, offerte, customer, mode, ownSignature);
     addPageNumbers(doc, TR);
-    doc.save(`${buildDocumentFilename(customer, docType, offerteNr(offerte))}.pdf`);
+    const filename = buildDocumentFilename(customer, docType, offerteNr(offerte));
+    doc.save(`${filename}.pdf`);
+    void archiveToDrive(doc, mode === 'ab' ? 'Auftragsbestätigungen' : offerte.art === 'material' ? 'Materialofferten' : 'Offerten', filename);
   } catch (err) {
     alert(`PDF-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);
   }

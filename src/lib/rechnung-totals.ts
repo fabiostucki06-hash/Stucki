@@ -13,6 +13,9 @@ export interface RechnungTotals {
   totalArbeit: number;
   totalZE: number;
   zwischensumme: number;
+  /** Gesamtbetrag aller Positionen, gerundet auf 5 Rp. */
+  gesamttotal: number;
+  /** Zu zahlender Betrag: gleich gesamttotal, bei einer Anzahlungsrechnung der Anzahlungsanteil. */
   rechnungstotal: number;
   kleinteilApplied: boolean;
 }
@@ -24,11 +27,14 @@ const roundToRappen = (n: number) => Math.round(n * 20) / 20;
  * Die Kleinteilepauschale wird automatisch verrechnet, wenn die Kategorie
  * "Reparatur" oder "Karosserie" ist (bei Inspektion/Service nie automatisch).
  * `kleinteilManuell` überschreibt die Automatik in beide Richtungen.
+ * `anzahlungProzent` (Anzahlungsrechnung mit vollständiger Positionsliste):
+ * das Rechnungstotal ist dieser Anteil des Gesamtbetrags.
  */
 export function computeRechnungTotals(
   positionen: Position[],
   kategorie?: RechnungKategorie,
   kleinteilManuell?: boolean | null,
+  anzahlungProzent?: number,
 ): RechnungTotals {
   const totalMaterial = positionen
     .filter((p) => p.typ === 'material')
@@ -43,7 +49,8 @@ export function computeRechnungTotals(
   const totalArbeit = totalArbeitBase + (kleinteilApplied ? KLEINTEIL_BETRAG : 0);
 
   const zwischensumme = totalMaterial + totalArbeit;
-  const rechnungstotal = roundToRappen(zwischensumme);
+  const gesamttotal = roundToRappen(zwischensumme);
+  const rechnungstotal = anzahlungProzent ? roundToRappen(zwischensumme * anzahlungProzent / 100) : gesamttotal;
 
-  return { totalMaterial, totalArbeit, totalZE, zwischensumme, rechnungstotal, kleinteilApplied };
+  return { totalMaterial, totalArbeit, totalZE, zwischensumme, gesamttotal, rechnungstotal, kleinteilApplied };
 }

@@ -81,6 +81,15 @@ export const SFReceipt = () => (
   </svg>
 );
 
+/** Receipt with a half-filled circle: 50% Anzahlung. */
+export const SFReceiptHalf = () => (
+  <svg width={25} height={25} viewBox="0 0 25 25" fill="none">
+    <path d="M5 3.5h15v18l-2.5-2-2.5 2-2.5-2-2.5 2-2.5-2-2.5 2V3.5z" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round"/>
+    <circle cx={12.5} cy={11} r={4} stroke="currentColor" strokeWidth={1.5}/>
+    <path d="M12.5 7a4 4 0 010 8z" fill="currentColor"/>
+  </svg>
+);
+
 export const SFCloud = () => (
   <svg width={24} height={20} viewBox="0 0 26 22" fill="none">
     <path d="M7.5 18.5a6.5 6.5 0 01-.6-12.96A8.5 8.5 0 0120.5 10a5.5 5.5 0 010 8.5H7.5z" stroke="currentColor" strokeWidth={1.7} strokeLinejoin="round"/>

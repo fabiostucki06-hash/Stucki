@@ -24,8 +24,8 @@ interface OfferteDetailProps {
   onCreateRechnung?: (offerte: Offerte, acceptedIndices: number[]) => Promise<void>;
   /** Creates a reine Materialofferte as next version of this Offerte from the given positions. */
   onCreateMaterialofferte?: (offerte: Offerte, positionen: Position[]) => Promise<void>;
-  /** Creates a 50% Vorkasse invoice over `total`. */
-  onCreateAnzahlung?: (offerte: Offerte, total: number) => Promise<void>;
+  /** Creates a 50% Vorkasse invoice listing the given (accepted) positions. */
+  onCreateAnzahlung?: (offerte: Offerte, positionen: Position[]) => Promise<void>;
 }
 
 const HDR: React.CSSProperties = {
@@ -283,7 +283,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
     if (!onCreateAnzahlung || acceptedTotal <= 0) return;
     setCreatingAnz(true);
     try {
-      await onCreateAnzahlung(offerte, acceptedTotal);
+      await onCreateAnzahlung(offerte, positionen.filter((_, i) => posAccepted[i]));
     } finally {
       setCreatingAnz(false);
     }
@@ -617,47 +617,6 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
         />
       )}
 
-      {/* ── Aktionen: Auftrag / Rechnung erstellen ── */}
-      {positionen.length > 0 && (
-        <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-          {onCreateAuftrag && (
-            <button
-              onClick={handleCreateAuftrag}
-              disabled={busy || acceptedCount === 0}
-              className="btn-system"
-              style={{
-                flex: 1,
-                background: acceptedCount > 0
-                  ? 'linear-gradient(to bottom, #54a4ff 0%, #007aff 50%, #0056b3 100%)'
-                  : undefined,
-                opacity: acceptedCount === 0 ? 0.4 : 1,
-              }}
-            >
-              {creatingAuftrag
-                ? <><Spinner size={13} />&nbsp; Wird erstellt…</>
-                : `Auftrag erstellen (${acceptedCount})`
-              }
-            </button>
-          )}
-          {onCreateRechnung && (
-            <button
-              onClick={handleCreateRechnung}
-              disabled={busy || acceptedCount === 0}
-              className="btn-system btn-green"
-              style={{
-                flex: 1,
-                opacity: acceptedCount === 0 ? 0.4 : 1,
-              }}
-            >
-              {creatingRechnung
-                ? <><Spinner size={13} />&nbsp; Wird erstellt…</>
-                : `Rechnung erstellen (${acceptedCount})`
-              }
-            </button>
-          )}
-        </div>
-      )}
-
       {/* ── Auftragsbestätigung (nur bei angenommener Offerte) ── */}
       {offerte.status === 'angenommen' && positionen.length > 0 && (
         <div className="glass-panel ab-panel">
@@ -688,45 +647,80 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
               <div className="ab-sig-caption">Unterschrift Kunde</div>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-            {dirty && (
-              <button onClick={() => savePositionen('Auftragsbestätigung gespeichert')} disabled={posSaving} className="btn-system btn-secondary" style={{ flex: 1 }}>
+          {dirty && (
+            <div style={{ marginTop: 14 }}>
+              <button onClick={() => savePositionen('Auftragsbestätigung gespeichert')} disabled={posSaving} className="btn-system btn-secondary">
                 {posSaving ? <><Spinner size={13} />&nbsp; Speichern…</> : 'AB speichern'}
               </button>
-            )}
-            <button onClick={handleExportAB} disabled={posSaving || acceptedCount === 0} className="btn-system" style={{ flex: 1 }}>
-              AB als PDF
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Folgedokumente: Materialofferte / Anzahlungsrechnung ── */}
-      {positionen.length > 0 && (onCreateMaterialofferte || onCreateAnzahlung) && (
-        <div className="doc-actions">
-          {onCreateMaterialofferte && acceptedMatPos.length > 0 && (
-            <button onClick={handleCreateMaterialofferte} disabled={busy} className="btn-system btn-secondary">
-              {creatingMat ? <><Spinner size={13} />&nbsp; Wird erstellt…</> : `Materialofferte erstellen (${acceptedMatPos.length} Pos.)`}
-            </button>
-          )}
-          {onCreateAnzahlung && (
-            <button onClick={handleCreateAnzahlung} disabled={busy || acceptedTotal <= 0} className="btn-system btn-green" style={{ opacity: acceptedTotal <= 0 ? 0.4 : 1 }}>
-              {creatingAnz
-                ? <><Spinner size={13} />&nbsp; Wird erstellt…</>
-                : `Anzahlungsrechnung ${ANZAHLUNG_PROZENT}% · CHF ${roundToRappen(acceptedTotal * ANZAHLUNG_PROZENT / 100).toFixed(2)}`}
-            </button>
+            </div>
           )}
         </div>
       )}
 
       {offerte.notizen && <div style={{ background: 'var(--fill3)', borderRadius: 12, padding: '12px 14px', fontSize: 15, color: 'var(--label2)', marginBottom: 16 }}>{offerte.notizen}</div>}
 
-      <button onClick={() => exportOffertePDF(buildPayload(), customer)} className="btn-system btn-green" style={{ marginBottom: 12 }}>PDF speichern</button>
-      <button onClick={() => printWithFilename(buildDocumentFilename(customer, docName, nr))} className="btn-system btn-secondary" style={{ marginBottom: 12 }}>Drucken</button>
-      <button onClick={handleDuplicate} disabled={duplicating} className="btn-system btn-secondary" style={{ marginBottom: 12 }}>
-        {duplicating ? <><Spinner size={13} />&nbsp; Wird dupliziert…</> : `${docName} duplizieren`}
-      </button>
-      <button onClick={async () => { if (window.confirm('Offerte löschen?')) await onDelete(offerte.id); }} className="btn-system btn-destructive">Offerte löschen</button>
+      {/* ── Aktionen, gruppiert. Screen only: buttons never print, so the
+          group panels are left out of the printout entirely (no-print). ── */}
+
+      {/* PDF / Druck: one button per document, nothing twice. */}
+      <div className="glass-panel doc-group no-print">
+        <div className="ab-panel-title">Dokumente</div>
+        <div className="doc-btn-grid">
+          <button onClick={() => exportOffertePDF(buildPayload(), customer)} className="btn-system btn-primary">
+            {docName} als PDF
+          </button>
+          {offerte.status === 'angenommen' && positionen.length > 0 && (
+            <button onClick={handleExportAB} disabled={posSaving || acceptedCount === 0} className="btn-system btn-primary">
+              AB als PDF
+            </button>
+          )}
+          <button onClick={() => printWithFilename(buildDocumentFilename(customer, docName, nr))} className="btn-system btn-secondary doc-btn-full">
+            Drucken
+          </button>
+        </div>
+        <div className="doc-group-hint">PDFs werden zusätzlich auf Google Drive abgelegt (GarageOS / Dokumenttyp / Jahr).</div>
+      </div>
+
+      {/* Folgedokumente aus den angenommenen Positionen. */}
+      {positionen.length > 0 && (onCreateAuftrag || onCreateRechnung || onCreateMaterialofferte || onCreateAnzahlung) && (
+        <div className="glass-panel doc-group no-print">
+          <div className="ab-panel-title">Weiterverarbeiten · {acceptedCount} Positionen</div>
+          <div className="doc-btn-grid">
+            {onCreateAuftrag && (
+              <button onClick={handleCreateAuftrag} disabled={busy || acceptedCount === 0} className="btn-system btn-primary">
+                {creatingAuftrag ? <><Spinner size={13} />&nbsp; Wird erstellt…</> : 'Auftrag erstellen'}
+              </button>
+            )}
+            {onCreateRechnung && (
+              <button onClick={handleCreateRechnung} disabled={busy || acceptedCount === 0} className="btn-system btn-green">
+                {creatingRechnung ? <><Spinner size={13} />&nbsp; Wird erstellt…</> : 'Rechnung erstellen'}
+              </button>
+            )}
+            {onCreateMaterialofferte && acceptedMatPos.length > 0 && (
+              <button onClick={handleCreateMaterialofferte} disabled={busy} className="btn-system btn-secondary doc-btn-full">
+                {creatingMat ? <><Spinner size={13} />&nbsp; Wird erstellt…</> : `Materialofferte erstellen (${acceptedMatPos.length} Pos.)`}
+              </button>
+            )}
+            {onCreateAnzahlung && (
+              <button onClick={handleCreateAnzahlung} disabled={busy || acceptedTotal <= 0} className="btn-system btn-green doc-btn-full">
+                {creatingAnz
+                  ? <><Spinner size={13} />&nbsp; Wird erstellt…</>
+                  : `Anzahlungsrechnung ${ANZAHLUNG_PROZENT}% · CHF ${roundToRappen(acceptedTotal * ANZAHLUNG_PROZENT / 100).toFixed(2)}`}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="glass-panel doc-group no-print">
+        <div className="ab-panel-title">Verwalten</div>
+        <div className="doc-btn-grid">
+          <button onClick={handleDuplicate} disabled={duplicating} className="btn-system btn-secondary">
+            {duplicating ? <><Spinner size={13} />&nbsp; Wird dupliziert…</> : 'Duplizieren'}
+          </button>
+          <button onClick={async () => { if (window.confirm(`${docName} löschen?`)) await onDelete(offerte.id); }} className="btn-system btn-destructive">Löschen</button>
+        </div>
+      </div>
       <div style={{ marginTop: 16, fontSize: 13, color: 'var(--label3)', textAlign: 'center' }}>Erstellt: {formatDateCH(offerte.createdAt)} · {docName} #{nr}</div>
     </Sheet>
   );

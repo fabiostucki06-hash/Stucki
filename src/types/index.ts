@@ -155,6 +155,10 @@ export interface Rechnung {
   kleinteilManuell?: boolean | null;
   /** 'anzahlung' = 50% Vorkasse invoice generated from an Offerte / AB. */
   art?: 'standard' | 'anzahlung';
+  /** Anzahlung share in % when the invoice lists the full Offerte positions; the
+      Rechnungstotal is then this share of the positions' sum. Unset on older
+      Anzahlungsrechnungen, which carry a single position with the amount due. */
+  anzahlungProzent?: number;
   offertId?: string;
   /** Free-text payment terms; replace "<zahlungsFrist> Tage netto" when set. */
   zahlungsbedingung?: string;
@@ -170,5 +174,5 @@ export interface MaterialCatalogItem {
   createdAt: string;
 }
 
-export type TabId = 'dashboard' | 'auftraege' | 'offerten' | 'materialofferten' | 'auftragsbestaetigungen' | 'rechnungen' | 'kunden' | 'statistiken' | 'einstellungen';
+export type TabId = 'dashboard' | 'auftraege' | 'offerten' | 'materialofferten' | 'auftragsbestaetigungen' | 'rechnungen' | 'anzahlungsrechnungen' | 'kunden' | 'statistiken' | 'einstellungen';
 export type SyncStatus = 'idle' | 'saving' | 'ok' | 'error';
