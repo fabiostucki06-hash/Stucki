@@ -17,6 +17,8 @@ export interface RechnungTotals {
   gesamttotal: number;
   /** Zu zahlender Betrag: gleich gesamttotal, bei einer Anzahlungsrechnung der Anzahlungsanteil. */
   rechnungstotal: number;
+  /** Bei einer Anzahlungsrechnung: der mit der Schlussrechnung verrechnete Rest (sonst 0). */
+  restbetrag: number;
   kleinteilApplied: boolean;
 }
 
@@ -52,5 +54,7 @@ export function computeRechnungTotals(
   const gesamttotal = roundToRappen(zwischensumme);
   const rechnungstotal = anzahlungProzent ? roundToRappen(zwischensumme * anzahlungProzent / 100) : gesamttotal;
 
-  return { totalMaterial, totalArbeit, totalZE, zwischensumme, gesamttotal, rechnungstotal, kleinteilApplied };
+  const restbetrag = anzahlungProzent ? roundToRappen(gesamttotal - rechnungstotal) : 0;
+
+  return { totalMaterial, totalArbeit, totalZE, zwischensumme, gesamttotal, rechnungstotal, restbetrag, kleinteilApplied };
 }

@@ -107,7 +107,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
 
   /* ── live totals from local state ── */
   const anzProzent = rechnung.anzahlungProzent;
-  const { totalMaterial: totM, totalArbeit: totA, totalZE: totZE, zwischensumme: total, gesamttotal, rechnungstotal, kleinteilApplied } =
+  const { totalMaterial: totM, totalArbeit: totA, totalZE: totZE, zwischensumme: total, gesamttotal, rechnungstotal, restbetrag, kleinteilApplied } =
     computeRechnungTotals(positionen, kategorie || undefined, kleinteilManuell, anzProzent);
 
   function updPos(i: number, key: string, val: string) {
@@ -309,7 +309,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
           >
             {/* Description + type badge */}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="sf-subhead" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div className="sf-subhead" style={{ overflowWrap: 'anywhere' }}>
                 {pos.beschreibung}
               </div>
               <div style={{ fontSize: 10, color: 'var(--label3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>
@@ -517,19 +517,12 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
             </div>
           </div>
 
-          {/* Row 2: Zwischensumme */}
+          {/* Row 2: Zwischensumme — on an Anzahlung the full amount of all positions,
+              of which the share below is due now */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 16px', borderBottom: '0.5px solid var(--sep)' }}>
-            <div style={{ fontSize: 13, color: 'var(--label2)' }}>Zwischensumme</div>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>CHF {fCHF(total)}</div>
+            <div style={{ fontSize: 13, color: 'var(--label2)' }}>{anzProzent ? 'Gesamtbetrag gemäss Offerte (100%)' : 'Zwischensumme'}</div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>CHF {fCHF(anzProzent ? gesamttotal : total)}</div>
           </div>
-
-          {/* Anzahlung: full amount of all positions, of which the share below is due now */}
-          {anzProzent ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 16px', borderBottom: '0.5px solid var(--sep)' }}>
-              <div style={{ fontSize: 13, color: 'var(--label2)' }}>Gesamtbetrag gemäss Offerte</div>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>CHF {fCHF(gesamttotal)}</div>
-            </div>
-          ) : null}
 
           {/* Row 3: Rechnungstotal (Swiss-rounded to 0.05 CHF) */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(0,122,255,0.06)' }}>
@@ -541,6 +534,14 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
               CHF {fCHF(rechnungstotal)}
             </div>
           </div>
+
+          {/* Anzahlung: remaining share, billed with the Schlussrechnung */}
+          {anzProzent ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 16px', borderTop: '0.5px solid var(--sep)' }}>
+              <div style={{ fontSize: 13, color: 'var(--label2)' }}>Restbetrag {100 - anzProzent}% (mit Schlussrechnung)</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--label2)' }}>CHF {fCHF(restbetrag)}</div>
+            </div>
+          ) : null}
         </div>
       </div>
 

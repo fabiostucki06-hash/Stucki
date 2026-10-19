@@ -21,6 +21,8 @@ const ML = 15;
 const TL = ML, TR = PW - ML, TW = TR - TL; // 15 … 195, width = 180
 
 const RH   = 5;    // data row height mm
+const LH   = 3.6;  // extra height per wrapped description line
+const MAX_LINES = 3;
 const RH_H = 6.5;  // table header row
 const RH_S = 6;    // section row (vehicle, std.satz)
 const RH_T = 7;    // total row
@@ -43,7 +45,7 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
   const owner   = customer ? `${customer.vorname} ${customer.nachname}` : '';
 
   const anzProzent = rechnung.anzahlungProzent;
-  const { totalMaterial: totM, totalArbeit: totA, zwischensumme: total, gesamttotal, rechnungstotal, kleinteilApplied } =
+  const { totalMaterial: totM, totalArbeit: totA, zwischensumme: total, gesamttotal, rechnungstotal, restbetrag, kleinteilApplied } =
     computeRechnungTotals(rechnung.positionen ?? [], rechnung.kategorie, rechnung.kleinteilManuell, anzProzent);
 
   const rows: (Position | undefined)[] = [...(rechnung.positionen ?? [])];
@@ -80,6 +82,14 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
     let r = s;
     while (r.length > 1 && doc.getTextWidth(r + '…') > maxW) r = r.slice(0, -1);
     return r + '…';
+  };
+  /** Description lines for a position: wrapped to the column, at most MAX_LINES (last one clipped). */
+  const wrap = (t: string, maxW: number): string[] => {
+    const lines = doc.splitTextToSize(String(t), maxW) as string[];
+    if (lines.length <= MAX_LINES) return lines;
+    const kept = lines.slice(0, MAX_LINES);
+    kept[MAX_LINES - 1] = clip(lines.slice(MAX_LINES - 1).join(' '), maxW);
+    return kept;
   };
 
   let y = 12;
@@ -158,8 +168,11 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
   tableHeader();
 
   // ── POSITION ROWS (min 15) ────────────────────────────────────────────────
+  // Long descriptions wrap onto further lines instead of being cut off.
   for (const pos of rows) {
-    if (!fits(RH)) {
+    const descLines = pos?.beschreibung ? wrap(pos.beschreibung, wBez - PAD * 2) : [];
+    const rowH = RH + Math.max(0, descLines.length - 1) * LH;
+    if (!fits(rowH)) {
       if (!pos) break; // only empty filler rows left: end the table here
       dividers(y); newPage(); segTop = y; tableHeader();
     }
@@ -167,10 +180,8 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
     const ap = pos?.typ === 'arbeit'   ? (pos as ArbeitPosition)   : null;
     const ty = y + RH * BL;
 
-    if (pos?.beschreibung) {
-      rgb(0, 0, 0);
-      tL(clip(pos.beschreibung, wBez - PAD * 2), x0 + PAD, ty);
-    }
+    rgb(0, 0, 0);
+    descLines.forEach((line, li) => tL(line, x0 + PAD, ty + li * LH));
     rgb(50, 50, 50);
     if (mp && fN(mp.menge))       tR(String(fN(mp.menge)),          x2 - PAD, ty);
     if (mp && fN(mp.stueckpreis)) tR(fN(mp.stueckpreis).toFixed(2), x3 - PAD, ty);
@@ -178,15 +189,15 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
     if (ap?.ze)                   tR(String(ap.ze),                 TR - PAD, ty);
     rgb(0, 0, 0);
 
-    hLine(y + RH, TL, TR, 0.1);
-    y += RH;
+    hLine(y + rowH, TL, TR, 0.1);
+    y += rowH;
   }
 
   dividers(y);
 
   // ── SUMME: Material total in Preis(CHF) col, Arbeit total in ZE col ───────
-  // Summe, Zwischensumme and Rechnungstotal stay together on one page.
-  if (!fits(RH_S + RH_S + (anzProzent ? RH_S : 0) + RH_T)) newPage();
+  // Summe, Zwischensumme/Gesamtbetrag, Anzahlung and Restbetrag stay together on one page.
+  if (!fits(RH_S + RH_S + RH_T + (anzProzent ? RH_S : 0))) newPage();
   lw(0.4); drgb(0, 0, 0); doc.line(TL, y, TR, y);
   const sumY = y + RH_S * BL;
   norm(); fs(8.5); rgb(100, 100, 100); tL('Summe', x0 + PAD, sumY);
@@ -196,21 +207,12 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
   norm();
   y += RH_S;
 
-  // ── ZWISCHENSUMME ─────────────────────────────────────────────────────────
+  // ── ZWISCHENSUMME / ANZAHLUNG: full amount of all positions (100%) ──────
   lw(0.3); drgb(180, 180, 180); doc.line(TL, y, TR, y); drgb(0, 0, 0);
   const zwY = y + RH_S * BL;
-  rgb(100, 100, 100); tL('Zwischensumme', x0 + PAD, zwY);
-  bold(); rgb(0, 0, 0); tR(chf(total), TR - PAD, zwY); norm();
+  rgb(100, 100, 100); tL(anzProzent ? 'Gesamtbetrag gemäss Offerte (100%)' : 'Zwischensumme', x0 + PAD, zwY);
+  bold(); rgb(0, 0, 0); tR(chf(anzProzent ? gesamttotal : total), TR - PAD, zwY); norm();
   y += RH_S;
-
-  // ── ANZAHLUNG: full amount of all positions, of which the share is due now ─
-  if (anzProzent) {
-    lw(0.3); drgb(180, 180, 180); doc.line(TL, y, TR, y); drgb(0, 0, 0);
-    const gY = y + RH_S * BL;
-    rgb(100, 100, 100); tL('Gesamtbetrag gemäss Offerte', x0 + PAD, gY);
-    bold(); rgb(0, 0, 0); tR(chf(gesamttotal), TR - PAD, gY); norm();
-    y += RH_S;
-  }
 
   // ── RECHNUNGSTOTAL — Swiss-rounded to 5 Rappen ────────────────────────────
   lw(0.5); drgb(0, 0, 0); doc.line(TL, y, TR, y);
@@ -223,12 +225,23 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
   lw(0.5); drgb(0, 0, 0); doc.line(TL, y, TR, y);
   norm();
 
+  // ── RESTBETRAG: the share billed later with the Schlussrechnung ──────────
+  if (anzProzent) {
+    const rY = y + RH_S * BL;
+    fs(8.5); rgb(100, 100, 100);
+    tL(`Restbetrag ${100 - anzProzent}% (mit Schlussrechnung)`, x0 + PAD, rY);
+    tR(chf(restbetrag), TR - PAD, rY);
+    rgb(0, 0, 0);
+    y += RH_S;
+    hLine(y, TL, TR, 0.3);
+  }
+
   // ── NOTES ─────────────────────────────────────────────────────────────────
   y += 6;
   if (!fits(0)) newPage();
   fs(7.5); rgb(130, 130, 130);
   tL(rechnung.art === 'anzahlung'
-    ? '* Die restlichen 50% werden mit der Schlussrechnung verrechnet (10 Tage netto)'
+    ? `* Die restlichen ${100 - (anzProzent ?? 50)}% werden mit der Schlussrechnung verrechnet (10 Tage netto)`
     : '* Kleinmaterial-Pauschale wird bei <100 ZE hinzugefügt', TL, y);
   if (rechnung.notizen) {
     y += 6;

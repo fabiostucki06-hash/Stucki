@@ -372,7 +372,6 @@ export default function App() {
     const nr = offerteNr(offerte);
     const pos = positionen.map((p) => (p.typ === 'material' ? (({ bestellt, ...m }) => m)(p) : p));
     const t = sumPositions(pos);
-    const total = roundToRappen(t.total);
     const betrag = roundToRappen(t.total * ANZAHLUNG_PROZENT / 100).toFixed(2);
     await addRechnung({
       customerId: offerte.customerId,
@@ -381,7 +380,8 @@ export default function App() {
       anzahlungProzent: ANZAHLUNG_PROZENT,
       titel: `Anzahlungsrechnung – Offerte #${nr}`,
       positionen: pos,
-      notizen: `Gesamtbetrag gemäss Offerte / Auftragsbestätigung Nr. ${nr}: CHF ${total.toFixed(2)}. Anzahlung ${ANZAHLUNG_PROZENT}%: CHF ${betrag}. Die Schlussrechnung (${100 - ANZAHLUNG_PROZENT}%) ist zahlbar innert 10 Tagen netto.`,
+      // Gesamtbetrag, Anzahlung and Restbetrag are shown in the totals section.
+      notizen: `Positionen gemäss Offerte / Auftragsbestätigung Nr. ${nr}.`,
       // Vorkasse: due before work starts, so no "Tage netto" due date.
       zahlungsFrist: '0',
       zahlungsbedingung: ANZAHLUNG_BEDINGUNG,
