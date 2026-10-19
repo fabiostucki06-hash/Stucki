@@ -2,6 +2,9 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 const buildTime = new Date().toISOString()
+// Vercel exposes the deployed commit at build time; empty on local builds.
+declare const process: { env: Record<string, string | undefined> }
+const buildSha = (process.env.VERCEL_GIT_COMMIT_SHA ?? '').slice(0, 7)
 
 export default defineConfig({
   plugins: [
@@ -29,5 +32,6 @@ export default defineConfig({
   ],
   define: {
     __BUILD_TIME__: JSON.stringify(buildTime),
+    __BUILD_SHA__: JSON.stringify(buildSha),
   },
 })

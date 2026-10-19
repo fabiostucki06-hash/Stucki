@@ -14,6 +14,8 @@ const SIDEBAR_ITEMS: { id: TabId; icon: React.ReactNode; label: string }[] = [
   { id: 'einstellungen', icon: <SFGear />,  label: 'Einstellungen' },
 ];
 
+const BUILD_LABEL = `Build: ${new Date(__BUILD_TIME__).toLocaleString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Zurich' })}${__BUILD_SHA__ ? ` · ${__BUILD_SHA__}` : ''}`;
+
 interface SidebarProps {
   open: boolean;
   activeTab: TabId;
@@ -174,6 +176,20 @@ export default function Sidebar({ open: openProp, activeTab, onTabChange, onClos
           >
             Abmelden
           </button>
+          {/* Build timestamp */}
+          <div
+            title={__BUILD_TIME__}
+            style={{
+              margin: '6px 14px 0',
+              fontSize: 10.5,
+              color: 'var(--label3)',
+              letterSpacing: '0.02em',
+              fontVariantNumeric: 'tabular-nums',
+              userSelect: 'none',
+            }}
+          >
+            {BUILD_LABEL}
+          </div>
         </div>
       </div>
     </>
