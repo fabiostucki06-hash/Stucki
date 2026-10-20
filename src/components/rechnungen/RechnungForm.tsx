@@ -3,7 +3,7 @@ import { FormCard, FormBar, SaveStatus, SummaryRow, VehicleChips, PositionenEdit
 import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../lib/rechnung-totals';
 import { offerteNr } from '../../lib/offerte-docs';
 import NummerField, { parseNummer } from '../ui/NummerField';
-import { materialPreis, materialZeSumme, zeMinuten } from '../../lib/ze';
+import { materialPreis, materialZeSumme, zeBetrag, zeMinuten } from '../../lib/ze';
 import { setMaterialFeld } from '../../lib/marge';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import type { Customer, Order, Offerte, ArbeitPosition, MaterialPosition, Rechnung, RechnungKategorie } from '../../types';
@@ -130,8 +130,8 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
     const arbeitRows: ArbeitRow[] = positions
       .filter((p): p is ArbeitPosition => p.typ === 'arbeit')
       .map((p) => {
-        const ze = parseFloat(p.ze) || 0; const sa = parseFloat(p.stundenansatz || '80') || 80;
-        return { ...p, stundenansatz: String(sa), preis: p.preis || (ze && sa ? ((ze / 100) * sa).toFixed(2) : ''), zeLoading: false, zeHint: p.zeHint ?? '' };
+        const ze = parseFloat(p.ze) || 0;
+        return { ...p, preis: ze ? zeBetrag(ze).toFixed(2) : '', zeLoading: false, zeHint: p.zeHint ?? '' };
       });
     const materialRows: MaterialRow[] = positions
       .filter((p): p is MaterialPosition => p.typ === 'material')
@@ -155,8 +155,8 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
     const arbeitRows: ArbeitRow[] = positions
       .filter((p): p is ArbeitPosition => p.typ === 'arbeit')
       .map((p) => {
-        const ze = parseFloat(p.ze) || 0; const sa = parseFloat(p.stundenansatz || '80') || 80;
-        return { ...p, stundenansatz: String(sa), preis: p.preis || (ze && sa ? ((ze / 100) * sa).toFixed(2) : ''), zeLoading: false, zeHint: p.zeHint ?? '' };
+        const ze = parseFloat(p.ze) || 0;
+        return { ...p, preis: ze ? zeBetrag(ze).toFixed(2) : '', zeLoading: false, zeHint: p.zeHint ?? '' };
       });
     const materialRows: MaterialRow[] = positions
       .filter((p): p is MaterialPosition => p.typ === 'material')
@@ -180,8 +180,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
     if (k === 'beschreibung' && v.trim().length > 3) { n[i].ze = schaetzeZE(v); n[i].zeKI = false; n[i].zeHint = ''; }
     if (k === 'ze') { n[i].zeKI = false; n[i].zeHint = ''; }
     const ze = parseFloat(k === 'ze' ? v : n[i].ze) || 0;
-    const sa = parseFloat(k === 'stundenansatz' ? v : n[i].stundenansatz) || 0;
-    n[i].preis = ze && sa ? ((ze / 100) * sa).toFixed(2) : '';
+    n[i].preis = ze ? zeBetrag(ze).toFixed(2) : '';
     return n;
   });
   const kiZE = async (i: number) => {
@@ -194,8 +193,8 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
         : 'unbekannt';
       const r = await schaetzeZEmitKI(pos.beschreibung, fz);
       setArbeit((a) => {
-        const n = [...a]; const sa = parseFloat(n[i].stundenansatz) || 0; const ze = parseFloat(r.ze) || 0;
-        n[i] = { ...n[i], ze: r.ze, zeKI: true, zeHint: r.begruendung, zeLoading: false, preis: ze && sa ? ((ze / 100) * sa).toFixed(2) : '' };
+        const n = [...a]; const ze = parseFloat(r.ze) || 0;
+        n[i] = { ...n[i], ze: r.ze, zeKI: true, zeHint: r.begruendung, zeLoading: false, preis: ze ? zeBetrag(ze).toFixed(2) : '' };
         return n;
       });
     } catch {

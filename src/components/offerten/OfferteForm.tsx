@@ -3,7 +3,7 @@ import { FormCard, FormBar, SaveStatus, SummaryRow, VehicleChips, PositionenEdit
 import type { Customer, ArbeitPosition, MaterialPosition, Offerte, OfferteStatus } from '../../types';
 import { offerteNotizen, anzahlungErforderlich, anzahlungMoeglich, anzahlungAufteilung, sindVorkasseTerms, ANZAHLUNG_PROZENT, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ } from '../../lib/offerte-docs';
 import NummerField, { parseNummer } from '../ui/NummerField';
-import { materialPreis, materialZeSumme, ohneMaterialZe, positionTotals, zeMinuten } from '../../lib/ze';
+import { materialPreis, materialZeSumme, ohneMaterialZe, positionTotals, zeBetrag, zeMinuten } from '../../lib/ze';
 import { setMaterialFeld } from '../../lib/marge';
 import { useAutoSave } from '../../hooks/useAutoSave';
 
@@ -118,8 +118,7 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
     if (k === 'beschreibung' && v.trim().length > 3) { n[i].ze = schaetzeZE(v); n[i].zeKI = false; n[i].zeHint = ''; }
     if (k === 'ze') { n[i].zeKI = false; n[i].zeHint = ''; }
     const ze = parseFloat(k === 'ze' ? v : n[i].ze) || 0;
-    const sa = parseFloat(k === 'stundenansatz' ? v : n[i].stundenansatz) || 0;
-    n[i].preis = ze && sa ? ((ze / 100) * sa).toFixed(2) : '';
+    n[i].preis = ze ? zeBetrag(ze).toFixed(2) : '';
     return n;
   });
   const kiZE = async (i: number) => {
@@ -132,8 +131,8 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
         : 'unbekannt';
       const r = await schaetzeZEmitKI(pos.beschreibung, fz);
       setArbeit((a) => {
-        const n = [...a]; const sa = parseFloat(n[i].stundenansatz) || 0; const ze = parseFloat(r.ze) || 0;
-        n[i] = { ...n[i], ze: r.ze, zeKI: true, zeHint: r.begruendung, zeLoading: false, preis: ze && sa ? ((ze / 100) * sa).toFixed(2) : '' };
+        const n = [...a]; const ze = parseFloat(r.ze) || 0;
+        n[i] = { ...n[i], ze: r.ze, zeKI: true, zeHint: r.begruendung, zeLoading: false, preis: ze ? zeBetrag(ze).toFixed(2) : '' };
         return n;
       });
     } catch {

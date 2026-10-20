@@ -6,7 +6,7 @@ import { findPartLink, parsePartLink } from '../../lib/utils';
 import { cleanPartTitle, partNameFromUrl } from '../../lib/partTitle';
 import { getMargin } from '../../lib/settings';
 import type { ArbeitPosition, MaterialPosition } from '../../types';
-import { materialSatz, zeText } from '../../lib/ze';
+import { materialSatz, zeMinuten, zeText } from '../../lib/ze';
 import { margeVon, vkAusEk } from '../../lib/marge';
 
 /* Shared building blocks for the Offerte / Rechnung / Auftrag creation forms
@@ -136,6 +136,7 @@ interface PositionenEditorProps {
 }
 
 const sum = (rows: { preis: string }[]) => rows.reduce((s, p) => s + (parseFloat(p.preis) || 0), 0);
+const zeSumme = (rows: { ze: string }[]) => rows.reduce((s, p) => s + (parseFloat(p.ze) || 0), 0);
 
 export function PositionenEditor({
   arbeit, material,
@@ -313,10 +314,10 @@ export function PositionenEditor({
       <div className="df-group-hdr">
         <span className="df-dot" style={{ background: 'var(--blue)' }} />
         Arbeit
-        <span className="df-group-sum">{fCHF(sum(arbeit))}</span>
+        <span className="df-group-sum">{zeSumme(arbeit)} ZE</span>
       </div>
       <div className="df-cols df-arbeit">
-        <span>Beschreibung</span><span className="r">ZE</span><span /><span className="r">CHF/h</span><span className="r">Total</span><span />
+        <span>Beschreibung</span><span className="r">ZE</span><span /><span className="r">Min.</span><span className="r">Preis</span><span />
       </div>
       {arbeit.map((pos, i) => (
         <div key={i} className="df-line df-arbeit" onKeyDown={(e) => onEnterNextRow(e, i === arbeit.length - 1, addArbeit)}>
@@ -341,15 +342,9 @@ export function PositionenEditor({
           >
             {pos.zeLoading ? <Spinner size={10} /> : '✦'}
           </button>
-          <label className="df-cell df-c-rate">
-            <span className="df-cell-lbl">CHF/h</span>
-            <input
-              className="df-inp num" type="number" inputMode="decimal"
-              value={pos.stundenansatz} onChange={(e) => onArbeitChange(i, 'stundenansatz', e.target.value)}
-              placeholder="80" aria-label="Stundenansatz"
-            />
-          </label>
-          <span className="df-total df-c-total">{pos.preis ? fCHF(parseFloat(pos.preis)) : '—'}</span>
+          <span className="df-cell df-c-rate df-ze-min" title="100 ZE = 60 Min.">{parseFloat(pos.ze) > 0 ? `${Math.round(zeMinuten(parseFloat(pos.ze)))} Min.` : ''}</span>
+          {/* Arbeit has no own price: its ZE count towards Arbeit Total. */}
+          <span className="df-total df-c-total">—</span>
           {arbeit.length > 1
             ? <button type="button" className="mf-pos-del df-c-del" onClick={() => onArbeitRemove(i)} aria-label="Position entfernen"><SFXmark /></button>
             : <span className="df-c-del" />}

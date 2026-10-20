@@ -174,7 +174,8 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
     rgb(50, 50, 50);
     if (mp && fN(mp.menge))       tR(String(fN(mp.menge)),            x2 - PAD, ty);
     if (mp && fN(mp.stueckpreis)) tR(fN(mp.stueckpreis).toFixed(2),   x3 - PAD, ty);
-    if (fN(p.preis))              tR(fN(p.preis).toFixed(2),           x4 - PAD, ty);
+    // Preis (CHF): material value only; Arbeit is billed via its ZE (Arbeit Total).
+    if (mp && fN(mp.preis))       tR(fN(mp.preis).toFixed(2),          x4 - PAD, ty);
     // ZE column: Arbeit time, or the time billed with a material position.
     const zeWert = fN(ap?.ze ?? mp?.ze);
     if (zeWert)                   tR(String(zeWert),                   TR - PAD,  ty);

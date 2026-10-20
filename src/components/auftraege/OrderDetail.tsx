@@ -164,14 +164,14 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
                     <div className="sf-subhead">{pos.beschreibung}</div>
                     <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--label2)', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       {ap
-                        ? `Arbeit${ap.ze ? ` · ${ap.ze} ZE` : ''}${ap.stundenansatz ? ` · CHF ${ap.stundenansatz}/Std` : ''}`
+                        ? `Arbeit${ap.ze ? ` · ${ap.ze} ZE` : ''}`
                         : `Material${mp?.menge ? ` · ${mp.menge}×` : ''}${mp?.stueckpreis ? ` · CHF ${mp.stueckpreis}/Stk` : ''}${mp?.ze ? ` · ${mp.ze} ZE` : ''}`
                       }
                       {mp && <> <PartLink url={mp.link} /></>}
                     </div>
                   </div>
                   <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--label)', flexShrink: 0 }}>
-                    CHF {parseFloat(pos.preis || '0').toFixed(2)}
+                    {ap ? '—' : `CHF ${parseFloat(pos.preis || '0').toFixed(2)}`}
                   </div>
                 </div>
               );

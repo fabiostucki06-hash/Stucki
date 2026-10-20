@@ -7,11 +7,11 @@ import { useAutoSave } from '../../hooks/useAutoSave';
 import { ActiveOfferteBanner } from './ActiveOfferte';
 import PartsOrder from '../teile/PartsOrder';
 import { exportOffertePDF, exportAuftragsbestaetigungPDF } from '../../lib/pdf-offerte';
-import { CO_NAME } from '../../lib/company';
+import { CO_NAME, STD_SATZ } from '../../lib/company';
 import { useSettings } from '../../hooks/useSettings';
 import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../lib/utils';
 import { offerteNr, sumPositions, todayISO, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_PROZENT, offerteNotizen, anzahlungErforderlich, anzahlungMoeglich, anzahlungAufteilung, sindVorkasseTerms } from '../../lib/offerte-docs';
-import { materialPreis } from '../../lib/ze';
+import { materialPreis, zeBetrag } from '../../lib/ze';
 import { setMaterialFeld } from '../../lib/marge';
 import type { AuftragsBestaetigung, Customer, Offerte, OfferteStatus, Position, ArbeitPosition, MaterialPosition, Rechnung } from '../../types';
 
@@ -93,7 +93,6 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   const [addingTyp, setAddingTyp] = useState<'arbeit' | 'material' | null>(null);
   const [newBeschreibung, setNewBeschreibung] = useState('');
   const [newZE, setNewZE] = useState('');
-  const [newAW, setNewAW] = useState('80');
   const [newMenge, setNewMenge] = useState('1');
   const [newPreis, setNewPreis] = useState('');
 
@@ -177,9 +176,8 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
       const cur = next[i];
       const pos = (cur.typ === 'material' ? setMaterialFeld(cur, key, val) : { ...cur, [key]: val }) as Position;
       if (pos.typ === 'arbeit') {
-        const ze = parseFloat(key === 'ze' ? val : (pos as ArbeitPosition).ze) || 0;
-        const sa = parseFloat(key === 'stundenansatz' ? val : (pos as ArbeitPosition).stundenansatz) || 0;
-        if (ze && sa) pos.preis = ((ze / 100) * sa).toFixed(2);
+        // Arbeit is entered in ZE only; Arbeit Total = all ZE at the Std.Satz.
+        pos.preis = zeBetrag(parseFloat((pos as ArbeitPosition).ze) || 0).toFixed(2);
       } else {
         // Menge × Stückpreis only; the ZE count as Arbeit (see positionTotals).
         const mp = pos as MaterialPosition;
@@ -201,7 +199,6 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
     setAddingTyp(null);
     setNewBeschreibung('');
     setNewZE('');
-    setNewAW('80');
     setNewMenge('1');
     setNewPreis('');
   }
@@ -213,8 +210,8 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
           typ: 'arbeit',
           beschreibung: newBeschreibung.trim(),
           ze: newZE,
-          stundenansatz: newAW || '80',
-          preis: (((parseFloat(newZE) || 0) / 100) * (parseFloat(newAW) || 0)).toFixed(2),
+          stundenansatz: STD_SATZ,
+          preis: zeBetrag(parseFloat(newZE) || 0).toFixed(2),
         }
       : {
           typ: 'material',
@@ -510,19 +507,6 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
                         style={{ width: 44, padding: '3px 5px', fontSize: 13 }}
                       />
                     </div>
-                    <span style={{ fontSize: 11, color: 'var(--label3)', paddingBottom: 4, flexShrink: 0 }}>×</span>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                      <span style={HDR}>CHF/H</span>
-                      <input
-                        className="mf-pos-num"
-                        type="number"
-                        value={(pos as ArbeitPosition).stundenansatz}
-                        onChange={(e) => updPos(i, 'stundenansatz', e.target.value)}
-                        placeholder="80"
-                        min={0}
-                        style={{ width: 52, padding: '3px 5px', fontSize: 13 }}
-                      />
-                    </div>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
@@ -554,7 +538,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
                 )}
 
                 <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--label)', flexShrink: 0, minWidth: 68, textAlign: 'right' }}>
-                  CHF {(parseFloat(pos.preis || '0')).toFixed(2)}
+                  {pos.typ === 'arbeit' ? '—' : `CHF ${(parseFloat(pos.preis || '0')).toFixed(2)}`}
                 </div>
 
                 <button
@@ -620,10 +604,6 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
                   <div className="cf-field">
                     <label className="cf-label">ZE</label>
                     <input className="cf-input" type="number" min={0} value={newZE} onChange={(e) => setNewZE(e.target.value)} placeholder="0" />
-                  </div>
-                  <div className="cf-field">
-                    <label className="cf-label">AW (CHF/h)</label>
-                    <input className="cf-input" type="number" min={0} value={newAW} onChange={(e) => setNewAW(e.target.value)} placeholder="80" />
                   </div>
                 </div>
               ) : (

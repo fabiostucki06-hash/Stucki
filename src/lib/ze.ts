@@ -8,11 +8,17 @@ const fN = (v?: string | number) => parseFloat(String(v ?? '0')) || 0;
 
 export const zeMinuten = (ze: number) => (ze * 60) / ZE_PRO_STUNDE;
 
-/** Rate for a material position's ZE: its own, else the Werkstatt rate. */
-export const materialSatz = (p: Pick<MaterialPosition, 'stundenansatz'>) => fN(p.stundenansatz) || fN(STD_SATZ);
+/** Rate for every ZE in a document: the Werkstatt Std.Satz (CHF per 100 ZE). */
+export const zeSatz = () => fN(STD_SATZ);
+
+/** Rate for a material position's ZE: the Std.Satz like every other ZE. */
+export const materialSatz = (_p?: Pick<MaterialPosition, 'stundenansatz'>) => zeSatz();
+
+/** CHF for a number of ZE at the Std.Satz (100 ZE = CHF 80.00, i.e. CHF 0.80 per ZE). */
+export const zeBetrag = (ze: number) => Math.round((ze / ZE_PRO_STUNDE) * zeSatz() * 100) / 100;
 
 /** CHF for the ZE of a material position; billed under Arbeit, never in its `preis`. */
-export const materialZeBetrag = (p: Pick<MaterialPosition, 'ze' | 'stundenansatz'>) => (fN(p.ze) / ZE_PRO_STUNDE) * materialSatz(p);
+export const materialZeBetrag = (p: Pick<MaterialPosition, 'ze' | 'stundenansatz'>) => zeBetrag(fN(p.ze));
 
 /** Position price: Menge × Stückpreis only, as "0.00". The ZE count as Arbeit (see positionTotals). */
 export function materialPreis(p: Pick<MaterialPosition, 'menge' | 'stueckpreis'>): string {
@@ -36,20 +42,17 @@ export function materialZeSumme(positionen: { typ: string }[]): { ze: number; be
 
 /**
  * Material Total = Menge × Stückpreis of the material positions only.
- * Arbeit Total = every ZE — Arbeit positions and the time billed with a
- * material position — at its rate (Std.Satz CHF 80 = 100 ZE, i.e. CHF 0.80 per ZE).
+ * Arbeit Total = the sum of every ZE in the document — Arbeit positions and the
+ * time billed with a material position — at the Std.Satz: ZE × 80 / 100, i.e.
+ * CHF 0.80 per ZE (1'420 ZE = CHF 1'136.00). Arbeit positions carry no own price.
  */
 export function positionTotals(positionen: Position[]) {
-  let totalMaterial = 0, totalArbeit = 0, totalZE = 0;
+  let totalMaterial = 0, totalZE = 0;
   for (const p of positionen) {
     totalZE += fN(p.ze);
-    if (p.typ === 'material') {
-      totalMaterial += fN(p.preis);
-      totalArbeit += materialZeBetrag(p);
-    } else {
-      totalArbeit += fN(p.preis);
-    }
+    if (p.typ === 'material') totalMaterial += fN(p.preis);
   }
+  const totalArbeit = zeBetrag(totalZE);
   return { totalMaterial, totalArbeit, totalZE, total: totalMaterial + totalArbeit };
 }
 
