@@ -191,53 +191,6 @@ export function PositionenEditor({
   return (
     <div ref={rootRef}>
       <div className="df-group-hdr">
-        <span className="df-dot" style={{ background: 'var(--blue)' }} />
-        Arbeit
-        <span className="df-group-sum">{fCHF(sum(arbeit))}</span>
-      </div>
-      <div className="df-cols df-arbeit">
-        <span>Beschreibung</span><span className="r">ZE</span><span /><span className="r">CHF/h</span><span className="r">Total</span><span />
-      </div>
-      {arbeit.map((pos, i) => (
-        <div key={i} className="df-line df-arbeit" onKeyDown={(e) => onEnterNextRow(e, i === arbeit.length - 1, addArbeit)}>
-          <input
-            className="df-inp df-c-desc" data-df-desc="arbeit"
-            value={pos.beschreibung} onChange={(e) => onArbeitChange(i, 'beschreibung', e.target.value)}
-            placeholder="Arbeitsschritt…" aria-label="Beschreibung Arbeit"
-          />
-          <label className="df-cell df-c-ze">
-            <span className="df-cell-lbl">ZE</span>
-            <input
-              className="df-inp num" type="number" inputMode="decimal" min={0}
-              style={{ color: pos.zeKI ? 'var(--teal)' : undefined, fontWeight: pos.zeKI ? 700 : undefined }}
-              value={pos.ze} onChange={(e) => onArbeitChange(i, 'ze', e.target.value)}
-              placeholder="—" title={pos.zeHint || undefined} aria-label="Zeiteinheiten"
-            />
-          </label>
-          <button
-            type="button" className={`mf-pos-ki df-c-ki${pos.zeKI ? ' ki-active' : ''}`}
-            onClick={() => onKiZE(i)} disabled={pos.zeLoading || !pos.beschreibung.trim()}
-            title="KI-Schätzung anfordern" aria-label="KI-Schätzung anfordern"
-          >
-            {pos.zeLoading ? <Spinner size={10} /> : '✦'}
-          </button>
-          <label className="df-cell df-c-rate">
-            <span className="df-cell-lbl">CHF/h</span>
-            <input
-              className="df-inp num" type="number" inputMode="decimal"
-              value={pos.stundenansatz} onChange={(e) => onArbeitChange(i, 'stundenansatz', e.target.value)}
-              placeholder="80" aria-label="Stundenansatz"
-            />
-          </label>
-          <span className="df-total df-c-total">{pos.preis ? fCHF(parseFloat(pos.preis)) : '—'}</span>
-          {arbeit.length > 1
-            ? <button type="button" className="mf-pos-del df-c-del" onClick={() => onArbeitRemove(i)} aria-label="Position entfernen"><SFXmark /></button>
-            : <span className="df-c-del" />}
-        </div>
-      ))}
-      <button type="button" className="mf-add-pos" onClick={addArbeit}><SFPlus size={12} /> Arbeit</button>
-
-      <div className="df-group-hdr">
         <span className="df-dot" style={{ background: 'var(--green)' }} />
         Material
         <span className="df-group-sum">{fCHF(sum(material))}</span>
@@ -300,6 +253,53 @@ export function PositionenEditor({
         );
       })}
       <button type="button" className="mf-add-pos green" onClick={addMaterial}><SFPlus size={12} /> Material</button>
+
+      <div className="df-group-hdr">
+        <span className="df-dot" style={{ background: 'var(--blue)' }} />
+        Arbeit
+        <span className="df-group-sum">{fCHF(sum(arbeit))}</span>
+      </div>
+      <div className="df-cols df-arbeit">
+        <span>Beschreibung</span><span className="r">ZE</span><span /><span className="r">CHF/h</span><span className="r">Total</span><span />
+      </div>
+      {arbeit.map((pos, i) => (
+        <div key={i} className="df-line df-arbeit" onKeyDown={(e) => onEnterNextRow(e, i === arbeit.length - 1, addArbeit)}>
+          <input
+            className="df-inp df-c-desc" data-df-desc="arbeit"
+            value={pos.beschreibung} onChange={(e) => onArbeitChange(i, 'beschreibung', e.target.value)}
+            placeholder="Arbeitsschritt…" aria-label="Beschreibung Arbeit"
+          />
+          <label className="df-cell df-c-ze">
+            <span className="df-cell-lbl">ZE</span>
+            <input
+              className="df-inp num" type="number" inputMode="decimal" min={0}
+              style={{ color: pos.zeKI ? 'var(--teal)' : undefined, fontWeight: pos.zeKI ? 700 : undefined }}
+              value={pos.ze} onChange={(e) => onArbeitChange(i, 'ze', e.target.value)}
+              placeholder="—" title={pos.zeHint || undefined} aria-label="Zeiteinheiten"
+            />
+          </label>
+          <button
+            type="button" className={`mf-pos-ki df-c-ki${pos.zeKI ? ' ki-active' : ''}`}
+            onClick={() => onKiZE(i)} disabled={pos.zeLoading || !pos.beschreibung.trim()}
+            title="KI-Schätzung anfordern" aria-label="KI-Schätzung anfordern"
+          >
+            {pos.zeLoading ? <Spinner size={10} /> : '✦'}
+          </button>
+          <label className="df-cell df-c-rate">
+            <span className="df-cell-lbl">CHF/h</span>
+            <input
+              className="df-inp num" type="number" inputMode="decimal"
+              value={pos.stundenansatz} onChange={(e) => onArbeitChange(i, 'stundenansatz', e.target.value)}
+              placeholder="80" aria-label="Stundenansatz"
+            />
+          </label>
+          <span className="df-total df-c-total">{pos.preis ? fCHF(parseFloat(pos.preis)) : '—'}</span>
+          {arbeit.length > 1
+            ? <button type="button" className="mf-pos-del df-c-del" onClick={() => onArbeitRemove(i)} aria-label="Position entfernen"><SFXmark /></button>
+            : <span className="df-c-del" />}
+        </div>
+      ))}
+      <button type="button" className="mf-add-pos" onClick={addArbeit}><SFPlus size={12} /> Arbeit</button>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import type { Order, Customer } from '../types';
+import type { Order, Customer, Position } from '../types';
 
 /** Formats any date as DD.MM.YYYY (de-CH), always zero-padded — de-CH's default toLocaleDateString does not pad. */
 export const formatDateCH = (d: string | Date): string =>
@@ -95,6 +95,11 @@ export function decodeMaybeDouble(v: string): string {
   }
   return out;
 }
+
+/** Material positions before Arbeit; the order within each group is kept.
+    Documents saved before the Material-first order are listed the same way. */
+export const materialZuerst = <P extends Position>(pos: P[]): P[] =>
+  [...pos.filter((p) => p.typ === 'material'), ...pos.filter((p) => p.typ !== 'material')];
 
 export const sortCustomers = (a: Customer, b: Customer): number => {
   const na = `${a.nachname} ${a.vorname}`.toLowerCase();

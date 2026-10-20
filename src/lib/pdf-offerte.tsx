@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { formatDateCH, buildDocumentFilename } from './utils';
+import { formatDateCH, buildDocumentFilename, materialZuerst } from './utils';
 import { CO_NAME, CO_ADDR, CO_CITY, CO_PHONE, CO_LOC, STD_SATZ } from './company';
 import { PAGE_TOP, PAGE_BOTTOM, addPageNumbers } from './pdf-paging';
 import { offerteNr, offerteZahlungszeilen, offerteNotizen, anzahlungErforderlich, anzahlungAufteilung, ANZAHLUNG_PROZENT } from './offerte-docs';
@@ -50,9 +50,9 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
       p.typ === 'material' && p.beschreibung === 'Kleinteil Pauschale',
   );
   const kleinteilAmt = fN(kleinteilPos?.preis);
-  const filteredPos  = allPos.filter(
+  const filteredPos  = materialZuerst(allPos.filter(
     p => !(p.typ === 'material' && (p as MaterialPosition).beschreibung === 'Kleinteil Pauschale'),
-  );
+  ));
   const pureMatTotal = fN(offerte.totalMaterial) - kleinteilAmt;
   const totalArb     = fN(offerte.totalArbeit);
   const totalBetrag  = fN(offerte.totalBetrag);

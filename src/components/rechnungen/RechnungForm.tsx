@@ -212,7 +212,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
     try {
       // Awaited so a rejected write keeps the sheet (and the user's input) open.
       await onSave({
-        rechnungNumber, customerId: cid, titel, positionen: [...ap, ...mp], notizen,
+        rechnungNumber, customerId: cid, titel, positionen: [...mp, ...ap], notizen,
         zahlungsFrist, faelligAm,
         kategorie: kategorie || undefined, kleinteilManuell,
         totalBetrag: rechnungstotal.toFixed(2), totalArbeit: totA.toFixed(2),
@@ -358,12 +358,12 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
             />
           </div>
           <div>
-            <SummaryRow label="Arbeit" sub={totZE ? `${totZE} ZE` : null} value={fCHF(totArbeitBase)} />
             <SummaryRow label="Material" value={fCHF(totM)} />
             {(() => {
               const mz = materialZeSumme(material);
               return mz.ze > 0 && <SummaryRow label="davon ZE zu Material" sub={`${mz.ze} ZE = ${Math.round(zeMinuten(mz.ze))} Min.`} value={fCHF(mz.betrag)} />;
             })()}
+            <SummaryRow label="Arbeit" sub={totZE ? `${totZE} ZE` : null} value={fCHF(totArbeitBase)} />
             {/* Kleinteilepauschale: manual override of the per-Auftragsart default */}
             <SummaryRow
               label={

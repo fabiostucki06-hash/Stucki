@@ -3,7 +3,7 @@ import { PAGE_TOP, PAGE_BOTTOM, addPageNumbers } from './pdf-paging';
 import { SwissQRBill } from 'swissqrbill/svg';
 import { computeRechnungTotals, rechnungDocName, schlussReferenz, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from './rechnung-totals';
 import { mitMaterialHinweis } from './offerte-docs';
-import { formatDateCH, buildDocumentFilename } from './utils';
+import { formatDateCH, buildDocumentFilename, materialZuerst } from './utils';
 import { getIban } from './settings';
 import { CO_NAME, CO_ADDR, CO_CITY, CO_PHONE, CO_LOC, CO_ZIP, CO_CITY_NAME, STD_SATZ } from './company';
 import { archiveToDrive } from './drive';
@@ -50,7 +50,7 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
   const { totalMaterial: totM, totalArbeit: totA, zwischensumme: total, gesamttotal, rechnungstotal, restbetrag, abzugAnzahlung, kleinteilApplied } =
     computeRechnungTotals(rechnung.positionen ?? [], rechnung.kategorie, rechnung.kleinteilManuell, anzProzent, parseFloat(rechnung.anzahlungBetrag ?? '') || undefined);
 
-  const rows: (Position | undefined)[] = [...(rechnung.positionen ?? [])];
+  const rows: (Position | undefined)[] = materialZuerst(rechnung.positionen ?? []);
   if (kleinteilApplied) {
     rows.push({
       typ: 'material',

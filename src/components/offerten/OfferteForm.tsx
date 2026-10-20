@@ -166,7 +166,7 @@ export default function OfferteForm({ customers, onSave, onCancel, saving: savin
       // Awaited so a rejected write keeps the sheet (and the user's input) open;
       // the save path already toasts the reason via syncOk().
       await onSave({
-        offertNumber, customerId: cid, titel, positionen: [...ap, ...mp, ...autoPauschale], notizen, gueltigBis, zahlungsziel, status,
+        offertNumber, customerId: cid, titel, positionen: [...mp, ...autoPauschale, ...ap], notizen, gueltigBis, zahlungsziel, status,
         ...zahlungsterms(),
         totalBetrag: (totA + totMeff).toFixed(2), totalArbeit: totA.toFixed(2),
         totalMaterial: totMeff.toFixed(2), totalZE: totZE,
@@ -294,12 +294,12 @@ export default function OfferteForm({ customers, onSave, onCancel, saving: savin
             />
           </div>
           <div>
-            <SummaryRow label="Arbeit" sub={totZE ? `${totZE} ZE` : null} value={fCHF(totA)} />
             <SummaryRow label="Material" value={fCHF(totM)} />
             {(() => {
               const mz = materialZeSumme(material);
               return mz.ze > 0 && <SummaryRow label="davon ZE zu Material" sub={`${mz.ze} ZE = ${Math.round(zeMinuten(mz.ze))} Min.`} value={fCHF(mz.betrag)} />;
             })()}
+            <SummaryRow label="Arbeit" sub={totZE ? `${totZE} ZE` : null} value={fCHF(totA)} />
             {kleinteilActive && <SummaryRow label="Kleinteil Pauschale" sub="über 100 ZE" value={fCHF(kleinteilBetrag)} />}
             <SummaryRow label="Total" value={fCHF(total)} total />
             {mitAnzahlung && <SummaryRow label={`Fällige Anzahlung (${ANZAHLUNG_PROZENT}%)`} value={fCHF(anzahlungAufteilung(total).anzahlung)} />}
