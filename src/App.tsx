@@ -63,7 +63,11 @@ export default function App() {
 
   const updateAvailable = useVersionCheck();
   // A Shortcut may open /offerten?import_url=… instead of the root; land on that tab.
-  const [tab, setTab] = useState<TabId>(() => (window.location.pathname.replace(/\/+$/, '') === '/offerten' ? 'offerten' : 'dashboard'));
+  // /schlussrechnungen opens the Schlussrechnungen list directly.
+  const [tab, setTab] = useState<TabId>(() => {
+    const path = window.location.pathname.replace(/\/+$/, '');
+    return path === '/offerten' ? 'offerten' : path === '/schlussrechnungen' ? 'schlussrechnungen' : 'dashboard';
+  });
   const [fabOpen, setFabOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // Laptop / desktop: docked sidebar, centered dialogs, table lists (see globals.css).
@@ -474,7 +478,7 @@ export default function App() {
     });
     setSelOff(null);
     setSelR(null);
-    setTab('rechnungen');
+    setTab('schlussrechnungen');
   }
   /** Active (not cancelled) Anzahlungsrechnungen of an Offerte, newest first. */
   const anzahlungenFor = (offertId: string) => rechnungen
@@ -651,6 +655,7 @@ export default function App() {
         {tab === 'auftragsbestaetigungen' && <OfferteList key="ab" variant="ab" offerten={offerten} customers={customers} onOfferteClick={setSelOff} onEdit={(off) => setEditOff(off)} onNew={() => setShowNOff(true)} />}
         {tab === 'rechnungen'  && <RechnungenList rechnungen={rechnungen} customers={customers} onRechnungClick={setSelR} onEdit={(r) => setEditR(r)} onNew={() => setShowNR(true)} onImportPdf={() => setPdfImport('rechnung')} />}
         {tab === 'anzahlungsrechnungen' && <RechnungenList key="anzahlung" variant="anzahlung" rechnungen={rechnungen.map((r) => withOffertePositionen(r, offerten))} customers={customers} onRechnungClick={setSelR} onEdit={(r) => setEditR(r)} />}
+        {tab === 'schlussrechnungen' && <RechnungenList key="schluss" variant="schluss" rechnungen={rechnungen} customers={customers} onRechnungClick={setSelR} onEdit={(r) => setEditR(r)} />}
         {tab === 'kunden'      && <CustomerList customers={customers} orders={orders} onCustomerClick={setSelC} onNew={() => setShowNC(true)} />}
         {tab === 'statistiken'   && <StatistikDashboard orders={orders} offerten={offerten} rechnungen={rechnungen} customers={customers} />}
         {tab === 'einstellungen' && (

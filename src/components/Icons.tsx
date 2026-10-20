@@ -90,6 +90,14 @@ export const SFReceiptHalf = () => (
   </svg>
 );
 
+/** Receipt with a checkmark: Schlussrechnung (final invoice). */
+export const SFReceiptCheck = () => (
+  <svg width={25} height={25} viewBox="0 0 25 25" fill="none">
+    <path d="M5 3.5h15v18l-2.5-2-2.5 2-2.5-2-2.5 2-2.5-2-2.5 2V3.5z" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round"/>
+    <path d="M8.5 11.5l2.8 2.8 5.2-5.6" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 export const SFCloud = () => (
   <svg width={24} height={20} viewBox="0 0 26 22" fill="none">
     <path d="M7.5 18.5a6.5 6.5 0 01-.6-12.96A8.5 8.5 0 0120.5 10a5.5 5.5 0 010 8.5H7.5z" stroke="currentColor" strokeWidth={1.7} strokeLinejoin="round"/>

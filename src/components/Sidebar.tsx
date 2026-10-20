@@ -1,4 +1,4 @@
-import { SFHouse, SFWrench, SFDoc, SFBox, SFDocCheck, SFReceipt, SFReceiptHalf, SFPerson, SFChart, SFXmark, SFGear } from './Icons';
+import { SFHouse, SFWrench, SFDoc, SFBox, SFDocCheck, SFReceipt, SFReceiptHalf, SFReceiptCheck, SFPerson, SFChart, SFXmark, SFGear } from './Icons';
 import type { TabId } from '../types';
 import { BUILD_LABEL } from '../lib/buildInfo';
 
@@ -10,6 +10,7 @@ const SIDEBAR_ITEMS: { id: TabId; icon: React.ReactNode; label: string }[] = [
   { id: 'auftragsbestaetigungen', icon: <SFDocCheck />, label: 'Auftragsbestätigungen' },
   { id: 'rechnungen', icon: <SFReceipt />, label: 'Rechnungen' },
   { id: 'anzahlungsrechnungen', icon: <SFReceiptHalf />, label: 'Anzahlungsrechnungen' },
+  { id: 'schlussrechnungen', icon: <SFReceiptCheck />, label: 'Schlussrechnungen' },
   { id: 'kunden',     icon: <SFPerson />,  label: 'Kunden'     },
   { id: 'statistiken',   icon: <SFChart />,  label: 'Statistik'     },
   { id: 'einstellungen', icon: <SFGear />,  label: 'Einstellungen' },

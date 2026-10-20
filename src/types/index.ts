@@ -193,5 +193,5 @@ export interface MaterialCatalogItem {
   createdAt: string;
 }
 
-export type TabId = 'dashboard' | 'auftraege' | 'offerten' | 'materialofferten' | 'auftragsbestaetigungen' | 'rechnungen' | 'anzahlungsrechnungen' | 'kunden' | 'statistiken' | 'einstellungen';
+export type TabId = 'dashboard' | 'auftraege' | 'offerten' | 'materialofferten' | 'auftragsbestaetigungen' | 'rechnungen' | 'anzahlungsrechnungen' | 'schlussrechnungen' | 'kunden' | 'statistiken' | 'einstellungen';
 export type SyncStatus = 'idle' | 'saving' | 'ok' | 'error';

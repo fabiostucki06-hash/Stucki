@@ -12,9 +12,9 @@ interface RechnungenListProps {
   onNew?: () => void;
   /** Opens the PDF import (Rechnung from an uploaded PDF). */
   onImportPdf?: () => void;
-  /** 'anzahlung' lists only the 50% Vorkasse invoices (own menu item);
-      the default list shows every other invoice. */
-  variant?: 'standard' | 'anzahlung';
+  /** 'anzahlung' / 'schluss' list only the 50% Vorkasse invoices or the
+      Schlussrechnungen (own menu items); the default list shows every other invoice. */
+  variant?: 'standard' | 'anzahlung' | 'schluss';
 }
 
 const STATUS_LABELS: Record<RechnungStatus, string> = {
@@ -32,7 +32,9 @@ const STATUS_COLORS: Record<RechnungStatus, string> = {
 
 export default function RechnungenList({ rechnungen: all, customers, onRechnungClick, onEdit, onNew, onImportPdf, variant = 'standard' }: RechnungenListProps) {
   const isAnz = variant === 'anzahlung';
-  const rechnungen = all.filter((r) => (r.art === 'anzahlung') === isAnz);
+  const isSchluss = variant === 'schluss';
+  const rechnungen = all.filter((r) => (r.art === 'anzahlung' || r.art === 'schluss' ? r.art : 'standard') === variant);
+  const titel = isAnz ? 'Anzahlungsrechnungen' : isSchluss ? 'Schlussrechnungen' : 'Rechnungen';
   const sortByName = (a: Rechnung, b: Rechnung) => {
     const ca = customers.find((x) => x.id === a.customerId);
     const cb = customers.find((x) => x.id === b.customerId);
@@ -44,7 +46,7 @@ export default function RechnungenList({ rechnungen: all, customers, onRechnungC
   return (
     <div style={{ padding: '16px 16px 0' }}>
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 12 }}>
-        <h1 className="sf-title1" style={{ paddingTop: 8 }}>{isAnz ? 'Anzahlungsrechnungen' : 'Rechnungen'}</h1>
+        <h1 className="sf-title1" style={{ paddingTop: 8 }}>{titel}</h1>
         {(onNew || onImportPdf) && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             {onImportPdf && <button onClick={onImportPdf} className="btn-tinted">PDF importieren</button>}
@@ -56,10 +58,12 @@ export default function RechnungenList({ rechnungen: all, customers, onRechnungC
       {!rechnungen.length && (
         <div className="glass-panel" style={{ padding: 40, textAlign: 'center' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🧾</div>
-          <div style={{ fontSize: 16, color: 'var(--label2)' }}>Noch keine {isAnz ? 'Anzahlungsrechnungen' : 'Rechnungen'}.</div>
-          {isAnz && (
+          <div style={{ fontSize: 16, color: 'var(--label2)' }}>Noch keine {titel}.</div>
+          {(isAnz || isSchluss) && (
             <div style={{ fontSize: 13, color: 'var(--label3)', marginTop: 6 }}>
-              Anzahlungsrechnungen werden in einer angenommenen Offerte erstellt.
+              {isAnz
+                ? 'Anzahlungsrechnungen werden in einer angenommenen Offerte erstellt.'
+                : 'Schlussrechnungen werden aus einer Anzahlungsrechnung erstellt.'}
             </div>
           )}
         </div>
