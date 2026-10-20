@@ -10,7 +10,7 @@ import { exportOffertePDF, exportAuftragsbestaetigungPDF } from '../../lib/pdf-o
 import { CO_NAME } from '../../lib/company';
 import { useSettings } from '../../hooks/useSettings';
 import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../lib/utils';
-import { offerteNr, sumPositions, todayISO, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_PROZENT, mitMaterialHinweis } from '../../lib/offerte-docs';
+import { offerteNr, sumPositions, todayISO, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_PROZENT, mitMaterialHinweis, anzahlungErforderlich, anzahlungAufteilung } from '../../lib/offerte-docs';
 import { materialPreis } from '../../lib/ze';
 import type { AuftragsBestaetigung, Customer, Offerte, OfferteStatus, Position, ArbeitPosition, MaterialPosition, Rechnung } from '../../types';
 
@@ -64,6 +64,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   const [zahlungsziel, setZahlungsziel] = useState(offerte.zahlungsziel ?? '10');
   const [zahlungsbedingung, setZahlungsbedingung] = useState(offerte.zahlungsbedingung ?? '');
   const [zusatznotiz, setZusatznotiz] = useState(offerte.zusatznotiz ?? '');
+  const [mitAnzahlung, setMitAnzahlung] = useState(() => anzahlungErforderlich(offerte));
   const [ab, setAb] = useState<AuftragsBestaetigung>(() => offerte.ab ?? {});
   /** Own signature, stored once in the settings; placed on every AB. */
   const { signature } = useSettings();
@@ -85,8 +86,9 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
     setZahlungsziel(offerte.zahlungsziel ?? '10');
     setZahlungsbedingung(offerte.zahlungsbedingung ?? '');
     setZusatznotiz(offerte.zusatznotiz ?? '');
+    setMitAnzahlung(anzahlungErforderlich(offerte));
     setAb(offerte.ab ?? {});
-  }, [dirty, offerte.id, offerte.positionen, offerte.zahlungsziel, offerte.zahlungsbedingung, offerte.zusatznotiz, offerte.ab]);
+  }, [dirty, offerte.id, offerte.positionen, offerte.zahlungsziel, offerte.zahlungsbedingung, offerte.zusatznotiz, offerte.anzahlungErforderlich, offerte.ab]);
 
   const [addingTyp, setAddingTyp] = useState<'arbeit' | 'material' | null>(null);
   const [newBeschreibung, setNewBeschreibung] = useState('');
@@ -143,15 +145,25 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
     setDirty(true);
   }
 
-  function applyVorkasse() {
-    setZahlungsbedingung(VORKASSE_BEDINGUNG);
-    setZusatznotiz(SCHLUSSRECHNUNG_NOTIZ);
+  /** 50% Anzahlung on: the Vorkasse terms are filled in unless own terms exist.
+      Off: the Offerte is a plain one again, the Vorkasse terms are removed. */
+  function toggleAnzahlung(on: boolean) {
+    setMitAnzahlung(on);
+    if (on && !zahlungsbedingung.trim() && !zusatznotiz.trim()) {
+      setZahlungsbedingung(VORKASSE_BEDINGUNG);
+      setZusatznotiz(SCHLUSSRECHNUNG_NOTIZ);
+    }
+    if (!on && zahlungsbedingung.trim() === VORKASSE_BEDINGUNG && [SCHLUSSRECHNUNG_NOTIZ, ''].includes(zusatznotiz.trim())) {
+      setZahlungsbedingung('');
+      setZusatznotiz('');
+    }
     setDirty(true);
   }
 
   function removeTerms() {
     setZahlungsbedingung('');
     setZusatznotiz('');
+    setMitAnzahlung(false);
     setDirty(true);
   }
 
@@ -233,6 +245,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
       zahlungsziel,
       zahlungsbedingung: zahlungsbedingung || undefined,
       zusatznotiz: zusatznotiz || undefined,
+      anzahlungErforderlich: mitAnzahlung,
       // AB data only exists once the Offerte was accepted (or already has some).
       ab: offerte.status === 'angenommen' || offerte.ab ? { ...ab, name: abName, ort: abOrt, datum: abDatum } : undefined,
       ...patch,
@@ -398,6 +411,24 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
         </div>
       )}
 
+      <label
+        className="glass-panel no-print"
+        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', marginBottom: 12, cursor: 'pointer' }}
+      >
+        <input
+          type="checkbox" checked={mitAnzahlung} onChange={(e) => toggleAnzahlung(e.target.checked)}
+          style={{ width: 22, height: 22, accentColor: '#007AFF', flexShrink: 0, cursor: 'pointer' }}
+        />
+        <span style={{ flex: 1 }}>
+          <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: 'var(--label)' }}>{ANZAHLUNG_PROZENT}% Anzahlung erforderlich</span>
+          <span style={{ display: 'block', fontSize: 12.5, color: 'var(--label2)', marginTop: 1 }}>
+            {mitAnzahlung
+              ? `Offerte und PDF weisen die Anzahlung von CHF ${anzahlungAufteilung(totalArbeit + totalMaterial).anzahlung.toFixed(2)} aus, Vorkasse-Bedingungen aktiv`
+              : 'Normale Offerte über 100% ohne Anzahlungshinweis'}
+          </span>
+        </span>
+      </label>
+
       {hasTerms ? (
         <div className="glass-panel doc-terms">
           <div className="ab-panel-title">Zahlungsbedingungen</div>
@@ -429,7 +460,6 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
           }}
         />
         <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--green)' }}>Tage netto</span>
-        <button onClick={applyVorkasse} className="mf-btn-cancel" style={{ marginLeft: 'auto' }}>50% Vorkasse</button>
       </div>
       )}
 
@@ -636,6 +666,21 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
                 CHF {acceptedTotal.toFixed(2)}
               </div>
             </div>
+            {mitAnzahlung && (() => {
+              const { anzahlung: anz, rest } = anzahlungAufteilung(acceptedTotal);
+              return (
+                <>
+                  <div style={{ display: 'flex', width: '100%', alignItems: 'center', marginTop: 4 }}>
+                    <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: 'var(--label)' }}>Anzahlung {ANZAHLUNG_PROZENT}% (fällig vor Arbeitsbeginn)</div>
+                    <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--label)' }}>CHF {anz.toFixed(2)}</div>
+                  </div>
+                  <div style={{ display: 'flex', width: '100%', alignItems: 'center' }}>
+                    <div style={{ flex: 1, fontSize: 13, color: 'var(--label2)' }}>Restbetrag {100 - ANZAHLUNG_PROZENT}% (mit Schlussrechnung)</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--label2)' }}>CHF {rest.toFixed(2)}</div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         )}
       </div>

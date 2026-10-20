@@ -27,6 +27,18 @@ export function mitMaterialHinweis(notizen?: string): string {
   return rest ? `${rest}\n${MATERIAL_BESTELL_HINWEIS}` : MATERIAL_BESTELL_HINWEIS;
 }
 
+/** Whether the Offerte asks for the 50% Anzahlung; older ones without the flag
+    count as such when they carry the Vorkasse terms. */
+export function anzahlungErforderlich(o: Pick<Offerte, 'anzahlungErforderlich' | 'zahlungsbedingung'>): boolean {
+  return o.anzahlungErforderlich ?? o.zahlungsbedingung?.trim() === VORKASSE_BEDINGUNG;
+}
+
+/** Anzahlung (ANZAHLUNG_PROZENT of the total) and remainder, both rounded to 5 Rappen. */
+export function anzahlungAufteilung(total: number): { anzahlung: number; rest: number } {
+  const anzahlung = roundToRappen(total * ANZAHLUNG_PROZENT / 100);
+  return { anzahlung, rest: roundToRappen(roundToRappen(total) - anzahlung) };
+}
+
 /** Number references in generated titles and notes ("Offerte #12", "Auftragsbestätigung Nr. 12_2"). */
 export const OFFERTE_REF = '(?:Offerte|Auftragsbestätigung) (?:#|Nr\\. )';
 export const ANZAHLUNG_REF = 'Anzahlungsrechnung #';
@@ -70,6 +82,7 @@ export function offerteZahlungszeilen(o: Offerte): string[] {
   if (o.zahlungsbedingung?.trim() || o.zusatznotiz?.trim()) {
     return [o.zahlungsbedingung, o.zusatznotiz].map((s) => s?.trim() ?? '').filter(Boolean);
   }
+  if (anzahlungErforderlich(o)) return [VORKASSE_BEDINGUNG];
   return [`${o.zahlungsziel ?? '10'} Tage netto`];
 }
 

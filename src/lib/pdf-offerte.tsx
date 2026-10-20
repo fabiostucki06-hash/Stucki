@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf';
 import { formatDateCH, buildDocumentFilename } from './utils';
 import { CO_NAME, CO_ADDR, CO_CITY, CO_PHONE, CO_LOC, STD_SATZ } from './company';
 import { PAGE_TOP, PAGE_BOTTOM, addPageNumbers } from './pdf-paging';
-import { offerteNr, offerteZahlungszeilen, mitMaterialHinweis } from './offerte-docs';
+import { offerteNr, offerteZahlungszeilen, mitMaterialHinweis, anzahlungErforderlich, anzahlungAufteilung, ANZAHLUNG_PROZENT } from './offerte-docs';
 import { archiveToDrive } from './drive';
 import type { ArbeitPosition, Customer, MaterialPosition, Offerte } from '../types';
 
@@ -185,7 +185,8 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
 
   // ── SUMME ─────────────────────────────────────────────────────────────────
   // Summe, Kleinteil and Total stay together on one page.
-  if (!fits(RH_S + (kleinteilAmt > 0 ? 4 : 0) + RH_T)) newPage();
+  const mitAnzahlung = anzahlungErforderlich(offerte);
+  if (!fits(RH_S + (kleinteilAmt > 0 ? 4 : 0) + RH_T + (mitAnzahlung ? RH_S * 2 : 0))) newPage();
   lw(0.3); drgb(0, 0, 0); doc.line(TL, y, TR, y);
   frgb(247, 247, 247); doc.rect(TL, y, TW, RH_S, 'F');
   const sumY = y + RH_S * BL;
@@ -216,6 +217,26 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
   y += RH_T;
   lw(0.5); drgb(0, 0, 0); doc.line(TL, y, TR, y);
   norm();
+
+  // ── ANZAHLUNG: only when the Offerte asks for it ─────────────────────────
+  if (mitAnzahlung) {
+    const { anzahlung, rest } = anzahlungAufteilung(totalBetrag);
+    const anzY = y + RH_S * BL;
+    frgb(235, 243, 255); doc.rect(TL, y, TW, RH_S, 'F');
+    bold(); fs(8.5); rgb(0, 0, 0);
+    tL(`Anzahlung ${ANZAHLUNG_PROZENT}% – zahlbar vor Arbeitsbeginn`, x0 + PAD, anzY);
+    tR(chf(anzahlung), TR - PAD, anzY);
+    norm();
+    y += RH_S;
+    hLine(y, TL, TR, 0.1);
+    const restY = y + RH_S * BL;
+    rgb(100, 100, 100);
+    tL(`Restbetrag ${100 - ANZAHLUNG_PROZENT}% – mit der Schlussrechnung`, x0 + PAD, restY);
+    tR(chf(rest), TR - PAD, restY);
+    rgb(0, 0, 0);
+    y += RH_S;
+    lw(0.5); drgb(0, 0, 0); doc.line(TL, y, TR, y);
+  }
 
   // ── NOTES ─────────────────────────────────────────────────────────────────
   y += 6;

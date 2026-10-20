@@ -404,6 +404,7 @@ export default function App() {
       totalZE: 0,
       zahlungsbedingung: VORKASSE_BEDINGUNG,
       zusatznotiz: SCHLUSSRECHNUNG_NOTIZ,
+      anzahlungErforderlich: true,
     }, { offertNumber: offerte.offertNumber });
     setSelOff(created);
   }

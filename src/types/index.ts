@@ -132,6 +132,9 @@ export interface Offerte {
   /** Free-text payment terms; replace "<zahlungsziel> Tage netto" when set. */
   zahlungsbedingung?: string;
   zusatznotiz?: string;
+  /** 50% Anzahlung (Vorkasse) required: the totals show the amount due and the
+      Vorkasse terms apply. Unset on older Offerten: derived from the terms. */
+  anzahlungErforderlich?: boolean;
   ab?: AuftragsBestaetigung;
 }
 
