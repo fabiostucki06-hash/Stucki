@@ -3,7 +3,7 @@ import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
 import { FormCard, FormBar, SummaryRow, VehicleChips, PositionenEditor, fCHF, type ArbeitRow, type MaterialRow } from '../ui/DocForm';
 import type { Customer, ArbeitPosition, MaterialPosition, Offerte, OfferteStatus } from '../../types';
-import { mitMaterialHinweis } from '../../lib/offerte-docs';
+import { mitMaterialHinweis, anzahlungErforderlich, anzahlungAufteilung, ANZAHLUNG_PROZENT, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ } from '../../lib/offerte-docs';
 import NummerField, { nummerBestaetigt, parseNummer } from '../ui/NummerField';
 import { materialPreis, materialZeSumme, zeMinuten } from '../../lib/ze';
 
@@ -72,6 +72,8 @@ const newMaterial = (): MaterialRow => ({ typ: 'material', beschreibung: '', men
 
 export default function OfferteForm({ customers, onSave, onCancel, saving: savingProp, initial, prefillMaterial, prefillCustomerId, nummerVorschlag, nummerVergeben }: OfferteFormProps) {
   const [nummer, setNummer] = useState(String(initial?.offertNumber ?? nummerVorschlag));
+  // Off by default: a new Offerte is a plain one.
+  const [mitAnzahlung, setMitAnzahlung] = useState(() => (initial ? anzahlungErforderlich(initial) : false));
   const [cid,        setCid]        = useState(initial?.customerId ?? prefillCustomerId ?? '');
   const [titel,      setTitel]      = useState(initial?.titel ?? '');
   const [arbeit,     setArbeit]     = useState<ArbeitRow[]>(() => {
@@ -165,6 +167,7 @@ export default function OfferteForm({ customers, onSave, onCancel, saving: savin
       // the save path already toasts the reason via syncOk().
       await onSave({
         offertNumber, customerId: cid, titel, positionen: [...ap, ...mp, ...autoPauschale], notizen, gueltigBis, zahlungsziel, status,
+        ...zahlungsterms(),
         totalBetrag: (totA + totMeff).toFixed(2), totalArbeit: totA.toFixed(2),
         totalMaterial: totMeff.toFixed(2), totalZE: totZE,
       });
@@ -176,6 +179,21 @@ export default function OfferteForm({ customers, onSave, onCancel, saving: savin
   }
 
   const total = totA + totMeff;
+
+  /** Anzahlung flag plus the matching terms: on fills in the Vorkasse terms unless
+      own ones exist, off removes the Vorkasse terms again (same as in the Offerte view). */
+  function zahlungsterms(): Pick<Offerte, 'anzahlungErforderlich' | 'zahlungsbedingung' | 'zusatznotiz'> {
+    const zb = initial?.zahlungsbedingung?.trim() ?? '', zn = initial?.zusatznotiz?.trim() ?? '';
+    if (mitAnzahlung) {
+      return zb || zn
+        ? { anzahlungErforderlich: true, zahlungsbedingung: initial?.zahlungsbedingung, zusatznotiz: initial?.zusatznotiz }
+        : { anzahlungErforderlich: true, zahlungsbedingung: VORKASSE_BEDINGUNG, zusatznotiz: SCHLUSSRECHNUNG_NOTIZ };
+    }
+    const vorkasse = zb === VORKASSE_BEDINGUNG && [SCHLUSSRECHNUNG_NOTIZ, ''].includes(zn);
+    return vorkasse
+      ? { anzahlungErforderlich: false, zahlungsbedingung: undefined, zusatznotiz: undefined }
+      : { anzahlungErforderlich: false, zahlungsbedingung: initial?.zahlungsbedingung, zusatznotiz: initial?.zusatznotiz };
+  }
 
   return (
     <div className="df">
@@ -215,6 +233,27 @@ export default function OfferteForm({ customers, onSave, onCancel, saving: savin
             <label className="cf-label">Zahlungsziel (Tage)</label>
             <input className="cf-input" type="number" inputMode="numeric" min={1} value={zahlungsziel} onChange={(e) => setZahlungsziel(e.target.value)} placeholder="10" />
           </div>
+          <label
+            className="df-span2"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, cursor: 'pointer',
+              background: mitAnzahlung ? 'rgba(0,122,255,0.12)' : 'var(--fill3)',
+              border: `1px solid ${mitAnzahlung ? 'rgba(0,122,255,0.45)' : 'transparent'}`,
+            }}
+          >
+            <input
+              type="checkbox" checked={mitAnzahlung} onChange={(e) => setMitAnzahlung(e.target.checked)}
+              style={{ width: 22, height: 22, accentColor: '#007AFF', flexShrink: 0, cursor: 'pointer' }}
+            />
+            <span style={{ flex: 1 }}>
+              <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: 'var(--label)' }}>{ANZAHLUNG_PROZENT}% Anzahlung verlangen</span>
+              <span style={{ display: 'block', fontSize: 12.5, color: 'var(--label2)', marginTop: 1 }}>
+                {mitAnzahlung
+                  ? 'Fällige Anzahlung wird im Total und im PDF ausgewiesen, Vorkasse-Bedingungen aktiv'
+                  : 'Normale Offerte über 100% ohne Anzahlungshinweis'}
+              </span>
+            </span>
+          </label>
           {initial && (
             <div className="cf-field df-span2">
               <label className="cf-label">Status</label>
@@ -257,6 +296,7 @@ export default function OfferteForm({ customers, onSave, onCancel, saving: savin
             })()}
             {kleinteilActive && <SummaryRow label="Kleinteil Pauschale" sub="über 100 ZE" value={fCHF(kleinteilBetrag)} />}
             <SummaryRow label="Total" value={fCHF(total)} total />
+            {mitAnzahlung && <SummaryRow label={`Fällige Anzahlung (${ANZAHLUNG_PROZENT}%)`} value={fCHF(anzahlungAufteilung(total).anzahlung)} />}
           </div>
         </div>
       </FormCard>

@@ -420,7 +420,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
           style={{ width: 22, height: 22, accentColor: '#007AFF', flexShrink: 0, cursor: 'pointer' }}
         />
         <span style={{ flex: 1 }}>
-          <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: 'var(--label)' }}>{ANZAHLUNG_PROZENT}% Anzahlung erforderlich</span>
+          <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: 'var(--label)' }}>{ANZAHLUNG_PROZENT}% Anzahlung verlangen</span>
           <span style={{ display: 'block', fontSize: 12.5, color: 'var(--label2)', marginTop: 1 }}>
             {mitAnzahlung
               ? `Offerte und PDF weisen die Anzahlung von CHF ${anzahlungAufteilung(totalArbeit + totalMaterial).anzahlung.toFixed(2)} aus, Vorkasse-Bedingungen aktiv`
@@ -671,7 +671,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
               return (
                 <>
                   <div style={{ display: 'flex', width: '100%', alignItems: 'center', marginTop: 4 }}>
-                    <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: 'var(--label)' }}>Anzahlung {ANZAHLUNG_PROZENT}% (fällig vor Arbeitsbeginn)</div>
+                    <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: 'var(--label)' }}>Fällige Anzahlung ({ANZAHLUNG_PROZENT}%)</div>
                     <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--label)' }}>CHF {anz.toFixed(2)}</div>
                   </div>
                   <div style={{ display: 'flex', width: '100%', alignItems: 'center' }}>
