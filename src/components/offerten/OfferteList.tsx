@@ -7,7 +7,7 @@ import { useSettings } from '../../hooks/useSettings';
 import { offerteNr } from '../../lib/offerte-docs';
 import type { Customer, Offerte, OfferteStatus } from '../../types';
 
-/** 'alle' = every Offerte, 'material' = only Materialofferten,
+/** 'alle' = regular Offerten only (no Materialofferten), 'material' = only Materialofferten,
     'ab' = accepted Offerten as Auftragsbestätigungen. */
 export type OfferteListVariant = 'alle' | 'material' | 'ab';
 
@@ -30,6 +30,9 @@ const EMPTY: Record<OfferteListVariant, { icon: string; text: string }> = {
   ab: { icon: '✅', text: 'Noch keine Auftragsbestätigungen. Sobald eine Offerte angenommen ist, erscheint sie hier.' },
 };
 
+// Older records may lack `art`, so fall back to the generated title prefix.
+const isMaterialofferte = (o: Offerte) => o.art === 'material' || /^Materialofferte\b/.test(o.titel ?? '');
+
 interface Group { key: string; label: string; color: string; items: Offerte[] }
 
 export default function OfferteList({ offerten, customers, onOfferteClick, onEdit, onNew, variant = 'alle' }: OfferteListProps) {
@@ -45,9 +48,9 @@ export default function OfferteList({ offerten, customers, onOfferteClick, onEdi
     return na < nb ? -1 : na > nb ? 1 : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   };
 
-  const list = variant === 'material' ? offerten.filter((o) => o.art === 'material')
+  const list = variant === 'material' ? offerten.filter(isMaterialofferte)
     : isAB ? offerten.filter((o) => o.status === 'angenommen')
-    : offerten;
+    : offerten.filter((o) => !isMaterialofferte(o));
 
   // AB: grouped by whether the customer has signed; otherwise by status.
   const groups: Group[] = isAB
@@ -85,7 +88,7 @@ export default function OfferteList({ offerten, customers, onOfferteClick, onEdi
               <div className="doc-table-head" aria-hidden="true"><span className="doc-row-title">Dokument</span><span className="doc-row-sub">Kunde</span><span className="doc-row-amount">Betrag</span></div>
               {grp.map((off) => {
                 const c = customers.find((x) => x.id === off.customerId);
-                const docName = isAB ? 'Auftragsbestätigung' : off.art === 'material' ? 'Materialofferte' : 'Offerte';
+                const docName = isAB ? 'Auftragsbestätigung' : isMaterialofferte(off) ? 'Materialofferte' : 'Offerte';
                 return (
                   <div key={off.id} className={`list-row${off.id === active?.id ? ' ao-active' : ''}`} tabIndex={0} onClick={() => onOfferteClick(off)}>
                     <div className="doc-row-main" style={{ flex: 1 }}>
