@@ -2,7 +2,8 @@ import { jsPDF } from 'jspdf';
 import { formatDateCH, buildDocumentFilename, materialZuerst } from './utils';
 import { CO_NAME, CO_ADDR, CO_CITY, CO_PHONE, CO_LOC, STD_SATZ } from './company';
 import { PAGE_TOP, PAGE_BOTTOM, addPageNumbers } from './pdf-paging';
-import { offerteNr, offerteZahlungszeilen, offerteNotizen, anzahlungErforderlich, anzahlungAufteilung, ANZAHLUNG_PROZENT } from './offerte-docs';
+import { offerteNr, offerteZahlungszeilen, offerteNotizen, anzahlungErforderlich, anzahlungAufteilung, sumPositions, ANZAHLUNG_PROZENT } from './offerte-docs';
+import { ohneZeAnteil } from './ze';
 import { archiveToDrive } from './drive';
 import type { ArbeitPosition, Customer, MaterialPosition, Offerte } from '../types';
 
@@ -44,7 +45,8 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
   const date    = isAB && ab.datum ? formatDateCH(ab.datum) : todayCH();
   const title   = isAB ? 'Auftragsbestätigung' : offerte.art === 'material' ? 'Materialofferte' : 'Budget Offerte';
 
-  const allPos       = offerte.positionen ?? [];
+  // Older positions may still carry the ZE share in the material price.
+  const allPos       = (offerte.positionen ?? []).map(ohneZeAnteil);
   const kleinteilPos = allPos.find(
     (p): p is MaterialPosition =>
       p.typ === 'material' && p.beschreibung === 'Kleinteil Pauschale',
@@ -53,9 +55,12 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
   const filteredPos  = materialZuerst(allPos.filter(
     p => !(p.typ === 'material' && (p as MaterialPosition).beschreibung === 'Kleinteil Pauschale'),
   ));
-  const pureMatTotal = fN(offerte.totalMaterial) - kleinteilAmt;
-  const totalArb     = fN(offerte.totalArbeit);
-  const totalBetrag  = fN(offerte.totalBetrag);
+  // Material Total = Menge × Stk.Preis only; Arbeit Total = all ZE (incl. those
+  // of material positions) at the Std.Satz; the Kleinteil Pauschale on its own.
+  const totals       = sumPositions(allPos);
+  const pureMatTotal = totals.totalMaterial - kleinteilAmt;
+  const totalArb     = totals.totalArbeit;
+  const totalBetrag  = totals.total;
 
   const norm  = () => doc.setFont('helvetica', 'normal');
   const bold  = () => doc.setFont('helvetica', 'bold');

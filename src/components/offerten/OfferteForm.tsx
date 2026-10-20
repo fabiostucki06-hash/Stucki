@@ -3,7 +3,7 @@ import { FormCard, FormBar, SaveStatus, SummaryRow, VehicleChips, PositionenEdit
 import type { Customer, ArbeitPosition, MaterialPosition, Offerte, OfferteStatus } from '../../types';
 import { offerteNotizen, anzahlungErforderlich, anzahlungMoeglich, anzahlungAufteilung, sindVorkasseTerms, ANZAHLUNG_PROZENT, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ } from '../../lib/offerte-docs';
 import NummerField, { parseNummer } from '../ui/NummerField';
-import { materialPreis, materialZeSumme, zeMinuten } from '../../lib/ze';
+import { materialPreis, materialZeSumme, positionTotals, zeMinuten } from '../../lib/ze';
 import { setMaterialFeld } from '../../lib/marge';
 import { useAutoSave } from '../../hooks/useAutoSave';
 
@@ -148,9 +148,8 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
     return n;
   });
 
-  const totA  = arbeit.reduce((s, p) => s + (parseFloat(p.preis) || 0), 0);
-  const totM  = material.reduce((s, p) => s + (parseFloat(p.preis) || 0), 0);
-  const totZE = arbeit.reduce((s, p) => s + (parseFloat(p.ze) || 0), 0);
+  // Material = Menge × Stückpreis only; Arbeit = every ZE (incl. material positions) at its rate.
+  const { totalArbeit: totA, totalMaterial: totM, totalZE: totZE } = positionTotals([...material, ...arbeit.map(toArbeitPosition)]);
   const kleinteilActive = totZE > 100;
   const kleinteilBetrag = kleinteilActive ? 10 : 0;
   const totMeff = totM + kleinteilBetrag;
@@ -310,11 +309,11 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
           </div>
           <div>
             <SummaryRow label="Material Total" value={fCHF(totM)} />
+            <SummaryRow label="Arbeit Total" sub={totZE ? `${totZE} ZE` : null} value={fCHF(totA)} />
             {(() => {
               const mz = materialZeSumme(material);
-              return mz.ze > 0 && <SummaryRow label="davon ZE zu Material" sub={`${mz.ze} ZE = ${Math.round(zeMinuten(mz.ze))} Min.`} value={fCHF(mz.betrag)} />;
+              return mz.ze > 0 && <SummaryRow label="inkl. ZE zu Material" sub={`${mz.ze} ZE = ${Math.round(zeMinuten(mz.ze))} Min.`} value={fCHF(mz.betrag)} />;
             })()}
-            <SummaryRow label="Arbeit Total" sub={totZE ? `${totZE} ZE` : null} value={fCHF(totA)} />
             {kleinteilActive && <SummaryRow label="Kleinteil Pauschale" sub="über 100 ZE" value={fCHF(kleinteilBetrag)} />}
             <SummaryRow label="Total" value={fCHF(total)} total />
             {mitAnzahlung && <SummaryRow label={`Fällige Anzahlung (${ANZAHLUNG_PROZENT}%)`} value={fCHF(anzahlungAufteilung(total).anzahlung)} />}

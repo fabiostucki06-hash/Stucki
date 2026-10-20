@@ -1,5 +1,6 @@
-import type { ArbeitPosition, Offerte, Position, Rechnung, RechnungKategorie } from '../types';
+import type { Offerte, Position, Rechnung, RechnungKategorie } from '../types';
 import { ANZAHLUNG_PROZENT, offerteNr, mitMaterialHinweis } from './offerte-docs';
+import { positionTotals } from './ze';
 
 /** Document name printed on PDFs, titles and file names. */
 export function rechnungDocName(r: Pick<Rechnung, 'art'>): string {
@@ -15,7 +16,6 @@ export function schlussReferenz(r: Rechnung): string {
   return parts.length ? `Schlussrechnung zu ${parts.join(' / ')}` : 'Schlussrechnung';
 }
 
-const fN = (v?: string | number) => parseFloat(String(v ?? '0')) || 0;
 
 export const KLEINTEIL_BETRAG = 10;
 export const KLEINTEIL_LABEL = 'Kleinteil-Pauschale';
@@ -24,8 +24,12 @@ export const KLEINTEIL_LABEL = 'Kleinteil-Pauschale';
 const KLEINTEIL_AUTO_KATEGORIEN: RechnungKategorie[] = ['reparatur', 'karosserie'];
 
 export interface RechnungTotals {
+  /** Menge × Stückpreis of the material positions only. */
   totalMaterial: number;
+  /** Every ZE (Arbeit and material positions) at its rate; without the Kleinteil-Pauschale. */
   totalArbeit: number;
+  /** Kleinteil-Pauschale when applied, else 0. */
+  kleinteil: number;
   totalZE: number;
   zwischensumme: number;
   /** Gesamtbetrag aller Positionen, gerundet auf 5 Rp. */
@@ -128,19 +132,13 @@ export function computeRechnungTotals(
   anzahlungProzent?: number,
   anzahlungBetrag?: number,
 ): RechnungTotals {
-  const totalMaterial = positionen
-    .filter((p) => p.typ === 'material')
-    .reduce((s, p) => s + fN(p.preis), 0);
-
-  const arbeitPositionen = positionen.filter((p): p is ArbeitPosition => p.typ === 'arbeit');
-  const totalZE = arbeitPositionen.reduce((s, p) => s + fN(p.ze), 0);
-  const totalArbeitBase = arbeitPositionen.reduce((s, p) => s + fN(p.preis), 0);
+  const { totalMaterial, totalArbeit, totalZE } = positionTotals(positionen);
 
   const autoApplies = !!kategorie && KLEINTEIL_AUTO_KATEGORIEN.includes(kategorie);
   const kleinteilApplied = kleinteilManuell != null ? kleinteilManuell : autoApplies;
-  const totalArbeit = totalArbeitBase + (kleinteilApplied ? KLEINTEIL_BETRAG : 0);
+  const kleinteil = kleinteilApplied ? KLEINTEIL_BETRAG : 0;
 
-  const zwischensumme = totalMaterial + totalArbeit;
+  const zwischensumme = totalMaterial + totalArbeit + kleinteil;
   const gesamttotal = roundToRappen(zwischensumme);
   const abzugAnzahlung = anzahlungBetrag ? roundToRappen(anzahlungBetrag) : 0;
   const rechnungstotal = anzahlungProzent ? roundToRappen(zwischensumme * anzahlungProzent / 100)
@@ -149,5 +147,5 @@ export function computeRechnungTotals(
 
   const restbetrag = anzahlungProzent ? roundToRappen(gesamttotal - rechnungstotal) : 0;
 
-  return { totalMaterial, totalArbeit, totalZE, zwischensumme, gesamttotal, rechnungstotal, restbetrag, abzugAnzahlung, kleinteilApplied };
+  return { totalMaterial, totalArbeit, totalZE, kleinteil, zwischensumme, gesamttotal, rechnungstotal, restbetrag, abzugAnzahlung, kleinteilApplied };
 }

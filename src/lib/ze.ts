@@ -1,4 +1,4 @@
-import type { MaterialPosition } from '../types';
+import type { MaterialPosition, Position } from '../types';
 import { STD_SATZ } from './company';
 
 /** 100 ZE = 60 minutes, billed at the hourly rate (CHF per 100 ZE). */
@@ -11,12 +11,12 @@ export const zeMinuten = (ze: number) => (ze * 60) / ZE_PRO_STUNDE;
 /** Rate for a material position's ZE: its own, else the Werkstatt rate. */
 export const materialSatz = (p: Pick<MaterialPosition, 'stundenansatz'>) => fN(p.stundenansatz) || fN(STD_SATZ);
 
-/** CHF for the ZE of a material position. */
+/** CHF for the ZE of a material position; billed under Arbeit, never in its `preis`. */
 export const materialZeBetrag = (p: Pick<MaterialPosition, 'ze' | 'stundenansatz'>) => (fN(p.ze) / ZE_PRO_STUNDE) * materialSatz(p);
 
-/** Position price: Menge × Stückpreis plus the ZE share, as "0.00". */
-export function materialPreis(p: Pick<MaterialPosition, 'menge' | 'stueckpreis' | 'ze' | 'stundenansatz'>): string {
-  return ((fN(p.menge) || 1) * fN(p.stueckpreis) + materialZeBetrag(p)).toFixed(2);
+/** Position price: Menge × Stückpreis only, as "0.00". The ZE count as Arbeit (see positionTotals). */
+export function materialPreis(p: Pick<MaterialPosition, 'menge' | 'stueckpreis'>): string {
+  return ((fN(p.menge) || 1) * fN(p.stueckpreis)).toFixed(2);
 }
 
 /** "30 ZE = 18 Min. = CHF 24.00" */
@@ -31,5 +31,54 @@ export function materialZeSumme(positionen: { typ: string }[]): { ze: number; be
   return {
     ze: mp.reduce((s, p) => s + fN(p.ze), 0),
     betrag: mp.reduce((s, p) => s + materialZeBetrag(p), 0),
+  };
+}
+
+/**
+ * Material Total = Menge × Stückpreis of the material positions only.
+ * Arbeit Total = every ZE — Arbeit positions and the time billed with a
+ * material position — at its rate (Std.Satz CHF 80 = 100 ZE, i.e. CHF 0.80 per ZE).
+ */
+export function positionTotals(positionen: Position[]) {
+  let totalMaterial = 0, totalArbeit = 0, totalZE = 0;
+  for (const p of positionen) {
+    totalZE += fN(p.ze);
+    if (p.typ === 'material') {
+      totalMaterial += fN(p.preis);
+      totalArbeit += materialZeBetrag(p);
+    } else {
+      totalArbeit += fN(p.preis);
+    }
+  }
+  return { totalMaterial, totalArbeit, totalZE, total: totalMaterial + totalArbeit };
+}
+
+/** Material positions saved before the split carried their ZE share in `preis`;
+    returns the position with the pure material price (unchanged otherwise). */
+export function ohneZeAnteil<P extends Position>(p: P): P {
+  if (p.typ !== 'material' || !fN(p.ze)) return p;
+  const preis = materialPreis(p);
+  return preis === p.preis ? p : { ...p, preis };
+}
+
+/** A stored document with its positions and Material / Arbeit totals moved to the
+    split above. The grand total stays the same: the ZE share only moves from
+    Material to Arbeit. */
+export function mitGetrenntenTotals<D extends { positionen?: Position[]; totalMaterial?: string; totalArbeit?: string; totalZE?: number }>(d: D): D {
+  if (!d.positionen?.length) return d;
+  let verschoben = 0;
+  const positionen = d.positionen.map((p) => {
+    const q = ohneZeAnteil(p);
+    if (q !== p) verschoben += fN(p.preis) - fN(q.preis);
+    return q;
+  });
+  if (!positionen.some((q, i) => q !== d.positionen![i])) return d;
+  const r = (v: number) => (Math.round(v * 100) / 100).toFixed(2);
+  return {
+    ...d,
+    positionen,
+    ...(d.totalZE != null && { totalZE: positionTotals(positionen).totalZE }),
+    ...(d.totalMaterial != null && { totalMaterial: r(fN(d.totalMaterial) - verschoben) }),
+    ...(d.totalArbeit != null && { totalArbeit: r(fN(d.totalArbeit) + verschoben) }),
   };
 }

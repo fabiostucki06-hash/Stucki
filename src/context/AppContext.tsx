@@ -3,6 +3,7 @@ import { auth, db, setAuthHandlers, tokenUserId } from '../lib/supabase';
 import { startSettingsSync, whenSettingsLoaded } from '../lib/settingsSync';
 import { showToast } from '../components/ui/Toast';
 import { offerteNr } from '../lib/offerte-docs';
+import { mitGetrenntenTotals } from '../lib/ze';
 import type { Customer, Order, Offerte, Rechnung, MaterialCatalogItem, SyncStatus } from '../types';
 
 interface AppContextValue {
@@ -133,15 +134,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (cancelled || writesInFlight.current > 0 || seq !== writeSeq.current) return;
       // db.get resolves with an error object on HTTP errors; never let that wipe good data.
       if (Array.isArray(cr)) setCustomers(parseRows(cr) as Customer[]);
-      if (Array.isArray(or)) setOrders(parseRows(or) as Order[]);
+      if (Array.isArray(or)) setOrders((parseRows(or) as Order[]).map(mitGetrenntenTotals));
       setOrderNum((p) => Math.max(p, cnt));
       if (Array.isArray(offr)) {
-        const offs = parseRows(offr) as Offerte[];
+        const offs = (parseRows(offr) as Offerte[]).map(mitGetrenntenTotals);
         setOfferten(offs);
         setOffertNum((p) => Math.max(p, ...offs.map((o) => o.offertNumber ?? 0)));
       }
       if (Array.isArray(rechr)) {
-        const rechns = parseRows(rechr) as Rechnung[];
+        const rechns = (parseRows(rechr) as Rechnung[]).map(mitGetrenntenTotals);
         setRechnungen(rechns);
         setRechnungNum((p) => Math.max(p, ...rechns.map((r) => r.rechnungNumber ?? 0)));
       }

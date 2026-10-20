@@ -1,4 +1,5 @@
 import type { Offerte, Position } from '../types';
+import { positionTotals } from './ze';
 
 export const VORKASSE_BEDINGUNG = 'Zahlungsbedingung: 50% Vorkasse (Anzahlung in Bar, TWINT, E-Banking)';
 export const SCHLUSSRECHNUNG_NOTIZ = 'Zusatznotiz: Schlussrechnung (50%) Zahlungsbedingung 10 Tage netto';
@@ -63,7 +64,6 @@ export function ersetzeNummer(text: string | undefined, ref: string, alt: string
   return text.replace(new RegExp(`(${ref})${esc}(?![\\d_])`, 'g'), `$1${neu}`);
 }
 
-const fN = (v?: string | number) => parseFloat(String(v ?? '0')) || 0;
 
 /** "12" for the original, "12_2" for later versions (underscore + version number). */
 export function offerteNr(o: Pick<Offerte, 'offertNumber' | 'version'>): string {
@@ -79,12 +79,8 @@ export function nextVersion(base: Offerte, all: Offerte[]): number {
   return Math.max(1, ...versions) + 1;
 }
 
-export function sumPositions(positionen: Position[]) {
-  const totalArbeit = positionen.filter((p) => p.typ === 'arbeit').reduce((s, p) => s + fN(p.preis), 0);
-  const totalMaterial = positionen.filter((p) => p.typ === 'material').reduce((s, p) => s + fN(p.preis), 0);
-  const totalZE = positionen.reduce((s, p) => s + (p.typ === 'arbeit' ? fN(p.ze) : 0), 0);
-  return { totalArbeit, totalMaterial, totalZE, total: totalArbeit + totalMaterial };
-}
+/** Material, Arbeit (every ZE) and ZE totals of the positions, see positionTotals. */
+export const sumPositions = (positionen: Position[]) => positionTotals(positionen);
 
 /** Swiss rounding to 5 Rappen. */
 export const roundToRappen = (n: number) => Math.round(n * 20) / 20;

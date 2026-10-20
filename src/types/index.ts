@@ -71,7 +71,7 @@ export interface MaterialPosition {
   beschreibung: string;
   menge: string;
   stueckpreis: string;
-  /** Menge × Stückpreis plus the ZE share (see materialPreis). */
+  /** Menge × Stückpreis only; the ZE are billed under Arbeit (see positionTotals). */
   preis: string;
   /** Working time billed with the part, in ZE (100 ZE = 60 min). */
   ze?: string;

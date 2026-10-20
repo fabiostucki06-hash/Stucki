@@ -116,7 +116,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
 
   /* ── live totals from local state ── */
   const anzProzent = rechnung.anzahlungProzent;
-  const { totalMaterial: totM, totalArbeit: totA, totalZE: totZE, zwischensumme: total, gesamttotal, rechnungstotal, restbetrag, abzugAnzahlung, kleinteilApplied } =
+  const { totalMaterial: totM, totalArbeit: totA, totalZE: totZE, kleinteil, zwischensumme: total, gesamttotal, rechnungstotal, restbetrag, abzugAnzahlung, kleinteilApplied } =
     computeRechnungTotals(positionen, kategorie || undefined, kleinteilManuell, anzProzent, parseFloat(rechnung.anzahlungBetrag ?? '') || undefined);
 
   function updPos(i: number, key: string, val: string) {
@@ -129,7 +129,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
         const sa = parseFloat(key === 'stundenansatz' ? val : (pos as ArbeitPosition).stundenansatz) || 0;
         if (ze && sa) pos.preis = ((ze / 100) * sa).toFixed(2);
       } else {
-        // Keeps the ZE share of the position (see materialPreis).
+        // Menge × Stückpreis only; the ZE count as Arbeit (see positionTotals).
         const mp = pos as MaterialPosition;
         if (parseFloat(mp.stueckpreis) || parseFloat(mp.ze ?? '')) pos.preis = materialPreis(mp);
       }
@@ -530,6 +530,12 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--blue)' }}>CHF {fCHF(totA)}</div>
               </div>
+              {kleinteil > 0 && (
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 10, color: 'var(--label3)', marginBottom: 1 }}>Kleinteil</div>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>CHF {fCHF(kleinteil)}</div>
+                </div>
+              )}
             </div>
           </div>
 

@@ -44,7 +44,7 @@ import RechnungenList from './components/rechnungen/RechnungenList';
 import RechnungForm from './components/rechnungen/RechnungForm';
 import RechnungDetail from './components/rechnungen/RechnungDetail';
 
-import type { ArbeitPosition, MaterialPosition, Customer, Order, Offerte, Position, Rechnung, TabId } from './types';
+import type { MaterialPosition, Customer, Order, Offerte, Position, Rechnung, TabId } from './types';
 
 export default function App() {
   const {
@@ -401,10 +401,11 @@ export default function App() {
       titel: baseTitel ? `Materialofferte – ${baseTitel}` : 'Materialofferte',
       notizen: mitMaterialHinweis(offerte.notizen),
       positionen: mat,
-      totalArbeit: '0.00',
+      // ZE billed with a part stay Arbeit, even on a reine Materialofferte.
+      totalArbeit: t.totalArbeit.toFixed(2),
       totalMaterial: t.totalMaterial.toFixed(2),
       totalBetrag: t.total.toFixed(2),
-      totalZE: 0,
+      totalZE: t.totalZE,
       zahlungsbedingung: VORKASSE_BEDINGUNG,
       zusatznotiz: SCHLUSSRECHNUNG_NOTIZ,
       anzahlungErforderlich: true,
@@ -505,15 +506,7 @@ export default function App() {
   async function handleCreateRechnungFromOfferte(offerte: Offerte, acceptedIndices: number[]) {
     // Copy every accepted position individually — no grouping or merging
     const positions = (offerte.positionen ?? []).filter((_, i) => acceptedIndices.includes(i));
-    const totalArbeit = positions
-      .filter((p) => p.typ === 'arbeit')
-      .reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
-    const totalMaterial = positions
-      .filter((p) => p.typ === 'material')
-      .reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
-    const totalZE = positions
-      .filter((p) => p.typ === 'arbeit')
-      .reduce((s, p) => s + (parseFloat((p as ArbeitPosition).ze || '0') || 0), 0);
+    const { totalArbeit, totalMaterial, totalZE } = sumPositions(positions);
     const faelligDate = new Date();
     faelligDate.setDate(faelligDate.getDate() + 10);
     await addRechnung({
@@ -537,9 +530,8 @@ export default function App() {
     const off = offerten.find((o) => o.id === offerteId);
     if (!off) return;
     const positionen = [...(off.positionen ?? []), position];
-    const totalArbeit = positionen.filter((p) => p.typ === 'arbeit').reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
-    const totalMaterial = positionen.filter((p) => p.typ === 'material').reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
-    await updateOfferte({ ...off, positionen, totalArbeit: totalArbeit.toFixed(2), totalMaterial: totalMaterial.toFixed(2), totalBetrag: (totalArbeit + totalMaterial).toFixed(2) });
+    const t = sumPositions(positionen);
+    await updateOfferte({ ...off, positionen, totalArbeit: t.totalArbeit.toFixed(2), totalMaterial: t.totalMaterial.toFixed(2), totalBetrag: t.total.toFixed(2), totalZE: t.totalZE });
     showToast(`Teil erfolgreich zu Offerte #${offerteNr(off)} hinzugefügt!`, 'success');
   }
   function handleStartNewOfferteFromImport(position: MaterialPosition, customerId?: string) {

@@ -8,6 +8,7 @@ import PartsOrder from '../teile/PartsOrder';
 import { isOverdue, daysSince, hoursSince, formatDateCH } from '../../lib/utils';
 import { SC, SO } from '../../constants/statuses';
 import { exportOrderPDF } from '../../lib/pdf-auftrag';
+import { sumPositions } from '../../lib/offerte-docs';
 import type { ArbeitPosition, Customer, MaterialPosition, Order, OrderItem, OrderStatus } from '../../types';
 
 interface OrderDetailProps {
@@ -164,7 +165,7 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
                     <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--label2)', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       {ap
                         ? `Arbeit${ap.ze ? ` · ${ap.ze} ZE` : ''}${ap.stundenansatz ? ` · CHF ${ap.stundenansatz}/Std` : ''}`
-                        : `Material${mp?.menge ? ` · ${mp.menge}×` : ''}${mp?.stueckpreis ? ` · CHF ${mp.stueckpreis}/Stk` : ''}`
+                        : `Material${mp?.menge ? ` · ${mp.menge}×` : ''}${mp?.stueckpreis ? ` · CHF ${mp.stueckpreis}/Stk` : ''}${mp?.ze ? ` · ${mp.ze} ZE` : ''}`
                       }
                       {mp && <> <PartLink url={mp.link} /></>}
                     </div>
@@ -178,7 +179,7 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
             <div className="list-row" style={{ cursor: 'default', background: 'rgba(0,122,255,0.12)' }}>
               <div className="sf-headline" style={{ flex: 1, textShadow: '0 1px 4px rgba(0,0,0,0.22)' }}>Total Positionen</div>
               <div style={{ fontWeight: 800, fontSize: 22, color: 'var(--blue)', textShadow: '0 1px 5px rgba(0,0,0,0.22)', letterSpacing: '-0.4px' }}>
-                CHF {(order.positionen ?? []).reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0).toFixed(2)}
+                CHF {sumPositions(order.positionen ?? []).total.toFixed(2)}
               </div>
             </div>
           </div>

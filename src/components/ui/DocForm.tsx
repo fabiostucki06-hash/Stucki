@@ -299,8 +299,7 @@ export function PositionenEditor({
         </div>
         {parseFloat(pos.ze ?? '') > 0 && (
           <div className="df-ze-hint">
-            {parseFloat(pos.stueckpreis) > 0 && `Material CHF ${((parseFloat(pos.menge) || 1) * parseFloat(pos.stueckpreis)).toFixed(2)} + `}
-            {zeText(parseFloat(pos.ze!), materialSatz(pos))}
+            Einbauzeit {zeText(parseFloat(pos.ze!), materialSatz(pos))} – zählt zu Arbeit Total
           </div>
         )}
         </Fragment>

@@ -103,17 +103,10 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   const acceptedCount = posAccepted.filter(Boolean).length;
 
   /* ── live totals from local state ── */
-  const totalArbeit = positionen.filter((p) => p.typ === 'arbeit')
-    .reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
-  const totalMaterial = positionen.filter((p) => p.typ === 'material')
-    .reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
-  const totalZE = positionen.filter((p): p is ArbeitPosition => p.typ === 'arbeit')
-    .reduce((s, p) => s + (parseFloat(p.ze || '0') || 0), 0);
+  // Material = Menge × Stückpreis only; Arbeit = every ZE incl. those of material positions.
+  const { totalArbeit, totalMaterial, totalZE } = sumPositions(positionen);
 
-  const acceptedArbeit = positionen.filter((p, i) => posAccepted[i] && p.typ === 'arbeit')
-    .reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
-  const acceptedMaterial = positionen.filter((p, i) => posAccepted[i] && p.typ === 'material')
-    .reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
+  const { totalArbeit: acceptedArbeit, totalMaterial: acceptedMaterial } = sumPositions(positionen.filter((_, i) => posAccepted[i]));
   const acceptedTotal = acceptedArbeit + acceptedMaterial;
   // Kleinteil Pauschale is a material position, listed on its own line in the totals.
   const acceptedKleinteil = positionen.filter((p, i) => posAccepted[i] && p.typ === 'material' && p.beschreibung === 'Kleinteil Pauschale')
@@ -188,7 +181,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
         const sa = parseFloat(key === 'stundenansatz' ? val : (pos as ArbeitPosition).stundenansatz) || 0;
         if (ze && sa) pos.preis = ((ze / 100) * sa).toFixed(2);
       } else {
-        // Keeps the ZE share of the position (see materialPreis).
+        // Menge × Stückpreis only; the ZE count as Arbeit (see positionTotals).
         const mp = pos as MaterialPosition;
         if (parseFloat(mp.stueckpreis) || parseFloat(mp.ze ?? '')) pos.preis = materialPreis(mp);
       }
@@ -658,7 +651,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
           <div className="list-row" style={{ cursor: 'default', background: 'rgba(0,122,255,0.06)', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
             {([
               ['Material Total', acceptedMaterial - acceptedKleinteil, positionen.some((p) => p.typ === 'material' && p.beschreibung !== 'Kleinteil Pauschale')],
-              ['Arbeit Total', acceptedArbeit, positionen.some((p) => p.typ === 'arbeit')],
+              ['Arbeit Total', acceptedArbeit, acceptedArbeit > 0 || positionen.some((p) => p.typ === 'arbeit')],
               ['Kleinteil Pauschale', acceptedKleinteil, acceptedKleinteil > 0],
             ] as [string, number, boolean][]).filter(([, , show]) => show).map(([label, betrag]) => (
               <div key={label} style={{ display: 'flex', width: '100%', alignItems: 'center' }}>

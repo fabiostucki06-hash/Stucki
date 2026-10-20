@@ -1,7 +1,8 @@
 import { jsPDF } from 'jspdf';
 import { PAGE_TOP, PAGE_BOTTOM, addPageNumbers } from './pdf-paging';
 import { SwissQRBill } from 'swissqrbill/svg';
-import { computeRechnungTotals, rechnungDocName, schlussReferenz, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from './rechnung-totals';
+import { computeRechnungTotals, rechnungDocName, schlussReferenz, KLEINTEIL_LABEL } from './rechnung-totals';
+import { ohneZeAnteil } from './ze';
 import { mitMaterialHinweis } from './offerte-docs';
 import { formatDateCH, buildDocumentFilename, materialZuerst } from './utils';
 import { getIban } from './settings';
@@ -47,19 +48,13 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
 
   const anzProzent = rechnung.anzahlungProzent;
   const isSchluss = rechnung.art === 'schluss';
-  const { totalMaterial: totM, totalArbeit: totA, zwischensumme: total, gesamttotal, rechnungstotal, restbetrag, abzugAnzahlung, kleinteilApplied } =
-    computeRechnungTotals(rechnung.positionen ?? [], rechnung.kategorie, rechnung.kleinteilManuell, anzProzent, parseFloat(rechnung.anzahlungBetrag ?? '') || undefined);
+  // Older positions may still carry the ZE share in the material price.
+  const positionen = (rechnung.positionen ?? []).map(ohneZeAnteil);
+  const { totalMaterial: totM, totalArbeit: totA, kleinteil, zwischensumme: total, gesamttotal, rechnungstotal, restbetrag, abzugAnzahlung } =
+    computeRechnungTotals(positionen, rechnung.kategorie, rechnung.kleinteilManuell, anzProzent, parseFloat(rechnung.anzahlungBetrag ?? '') || undefined);
 
-  const rows: (Position | undefined)[] = materialZuerst(rechnung.positionen ?? []);
-  if (kleinteilApplied) {
-    rows.push({
-      typ: 'material',
-      beschreibung: KLEINTEIL_LABEL,
-      menge: '',
-      stueckpreis: '',
-      preis: String(KLEINTEIL_BETRAG),
-    });
-  }
+  // The Kleinteil-Pauschale is listed in the totals below, not as a position.
+  const rows: (Position | undefined)[] = materialZuerst(positionen);
   while (rows.length < MIN_ROWS) rows.push(undefined);
 
   const norm  = () => doc.setFont('helvetica', 'normal');
@@ -203,18 +198,25 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
 
   dividers(y);
 
-  // ── SUMME: Material total in Preis(CHF) col, Arbeit total in ZE col ───────
-  // Summe, Zwischensumme/Gesamtbetrag, Anzahlung and Restbetrag stay together on one page.
-  // Summe, Gesamtbetrag, Abzug and Zu zahlen stay together on one page.
-  if (!fits(RH_S + RH_S + RH_T + (anzProzent || isSchluss ? RH_S : 0))) newPage();
+  // ── ZWISCHENSUMMEN: Material, Arbeit, Kleinteil Pauschale ────────────────
+  // Material Total = Menge × Stk.Preis only; Arbeit Total = all ZE (incl. those
+  // of material positions) at the Std.Satz. Subtotals, Gesamtbetrag, Abzug and
+  // Zu zahlen stay together on one page.
+  const subRows: [string, number][] = [
+    ['Material Total', totM],
+    ['Arbeit Total', totA],
+    ...(kleinteil > 0 ? [[KLEINTEIL_LABEL, kleinteil] as [string, number]] : []),
+  ];
+  if (!fits(RH_S * subRows.length + RH_S + RH_T + (anzProzent || isSchluss ? RH_S : 0))) newPage();
   lw(0.4); drgb(0, 0, 0); doc.line(TL, y, TR, y);
-  const sumY = y + RH_S * BL;
-  norm(); fs(8.5); rgb(100, 100, 100); tL('Summe', x0 + PAD, sumY);
-  bold(); rgb(0, 0, 0);
-  tR(chf(totM), x4 - PAD, sumY);
-  tR(chf(totA), TR - PAD, sumY);
-  norm();
-  y += RH_S;
+  subRows.forEach(([label, betrag], i) => {
+    if (i > 0) hLine(y, TL, TR, 0.1);
+    const subY = y + RH_S * BL;
+    norm(); fs(8.5); rgb(100, 100, 100); tL(label, x0 + PAD, subY);
+    bold(); rgb(0, 0, 0); tR(chf(betrag), TR - PAD, subY);
+    norm();
+    y += RH_S;
+  });
 
   // ── ZWISCHENSUMME / ANZAHLUNG: full amount of all positions (100%) ──────
   lw(0.3); drgb(180, 180, 180); doc.line(TL, y, TR, y); drgb(0, 0, 0);

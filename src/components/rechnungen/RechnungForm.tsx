@@ -213,7 +213,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
 
   const ap = arbeit.filter((p) => p.beschreibung.trim());
   const mp = material.filter((p) => p.beschreibung.trim());
-  const { totalMaterial: totM, totalArbeit: totA, totalZE: totZE, rechnungstotal, kleinteilApplied } =
+  const { totalMaterial: totM, totalArbeit: totA, totalZE: totZE, kleinteil, rechnungstotal, kleinteilApplied } =
     computeRechnungTotals([...ap, ...mp], kategorie || undefined, kleinteilManuell, initial?.anzahlungProzent, parseFloat(initial?.anzahlungBetrag ?? '') || undefined);
 
   const nr = parseNummer(nummer);
@@ -267,8 +267,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
         : 'Kunde übernommen, keine Positionen')
     : 'Optional: aus Auftrag oder Offerte übernehmen';
 
-  const totArbeitBase = totA - (kleinteilApplied ? KLEINTEIL_BETRAG : 0);
-  const rundung = rechnungstotal - (totA + totM);
+  const rundung = rechnungstotal - (totM + totA + kleinteil);
 
   return (
     <div className="df">
@@ -385,11 +384,11 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
           </div>
           <div>
             <SummaryRow label="Material" value={fCHF(totM)} />
+            <SummaryRow label="Arbeit" sub={totZE ? `${totZE} ZE` : null} value={fCHF(totA)} />
             {(() => {
               const mz = materialZeSumme(material);
-              return mz.ze > 0 && <SummaryRow label="davon ZE zu Material" sub={`${mz.ze} ZE = ${Math.round(zeMinuten(mz.ze))} Min.`} value={fCHF(mz.betrag)} />;
+              return mz.ze > 0 && <SummaryRow label="inkl. ZE zu Material" sub={`${mz.ze} ZE = ${Math.round(zeMinuten(mz.ze))} Min.`} value={fCHF(mz.betrag)} />;
             })()}
-            <SummaryRow label="Arbeit" sub={totZE ? `${totZE} ZE` : null} value={fCHF(totArbeitBase)} />
             {/* Kleinteilepauschale: manual override of the per-Auftragsart default */}
             <SummaryRow
               label={
