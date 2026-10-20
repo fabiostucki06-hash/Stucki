@@ -202,6 +202,7 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
 
   // ── SUMME: Material total in Preis(CHF) col, Arbeit total in ZE col ───────
   // Summe, Zwischensumme/Gesamtbetrag, Anzahlung and Restbetrag stay together on one page.
+  // Summe, Gesamtbetrag, Abzug and Zu zahlen stay together on one page.
   if (!fits(RH_S + RH_S + RH_T + (anzProzent || isSchluss ? RH_S : 0))) newPage();
   lw(0.4); drgb(0, 0, 0); doc.line(TL, y, TR, y);
   const sumY = y + RH_S * BL;
@@ -229,34 +230,33 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
     y += RH_S;
   }
 
+  // ── ANZAHLUNG: the remaining share is deducted here and billed later ─────
+  if (anzProzent) {
+    lw(0.3); drgb(180, 180, 180); doc.line(TL, y, TR, y); drgb(0, 0, 0);
+    const abY = y + RH_S * BL;
+    rgb(100, 100, 100);
+    tL(`Abzug Restbetrag ${100 - anzProzent}% (folgt mit Schlussrechnung)`, x0 + PAD, abY);
+    bold(); rgb(0, 0, 0); tR(`- ${chf(restbetrag)}`, TR - PAD, abY); norm();
+    y += RH_S;
+  }
+
   // ── RECHNUNGSTOTAL — Swiss-rounded to 5 Rappen ────────────────────────────
   lw(0.5); drgb(0, 0, 0); doc.line(TL, y, TR, y);
   frgb(229, 229, 229); doc.rect(TL, y, TW, RH_T, 'F');
   const totY = y + RH_T * BL;
   bold(); fs(9); rgb(0, 0, 0);
-  tL(anzProzent ? `Anzahlung ${anzProzent}% (zu bezahlen)` : isSchluss ? 'Restbetrag (zu bezahlen)' : 'Rechnungstotal', x0 + PAD, totY);
+  tL(anzProzent ? `Rechnungsbetrag / Zu zahlen (Anzahlung ${anzProzent}%)` : isSchluss ? 'Restbetrag (zu bezahlen)' : 'Rechnungstotal', x0 + PAD, totY);
   tR(chf(rechnungstotal), TR - PAD, totY);
   y += RH_T;
   lw(0.5); drgb(0, 0, 0); doc.line(TL, y, TR, y);
   norm();
-
-  // ── RESTBETRAG: the share billed later with the Schlussrechnung ──────────
-  if (anzProzent) {
-    const rY = y + RH_S * BL;
-    fs(8.5); rgb(100, 100, 100);
-    tL(`Restbetrag ${100 - anzProzent}% (mit Schlussrechnung)`, x0 + PAD, rY);
-    tR(chf(restbetrag), TR - PAD, rY);
-    rgb(0, 0, 0);
-    y += RH_S;
-    hLine(y, TL, TR, 0.3);
-  }
 
   // ── NOTES ─────────────────────────────────────────────────────────────────
   y += 6;
   if (!fits(0)) newPage();
   fs(7.5); rgb(130, 130, 130);
   tL(rechnung.art === 'anzahlung'
-    ? `* Die restlichen ${100 - (anzProzent ?? 50)}% werden mit der Schlussrechnung verrechnet (10 Tage netto)`
+    ? `* Der verbleibende Restbetrag (${100 - (anzProzent ?? 50)}%) wird mit der Schlussrechnung verrechnet (10 Tage netto)`
     : isSchluss ? `* ${schlussReferenz(rechnung)} – die geleistete Anzahlung ist abgezogen`
     : '* Kleinmaterial-Pauschale wird bei <100 ZE hinzugefügt', TL, y);
   if (rechnung.notizen) {

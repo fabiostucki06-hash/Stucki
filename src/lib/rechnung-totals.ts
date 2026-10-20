@@ -1,4 +1,5 @@
-import type { ArbeitPosition, Position, Rechnung, RechnungKategorie } from '../types';
+import type { ArbeitPosition, Offerte, Position, Rechnung, RechnungKategorie } from '../types';
+import { ANZAHLUNG_PROZENT } from './offerte-docs';
 
 /** Document name printed on PDFs, titles and file names. */
 export function rechnungDocName(r: Pick<Rechnung, 'art'>): string {
@@ -36,6 +37,30 @@ export interface RechnungTotals {
   /** Bei einer Schlussrechnung: die bereits bezahlte Anzahlung (sonst 0). */
   abzugAnzahlung: number;
   kleinteilApplied: boolean;
+}
+
+/**
+ * Older Anzahlungsrechnungen carry a single line "Anzahlung 50% gemäss Offerte Nr. X".
+ * Shows them with every position of the Offerte instead, as current ones are
+ * created — but only when the Offerte still yields the billed amount, so the
+ * invoice total never changes.
+ */
+export function withOffertePositionen(r: Rechnung, offerten: Offerte[]): Rechnung {
+  if (r.art !== 'anzahlung' || r.anzahlungProzent) return r;
+  const positionen = offerten.find((o) => o.id === r.offertId)?.positionen;
+  if (!positionen?.length) return r;
+  const pos = positionen.map((p) => (p.typ === 'material' ? (({ bestellt, ...m }) => m)(p) : p));
+  const t = computeRechnungTotals(pos, undefined, false, ANZAHLUNG_PROZENT);
+  if (t.rechnungstotal.toFixed(2) !== (parseFloat(r.totalBetrag ?? '') || 0).toFixed(2)) return r;
+  return {
+    ...r,
+    positionen: pos,
+    anzahlungProzent: ANZAHLUNG_PROZENT,
+    kleinteilManuell: false,
+    totalArbeit: t.totalArbeit.toFixed(2),
+    totalMaterial: t.totalMaterial.toFixed(2),
+    totalZE: t.totalZE,
+  };
 }
 
 /** Swiss rounding to nearest 0.05 CHF (Rappenrundung). */
