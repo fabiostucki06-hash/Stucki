@@ -34,6 +34,8 @@ interface OfferteDetailProps {
   /** Number of an existing Schlussrechnung for that Anzahlung, if any. */
   schlussrechnungNumber?: number;
   onCreateSchlussrechnung?: (anzahlung: Rechnung) => Promise<void>;
+  /** Switches the sheet to the Auftragsbestätigungen view after an AB was created. */
+  onShowAb?: () => void;
   /** 'ab' when opened from the Auftragsbestätigungen list: the sheet is then about
       the AB, so "Dokumente" offers only the AB PDF and prints as AB. */
   view?: 'ab';
@@ -54,7 +56,7 @@ const ST_META: Record<OfferteStatus, StatusMeta> = {
   abgelehnt:  { c: 'var(--red)',    l: 'Abgelehnt'  },
 };
 
-export default function OfferteDetail({ offerte, customer, onClose, onUpdate, onDelete, onEdit, onDuplicate, onCreateAuftrag, onCreateRechnung, onCreateMaterialofferte, onCreateAnzahlung, anzahlung, schlussrechnungNumber, onCreateSchlussrechnung, view }: OfferteDetailProps) {
+export default function OfferteDetail({ offerte, customer, onClose, onUpdate, onDelete, onEdit, onDuplicate, onCreateAuftrag, onCreateRechnung, onCreateMaterialofferte, onCreateAnzahlung, anzahlung, schlussrechnungNumber, onCreateSchlussrechnung, onShowAb, view }: OfferteDetailProps) {
   const [creatingSchluss, setCreatingSchluss] = useState(false);
   const [saving, setSaving] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
@@ -71,6 +73,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   const { signature } = useSettings();
   const [creatingMat, setCreatingMat] = useState(false);
   const [creatingAnz, setCreatingAnz] = useState(false);
+  const [creatingAb, setCreatingAb] = useState(false);
   const [dirty, setDirty] = useState(false);
 
   // The offerte prop can change under us while this component stays mounted
@@ -114,7 +117,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   const hasTerms = !!(zahlungsbedingung || zusatznotiz);
   const nr = offerteNr(offerte);
   const docName = offerte.art === 'material' ? 'Materialofferte' : 'Offerte';
-  const busy = creatingAuftrag || creatingRechnung || creatingMat || creatingAnz;
+  const busy = creatingAuftrag || creatingRechnung || creatingMat || creatingAnz || creatingAb;
 
   /* "Dokumente" only offers the document this sheet is about: the AB in the AB
      view; a reine Materialofferte only itself; a Haupt-Offerte itself plus its
@@ -300,6 +303,27 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   async function handleExportAB() {
     if (dirty && !(await autoSave.flush())) return;
     exportAuftragsbestaetigungPDF(abPayload(), customer, signature);
+  }
+
+  /* The AB is this Offerte accepted: same positions, amounts, customer, notes and
+     terms. Accepting stores the AB fields, then the AB PDF is generated and the
+     sheet switches to the AB view. */
+  async function handleCreateAb() {
+    if (acceptedCount === 0) return;
+    setCreatingAb(true);
+    try {
+      const abData = { ...ab, name: abName, ort: abOrt, datum: abDatum };
+      if (offerte.status !== 'angenommen' || dirty) {
+        await onUpdate(buildPayload({ status: 'angenommen', ab: abData }));
+        setDirty(false);
+      }
+      await exportAuftragsbestaetigungPDF({ ...abPayload(), status: 'angenommen', ab: abData }, customer, signature);
+      onShowAb?.();
+    } catch {
+      // onUpdate already toasted the reason.
+    } finally {
+      setCreatingAb(false);
+    }
   }
 
   async function handleCreateMaterialofferte() {
@@ -742,7 +766,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
       </div>
 
       {/* Folgedokumente aus den angenommenen Positionen. */}
-      {positionen.length > 0 && (onCreateAuftrag || onCreateRechnung || onCreateMaterialofferte || onCreateAnzahlung || (onCreateSchlussrechnung && anzahlung)) && (
+      {positionen.length > 0 && (!isAbView || onCreateAuftrag || onCreateRechnung || onCreateMaterialofferte || onCreateAnzahlung || (onCreateSchlussrechnung && anzahlung)) && (
         <div className="glass-panel doc-group no-print">
           <div className="ab-panel-title">Weiterverarbeiten · {acceptedCount} Positionen</div>
           <div className="doc-btn-grid">
@@ -754,6 +778,11 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
             {onCreateRechnung && (
               <button onClick={handleCreateRechnung} disabled={busy || acceptedCount === 0} className="btn-system btn-green">
                 {creatingRechnung ? <><Spinner size={13} />&nbsp; Wird erstellt…</> : 'Rechnung erstellen'}
+              </button>
+            )}
+            {!isAbView && (
+              <button onClick={handleCreateAb} disabled={busy || acceptedCount === 0} className="btn-system btn-primary doc-btn-full">
+                {creatingAb ? <><Spinner size={13} />&nbsp; Wird erstellt…</> : 'Auftragsbestätigung erstellen'}
               </button>
             )}
             {onCreateMaterialofferte && acceptedMatPos.length > 0 && (

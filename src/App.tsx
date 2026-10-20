@@ -774,6 +774,7 @@ export default function App() {
           anzahlung={anzahlungenFor(selOff.id)[0]}
           schlussrechnungNumber={(() => { const a = anzahlungenFor(selOff.id)[0]; return a ? schlussrechnungFor(a.id)?.rechnungNumber : undefined; })()}
           onCreateSchlussrechnung={handleCreateSchlussrechnung}
+          onShowAb={() => setTab('auftragsbestaetigungen')}
           view={tab === 'auftragsbestaetigungen' ? 'ab' : undefined}
         />
       )}
