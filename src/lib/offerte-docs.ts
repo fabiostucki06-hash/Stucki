@@ -32,11 +32,19 @@ export function mitMaterialHinweis(notizen?: string): string {
   return rest ? `${rest}\n${MATERIAL_BESTELL_HINWEIS}` : MATERIAL_BESTELL_HINWEIS;
 }
 
-/** Whether the Offerte asks for the 50% Anzahlung; older ones without the flag
-    count as such when they carry the Vorkasse terms. */
-export function anzahlungErforderlich(o: Pick<Offerte, 'anzahlungErforderlich' | 'zahlungsbedingung'>): boolean {
-  return o.anzahlungErforderlich ?? o.zahlungsbedingung?.trim() === VORKASSE_BEDINGUNG;
+/** The 50% Anzahlung (and with it the MATERIAL_BESTELL_HINWEIS) is an option of
+    the Materialofferte only; a normal Offerte is always billed at 100%. */
+export const anzahlungMoeglich = (o: Pick<Offerte, 'art'>) => o.art === 'material';
+
+/** Whether the Materialofferte asks for the 50% Anzahlung; older ones without the
+    flag count as such when they carry the Vorkasse terms. */
+export function anzahlungErforderlich(o: Pick<Offerte, 'art' | 'anzahlungErforderlich' | 'zahlungsbedingung'>): boolean {
+  return anzahlungMoeglich(o) && (o.anzahlungErforderlich ?? o.zahlungsbedingung?.trim() === VORKASSE_BEDINGUNG);
 }
+
+/** The terms the Anzahlung option fills in by itself (not typed by hand). */
+export const sindVorkasseTerms = (zahlungsbedingung?: string, zusatznotiz?: string) =>
+  zahlungsbedingung?.trim() === VORKASSE_BEDINGUNG && [SCHLUSSRECHNUNG_NOTIZ, ''].includes(zusatznotiz?.trim() ?? '');
 
 /** Anzahlung (ANZAHLUNG_PROZENT of the total) and remainder, both rounded to 5 Rappen. */
 export function anzahlungAufteilung(total: number): { anzahlung: number; rest: number } {
@@ -84,7 +92,10 @@ export const roundToRappen = (n: number) => Math.round(n * 20) / 20;
 /** Payment terms as printed on Offerte / AB: the free-text conditions when set,
     otherwise the classic "<n> Tage netto". */
 export function offerteZahlungszeilen(o: Offerte): string[] {
-  if (o.zahlungsbedingung?.trim() || o.zusatznotiz?.trim()) {
+  // Vorkasse terms left on an Offerte without Anzahlung (e.g. a normal Offerte from
+  // before the option moved to the Materialofferte) aren't printed.
+  const vorkasseOhneAnzahlung = !anzahlungErforderlich(o) && sindVorkasseTerms(o.zahlungsbedingung, o.zusatznotiz);
+  if (!vorkasseOhneAnzahlung && (o.zahlungsbedingung?.trim() || o.zusatznotiz?.trim())) {
     return [o.zahlungsbedingung, o.zusatznotiz].map((s) => s?.trim() ?? '').filter(Boolean);
   }
   if (anzahlungErforderlich(o)) return [VORKASSE_BEDINGUNG];

@@ -224,7 +224,8 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
     const anzY = y + RH_S * BL;
     frgb(235, 243, 255); doc.rect(TL, y, TW, RH_S, 'F');
     bold(); fs(8.5); rgb(0, 0, 0);
-    tL(`Fällige Anzahlung (${ANZAHLUNG_PROZENT}%) – zahlbar vor Arbeitsbeginn`, x0 + PAD, anzY);
+    // Only a Materialofferte carries the Anzahlung: the parts are ordered once it's paid.
+    tL(`Fällige Anzahlung (${ANZAHLUNG_PROZENT}%) – zahlbar vor Materialbestellung`, x0 + PAD, anzY);
     tR(chf(anzahlung), TR - PAD, anzY);
     norm();
     y += RH_S;

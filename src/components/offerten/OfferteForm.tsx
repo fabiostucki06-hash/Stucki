@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { FormCard, FormBar, SaveStatus, SummaryRow, VehicleChips, PositionenEditor, fCHF, type ArbeitRow, type MaterialRow } from '../ui/DocForm';
 import type { Customer, ArbeitPosition, MaterialPosition, Offerte, OfferteStatus } from '../../types';
-import { offerteNotizen, anzahlungErforderlich, anzahlungAufteilung, ANZAHLUNG_PROZENT, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ } from '../../lib/offerte-docs';
+import { offerteNotizen, anzahlungErforderlich, anzahlungMoeglich, anzahlungAufteilung, sindVorkasseTerms, ANZAHLUNG_PROZENT, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ } from '../../lib/offerte-docs';
 import NummerField, { parseNummer } from '../ui/NummerField';
 import { materialPreis, materialZeSumme, zeMinuten } from '../../lib/ze';
 import { setMaterialFeld } from '../../lib/marge';
@@ -82,7 +82,8 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
   const [saved, setSaved] = useState<Offerte | undefined>(initial);
   // A taken number is only used after "Trotzdem verwenden".
   const [dupOk, setDupOk] = useState<number | null>(null);
-  // Off by default: a new Offerte is a plain one.
+  // Only a Materialofferte offers the 50% Anzahlung; a new Offerte from this form is a normal one.
+  const istMaterial = !!initial && anzahlungMoeglich(initial);
   const [mitAnzahlung, setMitAnzahlung] = useState(() => (initial ? anzahlungErforderlich(initial) : false));
   const [cid,        setCid]        = useState(initial?.customerId ?? prefillCustomerId ?? '');
   const [titel,      setTitel]      = useState(initial?.titel ?? '');
@@ -201,7 +202,8 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
   }
 
   /** Anzahlung flag plus the matching terms: on fills in the Vorkasse terms unless
-      own ones exist, off removes the Vorkasse terms again (same as in the Offerte view). */
+      own ones exist, off (always on a normal Offerte) removes the Vorkasse terms
+      again (same as in the Offerte view). */
   function zahlungsterms(): Pick<Offerte, 'anzahlungErforderlich' | 'zahlungsbedingung' | 'zusatznotiz'> {
     const zb = saved?.zahlungsbedingung?.trim() ?? '', zn = saved?.zusatznotiz?.trim() ?? '';
     if (mitAnzahlung) {
@@ -209,8 +211,7 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
         ? { anzahlungErforderlich: true, zahlungsbedingung: saved?.zahlungsbedingung, zusatznotiz: saved?.zusatznotiz }
         : { anzahlungErforderlich: true, zahlungsbedingung: VORKASSE_BEDINGUNG, zusatznotiz: SCHLUSSRECHNUNG_NOTIZ };
     }
-    const vorkasse = zb === VORKASSE_BEDINGUNG && [SCHLUSSRECHNUNG_NOTIZ, ''].includes(zn);
-    return vorkasse
+    return sindVorkasseTerms(zb, zn)
       ? { anzahlungErforderlich: false, zahlungsbedingung: undefined, zusatznotiz: undefined }
       : { anzahlungErforderlich: false, zahlungsbedingung: saved?.zahlungsbedingung, zusatznotiz: saved?.zusatznotiz };
   }
@@ -253,7 +254,7 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
             <label className="cf-label">Zahlungsziel (Tage)</label>
             <input className="cf-input" type="number" inputMode="numeric" min={1} value={zahlungsziel} onChange={(e) => setZahlungsziel(e.target.value)} placeholder="10" />
           </div>
-          <label
+          {istMaterial && <label
             className="df-span2"
             style={{
               display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, cursor: 'pointer',
@@ -266,14 +267,14 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
               style={{ width: 22, height: 22, accentColor: '#007AFF', flexShrink: 0, cursor: 'pointer' }}
             />
             <span style={{ flex: 1 }}>
-              <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: 'var(--label)' }}>{ANZAHLUNG_PROZENT}% Anzahlung verlangen</span>
+              <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: 'var(--label)' }}>{ANZAHLUNG_PROZENT}% Anzahlung erforderlich</span>
               <span style={{ display: 'block', fontSize: 12.5, color: 'var(--label2)', marginTop: 1 }}>
                 {mitAnzahlung
-                  ? 'Fällige Anzahlung wird im Total und im PDF ausgewiesen, Vorkasse-Bedingungen aktiv'
-                  : 'Normale Offerte über 100% ohne Anzahlungshinweis'}
+                  ? 'Anzahlung wird im Total und im PDF ausgewiesen, Bestellhinweis in den Notizen, Vorkasse-Bedingungen aktiv'
+                  : 'Materialofferte über 100% ohne Anzahlung und Bestellhinweis'}
               </span>
             </span>
-          </label>
+          </label>}
           {initial && (
             <div className="cf-field df-span2">
               <label className="cf-label">Status</label>

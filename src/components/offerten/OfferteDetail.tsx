@@ -10,7 +10,7 @@ import { exportOffertePDF, exportAuftragsbestaetigungPDF } from '../../lib/pdf-o
 import { CO_NAME } from '../../lib/company';
 import { useSettings } from '../../hooks/useSettings';
 import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../lib/utils';
-import { offerteNr, sumPositions, todayISO, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_PROZENT, offerteNotizen, anzahlungErforderlich, anzahlungAufteilung } from '../../lib/offerte-docs';
+import { offerteNr, sumPositions, todayISO, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_PROZENT, offerteNotizen, anzahlungErforderlich, anzahlungMoeglich, anzahlungAufteilung, sindVorkasseTerms } from '../../lib/offerte-docs';
 import { materialPreis } from '../../lib/ze';
 import { setMaterialFeld } from '../../lib/marge';
 import type { AuftragsBestaetigung, Customer, Offerte, OfferteStatus, Position, ArbeitPosition, MaterialPosition, Rechnung } from '../../types';
@@ -145,15 +145,15 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
     setDirty(true);
   }
 
-  /** 50% Anzahlung on: the Vorkasse terms are filled in unless own terms exist.
-      Off: the Offerte is a plain one again, the Vorkasse terms are removed. */
+  /** 50% Anzahlung (Materialofferte only) on: the Vorkasse terms are filled in
+      unless own terms exist. Off: billed at 100% again, the Vorkasse terms are removed. */
   function toggleAnzahlung(on: boolean) {
     setMitAnzahlung(on);
     if (on && !zahlungsbedingung.trim() && !zusatznotiz.trim()) {
       setZahlungsbedingung(VORKASSE_BEDINGUNG);
       setZusatznotiz(SCHLUSSRECHNUNG_NOTIZ);
     }
-    if (!on && zahlungsbedingung.trim() === VORKASSE_BEDINGUNG && [SCHLUSSRECHNUNG_NOTIZ, ''].includes(zusatznotiz.trim())) {
+    if (!on && sindVorkasseTerms(zahlungsbedingung, zusatznotiz)) {
       setZahlungsbedingung('');
       setZusatznotiz('');
     }
@@ -418,7 +418,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
         </div>
       )}
 
-      <label
+      {anzahlungMoeglich(offerte) && <label
         className="glass-panel no-print"
         style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', marginBottom: 12, cursor: 'pointer' }}
       >
@@ -427,14 +427,14 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
           style={{ width: 22, height: 22, accentColor: '#007AFF', flexShrink: 0, cursor: 'pointer' }}
         />
         <span style={{ flex: 1 }}>
-          <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: 'var(--label)' }}>{ANZAHLUNG_PROZENT}% Anzahlung verlangen</span>
+          <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: 'var(--label)' }}>{ANZAHLUNG_PROZENT}% Anzahlung erforderlich</span>
           <span style={{ display: 'block', fontSize: 12.5, color: 'var(--label2)', marginTop: 1 }}>
             {mitAnzahlung
-              ? `Offerte und PDF weisen die Anzahlung von CHF ${anzahlungAufteilung(totalArbeit + totalMaterial).anzahlung.toFixed(2)} aus, Vorkasse-Bedingungen aktiv`
-              : 'Normale Offerte über 100% ohne Anzahlungshinweis'}
+              ? `Materialofferte und PDF weisen die Anzahlung von CHF ${anzahlungAufteilung(totalArbeit + totalMaterial).anzahlung.toFixed(2)} und den Bestellhinweis aus, Vorkasse-Bedingungen aktiv`
+              : 'Materialofferte über 100% ohne Anzahlung und Bestellhinweis'}
           </span>
         </span>
-      </label>
+      </label>}
 
       {hasTerms ? (
         <div className="glass-panel doc-terms">
