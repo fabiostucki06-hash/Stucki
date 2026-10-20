@@ -17,7 +17,7 @@ const TL = ML, TR = PW - ML, TW = TR - TL; // 15 … 195, width = 180
 
 const RH   = 5;    // data row height mm
 const RH_H = 6.5;  // table header row
-const RH_S = 6;    // section row (vehicle, std.satz, summe)
+const RH_S = 6;    // section row (vehicle, std.satz, subtotals)
 const RH_T = 7;    // total row
 const PAD  = 2;    // horizontal cell padding
 const BL   = 0.68; // text baseline inside row (from top)
@@ -183,28 +183,29 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
   }
   dividers(y);
 
-  // ── SUMME ─────────────────────────────────────────────────────────────────
-  // Summe, Kleinteil and Total stay together on one page.
+  // ── ZWISCHENSUMMEN: Material, Arbeit, Kleinteil Pauschale ────────────────
+  // One right-aligned row each, so the split between parts and labour shows at
+  // a glance; a type without positions (e.g. Materialofferte: no Arbeit) is left
+  // out. Subtotals, Total and Anzahlung stay together on one page.
+  const hatMaterial = filteredPos.some((p) => p.typ === 'material') || pureMatTotal > 0;
+  const hatArbeit   = filteredPos.some((p) => p.typ === 'arbeit')   || totalArb > 0;
+  const subRows: [string, number][] = [
+    ...(hatMaterial || !hatArbeit ? [['Material Total', pureMatTotal] as [string, number]] : []),
+    ...(hatArbeit || !hatMaterial ? [['Arbeit Total', totalArb] as [string, number]] : []),
+    ...(kleinteilAmt > 0 ? [['Kleinteil Pauschale', kleinteilAmt] as [string, number]] : []),
+  ];
   const mitAnzahlung = anzahlungErforderlich(offerte);
-  if (!fits(RH_S + (kleinteilAmt > 0 ? 4 : 0) + RH_T + (mitAnzahlung ? RH_S * 2 : 0))) newPage();
+  if (!fits(RH_S * subRows.length + RH_T + (mitAnzahlung ? RH_S * 2 : 0))) newPage();
   lw(0.3); drgb(0, 0, 0); doc.line(TL, y, TR, y);
-  frgb(247, 247, 247); doc.rect(TL, y, TW, RH_S, 'F');
-  const sumY = y + RH_S * BL;
-  norm(); fs(8.5); rgb(80, 80, 80); tL('Summe', x0 + PAD, sumY);
-  bold(); rgb(0, 0, 0);
-  if (pureMatTotal > 0) tR(pureMatTotal.toFixed(2), x4 - PAD, sumY);
-  if (totalArb > 0)     tR(totalArb.toFixed(2),      TR - PAD,  sumY);
-  norm();
-  y += RH_S;
-
-  if (kleinteilAmt > 0) {
-    const subH = 4;
-    fs(7.5); rgb(110, 110, 110);
-    tL('Kleinteil Pauschale', x0 + PAD, y + subH * BL);
-    tR(kleinteilAmt.toFixed(2), x4 - PAD, y + subH * BL);
-    rgb(0, 0, 0);
-    y += subH;
-  }
+  subRows.forEach(([label, betrag], i) => {
+    frgb(247, 247, 247); doc.rect(TL, y, TW, RH_S, 'F');
+    if (i > 0) hLine(y, TL, TR, 0.1);
+    const subY = y + RH_S * BL;
+    norm(); fs(8.5); rgb(80, 80, 80); tL(label, x0 + PAD, subY);
+    bold(); rgb(0, 0, 0); tR(chf(betrag), TR - PAD, subY);
+    norm();
+    y += RH_S;
+  });
 
   // ── TOTAL ─────────────────────────────────────────────────────────────────
   lw(0.5); drgb(0, 0, 0); doc.line(TL, y, TR, y);

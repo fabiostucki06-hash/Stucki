@@ -309,12 +309,12 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
             />
           </div>
           <div>
-            <SummaryRow label="Material" value={fCHF(totM)} />
+            <SummaryRow label="Material Total" value={fCHF(totM)} />
             {(() => {
               const mz = materialZeSumme(material);
               return mz.ze > 0 && <SummaryRow label="davon ZE zu Material" sub={`${mz.ze} ZE = ${Math.round(zeMinuten(mz.ze))} Min.`} value={fCHF(mz.betrag)} />;
             })()}
-            <SummaryRow label="Arbeit" sub={totZE ? `${totZE} ZE` : null} value={fCHF(totA)} />
+            <SummaryRow label="Arbeit Total" sub={totZE ? `${totZE} ZE` : null} value={fCHF(totA)} />
             {kleinteilActive && <SummaryRow label="Kleinteil Pauschale" sub="über 100 ZE" value={fCHF(kleinteilBetrag)} />}
             <SummaryRow label="Total" value={fCHF(total)} total />
             {mitAnzahlung && <SummaryRow label={`Fällige Anzahlung (${ANZAHLUNG_PROZENT}%)`} value={fCHF(anzahlungAufteilung(total).anzahlung)} />}

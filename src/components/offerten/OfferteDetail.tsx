@@ -115,6 +115,9 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   const acceptedMaterial = positionen.filter((p, i) => posAccepted[i] && p.typ === 'material')
     .reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
   const acceptedTotal = acceptedArbeit + acceptedMaterial;
+  // Kleinteil Pauschale is a material position, listed on its own line in the totals.
+  const acceptedKleinteil = positionen.filter((p, i) => posAccepted[i] && p.typ === 'material' && p.beschreibung === 'Kleinteil Pauschale')
+    .reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
   const acceptedMatPos = positionen.filter((p, i) => posAccepted[i] && p.typ === 'material');
   const hasTerms = !!(zahlungsbedingung || zusatznotiz);
   const nr = offerteNr(offerte);
@@ -653,7 +656,17 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
         {/* Accepted subtotal */}
         {positionen.length > 0 && (
           <div className="list-row" style={{ cursor: 'default', background: 'rgba(0,122,255,0.06)', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
-            <div style={{ display: 'flex', width: '100%', alignItems: 'center' }}>
+            {([
+              ['Material Total', acceptedMaterial - acceptedKleinteil, positionen.some((p) => p.typ === 'material' && p.beschreibung !== 'Kleinteil Pauschale')],
+              ['Arbeit Total', acceptedArbeit, positionen.some((p) => p.typ === 'arbeit')],
+              ['Kleinteil Pauschale', acceptedKleinteil, acceptedKleinteil > 0],
+            ] as [string, number, boolean][]).filter(([, , show]) => show).map(([label, betrag]) => (
+              <div key={label} style={{ display: 'flex', width: '100%', alignItems: 'center' }}>
+                <div style={{ flex: 1, fontSize: 14, color: 'var(--label2)' }}>{label}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--label)', fontVariantNumeric: 'tabular-nums' }}>CHF {betrag.toFixed(2)}</div>
+              </div>
+            ))}
+            <div style={{ display: 'flex', width: '100%', alignItems: 'center', marginTop: 4 }}>
               <div className="sf-headline" style={{ flex: 1 }}>
                 Total Angenommen
                 <span style={{ fontWeight: 400, fontSize: 13, color: 'var(--label3)', marginLeft: 6 }}>
