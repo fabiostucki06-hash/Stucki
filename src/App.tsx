@@ -5,6 +5,7 @@ import { ASSETS } from './lib/supabase';
 import { needsAttention, decodeMaybeDouble } from './lib/utils';
 import { sampleImageColor, applyBgTheme, hexToRgb, type WallpaperThemeId } from './lib/theme';
 import { updateSettings, getActiveOfferteId, setActiveOfferteId, getMargin } from './lib/settings';
+import { vkAusEk } from './lib/marge';
 import { useSettings } from './hooks/useSettings';
 import { cleanPartTitle } from './lib/partTitle';
 import { useVersionCheck } from './hooks/useVersionCheck';
@@ -233,10 +234,10 @@ export default function App() {
           openSheet({ ...payload, title: part.title, price: part.ek, artikelnummer: part.artikelnummer });
           return;
         }
-        const vk = (ek * (1 + getMargin() / 100)).toFixed(2);
+        const vk = vkAusEk(ek, getMargin());
         await handleAddImportedPartToOfferte(target.id, {
           typ: 'material', beschreibung, menge: '1', stueckpreis: vk, preis: vk,
-          link: part.link || undefined, ek: part.ek, artikelnummer: part.artikelnummer || undefined,
+          link: part.link || undefined, ek: part.ek, marge: String(getMargin()), artikelnummer: part.artikelnummer || undefined,
         });
         setPendingImport(null);
         importStarted.current = false;

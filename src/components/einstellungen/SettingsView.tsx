@@ -340,7 +340,7 @@ export default function SettingsView({ currentWallpaper, onWallpaperChange, bgMo
             />
           </div>
           <Hint>
-            Wird beim Import eines Teils automatisch auf den Einkaufspreis (EK) aufgeschlagen, um den Verkaufspreis (VK) vorzuschlagen.
+            Wird bei jeder Materialposition und beim Import eines Teils auf den Einkaufspreis (EK) aufgeschlagen und ergibt den Verkaufspreis (VK). Pro Position im Feld „Marge %“ anpassbar. Auf Offerte und Rechnung erscheint nur der VK.
           </Hint>
         </Card>
       </>)}

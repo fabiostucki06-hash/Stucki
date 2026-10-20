@@ -6,6 +6,7 @@ import type { Customer, ArbeitPosition, MaterialPosition, Offerte, OfferteStatus
 import { offerteNotizen, anzahlungErforderlich, anzahlungAufteilung, ANZAHLUNG_PROZENT, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ } from '../../lib/offerte-docs';
 import NummerField, { nummerBestaetigt, parseNummer } from '../ui/NummerField';
 import { materialPreis, materialZeSumme, zeMinuten } from '../../lib/ze';
+import { setMaterialFeld } from '../../lib/marge';
 
 type OfferteData = Omit<Offerte, 'id' | 'offertNumber' | 'createdAt'> & { offertNumber: number };
 
@@ -134,8 +135,8 @@ export default function OfferteForm({ customers, onSave, onCancel, saving: savin
   const addM = () => setMaterial((m) => [...m, newMaterial()]);
   const remM = (i: number) => setMaterial((m) => m.filter((_, j) => j !== i));
   const updM = (i: number, k: string, v: string) => setMaterial((m) => {
-    const n = [...m]; n[i] = { ...n[i], [k]: v };
-    if (k === 'stueckpreis' || k === 'menge' || k === 'ze') n[i].preis = materialPreis(n[i]);
+    const n = [...m]; n[i] = setMaterialFeld(n[i], k, v);
+    if (k === 'stueckpreis' || k === 'menge' || k === 'ze' || k === 'ek' || k === 'marge') n[i].preis = materialPreis(n[i]);
     return n;
   });
 

@@ -6,6 +6,7 @@ import { cleanPartTitle, partNameFromUrl } from '../../lib/partTitle';
 import { getMargin } from '../../lib/settings';
 import type { ArbeitPosition, MaterialPosition } from '../../types';
 import { materialSatz, zeText } from '../../lib/ze';
+import { margeVon, vkAusEk } from '../../lib/marge';
 
 /* Shared building blocks for the Offerte / Rechnung / Auftrag creation forms
    (styles: `.df-*` in globals.css). */
@@ -122,12 +123,11 @@ export function PositionenEditor({
   materialRef.current = material;
   const [resolving, setResolving] = useState<Set<string>>(new Set());
 
-  const vkFromEk = (ek: number) => (ek * (1 + getMargin() / 100)).toFixed(2);
-
   /** A shop link in a material description is resolved in place: the row is
-      named from the URL right away and then gets the product title, the VK
-      (EK + margin) and EK / article number via /api/import-part. Text entered
-      next to the link stays as the description. Returns false for ordinary text. */
+      named from the URL right away and then gets the product title, the EK
+      (and with it the VK = EK + Marge) and the article number via
+      /api/import-part. A VK already typed in is kept. Text entered next to
+      the link stays as the description. Returns false for ordinary text. */
   function resolveMaterialLink(i: number, text: string): boolean {
     const link = findPartLink(text);
     if (!link) return false;
@@ -138,7 +138,7 @@ export function PositionenEditor({
     onMaterialChange(i, 'link', link.href);
     // A price that still is the previous link's untouched VK belongs to that part.
     const prevEk = parseFloat(prev.ek ?? '');
-    if (prev.link !== link.href && prevEk > 0 && prev.stueckpreis === vkFromEk(prevEk)) onMaterialChange(i, 'stueckpreis', '');
+    if (prev.link !== link.href && prevEk > 0 && prev.stueckpreis === vkAusEk(prevEk, margeVon(prev))) onMaterialChange(i, 'stueckpreis', '');
 
     setResolving((s) => new Set(s).add(link.href));
     (async () => {
@@ -153,11 +153,11 @@ export function PositionenEditor({
         if (row < 0) return;
         const pos = materialRef.current[row];
         if (data.title && pos.beschreibung === placeholder) onMaterialChange(row, 'beschreibung', cleanPartTitle(data.title));
+        // Setting the EK recalculates the VK; a VK typed in by hand is put back
+        // afterwards, which turns it into the row's Marge instead.
         onMaterialChange(row, 'ek', data.ek ?? '');
+        if (parseFloat(pos.stueckpreis) > 0) onMaterialChange(row, 'stueckpreis', pos.stueckpreis);
         onMaterialChange(row, 'artikelnummer', data.artikelnummer ?? '');
-        const ek = parseFloat(data.ek ?? '');
-        const hasEk = Number.isFinite(ek) && ek > 0;
-        if (hasEk && !(parseFloat(pos.stueckpreis) > 0)) onMaterialChange(row, 'stueckpreis', vkFromEk(ek));
       } catch (err) {
         // Shop unreachable / blocked: the row silently keeps the name read from the URL.
         console.warn('[DocForm] could not resolve link:', err);
@@ -181,6 +181,7 @@ export function PositionenEditor({
     if (!value.trim() && materialRef.current[i]?.link) {
       onMaterialChange(i, 'link', '');
       onMaterialChange(i, 'ek', '');
+      onMaterialChange(i, 'marge', '');
       onMaterialChange(i, 'artikelnummer', '');
     }
   }
@@ -196,7 +197,7 @@ export function PositionenEditor({
         <span className="df-group-sum">{fCHF(sum(material))}</span>
       </div>
       <div className="df-cols df-material">
-        <span>Beschreibung</span><span className="r">Menge</span><span className="r">Stk. CHF</span><span className="r" title="Arbeitszeit zum Material: 100 ZE = 60 Min.">ZE</span><span className="r">Total</span><span />
+        <span>Beschreibung</span><span className="r">Menge</span><span className="r" title="Einkaufspreis pro Stück (intern)">EK CHF</span><span className="r" title="Aufschlag auf den EK (intern)">Marge %</span><span className="r" title="Verkaufspreis pro Stück – erscheint auf dem PDF">VK CHF</span><span className="r" title="Arbeitszeit zum Material: 100 ZE = 60 Min.">ZE</span><span className="r">Total</span><span />
       </div>
       {material.map((pos, i) => {
         const busy = !!pos.link && resolving.has(pos.link);
@@ -222,12 +223,30 @@ export function PositionenEditor({
               value={pos.menge} onChange={(e) => onMaterialChange(i, 'menge', e.target.value)} aria-label="Menge"
             />
           </label>
+          <label className="df-cell df-c-ek">
+            <span className="df-cell-lbl">EK CHF</span>
+            <input
+              className="df-inp num" type="number" inputMode="decimal" min={0}
+              value={pos.ek ?? ''} onChange={(e) => onMaterialChange(i, 'ek', e.target.value)}
+              placeholder="—" aria-label="Einkaufspreis pro Stück (intern)"
+            />
+          </label>
+          <label className="df-cell df-c-marge">
+            <span className="df-cell-lbl">Marge %</span>
+            <input
+              className="df-inp num" type="number" inputMode="decimal"
+              value={pos.marge ?? ''} onChange={(e) => onMaterialChange(i, 'marge', e.target.value)}
+              placeholder={String(getMargin())} disabled={!(parseFloat(pos.ek ?? '') > 0)}
+              title={parseFloat(pos.ek ?? '') > 0 ? 'Aufschlag auf den EK, ergibt den VK' : 'Zuerst EK eingeben'}
+              aria-label="Marge in Prozent (intern)"
+            />
+          </label>
           <label className="df-cell df-c-price">
-            <span className="df-cell-lbl">Stk. CHF</span>
+            <span className="df-cell-lbl">VK CHF</span>
             <input
               className="df-inp num" type="number" inputMode="decimal"
               value={pos.stueckpreis} onChange={(e) => onMaterialChange(i, 'stueckpreis', e.target.value)}
-              placeholder="0.00" aria-label="Stückpreis"
+              placeholder="0.00" aria-label="Verkaufspreis pro Stück"
             />
           </label>
           <label className="df-cell df-c-ze">

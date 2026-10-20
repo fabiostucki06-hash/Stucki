@@ -12,6 +12,7 @@ import { useSettings } from '../../hooks/useSettings';
 import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../lib/utils';
 import { offerteNr, sumPositions, todayISO, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_PROZENT, offerteNotizen, anzahlungErforderlich, anzahlungAufteilung } from '../../lib/offerte-docs';
 import { materialPreis } from '../../lib/ze';
+import { setMaterialFeld } from '../../lib/marge';
 import type { AuftragsBestaetigung, Customer, Offerte, OfferteStatus, Position, ArbeitPosition, MaterialPosition, Rechnung } from '../../types';
 
 interface OfferteDetailProps {
@@ -178,7 +179,8 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   function updPos(i: number, key: string, val: string) {
     setPositionen((prev) => {
       const next = [...prev];
-      const pos = { ...next[i], [key]: val } as Position;
+      const cur = next[i];
+      const pos = (cur.typ === 'material' ? setMaterialFeld(cur, key, val) : { ...cur, [key]: val }) as Position;
       if (pos.typ === 'arbeit') {
         const ze = parseFloat(key === 'ze' ? val : (pos as ArbeitPosition).ze) || 0;
         const sa = parseFloat(key === 'stundenansatz' ? val : (pos as ArbeitPosition).stundenansatz) || 0;

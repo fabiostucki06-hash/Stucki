@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
 import { getMargin } from '../../lib/settings';
+import { margeAusPreisen } from '../../lib/marge';
 import { cleanPartTitle } from '../../lib/partTitle';
 import { offerteNr } from '../../lib/offerte-docs';
 import type { Customer, MaterialPosition, Offerte, MaterialCatalogItem } from '../../types';
@@ -136,7 +137,8 @@ export default function ImportPartSheet({ payload, customers, offerten, defaultO
     const sp = parseFloat(stueckpreis) || 0;
     const mg = parseFloat(menge) || 1;
     if (!beschreibung.trim() || !sp) return null;
-    return { typ: 'material', beschreibung: beschreibung.trim(), menge: String(mg), stueckpreis: stueckpreis, preis: (sp * mg).toFixed(2), link: quelle || undefined, ek: ek || undefined, artikelnummer: artikelnummer || undefined };
+    const ekNum = parseFloat(ek) || 0;
+    return { typ: 'material', beschreibung: beschreibung.trim(), menge: String(mg), stueckpreis: stueckpreis, preis: (sp * mg).toFixed(2), link: quelle || undefined, ek: ek || undefined, marge: ekNum > 0 ? margeAusPreisen(ekNum, sp) : undefined, artikelnummer: artikelnummer || undefined };
   }
 
   async function handleAddToOfferte() {

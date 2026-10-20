@@ -81,6 +81,8 @@ export interface MaterialPosition {
   link?: string;
   /** Purchase price and article number read from the shop page. Internal reference only, like `link`. */
   ek?: string;
+  /** Margin (%) on `ek` that gave `stueckpreis` (see lib/marge). Internal only, like `ek`. */
+  marge?: string;
   artikelnummer?: string;
   /** Ticked off in "Teile bestellen". Internal only. */
   bestellt?: boolean;

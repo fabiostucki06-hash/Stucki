@@ -8,6 +8,7 @@ import { exportRechnungPDF } from '../../lib/pdf-rechnung';
 import { computeRechnungTotals, rechnungDocName, schlussReferenz, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../lib/rechnung-totals';
 import { mitMaterialHinweis } from '../../lib/offerte-docs';
 import { materialPreis } from '../../lib/ze';
+import { setMaterialFeld } from '../../lib/marge';
 import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../lib/utils';
 import type { Customer, Rechnung, RechnungStatus, RechnungKategorie, Position, ArbeitPosition, MaterialPosition } from '../../types';
 
@@ -122,7 +123,8 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
   function updPos(i: number, key: string, val: string) {
     setPositionen((prev) => {
       const next = [...prev];
-      const pos = { ...next[i], [key]: val } as Position;
+      const cur = next[i];
+      const pos = (cur.typ === 'material' ? setMaterialFeld(cur, key, val) : { ...cur, [key]: val }) as Position;
       if (pos.typ === 'arbeit') {
         const ze = parseFloat(key === 'ze' ? val : (pos as ArbeitPosition).ze) || 0;
         const sa = parseFloat(key === 'stundenansatz' ? val : (pos as ArbeitPosition).stundenansatz) || 0;

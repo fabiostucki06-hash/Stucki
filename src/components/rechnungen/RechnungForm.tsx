@@ -6,6 +6,7 @@ import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../
 import { offerteNr } from '../../lib/offerte-docs';
 import NummerField, { nummerBestaetigt, parseNummer } from '../ui/NummerField';
 import { materialPreis, materialZeSumme, zeMinuten } from '../../lib/ze';
+import { setMaterialFeld } from '../../lib/marge';
 import type { Customer, Order, Offerte, ArbeitPosition, MaterialPosition, Rechnung, RechnungKategorie } from '../../types';
 
 type RechnungData = Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'> & { rechnungNumber: number };
@@ -188,8 +189,8 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
   const addM = () => setMaterial((m) => [...m, newMaterial()]);
   const remM = (i: number) => setMaterial((m) => m.filter((_, j) => j !== i));
   const updM = (i: number, k: string, v: string) => setMaterial((m) => {
-    const n = [...m]; n[i] = { ...n[i], [k]: v };
-    if (k === 'stueckpreis' || k === 'menge' || k === 'ze') n[i].preis = materialPreis(n[i]);
+    const n = [...m]; n[i] = setMaterialFeld(n[i], k, v);
+    if (k === 'stueckpreis' || k === 'menge' || k === 'ze' || k === 'ek' || k === 'marge') n[i].preis = materialPreis(n[i]);
     return n;
   });
 
