@@ -262,10 +262,6 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
     ? `* Der verbleibende Restbetrag (${100 - (anzProzent ?? 50)}%) wird mit der Schlussrechnung verrechnet (10 Tage netto)`
     : isSchluss ? `* ${schlussReferenz(rechnung)} – die geleistete Anzahlung ist abgezogen`
     : '* Kleinmaterial-Pauschale wird bei <100 ZE hinzugefügt', TL, y);
-  if ((rechnung.positionen ?? []).some((p) => p.typ === 'material' && fN((p as MaterialPosition).ze))) {
-    y += 4;
-    tL(`* Material mit ZE: Preis = Menge × Stk.Preis + ZE (100 ZE = 60 Min. = CHF ${STD_SATZ})`, TL, y);
-  }
   const notizen = rechnung.art === 'anzahlung' ? mitMaterialHinweis(rechnung.notizen) : rechnung.notizen;
   if (notizen) {
     y += 6;

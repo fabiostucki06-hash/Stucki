@@ -250,10 +250,6 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
   } else {
     tL('* Materialpreise gemäss aktuellem Lieferantenpreis', TL, y);
   }
-  if (allPos.some((p) => p.typ === 'material' && fN((p as MaterialPosition).ze))) {
-    y += 4;
-    tL(`* Material mit ZE: Preis = Menge × Stk.Preis + ZE (100 ZE = 60 Min. = CHF ${STD_SATZ})`, TL, y);
-  }
   const notizen = offerteNotizen(offerte.notizen, anzahlungErforderlich(offerte));
   if (notizen) {
     y += 6;
