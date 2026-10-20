@@ -5,7 +5,7 @@ import { showToast } from '../ui/Toast';
 import { SFPlus, SFXmark } from '../Icons';
 import { PartLink } from '../ui/DocForm';
 import { exportRechnungPDF } from '../../lib/pdf-rechnung';
-import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../lib/rechnung-totals';
+import { computeRechnungTotals, rechnungDocName, schlussReferenz, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../lib/rechnung-totals';
 import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../lib/utils';
 import type { Customer, Rechnung, RechnungStatus, RechnungKategorie, Position, ArbeitPosition, MaterialPosition } from '../../types';
 
@@ -16,6 +16,10 @@ interface RechnungDetailProps {
   onUpdate: (upd: Rechnung) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onEdit: (r: Rechnung) => void;
+  /** Anzahlungsrechnung only: creates the Schlussrechnung that deducts this Anzahlung. */
+  onCreateSchlussrechnung?: (anzahlung: Rechnung) => Promise<void>;
+  /** Number of an existing Schlussrechnung for this Anzahlung, if any. */
+  schlussrechnungNumber?: number;
 }
 
 type StatusMeta = { c: string; l: string };
@@ -53,8 +57,9 @@ const HDR: React.CSSProperties = {
   textShadow: '0 1px 3px rgba(0,0,0,0.30)',
 };
 
-export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, onDelete, onEdit }: RechnungDetailProps) {
+export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, onDelete, onEdit, onCreateSchlussrechnung, schlussrechnungNumber }: RechnungDetailProps) {
   const [saving, setSaving] = useState(false);
+  const [creatingSchluss, setCreatingSchluss] = useState(false);
   const [posSaving, setPosSaving] = useState(false);
   const [positionen, setPositionen] = useState<Position[]>(() => rechnung.positionen ?? []);
   const [zahlungsFrist, setZahlungsFrist] = useState(rechnung.zahlungsFrist ?? '10');
@@ -80,7 +85,8 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
   const sc = ST_META[rechnung.status] ?? ST_META.entwurf;
   const faelligAm = calcFaelligAm(rechnung.createdAt, zahlungsFrist);
   const isAnzahlung = rechnung.art === 'anzahlung';
-  const docName = isAnzahlung ? 'Anzahlungsrechnung' : 'Rechnung';
+  const isSchluss = rechnung.art === 'schluss';
+  const docName = rechnungDocName(rechnung);
 
   const isOverdue = faelligAm
     && rechnung.status === 'versendet'
@@ -108,8 +114,8 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
 
   /* ── live totals from local state ── */
   const anzProzent = rechnung.anzahlungProzent;
-  const { totalMaterial: totM, totalArbeit: totA, totalZE: totZE, zwischensumme: total, gesamttotal, rechnungstotal, restbetrag, kleinteilApplied } =
-    computeRechnungTotals(positionen, kategorie || undefined, kleinteilManuell, anzProzent);
+  const { totalMaterial: totM, totalArbeit: totA, totalZE: totZE, zwischensumme: total, gesamttotal, rechnungstotal, restbetrag, abzugAnzahlung, kleinteilApplied } =
+    computeRechnungTotals(positionen, kategorie || undefined, kleinteilManuell, anzProzent, parseFloat(rechnung.anzahlungBetrag ?? '') || undefined);
 
   function updPos(i: number, key: string, val: string) {
     setPositionen((prev) => {
@@ -192,7 +198,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
 
   return (
     <Sheet
-      title={`${isAnzahlung ? 'Anzahlungsrechnung' : 'Rechnung'} #${rechnung.rechnungNumber}`}
+      title={`${docName} #${rechnung.rechnungNumber}`}
       onClose={onClose}
       full
       barRight={<button onClick={() => onEdit(rechnung)} className="bar-btn">Bearbeiten</button>}
@@ -249,6 +255,14 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
           </div>
         </div>
       ) : (<>
+      {isSchluss && (
+        <div className="glass-panel doc-terms">
+          <div className="ab-panel-title">{schlussReferenz(rechnung)}</div>
+          <div className="sf-subhead" style={{ color: 'var(--label2)' }}>
+            Alle Positionen der Offerte; die geleistete Anzahlung von CHF {fCHF(abzugAnzahlung)} wird abgezogen.
+          </div>
+        </div>
+      )}
       <p className="section-header">Auftragsart</p>
       <div className="h-scroll" style={{ marginBottom: 16 }}>
         {KATEGORIE_OPTS.map(([k, l]) => (
@@ -521,14 +535,24 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
           {/* Row 2: Zwischensumme — on an Anzahlung the full amount of all positions,
               of which the share below is due now */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 16px', borderBottom: '0.5px solid var(--sep)' }}>
-            <div style={{ fontSize: 13, color: 'var(--label2)' }}>{anzProzent ? 'Gesamtbetrag gemäss Offerte (100%)' : 'Zwischensumme'}</div>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>CHF {fCHF(anzProzent ? gesamttotal : total)}</div>
+            <div style={{ fontSize: 13, color: 'var(--label2)' }}>{anzProzent || isSchluss ? 'Gesamtbetrag gemäss Offerte (100%)' : 'Zwischensumme'}</div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>CHF {fCHF(anzProzent || isSchluss ? gesamttotal : total)}</div>
           </div>
+
+          {/* Schlussrechnung: the already paid Anzahlung is deducted */}
+          {isSchluss && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 16px', borderBottom: '0.5px solid var(--sep)' }}>
+              <div style={{ fontSize: 13, color: 'var(--label2)' }}>
+                abzüglich Anzahlung{rechnung.anzahlungRechnungNumber != null ? ` (Anzahlungsrechnung #${rechnung.anzahlungRechnungNumber})` : ''}
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--red)' }}>– CHF {fCHF(abzugAnzahlung)}</div>
+            </div>
+          )}
 
           {/* Row 3: Rechnungstotal (Swiss-rounded to 0.05 CHF) */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(0,122,255,0.06)' }}>
             <div>
-              <div className="sf-headline">{anzProzent ? `Anzahlung ${anzProzent}%` : 'Rechnungstotal'}</div>
+              <div className="sf-headline">{anzProzent ? `Anzahlung ${anzProzent}%` : isSchluss ? 'Restbetrag (zu bezahlen)' : 'Rechnungstotal'}</div>
               <div style={{ fontSize: 10, color: 'var(--label3)', marginTop: 1 }}>gerundet auf 5 Rp.</div>
             </div>
             <div style={{ fontWeight: 800, fontSize: 22, color: 'var(--blue)', letterSpacing: '-0.5px' }}>
@@ -568,6 +592,27 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
         </div>
         <div className="doc-group-hint">PDFs werden zusätzlich auf Google Drive abgelegt (GarageOS / Dokumenttyp / Jahr).</div>
       </div>
+
+      {/* Anzahlung → Schlussrechnung with the full positions minus the Anzahlung. */}
+      {isAnzahlung && onCreateSchlussrechnung && (
+        <div className="glass-panel doc-group no-print">
+          <div className="ab-panel-title">Weiterverarbeiten</div>
+          <div className="doc-btn-grid">
+            <button
+              onClick={async () => {
+                if (schlussrechnungNumber != null && !window.confirm(`Für diese Anzahlung existiert bereits Schlussrechnung #${schlussrechnungNumber}. Trotzdem eine weitere erstellen?`)) return;
+                setCreatingSchluss(true);
+                try { await onCreateSchlussrechnung(rechnung); } finally { setCreatingSchluss(false); }
+              }}
+              disabled={creatingSchluss}
+              className="btn-system btn-primary doc-btn-full"
+            >
+              {creatingSchluss ? <><Spinner size={13} />&nbsp; Wird erstellt…</> : `Schlussrechnung erstellen · CHF ${fCHF(restbetrag)}`}
+            </button>
+          </div>
+          {schlussrechnungNumber != null && <div className="doc-group-hint">Schlussrechnung #{schlussrechnungNumber} wurde bereits erstellt.</div>}
+        </div>
+      )}
       <button
         onClick={async () => { if (window.confirm(`${docName} löschen?`)) await onDelete(rechnung.id); }}
         className="btn-system btn-destructive"
@@ -575,7 +620,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
         {docName} löschen
       </button>
       <div style={{ marginTop: 16, fontSize: 13, color: 'var(--label3)', textAlign: 'center' }}>
-        Erstellt: {formatDateCH(rechnung.createdAt)} · {isAnzahlung ? 'Anzahlungsrechnung' : 'Rechnung'} #{rechnung.rechnungNumber}
+        Erstellt: {formatDateCH(rechnung.createdAt)} · {docName} #{rechnung.rechnungNumber}
       </div>
     </Sheet>
   );

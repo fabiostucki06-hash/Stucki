@@ -11,7 +11,7 @@ import { CO_NAME } from '../../lib/company';
 import { useSettings } from '../../hooks/useSettings';
 import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../lib/utils';
 import { offerteNr, sumPositions, todayISO, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_PROZENT } from '../../lib/offerte-docs';
-import type { AuftragsBestaetigung, Customer, Offerte, OfferteStatus, Position, ArbeitPosition, MaterialPosition } from '../../types';
+import type { AuftragsBestaetigung, Customer, Offerte, OfferteStatus, Position, ArbeitPosition, MaterialPosition, Rechnung } from '../../types';
 
 interface OfferteDetailProps {
   offerte: Offerte;
@@ -27,6 +27,11 @@ interface OfferteDetailProps {
   onCreateMaterialofferte?: (offerte: Offerte, positionen: Position[]) => Promise<void>;
   /** Creates a 50% Vorkasse invoice listing the given (accepted) positions. */
   onCreateAnzahlung?: (offerte: Offerte, positionen: Position[]) => Promise<void>;
+  /** Latest active Anzahlungsrechnung of this Offerte; enables "Schlussrechnung erstellen". */
+  anzahlung?: Rechnung;
+  /** Number of an existing Schlussrechnung for that Anzahlung, if any. */
+  schlussrechnungNumber?: number;
+  onCreateSchlussrechnung?: (anzahlung: Rechnung) => Promise<void>;
   /** 'ab' when opened from the Auftragsbestätigungen list: the sheet is then about
       the AB, so "Dokumente" offers only the AB PDF and prints as AB. */
   view?: 'ab';
@@ -47,7 +52,8 @@ const ST_META: Record<OfferteStatus, StatusMeta> = {
   abgelehnt:  { c: 'var(--red)',    l: 'Abgelehnt'  },
 };
 
-export default function OfferteDetail({ offerte, customer, onClose, onUpdate, onDelete, onEdit, onDuplicate, onCreateAuftrag, onCreateRechnung, onCreateMaterialofferte, onCreateAnzahlung, view }: OfferteDetailProps) {
+export default function OfferteDetail({ offerte, customer, onClose, onUpdate, onDelete, onEdit, onDuplicate, onCreateAuftrag, onCreateRechnung, onCreateMaterialofferte, onCreateAnzahlung, anzahlung, schlussrechnungNumber, onCreateSchlussrechnung, view }: OfferteDetailProps) {
+  const [creatingSchluss, setCreatingSchluss] = useState(false);
   const [saving, setSaving] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
   const [creatingAuftrag, setCreatingAuftrag] = useState(false);
@@ -299,6 +305,17 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
       await onCreateAnzahlung(offerte, positionen.filter((_, i) => posAccepted[i]));
     } finally {
       setCreatingAnz(false);
+    }
+  }
+
+  async function handleCreateSchlussrechnung() {
+    if (!onCreateSchlussrechnung || !anzahlung) return;
+    if (schlussrechnungNumber != null && !window.confirm(`Für diese Anzahlung existiert bereits Schlussrechnung #${schlussrechnungNumber}. Trotzdem eine weitere erstellen?`)) return;
+    setCreatingSchluss(true);
+    try {
+      await onCreateSchlussrechnung(anzahlung);
+    } finally {
+      setCreatingSchluss(false);
     }
   }
 
@@ -701,7 +718,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
       </div>
 
       {/* Folgedokumente aus den angenommenen Positionen. */}
-      {positionen.length > 0 && (onCreateAuftrag || onCreateRechnung || onCreateMaterialofferte || onCreateAnzahlung) && (
+      {positionen.length > 0 && (onCreateAuftrag || onCreateRechnung || onCreateMaterialofferte || onCreateAnzahlung || (onCreateSchlussrechnung && anzahlung)) && (
         <div className="glass-panel doc-group no-print">
           <div className="ab-panel-title">Weiterverarbeiten · {acceptedCount} Positionen</div>
           <div className="doc-btn-grid">
@@ -725,6 +742,13 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
                 {creatingAnz
                   ? <><Spinner size={13} />&nbsp; Wird erstellt…</>
                   : `Anzahlungsrechnung ${ANZAHLUNG_PROZENT}% · CHF ${roundToRappen(acceptedTotal * ANZAHLUNG_PROZENT / 100).toFixed(2)}`}
+              </button>
+            )}
+            {onCreateSchlussrechnung && anzahlung && (
+              <button onClick={handleCreateSchlussrechnung} disabled={busy || creatingSchluss} className="btn-system btn-primary doc-btn-full">
+                {creatingSchluss
+                  ? <><Spinner size={13} />&nbsp; Wird erstellt…</>
+                  : `Schlussrechnung erstellen (abzgl. Anzahlung #${anzahlung.rechnungNumber})`}
               </button>
             )}
           </div>

@@ -1,6 +1,7 @@
 import { SFChevron } from '../Icons';
 import { exportRechnungPDF } from '../../lib/pdf-rechnung';
 import { formatDateCH } from '../../lib/utils';
+import { rechnungDocName } from '../../lib/rechnung-totals';
 import type { Customer, Rechnung, RechnungStatus } from '../../types';
 
 interface RechnungenListProps {
@@ -29,7 +30,6 @@ const STATUS_COLORS: Record<RechnungStatus, string> = {
 
 export default function RechnungenList({ rechnungen: all, customers, onRechnungClick, onEdit, onNew, variant = 'standard' }: RechnungenListProps) {
   const isAnz = variant === 'anzahlung';
-  const docLabel = isAnz ? 'Anzahlungsrechnung' : 'Rechnung';
   const rechnungen = all.filter((r) => (r.art === 'anzahlung') === isAnz);
   const sortByName = (a: Rechnung, b: Rechnung) => {
     const ca = customers.find((x) => x.id === a.customerId);
@@ -74,7 +74,7 @@ export default function RechnungenList({ rechnungen: all, customers, onRechnungC
                 return (
                   <div key={rec.id} className="list-row" tabIndex={0} onClick={() => onRechnungClick(rec)}>
                     <div className="doc-row-main" style={{ flex: 1 }}>
-                      <div className="doc-row-title" style={{ fontWeight: 600, fontSize: 16 }}>{docLabel} #{rec.rechnungNumber}</div>
+                      <div className="doc-row-title" style={{ fontWeight: 600, fontSize: 16 }}>{rechnungDocName(rec)} #{rec.rechnungNumber}</div>
                       <div className="doc-row-sub" style={{ fontSize: 13, color: 'var(--label2)', marginTop: 1 }}>
                         {c ? `${c.vorname} ${c.nachname}` : 'Kein Kunde'}
                       </div>

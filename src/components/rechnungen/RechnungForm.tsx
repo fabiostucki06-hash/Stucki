@@ -193,7 +193,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
   const ap = arbeit.filter((p) => p.beschreibung.trim());
   const mp = material.filter((p) => p.beschreibung.trim());
   const { totalMaterial: totM, totalArbeit: totA, totalZE: totZE, rechnungstotal, kleinteilApplied } =
-    computeRechnungTotals([...ap, ...mp], kategorie || undefined, kleinteilManuell, initial?.anzahlungProzent);
+    computeRechnungTotals([...ap, ...mp], kategorie || undefined, kleinteilManuell, initial?.anzahlungProzent, parseFloat(initial?.anzahlungBetrag ?? '') || undefined);
 
   /** `draft` saves whatever is there so far (only the customer is required);
       a new Rechnung starts out as "Entwurf" either way. */

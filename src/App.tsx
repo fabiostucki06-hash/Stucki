@@ -11,6 +11,7 @@ import { useVersionCheck } from './hooks/useVersionCheck';
 import { useIsDesktop } from './hooks/useIsDesktop';
 import { offerteNr, nextVersion, sumPositions, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_BEDINGUNG, ANZAHLUNG_PROZENT } from './lib/offerte-docs';
 import { hardReload } from './lib/reload';
+import { computeRechnungTotals } from './lib/rechnung-totals';
 
 import Spinner from './components/ui/Spinner';
 import Sheet from './components/ui/Sheet';
@@ -394,6 +395,47 @@ export default function App() {
     setSelOff(null);
     setTab('anzahlungsrechnungen');
   }
+  /* Schlussrechnung: every position of the Offerte (as listed on the
+     Anzahlungsrechnung) minus the Anzahlung already billed; the amount due is the
+     Restbetrag shown on the Anzahlungsrechnung. */
+  async function handleCreateSchlussrechnung(anz: Rechnung) {
+    const off = offerten.find((o) => o.id === anz.offertId);
+    // Older Anzahlungsrechnungen carry a single amount line instead of the positions.
+    const source = anz.anzahlungProzent ? anz.positionen : off?.positionen;
+    if (!source?.length) { showToast('Keine Positionen für die Schlussrechnung gefunden', 'error'); return; }
+    const pos = source.map((p) => (p.typ === 'material' ? (({ bestellt, ...m }) => m)(p) : p));
+    const nr = off ? offerteNr(off) : undefined;
+    const anzBetrag = parseFloat(anz.totalBetrag ?? '') || 0;
+    const t = computeRechnungTotals(pos, undefined, false, undefined, anzBetrag);
+    await addRechnung({
+      customerId: anz.customerId,
+      offertId: anz.offertId,
+      art: 'schluss',
+      anzahlungRechnungId: anz.id,
+      anzahlungRechnungNumber: anz.rechnungNumber,
+      anzahlungBetrag: anzBetrag.toFixed(2),
+      offertNr: nr,
+      titel: nr ? `Schlussrechnung – Offerte #${nr}` : 'Schlussrechnung',
+      positionen: pos,
+      notizen: `Positionen gemäss Offerte / Auftragsbestätigung${nr ? ` Nr. ${nr}` : ''}. Die Anzahlung gemäss Anzahlungsrechnung #${anz.rechnungNumber} ist abgezogen.`,
+      zahlungsFrist: '10',
+      // Same basis as the Anzahlungsrechnung, so the Restbetrag matches exactly.
+      kleinteilManuell: false,
+      totalBetrag: t.rechnungstotal.toFixed(2),
+      totalArbeit: t.totalArbeit.toFixed(2),
+      totalMaterial: t.totalMaterial.toFixed(2),
+      totalZE: t.totalZE,
+    });
+    setSelOff(null);
+    setSelR(null);
+    setTab('rechnungen');
+  }
+  /** Active (not cancelled) Anzahlungsrechnungen of an Offerte, newest first. */
+  const anzahlungenFor = (offertId: string) => rechnungen
+    .filter((r) => r.art === 'anzahlung' && r.offertId === offertId && r.status !== 'storniert')
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const schlussrechnungFor = (anzId: string) =>
+    rechnungen.find((r) => r.art === 'schluss' && r.anzahlungRechnungId === anzId && r.status !== 'storniert');
   async function handleCreateAuftragFromOfferte(offerte: Offerte, acceptedIndices: number[]) {
     // Copy every accepted position individually — no grouping or merging
     const positions = (offerte.positionen ?? []).filter((_, i) => acceptedIndices.includes(i));
@@ -637,6 +679,9 @@ export default function App() {
           onCreateRechnung={handleCreateRechnungFromOfferte}
           onCreateMaterialofferte={handleCreateMaterialofferte}
           onCreateAnzahlung={handleCreateAnzahlung}
+          anzahlung={anzahlungenFor(selOff.id)[0]}
+          schlussrechnungNumber={(() => { const a = anzahlungenFor(selOff.id)[0]; return a ? schlussrechnungFor(a.id)?.rechnungNumber : undefined; })()}
+          onCreateSchlussrechnung={handleCreateSchlussrechnung}
           view={tab === 'auftragsbestaetigungen' ? 'ab' : undefined}
         />
       )}
@@ -657,6 +702,8 @@ export default function App() {
           onUpdate={handleUpdateRechnung}
           onDelete={handleDeleteRechnung}
           onEdit={(r) => { setSelR(null); setEditR(r); }}
+          onCreateSchlussrechnung={handleCreateSchlussrechnung}
+          schlussrechnungNumber={schlussrechnungFor(selR.id)?.rechnungNumber}
         />
       )}
 

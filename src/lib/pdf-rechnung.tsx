@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { PAGE_TOP, PAGE_BOTTOM, addPageNumbers } from './pdf-paging';
 import { SwissQRBill } from 'swissqrbill/svg';
-import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from './rechnung-totals';
+import { computeRechnungTotals, rechnungDocName, schlussReferenz, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from './rechnung-totals';
 import { formatDateCH, buildDocumentFilename } from './utils';
 import { getIban } from './settings';
 import { CO_NAME, CO_ADDR, CO_CITY, CO_PHONE, CO_LOC, CO_ZIP, CO_CITY_NAME, STD_SATZ } from './company';
@@ -45,8 +45,9 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
   const owner   = customer ? `${customer.vorname} ${customer.nachname}` : '';
 
   const anzProzent = rechnung.anzahlungProzent;
-  const { totalMaterial: totM, totalArbeit: totA, zwischensumme: total, gesamttotal, rechnungstotal, restbetrag, kleinteilApplied } =
-    computeRechnungTotals(rechnung.positionen ?? [], rechnung.kategorie, rechnung.kleinteilManuell, anzProzent);
+  const isSchluss = rechnung.art === 'schluss';
+  const { totalMaterial: totM, totalArbeit: totA, zwischensumme: total, gesamttotal, rechnungstotal, restbetrag, abzugAnzahlung, kleinteilApplied } =
+    computeRechnungTotals(rechnung.positionen ?? [], rechnung.kategorie, rechnung.kleinteilManuell, anzProzent, parseFloat(rechnung.anzahlungBetrag ?? '') || undefined);
 
   const rows: (Position | undefined)[] = [...(rechnung.positionen ?? [])];
   if (kleinteilApplied) {
@@ -98,13 +99,17 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
 
   // ── HEADER ────────────────────────────────────────────────────────────────
   bold(); fs(15); rgb(0, 0, 0);
-  tL(rechnung.art === 'anzahlung' ? 'Anzahlungsrechnung' : 'Rechnung', TL, y + 7);
+  tL(rechnungDocName(rechnung), TL, y + 7);
 
   norm(); fs(8); rgb(120, 120, 120);
   tL('Rechnungsnummer', TL, y + 13);
   bold(); fs(8.5); rgb(0, 0, 0);
   tL(String(rechnung.rechnungNumber ?? ''), TL + 37, y + 13);
   norm();
+  if (isSchluss) {
+    fs(8); rgb(90, 90, 90);
+    tL(schlussReferenz(rechnung), TL, y + 19);
+  }
 
   bold(); fs(9); rgb(0, 0, 0);
   tR(CO_NAME,  TR, y + 6);
@@ -197,7 +202,7 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
 
   // ── SUMME: Material total in Preis(CHF) col, Arbeit total in ZE col ───────
   // Summe, Zwischensumme/Gesamtbetrag, Anzahlung and Restbetrag stay together on one page.
-  if (!fits(RH_S + RH_S + RH_T + (anzProzent ? RH_S : 0))) newPage();
+  if (!fits(RH_S + RH_S + RH_T + (anzProzent || isSchluss ? RH_S : 0))) newPage();
   lw(0.4); drgb(0, 0, 0); doc.line(TL, y, TR, y);
   const sumY = y + RH_S * BL;
   norm(); fs(8.5); rgb(100, 100, 100); tL('Summe', x0 + PAD, sumY);
@@ -210,16 +215,26 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
   // ── ZWISCHENSUMME / ANZAHLUNG: full amount of all positions (100%) ──────
   lw(0.3); drgb(180, 180, 180); doc.line(TL, y, TR, y); drgb(0, 0, 0);
   const zwY = y + RH_S * BL;
-  rgb(100, 100, 100); tL(anzProzent ? 'Gesamtbetrag gemäss Offerte (100%)' : 'Zwischensumme', x0 + PAD, zwY);
-  bold(); rgb(0, 0, 0); tR(chf(anzProzent ? gesamttotal : total), TR - PAD, zwY); norm();
+  rgb(100, 100, 100); tL(anzProzent || isSchluss ? 'Gesamtbetrag gemäss Offerte (100%)' : 'Zwischensumme', x0 + PAD, zwY);
+  bold(); rgb(0, 0, 0); tR(chf(anzProzent || isSchluss ? gesamttotal : total), TR - PAD, zwY); norm();
   y += RH_S;
+
+  // ── SCHLUSSRECHNUNG: already paid Anzahlung is deducted ──────────────────
+  if (isSchluss) {
+    lw(0.3); drgb(180, 180, 180); doc.line(TL, y, TR, y); drgb(0, 0, 0);
+    const abY = y + RH_S * BL;
+    rgb(100, 100, 100);
+    tL(`abzüglich Anzahlung${rechnung.anzahlungRechnungNumber != null ? ` (Anzahlungsrechnung #${rechnung.anzahlungRechnungNumber})` : ''}`, x0 + PAD, abY);
+    bold(); rgb(0, 0, 0); tR(`- ${chf(abzugAnzahlung)}`, TR - PAD, abY); norm();
+    y += RH_S;
+  }
 
   // ── RECHNUNGSTOTAL — Swiss-rounded to 5 Rappen ────────────────────────────
   lw(0.5); drgb(0, 0, 0); doc.line(TL, y, TR, y);
   frgb(229, 229, 229); doc.rect(TL, y, TW, RH_T, 'F');
   const totY = y + RH_T * BL;
   bold(); fs(9); rgb(0, 0, 0);
-  tL(anzProzent ? `Anzahlung ${anzProzent}% (zu bezahlen)` : 'Rechnungstotal', x0 + PAD, totY);
+  tL(anzProzent ? `Anzahlung ${anzProzent}% (zu bezahlen)` : isSchluss ? 'Restbetrag (zu bezahlen)' : 'Rechnungstotal', x0 + PAD, totY);
   tR(chf(rechnungstotal), TR - PAD, totY);
   y += RH_T;
   lw(0.5); drgb(0, 0, 0); doc.line(TL, y, TR, y);
@@ -242,6 +257,7 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
   fs(7.5); rgb(130, 130, 130);
   tL(rechnung.art === 'anzahlung'
     ? `* Die restlichen ${100 - (anzProzent ?? 50)}% werden mit der Schlussrechnung verrechnet (10 Tage netto)`
+    : isSchluss ? `* ${schlussReferenz(rechnung)} – die geleistete Anzahlung ist abgezogen`
     : '* Kleinmaterial-Pauschale wird bei <100 ZE hinzugefügt', TL, y);
   if (rechnung.notizen) {
     y += 6;
@@ -288,7 +304,7 @@ async function renderQrBillImage(rechnung: Rechnung, amount: number): Promise<{ 
     const svg = new SwissQRBill({
       currency: 'CHF',
       amount,
-      message: `${rechnung.art === 'anzahlung' ? 'Anzahlungsrechnung' : 'Rechnung'} #${rechnung.rechnungNumber}`,
+      message: `${rechnungDocName(rechnung)} #${rechnung.rechnungNumber}`,
       creditor: {
         name: CO_NAME,
         address: CO_ADDR,
@@ -341,10 +357,9 @@ export async function exportRechnungPDF(rechnung: Rechnung, customer: Customer |
       doc.setTextColor(0, 0, 0);
     }
 
-    const isAnz = rechnung.art === 'anzahlung';
-    const filename = buildDocumentFilename(customer, isAnz ? 'Anzahlungsrechnung' : 'Rechnung', rechnung.rechnungNumber ?? '');
+    const filename = buildDocumentFilename(customer, rechnungDocName(rechnung), rechnung.rechnungNumber ?? '');
     doc.save(`${filename}.pdf`);
-    void archiveToDrive(doc, isAnz ? 'Anzahlungsrechnungen' : 'Rechnungen', filename);
+    void archiveToDrive(doc, rechnung.art === 'anzahlung' ? 'Anzahlungsrechnungen' : 'Rechnungen', filename);
   } catch (err) {
     alert(`PDF-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);
   }

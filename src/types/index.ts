@@ -153,12 +153,21 @@ export interface Rechnung {
   kategorie?: RechnungKategorie;
   /** Manual Kleinteilepauschale override: true=erzwingen, false=unterdrücken, undefined/null=automatisch (nach Kategorie). */
   kleinteilManuell?: boolean | null;
-  /** 'anzahlung' = 50% Vorkasse invoice generated from an Offerte / AB. */
-  art?: 'standard' | 'anzahlung';
+  /** 'anzahlung' = 50% Vorkasse invoice generated from an Offerte / AB;
+      'schluss' = Schlussrechnung that deducts a previous Anzahlungsrechnung. */
+  art?: 'standard' | 'anzahlung' | 'schluss';
   /** Anzahlung share in % when the invoice lists the full Offerte positions; the
       Rechnungstotal is then this share of the positions' sum. Unset on older
       Anzahlungsrechnungen, which carry a single position with the amount due. */
   anzahlungProzent?: number;
+  /** Schlussrechnung: the Anzahlungsrechnung whose amount is deducted. Number,
+      amount and Offerte-Nr. are snapshots taken when the Schlussrechnung is created. */
+  anzahlungRechnungId?: string;
+  anzahlungRechnungNumber?: number;
+  /** Already paid Anzahlung in CHF, deducted from the Gesamtbetrag. */
+  anzahlungBetrag?: string;
+  /** Display number of the source Offerte ("12" / "12_2"). */
+  offertNr?: string;
   offertId?: string;
   /** Free-text payment terms; replace "<zahlungsFrist> Tage netto" when set. */
   zahlungsbedingung?: string;
