@@ -371,6 +371,7 @@ export default function App() {
       version: nextVersion(offerte, offerten),
       basisOffertId: offerte.id,
       titel: baseTitel ? `Materialofferte – ${baseTitel}` : 'Materialofferte',
+      notizen: mitMaterialHinweis(offerte.notizen),
       positionen: mat,
       totalArbeit: '0.00',
       totalMaterial: t.totalMaterial.toFixed(2),

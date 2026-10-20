@@ -4,20 +4,27 @@ export const VORKASSE_BEDINGUNG = 'Zahlungsbedingung: 50% Vorkasse (Anzahlung in
 export const SCHLUSSRECHNUNG_NOTIZ = 'Zusatznotiz: Schlussrechnung (50%) Zahlungsbedingung 10 Tage netto';
 export const ANZAHLUNG_BEDINGUNG = 'Vorkasse – zahlbar vor Arbeitsbeginn (Bar, TWINT, E-Banking)';
 export const ANZAHLUNG_PROZENT = 50;
-export const MATERIAL_BESTELL_HINWEIS = 'Material wird erst bestellt wenn die Zahlung durchgeführt wurde';
-
-/** Notizen of Offerten, Materialofferten and Anzahlungsrechnungen always carry the
-    MATERIAL_BESTELL_HINWEIS; appended on its own line unless already present. */
-export function mitMaterialHinweis(notizen?: string): string {
-  const n = notizen?.trim() ?? '';
-  if (n.includes(MATERIAL_BESTELL_HINWEIS)) return n;
-  return n ? `${n}\n${MATERIAL_BESTELL_HINWEIS}` : MATERIAL_BESTELL_HINWEIS;
-}
+export const MATERIAL_BESTELL_HINWEIS = 'Material wird erst bestellt, sofern Zahlung vorliegt, Zeitverzug ist daher Sache des Käufers. Es gelten die Bestimmungen des Schweizerischen Obligationenrechts (OR), insbesondere Art. 82 und Art. 102 OR.';
+/** Earlier wording, still stored in some notes; replaced by MATERIAL_BESTELL_HINWEIS. */
+const MATERIAL_BESTELL_HINWEIS_ALT = 'Material wird erst bestellt wenn die Zahlung durchgeführt wurde';
 
 /** Offerte-Notizen carried over to an Auftrag or a regular Rechnung, without the hint. */
 export function ohneMaterialHinweis(notizen?: string): string | undefined {
-  const n = notizen?.replace(MATERIAL_BESTELL_HINWEIS, '').trim();
+  const n = notizen
+    ?.replace(MATERIAL_BESTELL_HINWEIS, '')
+    .replace(MATERIAL_BESTELL_HINWEIS_ALT, '')
+    .replace(/\n{2,}/g, '\n')
+    .trim();
   return n || undefined;
+}
+
+/** Notizen of Offerten, Materialofferten and Anzahlungsrechnungen always carry the
+    MATERIAL_BESTELL_HINWEIS on its own last line; the earlier wording is replaced. */
+export function mitMaterialHinweis(notizen?: string): string {
+  const n = notizen?.trim() ?? '';
+  if (n.includes(MATERIAL_BESTELL_HINWEIS)) return n;
+  const rest = ohneMaterialHinweis(n);
+  return rest ? `${rest}\n${MATERIAL_BESTELL_HINWEIS}` : MATERIAL_BESTELL_HINWEIS;
 }
 
 const fN = (v?: string | number) => parseFloat(String(v ?? '0')) || 0;
