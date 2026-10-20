@@ -1,8 +1,11 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Spinner from './Spinner';
-import { importPdf, type PdfImportResult } from '../../lib/pdf-import';
+import { importPdf, pdfImportConfigured, PdfImportError, type PdfImportResult } from '../../lib/pdf-import';
 
 export type PdfImportZiel = 'offerte' | 'rechnung';
+
+const VERCEL_ENV_URL = 'https://vercel.com/fabiostucki06-hashs-projects/stucki/settings/environment-variables';
+const ANTHROPIC_KEYS_URL = 'https://console.anthropic.com/settings/keys';
 
 interface PdfImportSheetProps {
   token: string;
@@ -19,17 +22,32 @@ export default function PdfImportSheet({ token, defaultZiel, onImported }: PdfIm
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Set when the Anthropic API key in Vercel is missing or rejected: shows the setup steps. */
+  const [keyProblem, setKeyProblem] = useState<'not_configured' | 'invalid_key' | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Point out a missing key before the user picks a file.
+  useEffect(() => {
+    let cancelled = false;
+    void pdfImportConfigured().then((ok) => {
+      if (cancelled || ok !== false) return;
+      setKeyProblem('not_configured');
+      setError('Der Anthropic API Key ist in Vercel nicht konfiguriert (Umgebungsvariable ANTHROPIC_API_KEY fehlt).');
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   async function handleFile(file: File | undefined) {
     if (!file || busy) return;
     setError(null);
+    setKeyProblem(null);
     setBusy(file.name);
     try {
       const result = await importPdf(file, token);
       await onImported(result, ziel, file.name);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Import fehlgeschlagen');
+      if (e instanceof PdfImportError && e.code) setKeyProblem(e.code);
     } finally {
       setBusy(null);
       if (inputRef.current) inputRef.current.value = '';
@@ -86,6 +104,27 @@ export default function PdfImportSheet({ token, defaultZiel, onImported }: PdfIm
         <div style={{ marginTop: 14, padding: '10px 14px', borderRadius: 12, background: 'rgba(255,59,48,0.12)', color: '#FF3B30', fontSize: 14, fontWeight: 600 }}>
           {error}
         </div>
+      )}
+
+      {keyProblem && (
+        <details open style={{ marginTop: 10, padding: '10px 14px', borderRadius: 12, background: 'var(--fill3)', fontSize: 14, color: 'var(--label)', lineHeight: 1.5 }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 700 }}>So richtest du den Key in Vercel ein</summary>
+          <ol style={{ margin: '8px 0 0', paddingLeft: 20 }}>
+            <li>
+              {keyProblem === 'invalid_key' ? 'Neuen' : 'Einen'} API Key in der{' '}
+              <a href={ANTHROPIC_KEYS_URL} target="_blank" rel="noreferrer" style={{ color: 'var(--blue)' }}>Anthropic Console</a> erstellen und kopieren.
+            </li>
+            <li>
+              <a href={VERCEL_ENV_URL} target="_blank" rel="noreferrer" style={{ color: 'var(--blue)' }}>Vercel → Projekt „stucki“ → Settings → Environment Variables</a> öffnen.
+            </li>
+            <li>
+              {keyProblem === 'invalid_key'
+                ? <>Den Wert von <code>ANTHROPIC_API_KEY</code> durch den neuen Key ersetzen.</>
+                : <>Variable <code>ANTHROPIC_API_KEY</code> mit dem Key als Wert hinzufügen, Environment „Production“ (und bei Bedarf „Preview“).</>}
+            </li>
+            <li>Unter „Deployments“ das neueste Deployment neu deployen („Redeploy“) – erst dann ist der Key aktiv.</li>
+          </ol>
+        </details>
       )}
 
       <div style={{ marginTop: 14, fontSize: 13, color: 'var(--label2)', lineHeight: 1.45 }}>

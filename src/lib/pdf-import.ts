@@ -37,6 +37,24 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+/** Import failure; `code` is set when the Anthropic API key in Vercel is the cause. */
+export class PdfImportError extends Error {
+  constructor(message: string, readonly code?: 'not_configured' | 'invalid_key') {
+    super(message);
+  }
+}
+
+/** Whether ANTHROPIC_API_KEY is set on the server; null when the check itself failed. */
+export async function pdfImportConfigured(): Promise<boolean | null> {
+  try {
+    const r = await fetch('/api/pdf-import');
+    const json = (await r.json()) as { configured?: boolean };
+    return typeof json.configured === 'boolean' ? json.configured : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function importPdf(file: File, token: string): Promise<PdfImportResult> {
   if (file.type && file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) throw new Error('Bitte eine PDF-Datei wählen');
   if (file.size > PDF_IMPORT_MAX_BYTES) throw new Error('PDF ist zu gross (max. 3 MB)');
@@ -46,8 +64,11 @@ export async function importPdf(file: File, token: string): Promise<PdfImportRes
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ data, filename: file.name }),
   });
-  const json = (await r.json().catch(() => null)) as { ok?: boolean; result?: PdfImportResult; error?: string } | null;
-  if (!r.ok || !json?.ok || !json.result) throw new Error(json?.error || `Import fehlgeschlagen (${r.status})`);
+  const json = (await r.json().catch(() => null)) as { ok?: boolean; result?: PdfImportResult; error?: string; code?: string } | null;
+  if (!r.ok || !json?.ok || !json.result) {
+    const code = json?.code === 'not_configured' || json?.code === 'invalid_key' ? json.code : undefined;
+    throw new PdfImportError(json?.error || `Import fehlgeschlagen (${r.status})`, code);
+  }
   return json.result;
 }
 

@@ -82,7 +82,9 @@ const PROMPT = `Lies dieses Dokument einer Autowerkstatt (Offerte, Rechnung, Kos
 Was im Dokument nicht steht: Text als "", Zahlen als 0. Nichts erfinden.`;
 
 export default async function handler(req: VercelLikeRequest, res: VercelLikeResponse) {
-  const configured = !!process.env.ANTHROPIC_API_KEY?.trim();
+  // Trimmed: a key pasted into Vercel with a trailing newline would fail authentication.
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim() ?? '';
+  const configured = !!apiKey;
   if (req.method === 'GET') return res.status(200).json({ ok: true, configured });
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Nur GET/POST' });
 
@@ -91,7 +93,7 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
   if (!token || !(await supabaseUserOk(token))) return res.status(401).json({ ok: false, error: 'Nicht angemeldet' });
 
   if (!configured) {
-    return res.status(501).json({ ok: false, configured: false, error: 'PDF-Import ist nicht eingerichtet – in Vercel fehlt die Umgebungsvariable ANTHROPIC_API_KEY' });
+    return res.status(501).json({ ok: false, configured: false, code: 'not_configured', error: 'Der Anthropic API Key ist in Vercel nicht konfiguriert (Umgebungsvariable ANTHROPIC_API_KEY fehlt).' });
   }
 
   let data: string;
@@ -105,7 +107,7 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
   if (data.length * 0.75 > MAX_BYTES) return res.status(413).json({ ok: false, error: 'PDF ist zu gross (max. 3 MB)' });
   if (!data.startsWith('JVBER')) return res.status(400).json({ ok: false, error: 'Die Datei ist kein PDF' }); // "%PDF"
 
-  const client = new Anthropic();
+  const client = new Anthropic({ apiKey });
   try {
     const response = await client.beta.messages.create({
       model: 'claude-opus-5-5',
@@ -128,7 +130,7 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
     return res.status(200).json({ ok: true, result: JSON.parse(text) });
   } catch (e) {
     if (e instanceof Anthropic.RateLimitError) return res.status(429).json({ ok: false, error: 'Zu viele Anfragen – bitte kurz warten und erneut versuchen' });
-    if (e instanceof Anthropic.AuthenticationError) return res.status(502).json({ ok: false, error: 'ANTHROPIC_API_KEY ist ungültig' });
+    if (e instanceof Anthropic.AuthenticationError) return res.status(502).json({ ok: false, code: 'invalid_key', error: 'Der Anthropic API Key in Vercel ist ungültig oder wurde widerrufen.' });
     if (e instanceof Anthropic.BadRequestError) return res.status(422).json({ ok: false, error: `PDF konnte nicht gelesen werden: ${e.message}` });
     if (e instanceof Anthropic.APIError) return res.status(502).json({ ok: false, error: `KI-Dienst nicht erreichbar (${e.status ?? 'Netzwerk'})` });
     if (e instanceof SyntaxError) return res.status(502).json({ ok: false, error: 'Antwort der KI war unvollständig' });
