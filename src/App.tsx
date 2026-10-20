@@ -332,24 +332,25 @@ export default function App() {
   }
 
   /* ── Offerte handlers ── */
-  async function handleAddOfferte(data: Omit<Offerte, 'id' | 'status' | 'createdAt'>) {
-    const { offertNumber, ...rest } = data;
-    await addOfferte(rest, { offertNumber }); setShowNOff(false); setTab('offerten');
-  }
   async function handleUpdateOfferte(upd: Offerte) {
-    const saved = await updateOfferte(upd); setSelOff(saved);
+    const saved = await updateOfferte(upd);
+    // Functional: a save flushed while the sheet closes must not reopen it.
+    setSelOff((p) => (p?.id === saved.id ? saved : p));
   }
-  async function handleSaveEditOfferte(data: Omit<Offerte, 'id' | 'createdAt'>) {
-    if (!editOff) return;
-    const updated: Offerte = { ...editOff, ...data };
-    // Close the sheet only once the write is confirmed; a throw propagates to the
-    // form, which keeps the edit on screen instead of discarding it.
-    const saved = await updateOfferte(updated);
-    setEditOff(null); setSelOff(saved);
+  /** Auto-save of the Offerte form: the first save of a new Offerte creates it,
+      every later one updates the stored row. A throw keeps the form's input and
+      shows the error there. */
+  async function handleSaveOfferte(data: Omit<Offerte, 'id' | 'createdAt'>, existing?: Offerte): Promise<Offerte> {
+    if (!existing) {
+      const { offertNumber, ...rest } = data;
+      return addOfferte(rest, { offertNumber });
+    }
+    const saved = await updateOfferte({ ...existing, ...data });
+    setEditOff((p) => (p?.id === saved.id ? saved : p));
     // Invoices made from this Offerte quote its number in title, notes and snapshot.
-    const alt = offerteNr(editOff), neu = offerteNr(saved);
+    const alt = offerteNr(existing), neu = offerteNr(saved);
     if (alt !== neu) {
-      for (const r of rechnungen.filter((x) => x.offertId === editOff.id)) {
+      for (const r of rechnungen.filter((x) => x.offertId === existing.id)) {
         await updateRechnung({
           ...r,
           titel: ersetzeNummer(r.titel, OFFERTE_REF, alt, neu),
@@ -358,6 +359,7 @@ export default function App() {
         });
       }
     }
+    return saved;
   }
   /* Next automatic numbers (the counters can lag behind the loaded rows) and duplicate checks. */
   const naechsteOffertNr = Math.max(offertNum, ...offerten.map((o) => o.offertNumber ?? 0)) + 1;
@@ -548,22 +550,26 @@ export default function App() {
   }
 
   /* ── Rechnung handlers ── */
-  async function handleAddRechnung(data: Omit<Rechnung, 'id' | 'status' | 'createdAt'>) {
-    const { rechnungNumber, ...rest } = data;
-    await addRechnung(rest, { rechnungNumber }); setShowNR(false); setTab('rechnungen');
-  }
   async function handleUpdateRechnung(upd: Rechnung) {
-    await updateRechnung(upd); setSelR(upd);
+    await updateRechnung(upd);
+    // Functional: a save flushed while the sheet closes must not reopen it.
+    setSelR((p) => (p?.id === upd.id ? upd : p));
   }
-  async function handleSaveEditRechnung(data: Omit<Rechnung, 'id' | 'status' | 'createdAt'>) {
-    if (!editR) return;
-    const updated: Rechnung = { ...editR, ...data };
+  /** Auto-save of the Rechnung form, like handleSaveOfferte. */
+  async function handleSaveRechnung(data: Omit<Rechnung, 'id' | 'status' | 'createdAt'>, existing?: Rechnung): Promise<Rechnung> {
+    if (!existing) {
+      const { rechnungNumber, ...rest } = data;
+      const created = await addRechnung(rest, { rechnungNumber });
+      if (!created) throw new Error('Rechnung konnte nicht gespeichert werden');
+      return created;
+    }
+    const updated: Rechnung = { ...existing, ...data };
     await updateRechnung(updated);
-    setEditR(null); setSelR(updated);
+    setEditR((p) => (p?.id === updated.id ? updated : p));
     // Schlussrechnungen deducting this Anzahlung keep its number as a snapshot.
-    const alt = editR.rechnungNumber, neu = updated.rechnungNumber;
-    if (editR.art === 'anzahlung' && alt !== neu) {
-      for (const s of rechnungen.filter((x) => x.anzahlungRechnungId === editR.id)) {
+    const alt = existing.rechnungNumber, neu = updated.rechnungNumber;
+    if (existing.art === 'anzahlung' && alt !== neu) {
+      for (const s of rechnungen.filter((x) => x.anzahlungRechnungId === existing.id)) {
         await updateRechnung({
           ...s,
           anzahlungRechnungNumber: neu,
@@ -571,6 +577,7 @@ export default function App() {
         });
       }
     }
+    return updated;
   }
   async function handleDeleteRechnung(id: string) {
     await deleteRechnung(id); setSelR(null);
@@ -721,12 +728,11 @@ export default function App() {
       {showNOff && (() => {
         const closeNOff = () => { setShowNOff(false); setPrefillMat(null); setPrefillCid(undefined); };
         return (
-          <Sheet title="Neue Offerte" onClose={closeNOff} full
-            barRight={<button onClick={closeNOff} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
+          <Sheet title="Neue Offerte" onClose={closeNOff} full>
             <OfferteForm
               customers={customers}
-              onSave={async (data) => { await handleAddOfferte(data); setPrefillMat(null); setPrefillCid(undefined); }}
-              onCancel={closeNOff}
+              onSave={handleSaveOfferte}
+              onDone={(saved) => { closeNOff(); if (saved) setTab('offerten'); }}
               prefillMaterial={prefillMat ?? undefined}
               prefillCustomerId={prefillCid}
               nummerVorschlag={naechsteOffertNr}
@@ -753,9 +759,8 @@ export default function App() {
       )}
 
       {showNR && (
-        <Sheet title="Neue Rechnung" onClose={() => setShowNR(false)} full
-          barRight={<button onClick={() => setShowNR(false)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
-          <RechnungForm customers={customers} orders={orders} offerten={offerten} onSave={handleAddRechnung} onCancel={() => setShowNR(false)} nummerVorschlag={naechsteRechnungNr} nummerVergeben={rechnungNrVergeben()} />
+        <Sheet title="Neue Rechnung" onClose={() => setShowNR(false)} full>
+          <RechnungForm customers={customers} orders={orders} offerten={offerten} onSave={handleSaveRechnung} onDone={(saved) => { setShowNR(false); if (saved) setTab('rechnungen'); }} nummerVorschlag={naechsteRechnungNr} nummerVergeben={rechnungNrVergeben()} />
         </Sheet>
       )}
 
@@ -781,10 +786,9 @@ export default function App() {
       )}
 
       {editOff && (
-        <Sheet title={`Offerte #${offerteNr(editOff)} bearbeiten`} onClose={() => setEditOff(null)} full
-          barRight={<button onClick={() => setEditOff(null)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
+        <Sheet title={`Offerte #${offerteNr(editOff)} bearbeiten`} onClose={() => setEditOff(null)} full>
           <ActiveOfferteBanner offerte={editOff} customer={customers.find((c) => c.id === editOff.customerId)} />
-          <OfferteForm key={editOff.id} customers={customers} initial={editOff} onSave={handleSaveEditOfferte} onCancel={() => setEditOff(null)} nummerVorschlag={editOff.offertNumber} nummerVergeben={offertNrVergeben(editOff)} />
+          <OfferteForm key={editOff.id} customers={customers} initial={editOff} onSave={handleSaveOfferte} onDone={(saved) => { setEditOff(null); if (saved) setSelOff(saved); }} nummerVorschlag={editOff.offertNumber} nummerVergeben={offertNrVergeben(editOff)} />
         </Sheet>
       )}
 
@@ -808,9 +812,8 @@ export default function App() {
       )}
 
       {editR && (
-        <Sheet title={`Rechnung #${editR.rechnungNumber} bearbeiten`} onClose={() => setEditR(null)} full
-          barRight={<button onClick={() => setEditR(null)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
-          <RechnungForm customers={customers} orders={orders} offerten={offerten} initial={editR} onSave={handleSaveEditRechnung} onCancel={() => setEditR(null)} nummerVorschlag={editR.rechnungNumber} nummerVergeben={rechnungNrVergeben(editR)} />
+        <Sheet title={`Rechnung #${editR.rechnungNumber} bearbeiten`} onClose={() => setEditR(null)} full>
+          <RechnungForm customers={customers} orders={orders} offerten={offerten} initial={editR} onSave={handleSaveRechnung} onDone={(saved) => { setEditR(null); if (saved) setSelR(saved); }} nummerVorschlag={editR.rechnungNumber} nummerVergeben={rechnungNrVergeben(editR)} />
         </Sheet>
       )}
 

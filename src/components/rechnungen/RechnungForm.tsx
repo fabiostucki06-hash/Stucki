@@ -1,12 +1,11 @@
-import { useState } from 'react';
-import Spinner from '../ui/Spinner';
-import { showToast } from '../ui/Toast';
-import { FormCard, FormBar, SummaryRow, VehicleChips, PositionenEditor, fCHF, type ArbeitRow, type MaterialRow } from '../ui/DocForm';
+import { useRef, useState } from 'react';
+import { FormCard, FormBar, SaveStatus, SummaryRow, VehicleChips, PositionenEditor, fCHF, type ArbeitRow, type MaterialRow } from '../ui/DocForm';
 import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../lib/rechnung-totals';
 import { offerteNr } from '../../lib/offerte-docs';
-import NummerField, { nummerBestaetigt, parseNummer } from '../ui/NummerField';
+import NummerField, { parseNummer } from '../ui/NummerField';
 import { materialPreis, materialZeSumme, zeMinuten } from '../../lib/ze';
 import { setMaterialFeld } from '../../lib/marge';
+import { useAutoSave } from '../../hooks/useAutoSave';
 import type { Customer, Order, Offerte, ArbeitPosition, MaterialPosition, Rechnung, RechnungKategorie } from '../../types';
 
 type RechnungData = Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'> & { rechnungNumber: number };
@@ -15,9 +14,11 @@ interface RechnungFormProps {
   customers: Customer[];
   orders: Order[];
   offerten: Offerte[];
-  onSave: (data: RechnungData) => Promise<void> | void;
-  onCancel: () => void;
-  saving?: boolean;
+  /** Auto-save: `existing` is the stored Rechnung (none yet for a new one, which
+      creates it); resolves with the row as stored and rejects when the write failed. */
+  onSave: (data: RechnungData, existing?: Rechnung) => Promise<Rechnung>;
+  /** "Fertig": everything is saved; `saved` is the stored Rechnung, if any. */
+  onDone: (saved?: Rechnung) => void;
   initial?: Rechnung;
   /** Automatic Rechnungs-Nr.: the next free one for a new Rechnung, else the current one. */
   nummerVorschlag: number;
@@ -58,6 +59,17 @@ const KATEGORIE_OPTS: [RechnungKategorie, string][] = [
 ];
 
 const newArbeit   = (): ArbeitRow   => ({ typ: 'arbeit',   beschreibung: '', ze: '', stundenansatz: '80', preis: '', zeKI: false, zeLoading: false, zeHint: '' });
+/* zeLoading is row-only UI state and must never reach the rechnungen jsonb payload,
+   so the persisted shape is spelled out instead of spreading the whole row. */
+const toArbeitPosition = (p: ArbeitRow): ArbeitPosition => ({
+  typ: 'arbeit',
+  beschreibung: p.beschreibung,
+  ze: p.ze,
+  stundenansatz: p.stundenansatz,
+  preis: p.preis,
+  zeKI: p.zeKI,
+  zeHint: p.zeHint,
+});
 const newMaterial = (): MaterialRow => ({ typ: 'material', beschreibung: '', menge: '1', stueckpreis: '', preis: '' });
 
 function calcFaelligAm(days: string): string {
@@ -68,8 +80,16 @@ function calcFaelligAm(days: string): string {
   return d.toISOString().split('T')[0];
 }
 
-export default function RechnungForm({ customers, orders, offerten, onSave, onCancel, saving: savingProp, initial, nummerVorschlag, nummerVergeben }: RechnungFormProps) {
-  const [nummer, setNummer] = useState(String(initial?.rechnungNumber ?? nummerVorschlag));
+export default function RechnungForm({ customers, orders, offerten, onSave, onDone, initial, nummerVorschlag, nummerVergeben }: RechnungFormProps) {
+  // Kept from the start: once a new Rechnung is stored, the next free number moves on.
+  const [vorschlag] = useState(nummerVorschlag);
+  const [nummer, setNummer] = useState(String(initial?.rechnungNumber ?? vorschlag));
+  /* The Rechnung as last stored. The ref feeds the save chain (a quick second save
+     must update the Rechnung the first one created), the state the render. */
+  const savedRef = useRef<Rechnung | undefined>(initial);
+  const [saved, setSaved] = useState<Rechnung | undefined>(initial);
+  // A taken number is only used after "Trotzdem verwenden".
+  const [dupOk, setDupOk] = useState<number | null>(null);
   const [selectedAuftragId, setSelectedAuftragId] = useState(initial?.auftragId ?? '');
   const [selectedOfferteId, setSelectedOfferteId] = useState('');
   const [cid,          setCid]          = useState(initial?.customerId ?? '');
@@ -89,9 +109,6 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
   const [faelligAm,    setFaelligAm]    = useState(
     () => initial?.faelligAm ?? calcFaelligAm(initial?.zahlungsFrist ?? '10')
   );
-
-  const [savingLocal, setSavingLocal] = useState(false);
-  const busy = savingProp || savingLocal;
 
   const selectedCustomer = customers.find((c) => c.id === cid) ?? null;
   const vehicleChips = selectedCustomer
@@ -199,32 +216,40 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
   const { totalMaterial: totM, totalArbeit: totA, totalZE: totZE, rechnungstotal, kleinteilApplied } =
     computeRechnungTotals([...ap, ...mp], kategorie || undefined, kleinteilManuell, initial?.anzahlungProzent, parseFloat(initial?.anzahlungBetrag ?? '') || undefined);
 
-  /** `draft` saves whatever is there so far (only the customer is required);
-      a new Rechnung starts out as "Entwurf" either way. */
-  async function submit(draft: boolean) {
-    if (busy) return;
-    if (!cid) { showToast('Bitte einen Kunden auswählen', 'error'); return; }
-    if (parseNummer(nummer) == null) { showToast('Bitte eine gültige Rechnungs-Nr. eingeben', 'error'); return; }
-    // Only a changed number is checked: an existing duplicate doesn't ask again on every save.
-    const rechnungNumber = nummerBestaetigt(nummer, (n) => n !== initial?.rechnungNumber && nummerVergeben(n), 'Rechnung');
-    if (rechnungNumber == null) return;
-    if (!draft && !ap.length && !mp.length) { showToast('Mindestens eine Position eingeben', 'error'); return; }
-    setSavingLocal(true);
-    try {
-      // Awaited so a rejected write keeps the sheet (and the user's input) open.
-      await onSave({
-        rechnungNumber, customerId: cid, titel, positionen: [...mp, ...ap], notizen,
-        zahlungsFrist, faelligAm,
-        kategorie: kategorie || undefined, kleinteilManuell,
-        totalBetrag: rechnungstotal.toFixed(2), totalArbeit: totA.toFixed(2),
-        totalMaterial: totM.toFixed(2), totalZE: totZE,
-        auftragId: selectedAuftragId || undefined,
-      });
-    } catch (e) {
-      console.error('[Rechnung] save failed:', e);
-    } finally {
-      setSavingLocal(false);
-    }
+  const nr = parseNummer(nummer);
+  // Only a changed number is checked: an existing duplicate doesn't block every save.
+  const nrVergeben = nr != null && nr !== saved?.rechnungNumber && nummerVergeben(nr);
+  const hatInhalt = !!titel.trim() || ap.length > 0 || mp.length > 0;
+
+  /** Why the current input isn't saved (null: it is). A new Rechnung is only
+      created once there is a customer and something to bill. */
+  const hinweis =
+    !cid ? (saved ? 'Kunde fehlt – nicht gespeichert' : 'Speichert automatisch, sobald ein Kunde gewählt ist')
+    : nr == null ? 'Ungültige Rechnungs-Nr. – nicht gespeichert'
+    : nrVergeben && dupOk !== nr ? `Nr. ${nr} existiert bereits – nicht gespeichert`
+    : !saved && !hatInhalt ? 'Speichert automatisch, sobald Betreff oder Position erfasst ist'
+    : null;
+
+  const data: RechnungData | null = hinweis || nr == null ? null : {
+    rechnungNumber: nr, customerId: cid, titel,
+    positionen: [...mp, ...ap.map(toArbeitPosition)], notizen,
+    zahlungsFrist, faelligAm,
+    kategorie: kategorie || undefined, kleinteilManuell,
+    totalBetrag: rechnungstotal.toFixed(2), totalArbeit: totA.toFixed(2),
+    totalMaterial: totM.toFixed(2), totalZE: totZE,
+    auftragId: selectedAuftragId || undefined,
+  };
+
+  const autoSave = useAutoSave(data, async (d) => {
+    const r = await onSave(d, savedRef.current);
+    savedRef.current = r;
+    setSaved(r);
+  }, { unsaved: !initial });
+
+  /** Saves what's still pending, then closes. A failed save keeps the form open. */
+  async function fertig() {
+    if (hinweis && (saved || hatInhalt) && !window.confirm(`${hinweis}. Trotzdem schliessen?`)) return;
+    if (await autoSave.flush()) onDone(savedRef.current);
   }
 
   /* import status summary */
@@ -306,8 +331,8 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
           </div>
           {vehicleChips.length > 0 && <div className="df-span2"><VehicleChips chips={vehicleChips} /></div>}
           <NummerField
-            label="Rechnungs-Nr." value={nummer} onChange={setNummer} vorschlag={nummerVorschlag}
-            vergeben={(() => { const n = parseNummer(nummer); return n != null && n !== initial?.rechnungNumber && nummerVergeben(n); })()}
+            label="Rechnungs-Nr." value={nummer} onChange={setNummer} vorschlag={vorschlag}
+            vergeben={nrVergeben}
           />
           <div className="cf-field">
             <label className="cf-label">Betreff</label>
@@ -398,15 +423,16 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
         </div>
       </FormCard>
 
-      <FormBar label="Total" value={fCHF(rechnungstotal)}>
-        {initial
-          ? <button className="mf-btn-cancel" onClick={onCancel} disabled={busy}>Abbrechen</button>
-          : <button className="mf-btn-cancel" onClick={() => submit(true)} disabled={busy}>Als Entwurf speichern</button>}
-        <button className="mf-btn-save" onClick={() => submit(false)} disabled={busy}>
-          {busy
-            ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Spinner size={12} /> Speichern…</span>
-            : initial ? 'Änderungen speichern' : 'Rechnung erstellen'}
-        </button>
+      <FormBar
+        label="Total" value={fCHF(rechnungstotal)}
+        status={
+          <SaveStatus
+            status={autoSave.status} onRetry={autoSave.retry} hinweis={hinweis}
+            action={nr != null && nrVergeben && dupOk !== nr && cid ? { label: 'Trotzdem verwenden', onClick: () => setDupOk(nr) } : undefined}
+          />
+        }
+      >
+        <button className="mf-btn-save" onClick={fertig}>Fertig</button>
       </FormBar>
 
     </div>

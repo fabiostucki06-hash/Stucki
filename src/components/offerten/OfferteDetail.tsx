@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import Sheet from '../ui/Sheet';
 import Spinner from '../ui/Spinner';
-import { showToast } from '../ui/Toast';
 import { SFPlus, SFXmark } from '../Icons';
-import { PartLink } from '../ui/DocForm';
+import { PartLink, SaveStatus } from '../ui/DocForm';
+import { useAutoSave } from '../../hooks/useAutoSave';
 import { ActiveOfferteBanner } from './ActiveOfferte';
 import PartsOrder from '../teile/PartsOrder';
 import { exportOffertePDF, exportAuftragsbestaetigungPDF } from '../../lib/pdf-offerte';
@@ -72,7 +72,6 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   const [creatingMat, setCreatingMat] = useState(false);
   const [creatingAnz, setCreatingAnz] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const [posSaving, setPosSaving] = useState(false);
 
   // The offerte prop can change under us while this component stays mounted
   // (edit sheet saved, background revalidate, another device). Re-seed the local
@@ -255,18 +254,23 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
     };
   }
 
-  async function savePositionen(msg = 'Positionen gespeichert') {
-    setPosSaving(true);
-    try {
-      await onUpdate(buildPayload());
-      setDirty(false);
-      showToast(msg, 'success');
-    } catch {
-      // onUpdate already toasted the concrete reason; keep the edits marked dirty.
-    } finally {
-      setPosSaving(false);
-    }
+  /* Inline edits save themselves. Only the edited fields are compared, so the
+     offerte prop coming back from a save doesn't count as a change; the write
+     itself always goes through buildPayload. Once stored, the edits are no longer
+     dirty and the local state follows the prop again. */
+  const autoSave = useAutoSave(
+    dirty ? { positionen, zahlungsziel, zahlungsbedingung, zusatznotiz, mitAnzahlung, ab } : null,
+    () => onUpdate(buildPayload()),
+  );
+  useEffect(() => {
+    if (autoSave.status === 'saved') setDirty(false);
+  }, [autoSave.status]);
+  /** The edit form starts from the inline edits, stored first so it can't overwrite them. */
+  async function bearbeiten() {
+    if (!dirty) { onEdit(offerte); return; }
+    if (await autoSave.flush()) onEdit(buildPayload());
   }
+  const saveStatus = (dirty || autoSave.status !== 'idle') && <SaveStatus status={autoSave.status} onRetry={autoSave.retry} />;
 
   async function handleDuplicate() {
     setDuplicating(true);
@@ -301,7 +305,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   }
 
   async function handleExportAB() {
-    if (dirty) await savePositionen('Auftragsbestätigung gespeichert');
+    if (dirty && !(await autoSave.flush())) return;
     exportAuftragsbestaetigungPDF(abPayload(), customer, signature);
   }
 
@@ -351,7 +355,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
       title={`${docName} #${nr}`}
       onClose={onClose}
       full
-      barRight={<button onClick={() => onEdit(offerte)} className="bar-btn">Bearbeiten</button>}
+      barRight={<button onClick={bearbeiten} className="bar-btn">Bearbeiten</button>}
     >
       <ActiveOfferteBanner offerte={offerte} customer={customer} />
 
@@ -469,16 +473,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
       {/* ── Positionen – inline editable mit Accept/Reject ── */}
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 0 }}>
         <p className="section-header" style={{ margin: 0 }}>Positionen</p>
-        {dirty && (
-          <button
-            onClick={() => savePositionen()}
-            disabled={posSaving}
-            className="mf-btn-save"
-            style={{ marginRight: 20, display: 'flex', alignItems: 'center', gap: 5 }}
-          >
-            {posSaving ? <><Spinner size={11} /> Speichern…</> : '✓ Speichern'}
-          </button>
-        )}
+        {saveStatus && <span style={{ marginRight: 20 }}>{saveStatus}</span>}
       </div>
       <div className="inset-grouped-list" style={{ marginBottom: 8, marginTop: 8 }}>
         {positionen.map((pos, i) => {
@@ -730,13 +725,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
               <div className="ab-sig-caption">Unterschrift Kunde</div>
             </div>
           </div>
-          {dirty && (
-            <div style={{ marginTop: 14 }}>
-              <button onClick={() => savePositionen('Auftragsbestätigung gespeichert')} disabled={posSaving} className="btn-system btn-secondary">
-                {posSaving ? <><Spinner size={13} />&nbsp; Speichern…</> : 'AB speichern'}
-              </button>
-            </div>
-          )}
+          {saveStatus && <div style={{ marginTop: 14 }}>{saveStatus}</div>}
         </div>
       )}
 
@@ -755,7 +744,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
             </button>
           )}
           {showAbPdf && (
-            <button onClick={handleExportAB} disabled={posSaving || acceptedCount === 0} className={`btn-system btn-primary${showDocPdf ? '' : ' doc-btn-full'}`}>
+            <button onClick={handleExportAB} disabled={autoSave.status === 'saving' || acceptedCount === 0} className={`btn-system btn-primary${showDocPdf ? '' : ' doc-btn-full'}`}>
               AB als PDF
             </button>
           )}

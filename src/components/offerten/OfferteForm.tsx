@@ -1,12 +1,11 @@
-import { useState } from 'react';
-import Spinner from '../ui/Spinner';
-import { showToast } from '../ui/Toast';
-import { FormCard, FormBar, SummaryRow, VehicleChips, PositionenEditor, fCHF, type ArbeitRow, type MaterialRow } from '../ui/DocForm';
+import { useRef, useState } from 'react';
+import { FormCard, FormBar, SaveStatus, SummaryRow, VehicleChips, PositionenEditor, fCHF, type ArbeitRow, type MaterialRow } from '../ui/DocForm';
 import type { Customer, ArbeitPosition, MaterialPosition, Offerte, OfferteStatus } from '../../types';
 import { offerteNotizen, anzahlungErforderlich, anzahlungAufteilung, ANZAHLUNG_PROZENT, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ } from '../../lib/offerte-docs';
-import NummerField, { nummerBestaetigt, parseNummer } from '../ui/NummerField';
+import NummerField, { parseNummer } from '../ui/NummerField';
 import { materialPreis, materialZeSumme, zeMinuten } from '../../lib/ze';
 import { setMaterialFeld } from '../../lib/marge';
+import { useAutoSave } from '../../hooks/useAutoSave';
 
 type OfferteData = Omit<Offerte, 'id' | 'offertNumber' | 'createdAt'> & { offertNumber: number };
 
@@ -19,9 +18,11 @@ const STATUS_OPTS: [OfferteStatus, string][] = [
 
 interface OfferteFormProps {
   customers: Customer[];
-  onSave: (data: OfferteData) => Promise<void> | void;
-  onCancel: () => void;
-  saving?: boolean;
+  /** Auto-save: `existing` is the stored Offerte (none yet for a new one, which
+      creates it); resolves with the row as stored and rejects when the write failed. */
+  onSave: (data: OfferteData, existing?: Offerte) => Promise<Offerte>;
+  /** "Fertig": everything is saved; `saved` is the stored Offerte, if any. */
+  onDone: (saved?: Offerte) => void;
   initial?: Offerte;
   /** Automatic Offerte-Nr.: the next free one for a new Offerte, else the current one. */
   nummerVorschlag: number;
@@ -71,8 +72,16 @@ const toArbeitPosition = (p: ArbeitRow): ArbeitPosition => ({
 });
 const newMaterial = (): MaterialRow => ({ typ: 'material', beschreibung: '', menge: '1', stueckpreis: '', preis: '' });
 
-export default function OfferteForm({ customers, onSave, onCancel, saving: savingProp, initial, prefillMaterial, prefillCustomerId, nummerVorschlag, nummerVergeben }: OfferteFormProps) {
-  const [nummer, setNummer] = useState(String(initial?.offertNumber ?? nummerVorschlag));
+export default function OfferteForm({ customers, onSave, onDone, initial, prefillMaterial, prefillCustomerId, nummerVorschlag, nummerVergeben }: OfferteFormProps) {
+  // Kept from the start: once a new Offerte is stored, the next free number moves on.
+  const [vorschlag] = useState(nummerVorschlag);
+  const [nummer, setNummer] = useState(String(initial?.offertNumber ?? vorschlag));
+  /* The Offerte as last stored. The ref feeds the save chain (a quick second save
+     must update the Offerte the first one created), the state the render. */
+  const savedRef = useRef<Offerte | undefined>(initial);
+  const [saved, setSaved] = useState<Offerte | undefined>(initial);
+  // A taken number is only used after "Trotzdem verwenden".
+  const [dupOk, setDupOk] = useState<number | null>(null);
   // Off by default: a new Offerte is a plain one.
   const [mitAnzahlung, setMitAnzahlung] = useState(() => (initial ? anzahlungErforderlich(initial) : false));
   const [cid,        setCid]        = useState(initial?.customerId ?? prefillCustomerId ?? '');
@@ -93,8 +102,6 @@ export default function OfferteForm({ customers, onSave, onCancel, saving: savin
   const [gueltigBis, setGueltigBis] = useState(initial?.gueltigBis ?? '');
   const [zahlungsziel, setZahlungsziel] = useState(initial?.zahlungsziel ?? '10');
   const [status,     setStatus]     = useState<OfferteStatus>(initial?.status ?? 'entwurf');
-  const [savingLocal, setSavingLocal] = useState(false);
-  const busy = savingProp || savingLocal;
 
   const selectedCustomer = customers.find((c) => c.id === cid) ?? null;
   const vehicleChips = selectedCustomer
@@ -147,36 +154,42 @@ export default function OfferteForm({ customers, onSave, onCancel, saving: savin
   const kleinteilBetrag = kleinteilActive ? 10 : 0;
   const totMeff = totM + kleinteilBetrag;
 
-  /** `draft` saves whatever is there so far (only the customer is required);
-      a new Offerte starts out as "Entwurf" either way. */
-  async function submit(draft: boolean) {
-    if (busy) return;
-    if (!cid) { showToast('Bitte einen Kunden auswählen', 'error'); return; }
-    if (parseNummer(nummer) == null) { showToast('Bitte eine gültige Offerte-Nr. eingeben', 'error'); return; }
-    // Only a changed number is checked: an existing duplicate doesn't ask again on every save.
-    const offertNumber = nummerBestaetigt(nummer, (n) => n !== initial?.offertNumber && nummerVergeben(n), 'Offerte');
-    if (offertNumber == null) return;
-    const ap = arbeit.filter((p) => p.beschreibung.trim()).map(toArbeitPosition);
-    const mp = material.filter((p) => p.beschreibung.trim());
-    if (!draft && !ap.length && !mp.length) { showToast('Mindestens eine Position eingeben', 'error'); return; }
-    const autoPauschale: MaterialPosition[] = kleinteilActive
-      ? [{ typ: 'material', beschreibung: 'Kleinteil Pauschale', menge: '1', stueckpreis: '10', preis: '10.00' }]
-      : [];
-    setSavingLocal(true);
-    try {
-      // Awaited so a rejected write keeps the sheet (and the user's input) open;
-      // the save path already toasts the reason via syncOk().
-      await onSave({
-        offertNumber, customerId: cid, titel, positionen: [...mp, ...autoPauschale, ...ap], notizen, gueltigBis, zahlungsziel, status,
-        ...zahlungsterms(),
-        totalBetrag: (totA + totMeff).toFixed(2), totalArbeit: totA.toFixed(2),
-        totalMaterial: totMeff.toFixed(2), totalZE: totZE,
-      });
-    } catch (e) {
-      console.error('[Offerte] save failed:', e);
-    } finally {
-      setSavingLocal(false);
-    }
+  const nr = parseNummer(nummer);
+  // Only a changed number is checked: an existing duplicate doesn't block every save.
+  const nrVergeben = nr != null && nr !== saved?.offertNumber && nummerVergeben(nr);
+  const hatInhalt = !!titel.trim() || arbeit.some((p) => p.beschreibung.trim()) || material.some((p) => p.beschreibung.trim());
+
+  /** Why the current input isn't saved (null: it is). A new Offerte is only
+      created once there is a customer and something to offer. */
+  const hinweis =
+    !cid ? (saved ? 'Kunde fehlt – nicht gespeichert' : 'Speichert automatisch, sobald ein Kunde gewählt ist')
+    : nr == null ? 'Ungültige Offerte-Nr. – nicht gespeichert'
+    : nrVergeben && dupOk !== nr ? `Nr. ${nr} existiert bereits – nicht gespeichert`
+    : !saved && !hatInhalt ? 'Speichert automatisch, sobald Betreff oder Position erfasst ist'
+    : null;
+
+  const autoPauschale: MaterialPosition[] = kleinteilActive
+    ? [{ typ: 'material', beschreibung: 'Kleinteil Pauschale', menge: '1', stueckpreis: '10', preis: '10.00' }]
+    : [];
+  const data: OfferteData | null = hinweis || nr == null ? null : {
+    offertNumber: nr, customerId: cid, titel,
+    positionen: [...material.filter((p) => p.beschreibung.trim()), ...autoPauschale, ...arbeit.filter((p) => p.beschreibung.trim()).map(toArbeitPosition)],
+    notizen, gueltigBis, zahlungsziel, status,
+    ...zahlungsterms(),
+    totalBetrag: (totA + totMeff).toFixed(2), totalArbeit: totA.toFixed(2),
+    totalMaterial: totMeff.toFixed(2), totalZE: totZE,
+  };
+
+  const autoSave = useAutoSave(data, async (d) => {
+    const s = await onSave(d, savedRef.current);
+    savedRef.current = s;
+    setSaved(s);
+  }, { unsaved: !initial });
+
+  /** Saves what's still pending, then closes. A failed save keeps the form open. */
+  async function fertig() {
+    if (hinweis && (saved || hatInhalt) && !window.confirm(`${hinweis}. Trotzdem schliessen?`)) return;
+    if (await autoSave.flush()) onDone(savedRef.current);
   }
 
   const total = totA + totMeff;
@@ -190,16 +203,16 @@ export default function OfferteForm({ customers, onSave, onCancel, saving: savin
   /** Anzahlung flag plus the matching terms: on fills in the Vorkasse terms unless
       own ones exist, off removes the Vorkasse terms again (same as in the Offerte view). */
   function zahlungsterms(): Pick<Offerte, 'anzahlungErforderlich' | 'zahlungsbedingung' | 'zusatznotiz'> {
-    const zb = initial?.zahlungsbedingung?.trim() ?? '', zn = initial?.zusatznotiz?.trim() ?? '';
+    const zb = saved?.zahlungsbedingung?.trim() ?? '', zn = saved?.zusatznotiz?.trim() ?? '';
     if (mitAnzahlung) {
       return zb || zn
-        ? { anzahlungErforderlich: true, zahlungsbedingung: initial?.zahlungsbedingung, zusatznotiz: initial?.zusatznotiz }
+        ? { anzahlungErforderlich: true, zahlungsbedingung: saved?.zahlungsbedingung, zusatznotiz: saved?.zusatznotiz }
         : { anzahlungErforderlich: true, zahlungsbedingung: VORKASSE_BEDINGUNG, zusatznotiz: SCHLUSSRECHNUNG_NOTIZ };
     }
     const vorkasse = zb === VORKASSE_BEDINGUNG && [SCHLUSSRECHNUNG_NOTIZ, ''].includes(zn);
     return vorkasse
       ? { anzahlungErforderlich: false, zahlungsbedingung: undefined, zusatznotiz: undefined }
-      : { anzahlungErforderlich: false, zahlungsbedingung: initial?.zahlungsbedingung, zusatznotiz: initial?.zusatznotiz };
+      : { anzahlungErforderlich: false, zahlungsbedingung: saved?.zahlungsbedingung, zusatznotiz: saved?.zusatznotiz };
   }
 
   return (
@@ -224,9 +237,9 @@ export default function OfferteForm({ customers, onSave, onCancel, saving: savin
           </div>
           {vehicleChips.length > 0 && <div className="df-span2"><VehicleChips chips={vehicleChips} /></div>}
           <NummerField
-            label="Offerte-Nr." value={nummer} onChange={setNummer} vorschlag={nummerVorschlag}
+            label="Offerte-Nr." value={nummer} onChange={setNummer} vorschlag={vorschlag}
             suffix={initial?.version && initial.version > 1 ? `_${initial.version}` : undefined}
-            vergeben={(() => { const n = parseNummer(nummer); return n != null && n !== initial?.offertNumber && nummerVergeben(n); })()}
+            vergeben={nrVergeben}
           />
           <div className="cf-field">
             <label className="cf-label">Betreff</label>
@@ -308,15 +321,16 @@ export default function OfferteForm({ customers, onSave, onCancel, saving: savin
         </div>
       </FormCard>
 
-      <FormBar label="Total" value={fCHF(total)}>
-        {initial
-          ? <button className="mf-btn-cancel" onClick={onCancel} disabled={busy}>Abbrechen</button>
-          : <button className="mf-btn-cancel" onClick={() => submit(true)} disabled={busy}>Als Entwurf speichern</button>}
-        <button className="mf-btn-save" onClick={() => submit(false)} disabled={busy}>
-          {busy
-            ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Spinner size={12} /> Speichern…</span>
-            : initial ? 'Änderungen speichern' : 'Offerte erstellen'}
-        </button>
+      <FormBar
+        label="Total" value={fCHF(total)}
+        status={
+          <SaveStatus
+            status={autoSave.status} onRetry={autoSave.retry} hinweis={hinweis}
+            action={nr != null && nrVergeben && dupOk !== nr && cid ? { label: 'Trotzdem verwenden', onClick: () => setDupOk(nr) } : undefined}
+          />
+        }
+      >
+        <button className="mf-btn-save" onClick={fertig}>Fertig</button>
       </FormBar>
 
     </div>

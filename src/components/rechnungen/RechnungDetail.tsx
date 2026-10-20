@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import Sheet from '../ui/Sheet';
 import Spinner from '../ui/Spinner';
-import { showToast } from '../ui/Toast';
 import { SFPlus, SFXmark } from '../Icons';
-import { PartLink } from '../ui/DocForm';
+import { PartLink, SaveStatus } from '../ui/DocForm';
+import { useAutoSave } from '../../hooks/useAutoSave';
 import { exportRechnungPDF } from '../../lib/pdf-rechnung';
 import { computeRechnungTotals, rechnungDocName, schlussReferenz, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../lib/rechnung-totals';
 import { mitMaterialHinweis } from '../../lib/offerte-docs';
@@ -63,7 +63,6 @@ const HDR: React.CSSProperties = {
 export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, onDelete, onEdit, onCreateSchlussrechnung, schlussrechnungNumber }: RechnungDetailProps) {
   const [saving, setSaving] = useState(false);
   const [creatingSchluss, setCreatingSchluss] = useState(false);
-  const [posSaving, setPosSaving] = useState(false);
   const [positionen, setPositionen] = useState<Position[]>(() => rechnung.positionen ?? []);
   const [zahlungsFrist, setZahlungsFrist] = useState(rechnung.zahlungsFrist ?? '10');
   const [kategorie, setKategorie] = useState<RechnungKategorie | ''>(rechnung.kategorie ?? '');
@@ -176,36 +175,41 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
     resetNewPos();
   }
 
-  async function savePositionen() {
-    setPosSaving(true);
-    try {
-      await onUpdate({
-        ...rechnung,
-        positionen,
-        totalBetrag: rechnungstotal.toFixed(2),
-        totalArbeit: totA.toFixed(2),
-        totalMaterial: totM.toFixed(2),
-        totalZE: totZE,
-        zahlungsFrist,
-        faelligAm,
-        kategorie: kategorie || undefined,
-        kleinteilManuell,
-      });
-      setDirty(false);
-      showToast('Positionen gespeichert', 'success');
-    } catch {
-      showToast('Fehler beim Speichern', 'error');
-    } finally {
-      setPosSaving(false);
-    }
+  function buildPayload(): Rechnung {
+    return {
+      ...rechnung,
+      positionen,
+      totalBetrag: rechnungstotal.toFixed(2),
+      totalArbeit: totA.toFixed(2),
+      totalMaterial: totM.toFixed(2),
+      totalZE: totZE,
+      zahlungsFrist,
+      faelligAm,
+      kategorie: kategorie || undefined,
+      kleinteilManuell,
+    };
   }
+  /* Inline edits save themselves (see OfferteDetail): only the edited fields are
+     compared, the write takes the current rechnung with them. */
+  const autoSave = useAutoSave(
+    dirty ? { positionen, zahlungsFrist, kategorie, kleinteilManuell } : null,
+    () => onUpdate(buildPayload()),
+  );
+  /** The edit form starts from the inline edits, stored first so it can't overwrite them. */
+  async function bearbeiten() {
+    if (!dirty) { onEdit(rechnung); return; }
+    if (await autoSave.flush()) onEdit(buildPayload());
+  }
+  useEffect(() => {
+    if (autoSave.status === 'saved') setDirty(false);
+  }, [autoSave.status]);
 
   return (
     <Sheet
       title={`${docName} #${rechnung.rechnungNumber}`}
       onClose={onClose}
       full
-      barRight={<button onClick={() => onEdit(rechnung)} className="bar-btn">Bearbeiten</button>}
+      barRight={<button onClick={bearbeiten} className="bar-btn">Bearbeiten</button>}
     >
       <div className="glass-panel" style={{ padding: 16, marginBottom: 16 }}>
         <div style={{ fontSize: 13, color: 'var(--label2)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Status</div>
@@ -301,15 +305,8 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
       {/* ── Positionen – inline editable ── */}
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 0 }}>
         <p className="section-header" style={{ margin: 0 }}>Positionen</p>
-        {dirty && (
-          <button
-            onClick={savePositionen}
-            disabled={posSaving}
-            className="mf-btn-save"
-            style={{ marginRight: 20, display: 'flex', alignItems: 'center', gap: 5 }}
-          >
-            {posSaving ? <><Spinner size={11} /> Speichern…</> : '✓ Speichern'}
-          </button>
+        {(dirty || autoSave.status !== 'idle') && (
+          <span style={{ marginRight: 20 }}><SaveStatus status={autoSave.status} onRetry={autoSave.retry} /></span>
         )}
       </div>
 

@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from 'react';
 import Spinner from './Spinner';
-import { SFPlus, SFXmark } from '../Icons';
+import { SFCheckmark, SFPlus, SFXmark } from '../Icons';
+import type { AutoSaveStatus } from '../../hooks/useAutoSave';
 import { findPartLink, parsePartLink } from '../../lib/utils';
 import { cleanPartTitle, partNameFromUrl } from '../../lib/partTitle';
 import { getMargin } from '../../lib/settings';
@@ -62,18 +63,52 @@ export function PartLink({ url }: { url?: string }) {
   );
 }
 
-/** Sticks to the bottom of the sheet's scroll area, so the running total and
-    the submit buttons stay reachable however long the position list gets. */
-export function FormBar({ label, value, children }: { label: string; value: string; children: ReactNode }) {
+/** Sticks to the bottom of the sheet's scroll area, so the running total, the
+    save status and the actions stay reachable however long the position list gets. */
+export function FormBar({ label, value, status, children }: { label: string; value: string; status?: ReactNode; children: ReactNode }) {
   return (
     <div className="df-bar">
       <div className="df-bar-total">
         <span className="df-bar-lbl">{label}</span>
         <span className="df-bar-val">{value}</span>
+        {status}
       </div>
       <div className="df-bar-actions">{children}</div>
     </div>
   );
+}
+
+/** Auto-save state next to the form actions. `hinweis` explains why nothing is
+    saved yet (e.g. no customer chosen) and `action` offers a way out of it. */
+export function SaveStatus({ status, onRetry, hinweis, action }: {
+  status: AutoSaveStatus;
+  onRetry: () => void;
+  hinweis?: string | null;
+  action?: { label: string; onClick: () => void };
+}) {
+  if (status === 'error') {
+    return (
+      <span className="df-save df-save-error" role="status">
+        <span aria-hidden>⚠︎</span> Fehler beim Speichern
+        <button type="button" className="df-save-btn" onClick={onRetry}>Erneut versuchen</button>
+      </span>
+    );
+  }
+  if (status === 'saving' || status === 'pending') {
+    return <span className="df-save" role="status"><Spinner size={12} /> Speichert…</span>;
+  }
+  if (hinweis) {
+    return (
+      <span className="df-save df-save-hint" role="status">
+        {hinweis}
+        {action && <button type="button" className="df-save-btn" onClick={action.onClick}>{action.label}</button>}
+      </span>
+    );
+  }
+  if (status === 'saved') {
+    return <span className="df-save df-save-ok" role="status"><SFCheckmark /> Alle Änderungen gespeichert</span>;
+  }
+  return <span className="df-save" role="status">Änderungen werden automatisch gespeichert</span>;
 }
 
 /** Enter in a row jumps to the next row's description, or appends a new row
