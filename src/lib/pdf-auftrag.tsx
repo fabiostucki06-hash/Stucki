@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { PAGE_TOP, PAGE_BOTTOM, addPageNumbers } from './pdf-paging';
-import { formatDateCH, buildDocumentFilename } from './utils';
+import { formatDateCH, buildDocumentFilename, echteBeanstandungen } from './utils';
 import { CO_NAME, CO_ADDR, CO_CITY, CO_PHONE, CO_LOC, STD_SATZ } from './company';
 import type { ArbeitPosition, Customer, Order } from '../types';
 
@@ -13,6 +13,7 @@ const ML = 15;
 const TL = ML, TR = PW - ML, TW = TR - TL; // 15 … 195, width = 180
 
 const RH   = 5;    // data row height mm
+const RL   = 3.6;  // extra height per wrapped line in a data row
 const RH_H = 6.5;  // table header row
 const RH_S = 6;    // section row (vehicle, std.satz)
 const RH_T = 7;    // total row
@@ -31,9 +32,7 @@ function drawDoc(doc: jsPDF, order: Order, customer: Customer | undefined) {
   const vehicle = [customer?.marke, customer?.modell].filter(Boolean).join(' ');
   const owner   = customer ? `${customer.vorname} ${customer.nachname}` : '';
 
-  const bItems = (order.beanstandungen ?? []).filter(
-    b => b && !b.trim().toLowerCase().startsWith('offerte'),
-  );
+  const bItems = echteBeanstandungen(order.beanstandungen);
   const oItems = (order.offertItems ?? []).map(i => i.text).filter(Boolean);
   const aPos   = (order.positionen ?? []).filter(p => p.typ === 'arbeit') as ArbeitPosition[];
 
@@ -61,13 +60,6 @@ function drawDoc(doc: jsPDF, order: Order, customer: Customer | undefined) {
   };
   const tL = (t: string, x: number, y: number) => doc.text(String(t), x, y);
   const tR = (t: string, x: number, y: number) => doc.text(String(t), x, y, { align: 'right' });
-  const clip = (t: string, maxW: number): string => {
-    const s = String(t);
-    if (doc.getTextWidth(s) <= maxW) return s;
-    let r = s;
-    while (r.length > 1 && doc.getTextWidth(r + '…') > maxW) r = r.slice(0, -1);
-    return r + '…';
-  };
 
   let y = 12;
   const fits = (h: number) => y + h <= PAGE_BOTTOM;
@@ -136,14 +128,17 @@ function drawDoc(doc: jsPDF, order: Order, customer: Customer | undefined) {
   tableHeader();
 
   // ── WORK ROWS (min 15) ────────────────────────────────────────────────────
+  // Long texts wrap onto extra lines inside their row instead of being cut off.
   for (const row of allRows) {
-    if (!fits(RH)) { vLine(x1, segTop, y, 0.15); newPage(); segTop = y; tableHeader(); }
+    const lines = doc.splitTextToSize(String(row.text), wArb - PAD * 2) as string[];
+    const h = RH + (lines.length - 1) * RL;
+    if (!fits(h)) { vLine(x1, segTop, y, 0.15); newPage(); segTop = y; tableHeader(); }
     const ty = y + RH * BL;
     rgb(0, 0, 0);
-    tL(clip(row.text, wArb - PAD * 2), x0 + PAD, ty);
+    lines.forEach((line, k) => tL(line, x0 + PAD, ty + k * RL));
     if (row.ze) { rgb(50, 50, 50); tR(row.ze, TR - PAD, ty); rgb(0, 0, 0); }
-    hLine(y + RH, TL, TR, 0.1);
-    y += RH;
+    hLine(y + h, TL, TR, 0.1);
+    y += h;
   }
   for (let i = allRows.length; i < 15 && fits(RH); i++) {
     hLine(y + RH, TL, TR, 0.1);

@@ -66,6 +66,15 @@ export const isOverdue = (o: Order): boolean => {
   return false;
 };
 
+/** The "Offerte #12" / "Offerte #12: Titel" reference handleCreateAuftragFromOfferte
+    puts first in an Auftrag's Beanstandungen. Matched on the "#", so a complaint
+    that merely mentions an Offerte stays a real Beanstandung. */
+export const isOfferteRef = (b: string): boolean => /^offerte\s*#/i.test(b.trim());
+
+/** Beanstandungen as shown, edited and printed: no empty lines, no Offerte reference. */
+export const echteBeanstandungen = (bs?: string[]): string[] =>
+  (bs ?? []).filter((b) => b.trim() !== '' && !isOfferteRef(b));
+
 export const needsAttention = (o: Order): boolean =>
   o.status !== 'abgeschlossen' && isOverdue(o);
 

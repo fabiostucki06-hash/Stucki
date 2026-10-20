@@ -5,7 +5,7 @@ import Spinner from '../ui/Spinner';
 import { SFPlus, SFXmark } from '../Icons';
 import { PartLink } from '../ui/DocForm';
 import PartsOrder from '../teile/PartsOrder';
-import { isOverdue, daysSince, hoursSince, formatDateCH } from '../../lib/utils';
+import { isOverdue, daysSince, hoursSince, formatDateCH, isOfferteRef, echteBeanstandungen } from '../../lib/utils';
 import { SC, SO } from '../../constants/statuses';
 import { exportOrderPDF } from '../../lib/pdf-auftrag';
 import { sumPositions } from '../../lib/offerte-docs';
@@ -24,7 +24,8 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
   const [edit, setEdit] = useState(defaultEdit ?? false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<OrderStatus>(order.status);
-  const [bs, setBs] = useState((order.beanstandungen ?? ['']).filter((b) => !b.trim().toLowerCase().includes('offerte')));
+  const initialBs = () => { const b = echteBeanstandungen(order.beanstandungen); return b.length ? b : ['']; };
+  const [bs, setBs] = useState(initialBs);
   const [notizen, setNotizen] = useState(order.notizen ?? '');
   const [items] = useState<OrderItem[]>(order.offertItems ?? []);
   const offB = order.offertBetrag ?? '';
@@ -44,10 +45,21 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
   const addB = () => setBs((p) => [...p, '']);
   const updB = (i: number, v: string) => setBs((p) => { const n = [...p]; n[i] = v; return n; });
   const remB = (i: number) => setBs((p) => p.filter((_, j) => j !== i));
+  // The Offerte reference isn't editable here; keep it in front of the edited lines
+  // instead of dropping it on every save.
+  const beanstandungen = () => [...(order.beanstandungen ?? []).filter(isOfferteRef), ...bs.filter((x) => x.trim())];
+  // Textareas grow with their content, so long complaints stay fully visible.
+  const grow = (el: HTMLTextAreaElement | null) => { if (el) { el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; } };
+
+  function cancelEdit() {
+    setEdit(false); setEditCust(false);
+    // Discarded edits must not ride along on the next status change (saveStatus).
+    setBs(initialBs()); setNotizen(order.notizen ?? '');
+  }
 
   async function save() {
     setSaving(true);
-    const upd: Order = { ...order, status, beanstandungen: bs.filter((x) => x.trim()), notizen, offertItems: items, offertBetrag: offB, rechnungsBetrag: recB, zahlungsFrist };
+    const upd: Order = { ...order, status, beanstandungen: beanstandungen(), notizen, offertItems: items, offertBetrag: offB, rechnungsBetrag: recB, zahlungsFrist };
     if (status !== order.status) upd.statusChangedAt = new Date().toISOString();
     const cp = editCust ? { vorname: cv, nachname: cn, telefon: ct, kennzeichen: ck, modell: cm, marke: cma } : null;
     await onUpdate(upd, cp); setSaving(false); setEdit(false); setEditCust(false);
@@ -55,7 +67,7 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
 
   async function saveStatus(ns: OrderStatus) {
     setStatus(ns); setSaving(true);
-    const upd: Order = { ...order, status: ns, beanstandungen: bs.filter((x) => x.trim()), notizen, offertItems: items, offertBetrag: offB, rechnungsBetrag: recB, zahlungsFrist, statusChangedAt: new Date().toISOString() };
+    const upd: Order = { ...order, status: ns, beanstandungen: beanstandungen(), notizen, offertItems: items, offertBetrag: offB, rechnungsBetrag: recB, zahlungsFrist, statusChangedAt: new Date().toISOString() };
     await onUpdate(upd, null); setSaving(false);
   }
 
@@ -72,7 +84,7 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
       barRight={
         <div style={{ display: 'flex', gap: 4, minWidth: 60, justifyContent: 'flex-end' }}>
           {!edit && <button onClick={() => setEdit(true)} className="bar-btn">Bearbeiten</button>}
-          {edit && <button onClick={() => { setEdit(false); setEditCust(false); }} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}
+          {edit && <button onClick={cancelEdit} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}
         </div>
       }
     >
@@ -124,7 +136,12 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
         <div style={{ marginBottom: 20 }}>
           {bs.map((b, i) => (
             <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-              <input value={b} onChange={(e) => updB(i, e.target.value)} placeholder={`Beanstandung ${i + 1}`} style={{ ...inp2, flex: 1 }} />
+              <textarea
+                ref={grow} rows={1} value={b}
+                onChange={(e) => { updB(i, e.target.value); grow(e.currentTarget); }}
+                placeholder={`Beanstandung ${i + 1}`}
+                style={{ ...inp2, flex: 1, resize: 'none', overflow: 'hidden', fontFamily: 'inherit', lineHeight: 1.35 }}
+              />
               {bs.length > 1 && (
                 <button onClick={() => remB(i)} style={{ background: 'rgba(255,59,48,0.10)', border: '1px solid rgba(255,59,48,0.22)', borderRadius: 9, width: 38, height: 38, color: 'var(--red)', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <SFXmark />
@@ -138,12 +155,11 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
         </div>
       ) : (
         <div className="inset-grouped-list" style={{ marginBottom: 16 }}>
-          {(order.beanstandungen ?? [])
-            .filter((b) => b.trim() !== '' && !b.trim().toLowerCase().includes('offerte'))
+          {echteBeanstandungen(order.beanstandungen)
             .map((b, i) => (
-              <div key={i} className="list-row" style={{ cursor: 'default' }}>
+              <div key={i} className="list-row" style={{ cursor: 'default', alignItems: 'flex-start' }}>
                 <span style={{ fontWeight: 600, color: 'var(--blue)', marginRight: 8, fontSize: 13 }}>{i + 1}.</span>
-                <span className="sf-subhead">{b}</span>
+                <span className="sf-subhead" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', minWidth: 0 }}>{b}</span>
               </div>
             ))}
         </div>

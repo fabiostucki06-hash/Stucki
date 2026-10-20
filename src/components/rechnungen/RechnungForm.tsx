@@ -6,6 +6,7 @@ import NummerField, { parseNummer } from '../ui/NummerField';
 import { materialPreis, materialZeSumme, zeBetrag, zeMinuten } from '../../lib/ze';
 import { setMaterialFeld } from '../../lib/marge';
 import { useAutoSave } from '../../hooks/useAutoSave';
+import { echteBeanstandungen } from '../../lib/utils';
 import type { Customer, Order, Offerte, ArbeitPosition, MaterialPosition, Rechnung, RechnungKategorie } from '../../types';
 
 type RechnungData = Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'> & { rechnungNumber: number };
@@ -141,6 +142,14 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
       });
     setArbeit(arbeitRows.length ? arbeitRows : [newArbeit()]);
     setMaterial(materialRows.length ? materialRows : [newMaterial()]);
+    // Beanstandungen go into the Notizen (printed on the Rechnung). Those already
+    // listed as an Arbeitsposition (Auftrag from an Offerte) aren't repeated.
+    const arbeitTexte = new Set(arbeitRows.map((p) => p.beschreibung.trim()));
+    const bs = echteBeanstandungen(auftrag.beanstandungen).filter((b) => !arbeitTexte.has(b.trim()));
+    if (bs.length) {
+      const block = `Beanstandungen:\n${bs.map((b) => `- ${b}`).join('\n')}`;
+      setNotizen((prev) => (prev.includes(block) ? prev : [block, prev.trim()].filter(Boolean).join('\n\n')));
+    }
   }
 
   function onOfferteSelect(offerteId: string) {
