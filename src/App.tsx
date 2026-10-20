@@ -11,7 +11,7 @@ import { useVersionCheck } from './hooks/useVersionCheck';
 import { useIsDesktop } from './hooks/useIsDesktop';
 import { offerteNr, nextVersion, sumPositions, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_BEDINGUNG, ANZAHLUNG_PROZENT } from './lib/offerte-docs';
 import { hardReload } from './lib/reload';
-import { computeRechnungTotals, withOffertePositionen, migrateAnzahlungEntwurf } from './lib/rechnung-totals';
+import { computeRechnungTotals, withOffertePositionen, migrateAnzahlungEntwurf, findQuellOfferte } from './lib/rechnung-totals';
 
 import Spinner from './components/ui/Spinner';
 import Sheet from './components/ui/Sheet';
@@ -413,7 +413,7 @@ export default function App() {
      Anzahlungsrechnung) minus the Anzahlung already billed; the amount due is the
      Restbetrag shown on the Anzahlungsrechnung. */
   async function handleCreateSchlussrechnung(anz: Rechnung) {
-    const off = offerten.find((o) => o.id === anz.offertId);
+    const off = findQuellOfferte(anz, offerten);
     // Older Anzahlungsrechnungen carry a single amount line instead of the positions.
     const source = anz.anzahlungProzent ? anz.positionen : off?.positionen;
     if (!source?.length) { showToast('Keine Positionen für die Schlussrechnung gefunden', 'error'); return; }

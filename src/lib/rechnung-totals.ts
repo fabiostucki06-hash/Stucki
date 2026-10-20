@@ -40,6 +40,22 @@ export interface RechnungTotals {
 }
 
 /**
+ * Source Offerte of an Anzahlungsrechnung. Falls back to the newest version of
+ * the same Offerte-Nr. for the same Kunde when the linked version was deleted
+ * (e.g. replaced by "1_2"); the number is read from the title or first position.
+ */
+export function findQuellOfferte(r: Rechnung, offerten: Offerte[]): Offerte | undefined {
+  const direct = offerten.find((o) => o.id === r.offertId);
+  if (direct) return direct;
+  const m = `${r.titel ?? ''} ${r.positionen?.[0]?.beschreibung ?? ''}`.match(/Offerte (?:#|Nr\. )(\d+)/);
+  if (!m) return undefined;
+  const nr = Number(m[1]);
+  return offerten
+    .filter((o) => o.customerId === r.customerId && o.offertNumber === nr)
+    .sort((a, b) => (b.version ?? 1) - (a.version ?? 1))[0];
+}
+
+/**
  * Older Anzahlungsrechnungen carry a single line "Anzahlung 50% gemäss Offerte Nr. X".
  * Shows them with every position of the Offerte instead, as current ones are
  * created — but only when the Offerte still yields the billed amount, so the
@@ -47,7 +63,7 @@ export interface RechnungTotals {
  */
 export function withOffertePositionen(r: Rechnung, offerten: Offerte[]): Rechnung {
   if (r.art !== 'anzahlung' || r.anzahlungProzent) return r;
-  const positionen = offerten.find((o) => o.id === r.offertId)?.positionen;
+  const positionen = findQuellOfferte(r, offerten)?.positionen;
   if (!positionen?.length) return r;
   const pos = positionen.map((p) => (p.typ === 'material' ? (({ bestellt, ...m }) => m)(p) : p));
   const t = computeRechnungTotals(pos, undefined, false, ANZAHLUNG_PROZENT);
@@ -71,7 +87,7 @@ export function withOffertePositionen(r: Rechnung, offerten: Offerte[]): Rechnun
  */
 export function migrateAnzahlungEntwurf(r: Rechnung, offerten: Offerte[]): Rechnung | null {
   if (r.art !== 'anzahlung' || r.anzahlungProzent || r.status !== 'entwurf') return null;
-  const offerte = offerten.find((o) => o.id === r.offertId);
+  const offerte = findQuellOfferte(r, offerten);
   const positionen = offerte?.positionen;
   if (!offerte || !positionen?.length) return null;
   const pos = positionen.map((p) => (p.typ === 'material' ? (({ bestellt, ...m }) => m)(p) : p));
@@ -80,6 +96,9 @@ export function migrateAnzahlungEntwurf(r: Rechnung, offerten: Offerte[]): Rechn
     ...r,
     positionen: pos,
     anzahlungProzent: ANZAHLUNG_PROZENT,
+    // Relinked in case the original Offerte version was replaced.
+    offertId: offerte.id,
+    titel: `Anzahlungsrechnung – Offerte #${offerteNr(offerte)}`,
     // The old note quoted the amounts; they are now in the totals section.
     notizen: `Positionen gemäss Offerte / Auftragsbestätigung Nr. ${offerteNr(offerte)}.`,
     kleinteilManuell: false,

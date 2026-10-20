@@ -549,6 +549,14 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
             </div>
           )}
 
+          {/* Anzahlung: the remaining share is deducted here and billed with the Schlussrechnung */}
+          {anzProzent ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 16px', borderBottom: '0.5px solid var(--sep)' }}>
+              <div style={{ fontSize: 13, color: 'var(--label2)' }}>Abzug Restbetrag {100 - anzProzent}% (folgt mit Schlussrechnung)</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--red)' }}>– CHF {fCHF(restbetrag)}</div>
+            </div>
+          ) : null}
+
           {/* Row 3: Rechnungstotal (Swiss-rounded to 0.05 CHF) */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(0,122,255,0.06)' }}>
             <div>
@@ -559,14 +567,6 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
               CHF {fCHF(rechnungstotal)}
             </div>
           </div>
-
-          {/* Anzahlung: remaining share, billed with the Schlussrechnung */}
-          {anzProzent ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 16px', borderTop: '0.5px solid var(--sep)' }}>
-              <div style={{ fontSize: 13, color: 'var(--label2)' }}>Restbetrag {100 - anzProzent}% (mit Schlussrechnung)</div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--label2)' }}>CHF {fCHF(restbetrag)}</div>
-            </div>
-          ) : null}
         </div>
       </div>
 
