@@ -12,7 +12,7 @@ import { useVersionCheck } from './hooks/useVersionCheck';
 import { useIsDesktop } from './hooks/useIsDesktop';
 import { offerteNr, nextVersion, sumPositions, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_BEDINGUNG, ANZAHLUNG_PROZENT, mitMaterialHinweis, ohneMaterialHinweis, ersetzeNummer, OFFERTE_REF, ANZAHLUNG_REF } from './lib/offerte-docs';
 import { hardReload } from './lib/reload';
-import { computeRechnungTotals, withOffertePositionen, migrateAnzahlungEntwurf, findQuellOfferte } from './lib/rechnung-totals';
+import { computeRechnungTotals, withOffertePositionen, migrateAnzahlungEntwurf, findQuellOfferte, hoechsteRechnungNr, rechnungArt } from './lib/rechnung-totals';
 import { ohneMaterialZe } from './lib/ze';
 
 import Spinner from './components/ui/Spinner';
@@ -368,12 +368,14 @@ export default function App() {
   }
   /* Next automatic numbers (the counters can lag behind the loaded rows) and duplicate checks. */
   const naechsteOffertNr = Math.max(offertNum, ...offerten.map((o) => o.offertNumber ?? 0)) + 1;
-  const naechsteRechnungNr = Math.max(rechnungNum, ...rechnungen.map((r) => r.rechnungNumber ?? 0)) + 1;
+  /** Each Rechnung type has its own sequence; the new-Rechnung form creates normal Rechnungen. */
+  const naechsteRechnungNr = Math.max(rechnungNum.standard, hoechsteRechnungNr(rechnungen, 'standard')) + 1;
   /** Versions share their number ("12", "12_2"), so only the same version counts as taken. */
   const offertNrVergeben = (self?: Offerte) => (n: number) =>
     offerten.some((o) => o.id !== self?.id && o.offertNumber === n && (o.version ?? 1) === (self?.version ?? 1));
+  /** Only the same type counts as taken: Rechnung #1 and Schlussrechnung #1 may coexist. */
   const rechnungNrVergeben = (self?: Rechnung) => (n: number) =>
-    rechnungen.some((r) => r.id !== self?.id && r.rechnungNumber === n);
+    rechnungen.some((r) => r.id !== self?.id && r.rechnungNumber === n && rechnungArt(r) === rechnungArt(self ?? {}));
   async function handleDeleteOfferte(id: string) {
     await deleteOfferte(id); setSelOff(null);
     if (getActiveOfferteId() === id) setActiveOfferteId('');

@@ -142,7 +142,10 @@ export interface Offerte {
 
 export type RechnungStatus = 'entwurf' | 'versendet' | 'bezahlt' | 'storniert';
 
-export type RechnungKategorie = 'reparatur' | 'karosserie' | 'inspektion' | 'service';
+/** Document type of a Rechnung; each has its own number sequence. */
+export type RechnungArt = 'standard' | 'anzahlung' | 'schluss';
+
+export type RechnungKategorie ='reparatur' | 'karosserie' | 'inspektion' | 'service';
 
 export interface Rechnung {
   id: string;
@@ -165,7 +168,7 @@ export interface Rechnung {
   kleinteilManuell?: boolean | null;
   /** 'anzahlung' = 50% Vorkasse invoice generated from an Offerte / AB;
       'schluss' = Schlussrechnung that deducts a previous Anzahlungsrechnung. */
-  art?: 'standard' | 'anzahlung' | 'schluss';
+  art?: RechnungArt;
   /** Anzahlung share in % when the invoice lists the full Offerte positions; the
       Rechnungstotal is then this share of the positions' sum. Unset on older
       Anzahlungsrechnungen, which carry a single position with the amount due. */

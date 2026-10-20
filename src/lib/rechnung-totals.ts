@@ -1,6 +1,16 @@
-import type { Offerte, Position, Rechnung, RechnungKategorie } from '../types';
+import type { Offerte, Position, Rechnung, RechnungArt, RechnungKategorie } from '../types';
 import { ANZAHLUNG_PROZENT, offerteNr, mitMaterialHinweis } from './offerte-docs';
 import { positionTotals } from './ze';
+
+/** Document type of a Rechnung; rows without art are normal Rechnungen. */
+export function rechnungArt(r: Pick<Rechnung, 'art'>): RechnungArt {
+  return r.art === 'anzahlung' || r.art === 'schluss' ? r.art : 'standard';
+}
+
+/** Highest number used in the art's own sequence (0 when none). */
+export function hoechsteRechnungNr(rechnungen: Rechnung[], art: RechnungArt): number {
+  return Math.max(0, ...rechnungen.filter((r) => rechnungArt(r) === art).map((r) => r.rechnungNumber ?? 0));
+}
 
 /** Document name printed on PDFs, titles and file names. */
 export function rechnungDocName(r: Pick<Rechnung, 'art'>): string {

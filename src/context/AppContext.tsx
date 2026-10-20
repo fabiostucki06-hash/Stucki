@@ -4,7 +4,8 @@ import { startSettingsSync, whenSettingsLoaded } from '../lib/settingsSync';
 import { showToast } from '../components/ui/Toast';
 import { offerteNr } from '../lib/offerte-docs';
 import { alsReineMaterialofferte, mitGetrenntenTotals } from '../lib/ze';
-import type { Customer, Order, Offerte, Rechnung, MaterialCatalogItem, SyncStatus } from '../types';
+import { hoechsteRechnungNr, rechnungArt, rechnungDocName } from '../lib/rechnung-totals';
+import type { Customer, Order, Offerte, Rechnung, RechnungArt, MaterialCatalogItem, SyncStatus } from '../types';
 
 interface AppContextValue {
   customers: Customer[];
@@ -13,7 +14,8 @@ interface AppContextValue {
   rechnungen: Rechnung[];
   orderNum: number;
   offertNum: number;
-  rechnungNum: number;
+  /** Highest number handed out per Rechnung type; each type has its own sequence. */
+  rechnungNum: Record<RechnungArt, number>;
   loading: boolean;
   syncStatus: SyncStatus;
   token: string | null;
@@ -70,7 +72,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [rechnungen, setRechnungen] = useState<Rechnung[]>([]);
   const [orderNum, setOrderNum] = useState(0);
   const [offertNum, setOffertNum] = useState(0);
-  const [rechnungNum, setRechnungNum] = useState(0);
+  const [rechnungNum, setRechnungNum] = useState<Record<RechnungArt, number>>({ standard: 0, anzahlung: 0, schluss: 0 });
   const [loading, setLoading] = useState(true);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [sessionExpired, setSessionExpired] = useState(false);
@@ -144,7 +146,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (Array.isArray(rechr)) {
         const rechns = (parseRows(rechr) as Rechnung[]).map(mitGetrenntenTotals);
         setRechnungen(rechns);
-        setRechnungNum((p) => Math.max(p, ...rechns.map((r) => r.rechnungNumber ?? 0)));
+        setRechnungNum((p) => ({
+          standard: Math.max(p.standard, hoechsteRechnungNr(rechns, 'standard')),
+          anzahlung: Math.max(p.anzahlung, hoechsteRechnungNr(rechns, 'anzahlung')),
+          schluss: Math.max(p.schluss, hoechsteRechnungNr(rechns, 'schluss')),
+        }));
       }
     };
 
@@ -268,21 +274,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   async function addRechnung(data: Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>, opts?: { rechnungNumber?: number }): Promise<Rechnung | undefined> {
-    // Like addOfferte: take both maxima in case the counter lags behind the loaded rows.
-    const num = opts?.rechnungNumber ?? Math.max(rechnungNum, ...rechnungen.map((r) => r.rechnungNumber ?? 0)) + 1;
+    // Each type (Rechnung / Anzahlungs- / Schlussrechnung) counts on its own. Like
+    // addOfferte: take both maxima in case the counter lags behind the loaded rows.
+    const art = rechnungArt(data);
+    const num = opts?.rechnungNumber ?? Math.max(rechnungNum[art], hoechsteRechnungNr(rechnungen, art)) + 1;
     const newR: Rechnung = { id: `r_${Date.now()}`, rechnungNumber: num, status: 'entwurf', createdAt: new Date().toISOString(), ...data };
     try {
       await syncOk(() => db.upsert('rechnungen', { id: newR.id, data: newR }, token!));
     } catch { return; }
-    setRechnungen((p) => [...p, newR]); setRechnungNum((p) => Math.max(p, num));
-    showToast(`Rechnung #${num} gespeichert`, 'success');
+    setRechnungen((p) => [...p, newR]); setRechnungNum((p) => ({ ...p, [art]: Math.max(p[art], num) }));
+    showToast(`${rechnungDocName(newR)} #${num} gespeichert`, 'success');
     return newR;
   }
 
   async function updateRechnung(upd: Rechnung) {
     await syncOk(() => db.upsert('rechnungen', { id: upd.id, data: upd }, token!));
     setRechnungen((p) => p.map((r) => (r.id === upd.id ? upd : r)));
-    setRechnungNum((p) => Math.max(p, upd.rechnungNumber ?? 0));
+    const art = rechnungArt(upd);
+    setRechnungNum((p) => ({ ...p, [art]: Math.max(p[art], upd.rechnungNumber ?? 0) }));
   }
 
   async function deleteRechnung(id: string) {

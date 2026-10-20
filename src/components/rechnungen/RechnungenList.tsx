@@ -1,8 +1,8 @@
 import { SFChevron } from '../Icons';
 import { exportRechnungPDF } from '../../lib/pdf-rechnung';
 import { formatDateCH } from '../../lib/utils';
-import { rechnungDocName } from '../../lib/rechnung-totals';
-import type { Customer, Rechnung, RechnungStatus } from '../../types';
+import { rechnungArt, rechnungDocName } from '../../lib/rechnung-totals';
+import type { Customer, Rechnung, RechnungArt, RechnungStatus } from '../../types';
 
 interface RechnungenListProps {
   rechnungen: Rechnung[];
@@ -14,7 +14,7 @@ interface RechnungenListProps {
   onImportPdf?: () => void;
   /** 'anzahlung' / 'schluss' list only the 50% Vorkasse invoices or the
       Schlussrechnungen (own menu items); the default list shows every other invoice. */
-  variant?: 'standard' | 'anzahlung' | 'schluss';
+  variant?: RechnungArt;
 }
 
 const STATUS_LABELS: Record<RechnungStatus, string> = {
@@ -33,7 +33,7 @@ const STATUS_COLORS: Record<RechnungStatus, string> = {
 export default function RechnungenList({ rechnungen: all, customers, onRechnungClick, onEdit, onNew, onImportPdf, variant = 'standard' }: RechnungenListProps) {
   const isAnz = variant === 'anzahlung';
   const isSchluss = variant === 'schluss';
-  const rechnungen = all.filter((r) => (r.art === 'anzahlung' || r.art === 'schluss' ? r.art : 'standard') === variant);
+  const rechnungen = all.filter((r) => rechnungArt(r) === variant);
   const titel = isAnz ? 'Anzahlungsrechnungen' : isSchluss ? 'Schlussrechnungen' : 'Rechnungen';
   const sortByName = (a: Rechnung, b: Rechnung) => {
     const ca = customers.find((x) => x.id === a.customerId);
