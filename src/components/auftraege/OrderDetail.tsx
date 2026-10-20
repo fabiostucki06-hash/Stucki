@@ -63,7 +63,7 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
 
   return (
     <Sheet
-      title={`Auftrag #${order.orderNumber}`} onClose={onClose} full
+      title={`Auftrag #${order.orderNumber}`} onClose={onClose} full back={!edit}
       barLeft={
         <div style={{ minWidth: 60, display: 'flex', alignItems: 'center', gap: 6 }}>
           {edit && <button onClick={save} disabled={saving} className="bar-btn" style={{ color: 'var(--blue)', fontWeight: 600 }}>{saving ? '…' : 'Sichern'}</button>}

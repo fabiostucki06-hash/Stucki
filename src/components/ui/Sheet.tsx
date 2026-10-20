@@ -1,4 +1,5 @@
 import { ReactNode, useEffect, useRef } from 'react';
+import { SFChevron } from '../Icons';
 
 interface SheetProps {
   title: string;
@@ -7,12 +8,16 @@ interface SheetProps {
   full?: boolean;
   barLeft?: ReactNode;
   barRight?: ReactNode;
+  /** Detail views: "Zurück" button at the left of the bar. Their barRight replaces
+      the default "Fertig", and full sheets cover the whole phone screen (no
+      backdrop to tap), so without it there is no way back to the list. */
+  back?: boolean;
 }
 
 /* Touch: bottom sheet sliding up from the edge. Desktop (≥1024px, see
    globals.css): the same markup renders as a centered dialog. Escape closes
    the topmost sheet on both. */
-export default function Sheet({ title, onClose, children, full, barLeft, barRight }: SheetProps) {
+export default function Sheet({ title, onClose, children, full, barLeft, barRight, back }: SheetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -55,7 +60,15 @@ export default function Sheet({ title, onClose, children, full, barLeft, barRigh
       <div ref={containerRef} className={`sheet-container${full ? ' sheet-full' : ''}`} role="dialog" aria-modal="true" aria-label={title} style={{ maxHeight: full ? '96dvh' : '92dvh' }}>
         <div className="sheet-handle" />
         <div className="sheet-nav">
-          {barLeft ?? <div style={{ minWidth: 60 }} />}
+          {back ? (
+            <div className="sheet-bar-left">
+              <button className="bar-btn sheet-back" onClick={onClose} aria-label="Zurück">
+                <span className="sheet-back-chevron"><SFChevron size={18} /></span>
+                Zurück
+              </button>
+              {barLeft}
+            </div>
+          ) : barLeft ?? <div style={{ minWidth: 60 }} />}
           <span className="sf-headline">{title}</span>
           {barRight ?? (
             <button className="bar-btn" onClick={onClose} style={{ color: 'var(--blue)', fontWeight: 400 }}>

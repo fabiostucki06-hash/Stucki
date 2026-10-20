@@ -122,7 +122,7 @@ export default function CustomerDetail({ customer, orders, onClose, onEdit, onNe
   }
 
   return (
-    <Sheet title="Kundenakte" onClose={onClose} full barRight={<button onClick={onEdit} className="bar-btn">Bearbeiten</button>}>
+    <Sheet title="Kundenakte" onClose={onClose} full back barRight={<button onClick={onEdit} className="bar-btn">Bearbeiten</button>}>
       <div className="glass-panel" style={{ padding: 16, marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
           <div style={{

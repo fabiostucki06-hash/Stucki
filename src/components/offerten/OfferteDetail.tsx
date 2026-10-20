@@ -372,6 +372,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
       title={`${docName} #${nr}`}
       onClose={onClose}
       full
+      back
       barRight={<button onClick={bearbeiten} className="bar-btn">Bearbeiten</button>}
     >
       <ActiveOfferteBanner offerte={offerte} customer={customer} />

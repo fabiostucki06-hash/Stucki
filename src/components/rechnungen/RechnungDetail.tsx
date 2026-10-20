@@ -207,6 +207,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
       title={`${docName} #${rechnung.rechnungNumber}`}
       onClose={onClose}
       full
+      back
       barRight={<button onClick={bearbeiten} className="bar-btn">Bearbeiten</button>}
     >
       <div className="glass-panel" style={{ padding: 16, marginBottom: 16 }}>
