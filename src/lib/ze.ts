@@ -82,3 +82,26 @@ export function mitGetrenntenTotals<D extends { positionen?: Position[]; totalMa
     ...(d.totalArbeit != null && { totalArbeit: r(fN(d.totalArbeit) + verschoben) }),
   };
 }
+
+/** Materialofferte: material prices only. The ZE of a part are dropped, so they
+    are neither priced nor added to the Offertentotal (the work is offered separately). */
+export function ohneMaterialZe<P extends Position>(p: P): P {
+  if (p.typ !== 'material' || (p.ze == null && p.stundenansatz == null)) return p;
+  const { ze, stundenansatz, ...rest } = ohneZeAnteil(p) as MaterialPosition;
+  return rest as P;
+}
+
+/** A Materialofferte with ZE-free positions and totals from them (Arbeit 0). */
+export function alsReineMaterialofferte<D extends { positionen?: Position[]; totalMaterial?: string; totalArbeit?: string; totalBetrag?: string; totalZE?: number }>(d: D): D {
+  if (!d.positionen?.some((p) => p.typ === 'material' && (p.ze != null || p.stundenansatz != null))) return d;
+  const positionen = d.positionen.map(ohneMaterialZe);
+  const t = positionTotals(positionen);
+  return {
+    ...d,
+    positionen,
+    totalMaterial: t.totalMaterial.toFixed(2),
+    totalArbeit: t.totalArbeit.toFixed(2),
+    totalBetrag: t.total.toFixed(2),
+    totalZE: t.totalZE,
+  };
+}

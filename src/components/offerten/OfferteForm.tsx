@@ -3,7 +3,7 @@ import { FormCard, FormBar, SaveStatus, SummaryRow, VehicleChips, PositionenEdit
 import type { Customer, ArbeitPosition, MaterialPosition, Offerte, OfferteStatus } from '../../types';
 import { offerteNotizen, anzahlungErforderlich, anzahlungMoeglich, anzahlungAufteilung, sindVorkasseTerms, ANZAHLUNG_PROZENT, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ } from '../../lib/offerte-docs';
 import NummerField, { parseNummer } from '../ui/NummerField';
-import { materialPreis, materialZeSumme, positionTotals, zeMinuten } from '../../lib/ze';
+import { materialPreis, materialZeSumme, ohneMaterialZe, positionTotals, zeMinuten } from '../../lib/ze';
 import { setMaterialFeld } from '../../lib/marge';
 import { useAutoSave } from '../../hooks/useAutoSave';
 
@@ -95,7 +95,8 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
     const mp = (initial?.positionen ?? [])
       .filter((p): p is MaterialPosition => p.typ === 'material')
       .filter((p) => p.beschreibung !== 'Kleinteil Pauschale');
-    if (mp.length) return [...mp];
+    // A Materialofferte prices the parts only: no ZE on its positions.
+    if (mp.length) return istMaterial ? mp.map(ohneMaterialZe) : [...mp];
     if (!initial && prefillMaterial) return [{ ...prefillMaterial }];
     return [newMaterial()];
   });
@@ -291,6 +292,7 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
           arbeit={arbeit} material={material}
           onArbeitChange={updA} onArbeitAdd={addA} onArbeitRemove={remA} onKiZE={kiZE}
           onMaterialChange={updM} onMaterialAdd={addM} onMaterialRemove={remM}
+          ohneZe={istMaterial}
         />
       </FormCard>
 

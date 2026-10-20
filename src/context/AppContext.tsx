@@ -3,7 +3,7 @@ import { auth, db, setAuthHandlers, tokenUserId } from '../lib/supabase';
 import { startSettingsSync, whenSettingsLoaded } from '../lib/settingsSync';
 import { showToast } from '../components/ui/Toast';
 import { offerteNr } from '../lib/offerte-docs';
-import { mitGetrenntenTotals } from '../lib/ze';
+import { alsReineMaterialofferte, mitGetrenntenTotals } from '../lib/ze';
 import type { Customer, Order, Offerte, Rechnung, MaterialCatalogItem, SyncStatus } from '../types';
 
 interface AppContextValue {
@@ -137,7 +137,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (Array.isArray(or)) setOrders((parseRows(or) as Order[]).map(mitGetrenntenTotals));
       setOrderNum((p) => Math.max(p, cnt));
       if (Array.isArray(offr)) {
-        const offs = (parseRows(offr) as Offerte[]).map(mitGetrenntenTotals);
+        const offs = (parseRows(offr) as Offerte[]).map((o) => (o.art === 'material' ? alsReineMaterialofferte(o) : mitGetrenntenTotals(o)));
         setOfferten(offs);
         setOffertNum((p) => Math.max(p, ...offs.map((o) => o.offertNumber ?? 0)));
       }

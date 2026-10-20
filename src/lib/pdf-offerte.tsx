@@ -3,7 +3,7 @@ import { formatDateCH, buildDocumentFilename, materialZuerst } from './utils';
 import { CO_NAME, CO_ADDR, CO_CITY, CO_PHONE, CO_LOC, STD_SATZ } from './company';
 import { PAGE_TOP, PAGE_BOTTOM, addPageNumbers } from './pdf-paging';
 import { offerteNr, offerteZahlungszeilen, offerteNotizen, anzahlungErforderlich, anzahlungAufteilung, sumPositions, ANZAHLUNG_PROZENT } from './offerte-docs';
-import { ohneZeAnteil } from './ze';
+import { ohneMaterialZe, ohneZeAnteil } from './ze';
 import { archiveToDrive } from './drive';
 import type { ArbeitPosition, Customer, MaterialPosition, Offerte } from '../types';
 
@@ -45,8 +45,9 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
   const date    = isAB && ab.datum ? formatDateCH(ab.datum) : todayCH();
   const title   = isAB ? 'Auftragsbestätigung' : offerte.art === 'material' ? 'Materialofferte' : 'Budget Offerte';
 
-  // Older positions may still carry the ZE share in the material price.
-  const allPos       = (offerte.positionen ?? []).map(ohneZeAnteil);
+  // Older positions may still carry the ZE share in the material price; a
+  // Materialofferte prices the parts only, without their ZE.
+  const allPos       = (offerte.positionen ?? []).map(offerte.art === 'material' ? ohneMaterialZe : ohneZeAnteil);
   const kleinteilPos = allPos.find(
     (p): p is MaterialPosition =>
       p.typ === 'material' && p.beschreibung === 'Kleinteil Pauschale',

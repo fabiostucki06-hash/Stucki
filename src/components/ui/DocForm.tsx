@@ -131,6 +131,8 @@ interface PositionenEditorProps {
   onMaterialChange: (i: number, key: string, value: string) => void;
   onMaterialAdd: () => void;
   onMaterialRemove: (i: number) => void;
+  /** Materialofferte: material prices only, no ZE on the parts. */
+  ohneZe?: boolean;
 }
 
 const sum = (rows: { preis: string }[]) => rows.reduce((s, p) => s + (parseFloat(p.preis) || 0), 0);
@@ -138,7 +140,7 @@ const sum = (rows: { preis: string }[]) => rows.reduce((s, p) => s + (parseFloat
 export function PositionenEditor({
   arbeit, material,
   onArbeitChange, onArbeitAdd, onArbeitRemove, onKiZE,
-  onMaterialChange, onMaterialAdd, onMaterialRemove,
+  onMaterialChange, onMaterialAdd, onMaterialRemove, ohneZe,
 }: PositionenEditorProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   // Set right before a row is appended; once it has rendered, its description
@@ -290,6 +292,7 @@ export function PositionenEditor({
               className="df-inp num" type="number" inputMode="decimal" min={0}
               value={pos.ze ?? ''} onChange={(e) => onMaterialChange(i, 'ze', e.target.value)}
               placeholder="—" aria-label="Zeiteinheiten zum Material (100 ZE = 60 Min.)"
+              disabled={ohneZe} title={ohneZe ? 'Materialofferte: nur Materialpreise, keine ZE' : undefined}
             />
           </label>
           <span className="df-total df-c-total">{pos.preis ? fCHF(parseFloat(pos.preis)) : '—'}</span>

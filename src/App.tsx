@@ -13,6 +13,7 @@ import { useIsDesktop } from './hooks/useIsDesktop';
 import { offerteNr, nextVersion, sumPositions, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_BEDINGUNG, ANZAHLUNG_PROZENT, mitMaterialHinweis, ohneMaterialHinweis, ersetzeNummer, OFFERTE_REF, ANZAHLUNG_REF } from './lib/offerte-docs';
 import { hardReload } from './lib/reload';
 import { computeRechnungTotals, withOffertePositionen, migrateAnzahlungEntwurf, findQuellOfferte } from './lib/rechnung-totals';
+import { ohneMaterialZe } from './lib/ze';
 
 import Spinner from './components/ui/Spinner';
 import Sheet from './components/ui/Sheet';
@@ -389,7 +390,7 @@ export default function App() {
     // positions, and the 50% Vorkasse terms as default remarks.
     const mat = positionen
       .filter((p): p is MaterialPosition => p.typ === 'material')
-      .map(({ bestellt, ...p }) => p);
+      .map(({ bestellt, ...p }) => ohneMaterialZe(p));
     const t = sumPositions(mat);
     const { id, offertNumber, status, createdAt, ab, materialStatus, ...rest } = offerte;
     const baseTitel = (offerte.titel ?? '').replace(/^Materialofferte( – )?/, '');
@@ -401,11 +402,11 @@ export default function App() {
       titel: baseTitel ? `Materialofferte – ${baseTitel}` : 'Materialofferte',
       notizen: mitMaterialHinweis(offerte.notizen),
       positionen: mat,
-      // ZE billed with a part stay Arbeit, even on a reine Materialofferte.
-      totalArbeit: t.totalArbeit.toFixed(2),
+      // Material prices only: the ZE of the parts stay with the Haupt-Offerte.
+      totalArbeit: '0.00',
       totalMaterial: t.totalMaterial.toFixed(2),
       totalBetrag: t.total.toFixed(2),
-      totalZE: t.totalZE,
+      totalZE: 0,
       zahlungsbedingung: VORKASSE_BEDINGUNG,
       zusatznotiz: SCHLUSSRECHNUNG_NOTIZ,
       anzahlungErforderlich: true,
