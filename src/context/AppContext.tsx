@@ -29,7 +29,7 @@ interface AppContextValue {
   addOfferte: (data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>, opts?: { offertNumber?: number }) => Promise<Offerte>;
   updateOfferte: (upd: Offerte) => Promise<Offerte>;
   deleteOfferte: (id: string) => Promise<void>;
-  addRechnung: (data: Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>) => Promise<Rechnung | undefined>;
+  addRechnung: (data: Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>, opts?: { rechnungNumber?: number }) => Promise<Rechnung | undefined>;
   updateRechnung: (upd: Rechnung) => Promise<void>;
   deleteRechnung: (id: string) => Promise<void>;
   addMaterial: (data: Omit<MaterialCatalogItem, 'id' | 'createdAt'>) => Promise<void>;
@@ -256,6 +256,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       saved = pickRow<Offerte>(rows) ?? upd;
     });
     setOfferten((p) => p.map((o) => (o.id === saved.id ? saved : o)));
+    // A manually raised number moves the sequence on, so the next one stays unique.
+    setOffertNum((p) => Math.max(p, saved.offertNumber ?? 0));
     return saved;
   }
 
@@ -264,13 +266,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setOfferten((p) => p.filter((o) => o.id !== id));
   }
 
-  async function addRechnung(data: Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>): Promise<Rechnung | undefined> {
-    const num = rechnungNum + 1;
+  async function addRechnung(data: Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>, opts?: { rechnungNumber?: number }): Promise<Rechnung | undefined> {
+    // Like addOfferte: take both maxima in case the counter lags behind the loaded rows.
+    const num = opts?.rechnungNumber ?? Math.max(rechnungNum, ...rechnungen.map((r) => r.rechnungNumber ?? 0)) + 1;
     const newR: Rechnung = { id: `r_${Date.now()}`, rechnungNumber: num, status: 'entwurf', createdAt: new Date().toISOString(), ...data };
     try {
       await syncOk(() => db.upsert('rechnungen', { id: newR.id, data: newR }, token!));
     } catch { return; }
-    setRechnungen((p) => [...p, newR]); setRechnungNum(num);
+    setRechnungen((p) => [...p, newR]); setRechnungNum((p) => Math.max(p, num));
     showToast(`Rechnung #${num} gespeichert`, 'success');
     return newR;
   }
@@ -278,6 +281,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   async function updateRechnung(upd: Rechnung) {
     await syncOk(() => db.upsert('rechnungen', { id: upd.id, data: upd }, token!));
     setRechnungen((p) => p.map((r) => (r.id === upd.id ? upd : r)));
+    setRechnungNum((p) => Math.max(p, upd.rechnungNumber ?? 0));
   }
 
   async function deleteRechnung(id: string) {

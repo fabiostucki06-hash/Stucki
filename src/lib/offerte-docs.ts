@@ -27,6 +27,17 @@ export function mitMaterialHinweis(notizen?: string): string {
   return rest ? `${rest}\n${MATERIAL_BESTELL_HINWEIS}` : MATERIAL_BESTELL_HINWEIS;
 }
 
+/** Number references in generated titles and notes ("Offerte #12", "Auftragsbestätigung Nr. 12_2"). */
+export const OFFERTE_REF = '(?:Offerte|Auftragsbestätigung) (?:#|Nr\\. )';
+export const ANZAHLUNG_REF = 'Anzahlungsrechnung #';
+
+/** Replaces a changed document number after `ref`; "12" doesn't touch "120" or "12_2". */
+export function ersetzeNummer(text: string | undefined, ref: string, alt: string, neu: string): string | undefined {
+  if (!text) return text;
+  const esc = alt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return text.replace(new RegExp(`(${ref})${esc}(?![\\d_])`, 'g'), `$1${neu}`);
+}
+
 const fN = (v?: string | number) => parseFloat(String(v ?? '0')) || 0;
 
 /** "12" for the original, "12_2" for later versions (underscore + version number). */

@@ -4,9 +4,10 @@ import { showToast } from '../ui/Toast';
 import { FormCard, FormBar, SummaryRow, VehicleChips, PositionenEditor, fCHF, type ArbeitRow, type MaterialRow } from '../ui/DocForm';
 import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../lib/rechnung-totals';
 import { offerteNr } from '../../lib/offerte-docs';
+import NummerField, { nummerBestaetigt, parseNummer } from '../ui/NummerField';
 import type { Customer, Order, Offerte, ArbeitPosition, MaterialPosition, Rechnung, RechnungKategorie } from '../../types';
 
-type RechnungData = Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>;
+type RechnungData = Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'> & { rechnungNumber: number };
 
 interface RechnungFormProps {
   customers: Customer[];
@@ -16,6 +17,10 @@ interface RechnungFormProps {
   onCancel: () => void;
   saving?: boolean;
   initial?: Rechnung;
+  /** Automatic Rechnungs-Nr.: the next free one for a new Rechnung, else the current one. */
+  nummerVorschlag: number;
+  /** Whether another Rechnung already has this number. */
+  nummerVergeben: (n: number) => boolean;
 }
 
 function schaetzeZE(desc: string): string {
@@ -61,7 +66,8 @@ function calcFaelligAm(days: string): string {
   return d.toISOString().split('T')[0];
 }
 
-export default function RechnungForm({ customers, orders, offerten, onSave, onCancel, saving: savingProp, initial }: RechnungFormProps) {
+export default function RechnungForm({ customers, orders, offerten, onSave, onCancel, saving: savingProp, initial, nummerVorschlag, nummerVergeben }: RechnungFormProps) {
+  const [nummer, setNummer] = useState(String(initial?.rechnungNumber ?? nummerVorschlag));
   const [selectedAuftragId, setSelectedAuftragId] = useState(initial?.auftragId ?? '');
   const [selectedOfferteId, setSelectedOfferteId] = useState('');
   const [cid,          setCid]          = useState(initial?.customerId ?? '');
@@ -200,12 +206,16 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
   async function submit(draft: boolean) {
     if (busy) return;
     if (!cid) { showToast('Bitte einen Kunden auswählen', 'error'); return; }
+    if (parseNummer(nummer) == null) { showToast('Bitte eine gültige Rechnungs-Nr. eingeben', 'error'); return; }
+    // Only a changed number is checked: an existing duplicate doesn't ask again on every save.
+    const rechnungNumber = nummerBestaetigt(nummer, (n) => n !== initial?.rechnungNumber && nummerVergeben(n), 'Rechnung');
+    if (rechnungNumber == null) return;
     if (!draft && !ap.length && !mp.length) { showToast('Mindestens eine Position eingeben', 'error'); return; }
     setSavingLocal(true);
     try {
       // Awaited so a rejected write keeps the sheet (and the user's input) open.
       await onSave({
-        customerId: cid, titel, positionen: [...ap, ...mp], notizen,
+        rechnungNumber, customerId: cid, titel, positionen: [...ap, ...mp], notizen,
         zahlungsFrist, faelligAm,
         kategorie: kategorie || undefined, kleinteilManuell,
         totalBetrag: rechnungstotal.toFixed(2), totalArbeit: totA.toFixed(2),
@@ -297,6 +307,10 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
             </select>
           </div>
           {vehicleChips.length > 0 && <div className="df-span2"><VehicleChips chips={vehicleChips} /></div>}
+          <NummerField
+            label="Rechnungs-Nr." value={nummer} onChange={setNummer} vorschlag={nummerVorschlag}
+            vergeben={(() => { const n = parseNummer(nummer); return n != null && n !== initial?.rechnungNumber && nummerVergeben(n); })()}
+          />
           <div className="cf-field">
             <label className="cf-label">Betreff</label>
             <input className="cf-input" value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="z.B. Inspektion, Reparatur…" />

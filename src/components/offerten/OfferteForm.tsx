@@ -4,8 +4,9 @@ import { showToast } from '../ui/Toast';
 import { FormCard, FormBar, SummaryRow, VehicleChips, PositionenEditor, fCHF, type ArbeitRow, type MaterialRow } from '../ui/DocForm';
 import type { Customer, ArbeitPosition, MaterialPosition, Offerte, OfferteStatus } from '../../types';
 import { mitMaterialHinweis } from '../../lib/offerte-docs';
+import NummerField, { nummerBestaetigt, parseNummer } from '../ui/NummerField';
 
-type OfferteData = Omit<Offerte, 'id' | 'offertNumber' | 'createdAt'>;
+type OfferteData = Omit<Offerte, 'id' | 'offertNumber' | 'createdAt'> & { offertNumber: number };
 
 const STATUS_OPTS: [OfferteStatus, string][] = [
   ['entwurf',    'Entwurf'],
@@ -20,6 +21,10 @@ interface OfferteFormProps {
   onCancel: () => void;
   saving?: boolean;
   initial?: Offerte;
+  /** Automatic Offerte-Nr.: the next free one for a new Offerte, else the current one. */
+  nummerVorschlag: number;
+  /** Whether another Offerte (same version) already has this number. */
+  nummerVergeben: (n: number) => boolean;
   /** Pre-fills the material tab with one row (e.g. from the part-import flow). Ignored when `initial` is set. */
   prefillMaterial?: MaterialPosition;
   prefillCustomerId?: string;
@@ -64,7 +69,8 @@ const toArbeitPosition = (p: ArbeitRow): ArbeitPosition => ({
 });
 const newMaterial = (): MaterialRow => ({ typ: 'material', beschreibung: '', menge: '1', stueckpreis: '', preis: '' });
 
-export default function OfferteForm({ customers, onSave, onCancel, saving: savingProp, initial, prefillMaterial, prefillCustomerId }: OfferteFormProps) {
+export default function OfferteForm({ customers, onSave, onCancel, saving: savingProp, initial, prefillMaterial, prefillCustomerId, nummerVorschlag, nummerVergeben }: OfferteFormProps) {
+  const [nummer, setNummer] = useState(String(initial?.offertNumber ?? nummerVorschlag));
   const [cid,        setCid]        = useState(initial?.customerId ?? prefillCustomerId ?? '');
   const [titel,      setTitel]      = useState(initial?.titel ?? '');
   const [arbeit,     setArbeit]     = useState<ArbeitRow[]>(() => {
@@ -146,6 +152,10 @@ export default function OfferteForm({ customers, onSave, onCancel, saving: savin
   async function submit(draft: boolean) {
     if (busy) return;
     if (!cid) { showToast('Bitte einen Kunden auswählen', 'error'); return; }
+    if (parseNummer(nummer) == null) { showToast('Bitte eine gültige Offerte-Nr. eingeben', 'error'); return; }
+    // Only a changed number is checked: an existing duplicate doesn't ask again on every save.
+    const offertNumber = nummerBestaetigt(nummer, (n) => n !== initial?.offertNumber && nummerVergeben(n), 'Offerte');
+    if (offertNumber == null) return;
     const ap = arbeit.filter((p) => p.beschreibung.trim()).map(toArbeitPosition);
     const mp = material.filter((p) => p.beschreibung.trim());
     if (!draft && !ap.length && !mp.length) { showToast('Mindestens eine Position eingeben', 'error'); return; }
@@ -157,7 +167,7 @@ export default function OfferteForm({ customers, onSave, onCancel, saving: savin
       // Awaited so a rejected write keeps the sheet (and the user's input) open;
       // the save path already toasts the reason via syncOk().
       await onSave({
-        customerId: cid, titel, positionen: [...ap, ...mp, ...autoPauschale], notizen, gueltigBis, zahlungsziel, status,
+        offertNumber, customerId: cid, titel, positionen: [...ap, ...mp, ...autoPauschale], notizen, gueltigBis, zahlungsziel, status,
         totalBetrag: (totA + totMeff).toFixed(2), totalArbeit: totA.toFixed(2),
         totalMaterial: totMeff.toFixed(2), totalZE: totZE,
       });
@@ -191,7 +201,12 @@ export default function OfferteForm({ customers, onSave, onCancel, saving: savin
             </select>
           </div>
           {vehicleChips.length > 0 && <div className="df-span2"><VehicleChips chips={vehicleChips} /></div>}
-          <div className="cf-field df-span2">
+          <NummerField
+            label="Offerte-Nr." value={nummer} onChange={setNummer} vorschlag={nummerVorschlag}
+            suffix={initial?.version && initial.version > 1 ? `_${initial.version}` : undefined}
+            vergeben={(() => { const n = parseNummer(nummer); return n != null && n !== initial?.offertNumber && nummerVergeben(n); })()}
+          />
+          <div className="cf-field">
             <label className="cf-label">Betreff</label>
             <input className="cf-input" value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="z.B. Inspektion, Reparatur…" />
           </div>

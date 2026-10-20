@@ -9,7 +9,7 @@ import { useSettings } from './hooks/useSettings';
 import { cleanPartTitle } from './lib/partTitle';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { useIsDesktop } from './hooks/useIsDesktop';
-import { offerteNr, nextVersion, sumPositions, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_BEDINGUNG, ANZAHLUNG_PROZENT, mitMaterialHinweis, ohneMaterialHinweis } from './lib/offerte-docs';
+import { offerteNr, nextVersion, sumPositions, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_BEDINGUNG, ANZAHLUNG_PROZENT, mitMaterialHinweis, ohneMaterialHinweis, ersetzeNummer, OFFERTE_REF, ANZAHLUNG_REF } from './lib/offerte-docs';
 import { hardReload } from './lib/reload';
 import { computeRechnungTotals, withOffertePositionen, migrateAnzahlungEntwurf, findQuellOfferte } from './lib/rechnung-totals';
 
@@ -55,6 +55,7 @@ export default function App() {
     addOrder, updateOrder, deleteOrder,
     addOfferte, updateOfferte, deleteOfferte,
     addRechnung, updateRechnung, deleteRechnung,
+    offertNum, rechnungNum,
     addMaterial,
   } = useApp();
 
@@ -330,20 +331,41 @@ export default function App() {
   }
 
   /* ── Offerte handlers ── */
-  async function handleAddOfferte(data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>) {
-    await addOfferte(data); setShowNOff(false); setTab('offerten');
+  async function handleAddOfferte(data: Omit<Offerte, 'id' | 'status' | 'createdAt'>) {
+    const { offertNumber, ...rest } = data;
+    await addOfferte(rest, { offertNumber }); setShowNOff(false); setTab('offerten');
   }
   async function handleUpdateOfferte(upd: Offerte) {
     const saved = await updateOfferte(upd); setSelOff(saved);
   }
-  async function handleSaveEditOfferte(data: Omit<Offerte, 'id' | 'offertNumber' | 'createdAt'>) {
+  async function handleSaveEditOfferte(data: Omit<Offerte, 'id' | 'createdAt'>) {
     if (!editOff) return;
     const updated: Offerte = { ...editOff, ...data };
     // Close the sheet only once the write is confirmed; a throw propagates to the
     // form, which keeps the edit on screen instead of discarding it.
     const saved = await updateOfferte(updated);
     setEditOff(null); setSelOff(saved);
+    // Invoices made from this Offerte quote its number in title, notes and snapshot.
+    const alt = offerteNr(editOff), neu = offerteNr(saved);
+    if (alt !== neu) {
+      for (const r of rechnungen.filter((x) => x.offertId === editOff.id)) {
+        await updateRechnung({
+          ...r,
+          titel: ersetzeNummer(r.titel, OFFERTE_REF, alt, neu),
+          notizen: ersetzeNummer(r.notizen, OFFERTE_REF, alt, neu),
+          ...(r.offertNr === alt ? { offertNr: neu } : {}),
+        });
+      }
+    }
   }
+  /* Next automatic numbers (the counters can lag behind the loaded rows) and duplicate checks. */
+  const naechsteOffertNr = Math.max(offertNum, ...offerten.map((o) => o.offertNumber ?? 0)) + 1;
+  const naechsteRechnungNr = Math.max(rechnungNum, ...rechnungen.map((r) => r.rechnungNumber ?? 0)) + 1;
+  /** Versions share their number ("12", "12_2"), so only the same version counts as taken. */
+  const offertNrVergeben = (self?: Offerte) => (n: number) =>
+    offerten.some((o) => o.id !== self?.id && o.offertNumber === n && (o.version ?? 1) === (self?.version ?? 1));
+  const rechnungNrVergeben = (self?: Rechnung) => (n: number) =>
+    rechnungen.some((r) => r.id !== self?.id && r.rechnungNumber === n);
   async function handleDeleteOfferte(id: string) {
     await deleteOfferte(id); setSelOff(null);
     if (getActiveOfferteId() === id) setActiveOfferteId('');
@@ -524,17 +546,29 @@ export default function App() {
   }
 
   /* ── Rechnung handlers ── */
-  async function handleAddRechnung(data: Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>) {
-    await addRechnung(data); setShowNR(false); setTab('rechnungen');
+  async function handleAddRechnung(data: Omit<Rechnung, 'id' | 'status' | 'createdAt'>) {
+    const { rechnungNumber, ...rest } = data;
+    await addRechnung(rest, { rechnungNumber }); setShowNR(false); setTab('rechnungen');
   }
   async function handleUpdateRechnung(upd: Rechnung) {
     await updateRechnung(upd); setSelR(upd);
   }
-  async function handleSaveEditRechnung(data: Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>) {
+  async function handleSaveEditRechnung(data: Omit<Rechnung, 'id' | 'status' | 'createdAt'>) {
     if (!editR) return;
     const updated: Rechnung = { ...editR, ...data };
     await updateRechnung(updated);
     setEditR(null); setSelR(updated);
+    // Schlussrechnungen deducting this Anzahlung keep its number as a snapshot.
+    const alt = editR.rechnungNumber, neu = updated.rechnungNumber;
+    if (editR.art === 'anzahlung' && alt !== neu) {
+      for (const s of rechnungen.filter((x) => x.anzahlungRechnungId === editR.id)) {
+        await updateRechnung({
+          ...s,
+          anzahlungRechnungNumber: neu,
+          notizen: ersetzeNummer(s.notizen, ANZAHLUNG_REF, String(alt), String(neu)),
+        });
+      }
+    }
   }
   async function handleDeleteRechnung(id: string) {
     await deleteRechnung(id); setSelR(null);
@@ -693,6 +727,8 @@ export default function App() {
               onCancel={closeNOff}
               prefillMaterial={prefillMat ?? undefined}
               prefillCustomerId={prefillCid}
+              nummerVorschlag={naechsteOffertNr}
+              nummerVergeben={offertNrVergeben()}
             />
           </Sheet>
         );
@@ -717,7 +753,7 @@ export default function App() {
       {showNR && (
         <Sheet title="Neue Rechnung" onClose={() => setShowNR(false)} full
           barRight={<button onClick={() => setShowNR(false)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
-          <RechnungForm customers={customers} orders={orders} offerten={offerten} onSave={handleAddRechnung} onCancel={() => setShowNR(false)} />
+          <RechnungForm customers={customers} orders={orders} offerten={offerten} onSave={handleAddRechnung} onCancel={() => setShowNR(false)} nummerVorschlag={naechsteRechnungNr} nummerVergeben={rechnungNrVergeben()} />
         </Sheet>
       )}
 
@@ -746,7 +782,7 @@ export default function App() {
         <Sheet title={`Offerte #${offerteNr(editOff)} bearbeiten`} onClose={() => setEditOff(null)} full
           barRight={<button onClick={() => setEditOff(null)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
           <ActiveOfferteBanner offerte={editOff} customer={customers.find((c) => c.id === editOff.customerId)} />
-          <OfferteForm key={editOff.id} customers={customers} initial={editOff} onSave={handleSaveEditOfferte} onCancel={() => setEditOff(null)} />
+          <OfferteForm key={editOff.id} customers={customers} initial={editOff} onSave={handleSaveEditOfferte} onCancel={() => setEditOff(null)} nummerVorschlag={editOff.offertNumber} nummerVergeben={offertNrVergeben(editOff)} />
         </Sheet>
       )}
 
@@ -772,7 +808,7 @@ export default function App() {
       {editR && (
         <Sheet title={`Rechnung #${editR.rechnungNumber} bearbeiten`} onClose={() => setEditR(null)} full
           barRight={<button onClick={() => setEditR(null)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
-          <RechnungForm customers={customers} orders={orders} offerten={offerten} initial={editR} onSave={handleSaveEditRechnung} onCancel={() => setEditR(null)} />
+          <RechnungForm customers={customers} orders={orders} offerten={offerten} initial={editR} onSave={handleSaveEditRechnung} onCancel={() => setEditR(null)} nummerVorschlag={editR.rechnungNumber} nummerVergeben={rechnungNrVergeben(editR)} />
         </Sheet>
       )}
 
