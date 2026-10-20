@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf';
 import { formatDateCH, buildDocumentFilename } from './utils';
 import { CO_NAME, CO_ADDR, CO_CITY, CO_PHONE, CO_LOC, STD_SATZ } from './company';
 import { PAGE_TOP, PAGE_BOTTOM, addPageNumbers } from './pdf-paging';
-import { offerteNr, offerteZahlungszeilen, mitMaterialHinweis, anzahlungErforderlich, anzahlungAufteilung, ANZAHLUNG_PROZENT } from './offerte-docs';
+import { offerteNr, offerteZahlungszeilen, offerteNotizen, anzahlungErforderlich, anzahlungAufteilung, ANZAHLUNG_PROZENT } from './offerte-docs';
 import { archiveToDrive } from './drive';
 import type { ArbeitPosition, Customer, MaterialPosition, Offerte } from '../types';
 
@@ -253,7 +253,7 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
     y += 4;
     tL(`* Material mit ZE: Preis = Menge × Stk.Preis + ZE (100 ZE = 60 Min. = CHF ${STD_SATZ})`, TL, y);
   }
-  const notizen = mitMaterialHinweis(offerte.notizen);
+  const notizen = offerteNotizen(offerte.notizen, anzahlungErforderlich(offerte));
   if (notizen) {
     y += 6;
     if (!fits(8)) newPage();

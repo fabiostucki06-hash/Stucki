@@ -18,8 +18,13 @@ export function ohneMaterialHinweis(notizen?: string): string | undefined {
   return n || undefined;
 }
 
-/** Notizen of Offerten, Materialofferten and Anzahlungsrechnungen always carry the
-    MATERIAL_BESTELL_HINWEIS on its own last line; the earlier wording is replaced. */
+/** Offerte-Notizen follow the 50% Anzahlung option: the hint only with Anzahlung. */
+export function offerteNotizen(notizen: string | undefined, mitAnzahlung: boolean): string {
+  return mitAnzahlung ? mitMaterialHinweis(notizen) : ohneMaterialHinweis(notizen) ?? '';
+}
+
+/** Notizen with the MATERIAL_BESTELL_HINWEIS on its own last line (Anzahlungsrechnungen,
+    Offerten with Anzahlung); the earlier wording is replaced. */
 export function mitMaterialHinweis(notizen?: string): string {
   const n = notizen?.trim() ?? '';
   if (n.includes(MATERIAL_BESTELL_HINWEIS)) return n;

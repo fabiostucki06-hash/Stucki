@@ -10,7 +10,7 @@ import { exportOffertePDF, exportAuftragsbestaetigungPDF } from '../../lib/pdf-o
 import { CO_NAME } from '../../lib/company';
 import { useSettings } from '../../hooks/useSettings';
 import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../lib/utils';
-import { offerteNr, sumPositions, todayISO, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_PROZENT, mitMaterialHinweis, anzahlungErforderlich, anzahlungAufteilung } from '../../lib/offerte-docs';
+import { offerteNr, sumPositions, todayISO, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_PROZENT, offerteNotizen, anzahlungErforderlich, anzahlungAufteilung } from '../../lib/offerte-docs';
 import { materialPreis } from '../../lib/ze';
 import type { AuftragsBestaetigung, Customer, Offerte, OfferteStatus, Position, ArbeitPosition, MaterialPosition, Rechnung } from '../../types';
 
@@ -246,6 +246,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
       zahlungsbedingung: zahlungsbedingung || undefined,
       zusatznotiz: zusatznotiz || undefined,
       anzahlungErforderlich: mitAnzahlung,
+      notizen: offerteNotizen(offerte.notizen, mitAnzahlung) || undefined,
       // AB data only exists once the Offerte was accepted (or already has some).
       ab: offerte.status === 'angenommen' || offerte.ab ? { ...ab, name: abName, ort: abOrt, datum: abDatum } : undefined,
       ...patch,
@@ -737,7 +738,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
         </div>
       )}
 
-      <div style={{ background: 'var(--fill3)', borderRadius: 12, padding: '12px 14px', fontSize: 15, color: 'var(--label2)', marginBottom: 16, whiteSpace: 'pre-line' }}>{mitMaterialHinweis(offerte.notizen)}</div>
+      {offerteNotizen(offerte.notizen, mitAnzahlung) && <div style={{ background: 'var(--fill3)', borderRadius: 12, padding: '12px 14px', fontSize: 15, color: 'var(--label2)', marginBottom: 16, whiteSpace: 'pre-line' }}>{offerteNotizen(offerte.notizen, mitAnzahlung)}</div>}
 
       {/* ── Aktionen, gruppiert. Screen only: buttons never print, so the
           group panels are left out of the printout entirely (no-print). ── */}

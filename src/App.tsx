@@ -587,7 +587,7 @@ export default function App() {
       total = t.total;
       const created = await addOfferte({
         customerId, titel, positionen,
-        notizen: mitMaterialHinweis(result.notizen),
+        notizen: result.notizen.trim() || undefined,
         zahlungsziel: '10',
         totalBetrag: t.total.toFixed(2), totalArbeit: t.totalArbeit.toFixed(2),
         totalMaterial: t.totalMaterial.toFixed(2), totalZE: t.totalZE,

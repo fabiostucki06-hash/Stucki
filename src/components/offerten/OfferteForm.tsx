@@ -3,7 +3,7 @@ import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
 import { FormCard, FormBar, SummaryRow, VehicleChips, PositionenEditor, fCHF, type ArbeitRow, type MaterialRow } from '../ui/DocForm';
 import type { Customer, ArbeitPosition, MaterialPosition, Offerte, OfferteStatus } from '../../types';
-import { mitMaterialHinweis, anzahlungErforderlich, anzahlungAufteilung, ANZAHLUNG_PROZENT, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ } from '../../lib/offerte-docs';
+import { offerteNotizen, anzahlungErforderlich, anzahlungAufteilung, ANZAHLUNG_PROZENT, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ } from '../../lib/offerte-docs';
 import NummerField, { nummerBestaetigt, parseNummer } from '../ui/NummerField';
 import { materialPreis, materialZeSumme, zeMinuten } from '../../lib/ze';
 
@@ -88,7 +88,7 @@ export default function OfferteForm({ customers, onSave, onCancel, saving: savin
     if (!initial && prefillMaterial) return [{ ...prefillMaterial }];
     return [newMaterial()];
   });
-  const [notizen,    setNotizen]    = useState(() => mitMaterialHinweis(initial?.notizen));
+  const [notizen,    setNotizen]    = useState(() => offerteNotizen(initial?.notizen, initial ? anzahlungErforderlich(initial) : false));
   const [gueltigBis, setGueltigBis] = useState(initial?.gueltigBis ?? '');
   const [zahlungsziel, setZahlungsziel] = useState(initial?.zahlungsziel ?? '10');
   const [status,     setStatus]     = useState<OfferteStatus>(initial?.status ?? 'entwurf');
@@ -180,6 +180,12 @@ export default function OfferteForm({ customers, onSave, onCancel, saving: savin
 
   const total = totA + totMeff;
 
+  /** The legal material hint in the Notizen comes and goes with the checkbox. */
+  function toggleAnzahlung(on: boolean) {
+    setMitAnzahlung(on);
+    setNotizen((n) => offerteNotizen(n, on));
+  }
+
   /** Anzahlung flag plus the matching terms: on fills in the Vorkasse terms unless
       own ones exist, off removes the Vorkasse terms again (same as in the Offerte view). */
   function zahlungsterms(): Pick<Offerte, 'anzahlungErforderlich' | 'zahlungsbedingung' | 'zusatznotiz'> {
@@ -242,7 +248,7 @@ export default function OfferteForm({ customers, onSave, onCancel, saving: savin
             }}
           >
             <input
-              type="checkbox" checked={mitAnzahlung} onChange={(e) => setMitAnzahlung(e.target.checked)}
+              type="checkbox" checked={mitAnzahlung} onChange={(e) => toggleAnzahlung(e.target.checked)}
               style={{ width: 22, height: 22, accentColor: '#007AFF', flexShrink: 0, cursor: 'pointer' }}
             />
             <span style={{ flex: 1 }}>
