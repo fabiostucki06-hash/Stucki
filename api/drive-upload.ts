@@ -50,7 +50,7 @@ const q = (s: string) => `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 /** Folder / file names: no path separators, no control characters, bounded length. */
 const cleanName = (s: string) => s.replace(/[\\/\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
 
-async function supabaseUserOk(token: string): Promise<boolean> {
+export async function supabaseUserOk(token: string): Promise<boolean> {
   try {
     const r = await fetch(`${SUPA_URL}/auth/v1/user`, { headers: { apikey: SUPA_KEY, Authorization: `Bearer ${token}` } });
     if (!r.ok) return false;

@@ -35,6 +35,8 @@ import OfferteDetail from './components/offerten/OfferteDetail';
 import { ActiveOfferteBanner } from './components/offerten/ActiveOfferte';
 import { isOpenOfferte } from './hooks/useActiveOfferte';
 import ImportPartSheet, { type ImportPayload } from './components/offerten/ImportPartSheet';
+import PdfImportSheet, { type PdfImportZiel } from './components/ui/PdfImportSheet';
+import { toPositionen, findKunde, neuerKunde, importTitel, type PdfImportResult } from './lib/pdf-import';
 import StatistikDashboard from './components/statistiken/StatistikDashboard';
 import SettingsView from './components/einstellungen/SettingsView';
 import RechnungenList from './components/rechnungen/RechnungenList';
@@ -137,6 +139,7 @@ export default function App() {
   const [editOff,  setEditOff]  = useState<Offerte | null>(null);
   const [selR,     setSelR]     = useState<Rechnung | null>(null);
   const [editR,    setEditR]    = useState<Rechnung | null>(null);
+  const [pdfImport, setPdfImport] = useState<PdfImportZiel | null>(null);
 
   const [importPayload, setImportPayload] = useState<ImportPayload | null>(null);
   const [importTargetId, setImportTargetId] = useState<string | undefined>(undefined);
@@ -537,6 +540,44 @@ export default function App() {
     await deleteRechnung(id); setSelR(null);
   }
 
+  /* PDF-Import: the read data becomes a draft that opens in the edit form for review. */
+  async function handlePdfImported(result: PdfImportResult, ziel: PdfImportZiel, filename: string) {
+    const positionen = toPositionen(result);
+    if (!positionen.length) throw new Error('Im PDF wurden keine Positionen erkannt');
+    const customerId = findKunde(result.kunde, customers)?.id ?? await addCustomer(neuerKunde(result.kunde));
+    const titel = importTitel(result, filename);
+    let total: number;
+    if (ziel === 'offerte') {
+      const t = sumPositions(positionen);
+      total = t.total;
+      const created = await addOfferte({
+        customerId, titel, positionen,
+        notizen: mitMaterialHinweis(result.notizen),
+        zahlungsziel: '10',
+        totalBetrag: t.total.toFixed(2), totalArbeit: t.totalArbeit.toFixed(2),
+        totalMaterial: t.totalMaterial.toFixed(2), totalZE: t.totalZE,
+      });
+      setPdfImport(null); setTab('offerten'); setEditOff(created);
+    } else {
+      // No automatic Kleinteilepauschale: the PDF's positions are taken as they are.
+      const t = computeRechnungTotals(positionen, undefined, false);
+      total = t.rechnungstotal;
+      const created = await addRechnung({
+        customerId, titel, positionen,
+        notizen: result.notizen.trim() || undefined,
+        zahlungsFrist: '10', kleinteilManuell: false,
+        totalBetrag: t.rechnungstotal.toFixed(2), totalArbeit: t.totalArbeit.toFixed(2),
+        totalMaterial: t.totalMaterial.toFixed(2), totalZE: t.totalZE,
+      });
+      if (!created) throw new Error('Rechnung konnte nicht gespeichert werden');
+      setPdfImport(null); setTab('rechnungen'); setEditR(created);
+    }
+    // MWST, Rabatte or missed lines make the totals differ — point it out for the review.
+    if (result.gesamttotal > 0 && Math.abs(result.gesamttotal - total) > 0.05) {
+      showToast(`Total im PDF CHF ${result.gesamttotal.toFixed(2)}, Positionen ergeben CHF ${total.toFixed(2)} – bitte prüfen`, 'info');
+    }
+  }
+
   return (
     <div className={`app-shell${isDesktop ? ' is-desktop' : ''}`} style={{ minHeight: '100dvh', paddingBottom: 'calc(55px + env(safe-area-inset-bottom))' }}>
       {sessionExpired && <ReauthModal email={userEmail} onResolved={updateToken} />}
@@ -569,10 +610,10 @@ export default function App() {
       <main className="app-main">
         {tab === 'dashboard'   && <Dashboard customers={customers} orders={orders} onOrderClick={(o) => { setSelOInEdit(false); setSelO(o); }} />}
         {tab === 'auftraege'   && <OrderList orders={orders} customers={customers} onOrderClick={(o) => { setSelOInEdit(false); setSelO(o); }} onEditClick={(o) => { setSelOInEdit(true); setSelO(o); }} onNew={() => { setNewOCid(null); setShowNO(true); }} />}
-        {tab === 'offerten'    && <OfferteList offerten={offerten} customers={customers} onOfferteClick={setSelOff} onEdit={(off) => setEditOff(off)} onNew={() => setShowNOff(true)} />}
+        {tab === 'offerten'    && <OfferteList offerten={offerten} customers={customers} onOfferteClick={setSelOff} onEdit={(off) => setEditOff(off)} onNew={() => setShowNOff(true)} onImportPdf={() => setPdfImport('offerte')} />}
         {tab === 'materialofferten'       && <OfferteList key="material" variant="material" offerten={offerten} customers={customers} onOfferteClick={setSelOff} onEdit={(off) => setEditOff(off)} onNew={() => setShowNOff(true)} />}
         {tab === 'auftragsbestaetigungen' && <OfferteList key="ab" variant="ab" offerten={offerten} customers={customers} onOfferteClick={setSelOff} onEdit={(off) => setEditOff(off)} onNew={() => setShowNOff(true)} />}
-        {tab === 'rechnungen'  && <RechnungenList rechnungen={rechnungen} customers={customers} onRechnungClick={setSelR} onEdit={(r) => setEditR(r)} onNew={() => setShowNR(true)} />}
+        {tab === 'rechnungen'  && <RechnungenList rechnungen={rechnungen} customers={customers} onRechnungClick={setSelR} onEdit={(r) => setEditR(r)} onNew={() => setShowNR(true)} onImportPdf={() => setPdfImport('rechnung')} />}
         {tab === 'anzahlungsrechnungen' && <RechnungenList key="anzahlung" variant="anzahlung" rechnungen={rechnungen.map((r) => withOffertePositionen(r, offerten))} customers={customers} onRechnungClick={setSelR} onEdit={(r) => setEditR(r)} />}
         {tab === 'kunden'      && <CustomerList customers={customers} orders={orders} onCustomerClick={setSelC} onNew={() => setShowNC(true)} />}
         {tab === 'statistiken'   && <StatistikDashboard orders={orders} offerten={offerten} rechnungen={rechnungen} customers={customers} />}
@@ -720,6 +761,12 @@ export default function App() {
           onCreateSchlussrechnung={handleCreateSchlussrechnung}
           schlussrechnungNumber={schlussrechnungFor(selR.id)?.rechnungNumber}
         />
+      )}
+
+      {pdfImport && token && (
+        <Sheet title="PDF importieren" onClose={() => setPdfImport(null)}>
+          <PdfImportSheet token={token} defaultZiel={pdfImport} onImported={handlePdfImported} />
+        </Sheet>
       )}
 
       {editR && (

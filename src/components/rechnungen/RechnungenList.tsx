@@ -10,6 +10,8 @@ interface RechnungenListProps {
   onRechnungClick: (r: Rechnung) => void;
   onEdit: (r: Rechnung) => void;
   onNew?: () => void;
+  /** Opens the PDF import (Rechnung from an uploaded PDF). */
+  onImportPdf?: () => void;
   /** 'anzahlung' lists only the 50% Vorkasse invoices (own menu item);
       the default list shows every other invoice. */
   variant?: 'standard' | 'anzahlung';
@@ -28,7 +30,7 @@ const STATUS_COLORS: Record<RechnungStatus, string> = {
   storniert: 'var(--red)',
 };
 
-export default function RechnungenList({ rechnungen: all, customers, onRechnungClick, onEdit, onNew, variant = 'standard' }: RechnungenListProps) {
+export default function RechnungenList({ rechnungen: all, customers, onRechnungClick, onEdit, onNew, onImportPdf, variant = 'standard' }: RechnungenListProps) {
   const isAnz = variant === 'anzahlung';
   const rechnungen = all.filter((r) => (r.art === 'anzahlung') === isAnz);
   const sortByName = (a: Rechnung, b: Rechnung) => {
@@ -43,7 +45,12 @@ export default function RechnungenList({ rechnungen: all, customers, onRechnungC
     <div style={{ padding: '16px 16px 0' }}>
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 12 }}>
         <h1 className="sf-title1" style={{ paddingTop: 8 }}>{isAnz ? 'Anzahlungsrechnungen' : 'Rechnungen'}</h1>
-        {onNew && <button onClick={onNew} className="btn-tinted">+ Neue</button>}
+        {(onNew || onImportPdf) && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {onImportPdf && <button onClick={onImportPdf} className="btn-tinted">PDF importieren</button>}
+            {onNew && <button onClick={onNew} className="btn-tinted">+ Neue</button>}
+          </div>
+        )}
       </div>
 
       {!rechnungen.length && (

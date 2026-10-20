@@ -29,7 +29,7 @@ interface AppContextValue {
   addOfferte: (data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>, opts?: { offertNumber?: number }) => Promise<Offerte>;
   updateOfferte: (upd: Offerte) => Promise<Offerte>;
   deleteOfferte: (id: string) => Promise<void>;
-  addRechnung: (data: Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>) => Promise<void>;
+  addRechnung: (data: Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>) => Promise<Rechnung | undefined>;
   updateRechnung: (upd: Rechnung) => Promise<void>;
   deleteRechnung: (id: string) => Promise<void>;
   addMaterial: (data: Omit<MaterialCatalogItem, 'id' | 'createdAt'>) => Promise<void>;
@@ -264,7 +264,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setOfferten((p) => p.filter((o) => o.id !== id));
   }
 
-  async function addRechnung(data: Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>) {
+  async function addRechnung(data: Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>): Promise<Rechnung | undefined> {
     const num = rechnungNum + 1;
     const newR: Rechnung = { id: `r_${Date.now()}`, rechnungNumber: num, status: 'entwurf', createdAt: new Date().toISOString(), ...data };
     try {
@@ -272,6 +272,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch { return; }
     setRechnungen((p) => [...p, newR]); setRechnungNum(num);
     showToast(`Rechnung #${num} gespeichert`, 'success');
+    return newR;
   }
 
   async function updateRechnung(upd: Rechnung) {

@@ -17,6 +17,8 @@ interface OfferteListProps {
   onOfferteClick: (o: Offerte) => void;
   onEdit: (o: Offerte) => void;
   onNew: () => void;
+  /** Opens the PDF import (Offerte from an uploaded PDF). */
+  onImportPdf?: () => void;
   variant?: OfferteListVariant;
 }
 
@@ -35,7 +37,7 @@ const isMaterialofferte = (o: Offerte) => o.art === 'material' || /^Materialoffe
 
 interface Group { key: string; label: string; color: string; items: Offerte[] }
 
-export default function OfferteList({ offerten, customers, onOfferteClick, onEdit, onNew, variant = 'alle' }: OfferteListProps) {
+export default function OfferteList({ offerten, customers, onOfferteClick, onEdit, onNew, onImportPdf, variant = 'alle' }: OfferteListProps) {
   const active = useActiveOfferte(offerten);
   const { signature } = useSettings();
   const isAB = variant === 'ab';
@@ -67,7 +69,12 @@ export default function OfferteList({ offerten, customers, onOfferteClick, onEdi
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 12 }}>
         <h1 className="sf-title1" style={{ paddingTop: 8 }}>{TITLES[variant]}</h1>
         {/* Materialofferten and ABs are derived from an existing Offerte, not created from scratch. */}
-        {variant === 'alle' && <button onClick={onNew} className="btn-tinted">+ Neue</button>}
+        {variant === 'alle' && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {onImportPdf && <button onClick={onImportPdf} className="btn-tinted">PDF importieren</button>}
+            <button onClick={onNew} className="btn-tinted">+ Neue</button>
+          </div>
+        )}
       </div>
 
       {!list.length && (

@@ -1,4 +1,7 @@
 {
+  "functions": {
+    "api/pdf-import.ts": { "maxDuration": 120 }
+  },
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
