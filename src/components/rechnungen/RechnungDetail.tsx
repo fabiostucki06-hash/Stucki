@@ -312,6 +312,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
         {positionen.map((pos, i) => (
           <div
             key={i}
+            className="pos-line"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -322,7 +323,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
             }}
           >
             {/* Description + type badge */}
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="pos-line-desc" style={{ flex: 1, minWidth: 0 }}>
               <div className="sf-subhead" style={{ overflowWrap: 'anywhere' }}>
                 {pos.beschreibung}
               </div>
@@ -333,7 +334,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
 
             {/* Inline editable inputs */}
             {pos.typ === 'arbeit' ? (
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
+              <div className="pos-line-inputs" style={{ display: 'flex', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                   <span style={HDR}>ZE</span>
                   <input
@@ -348,7 +349,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
                 </div>
               </div>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
+              <div className="pos-line-inputs" style={{ display: 'flex', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                   <span style={HDR}>ST.</span>
                   <input
@@ -377,7 +378,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
             )}
 
             {/* Live line total */}
-            <div style={{
+            <div className="pos-line-total" style={{
               fontWeight: 700, fontSize: 14,
               color: pos.typ === 'arbeit' ? 'var(--blue)' : 'var(--green)',
               flexShrink: 0, minWidth: 68, textAlign: 'right',

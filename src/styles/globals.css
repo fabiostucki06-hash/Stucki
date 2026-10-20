@@ -347,6 +347,76 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
   .doc-btn-grid>.btn-system{height:44px;font-size:15px}
 }
 
+/* ── PHONE ── thumb-sized targets (≥44px), compact spacing, stacked position rows.
+   Screen-only like the block above, so print and the generated PDFs stay as they are. */
+.sidebar-item{min-height:48px}
+@media screen and (pointer:coarse){
+  .btn-tinted{height:44px}
+  .mf-btn-save,.mf-btn-cancel,.cf-btn-save,.cf-btn-cancel,.df-bar .mf-btn-save,.df-bar .mf-btn-cancel{height:44px;font-size:15px}
+  .mf-add-pos,.mf-add-bean,.df .mf-add-pos,.df .mf-add-bean{min-height:44px;padding:8px 14px;font-size:14px}
+  .del-btn-visible{width:40px;height:40px}
+  .mf-pos-del,.mf-bean-del,.pos-del-btn,.bean-del,.toast-close{min-width:40px;min-height:40px}
+  .cf-input,.cf-select,.mf-input,.mf-select,.df-inp,.mf-bean-inp{min-height:44px}
+  .bean-input-wrap{height:44px}
+  .seg-item{height:36px;font-size:13px;padding:0 14px}
+  .doc-tab{height:44px}
+  .pill-btn{min-height:44px}
+  .ao-btn,.po-link{height:40px}
+  .ao-toggle{width:44px;height:44px}
+  .df-save-btn{height:32px}
+  .context-item{min-height:52px}
+  .po-check input{width:24px;height:24px}
+}
+/* No sticky hover shift on touch screens. */
+@media screen and (hover:none){
+  .list-row:hover{transform:none;box-shadow:none;background:transparent}
+  .btn-system:hover,.btn-tinted:hover,.btn-system.btn-primary:hover{transform:none}
+}
+@media screen and (max-width:640px){
+  .sf-title1{font-size:24px;letter-spacing:-0.4px}
+  .sf-title2{font-size:20px}
+  .sf-title3{font-size:18px}
+  .section-header{padding:16px 16px 6px}
+
+  /* Landscape notch: keep chrome and content out of the side insets. */
+  .nav-bar-inner{padding:0 calc(8px + env(safe-area-inset-right)) 0 calc(8px + env(safe-area-inset-left))}
+  .nav-actions{gap:4px!important}
+  .werkstatt-logo{max-height:38px!important}
+  .app-main{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+
+  .inset-grouped-list{margin-bottom:20px}
+  .list-row{padding:12px 14px;gap:12px}
+  .card-padded,.inset-card{padding:16px}
+  .stat-grid{gap:8px}
+  .stat-card{padding:14px}
+  .stat-icon{font-size:26px;margin-bottom:6px}
+  .stat-number{font-size:26px}
+  .doc-group,.ab-panel,.doc-terms{padding:12px}
+
+  .sheet-container{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+  .sheet-nav{padding:6px 10px;gap:8px}
+  .sheet-nav .sf-headline{flex:1;min-width:0;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:17px}
+  .sheet-content{padding:16px 14px 20px}
+
+  .df{gap:12px}
+  .df-bar{padding:10px 12px;border-radius:14px}
+
+  /* Offerte / Rechnung detail positions: description + delete on top, inputs and total below. */
+  .pos-line{flex-wrap:wrap;row-gap:10px}
+  .pos-line-desc{flex:1 1 calc(100% - 56px);order:0}
+  .pos-line-desc .sf-subhead{white-space:normal!important;overflow-wrap:anywhere}
+  .pos-line .del-btn-visible{order:1}
+  .pos-line-inputs{order:2;gap:8px!important}
+  .pos-line-inputs .mf-pos-num{width:76px!important;min-height:40px;padding:6px 8px!important}
+  .pos-line-total{order:3;margin-left:auto;align-self:flex-end;padding-bottom:10px}
+  .pos-accept{width:100%}
+  .pos-accept button{flex:1;min-height:40px;font-size:13px!important}
+}
+@media screen and (max-width:400px){
+  .df-grid,.cf-grid-2,.cf-grid-21,.mf-row-2{grid-template-columns:minmax(0,1fr)}
+  .stat-number{font-size:24px}
+}
+
 /* ── PRINT ── hide app chrome, show only the sheet content ── */
 @page{
   size:auto;

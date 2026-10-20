@@ -508,8 +508,8 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
                 transition: 'opacity 0.15s',
               }}
             >
-              <div style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 8 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="pos-line" style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 8 }}>
+                <div className="pos-line-desc" style={{ flex: 1, minWidth: 0 }}>
                   <div className="sf-subhead" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pos.beschreibung}</div>
                   <div style={{ fontSize: 11, color: 'var(--label3)', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     {pos.typ === 'arbeit' ? 'Arbeit' : <>Material <PartLink url={pos.link} /></>}
@@ -518,7 +518,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
 
                 {/* Inline editable inputs */}
                 {pos.typ === 'arbeit' ? (
-                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
+                  <div className="pos-line-inputs" style={{ display: 'flex', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                       <span style={HDR}>ZE</span>
                       <input
@@ -533,7 +533,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
+                  <div className="pos-line-inputs" style={{ display: 'flex', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                       <span style={HDR}>ST.</span>
                       <input
@@ -561,7 +561,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
                   </div>
                 )}
 
-                <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--label)', flexShrink: 0, minWidth: 68, textAlign: 'right' }}>
+                <div className="pos-line-total" style={{ fontWeight: 600, fontSize: 15, color: 'var(--label)', flexShrink: 0, minWidth: 68, textAlign: 'right' }}>
                   {pos.typ === 'arbeit' ? '—' : `CHF ${(parseFloat(pos.preis || '0')).toFixed(2)}`}
                 </div>
 
@@ -574,7 +574,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
                   <SFXmark />
                 </button>
               </div>
-              <div style={{ display: 'flex', gap: 6 }}>
+              <div className="pos-accept" style={{ display: 'flex', gap: 6 }}>
                 <button
                   onClick={() => togglePos(i, true)}
                   style={{

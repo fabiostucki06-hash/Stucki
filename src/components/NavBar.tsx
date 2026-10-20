@@ -57,7 +57,7 @@ export default function NavBar({ syncStatus, todosCount, offerten, customers, on
         </button>
 
         {/* Right side: sync indicator + todo badge */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
+        <div className="nav-actions" style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
           <ActiveOffertePill offerten={offerten} customers={customers} />
           <button
             onClick={hardReload}

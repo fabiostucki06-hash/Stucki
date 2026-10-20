@@ -54,7 +54,7 @@ export default function Sidebar({ open: openProp, activeTab, onTabChange, onClos
           top: docked ? 'calc(60px + env(safe-area-inset-top))' : 0,
           left: 0,
           bottom: 0,
-          width: docked ? 260 : 292,
+          width: docked ? 260 : 'min(292px, 86vw)',
           zIndex: docked ? 150 : 400,
           background: 'rgba(255,255,255,0.10)',
           backdropFilter: 'blur(80px) saturate(280%)',
@@ -83,7 +83,8 @@ export default function Sidebar({ open: openProp, activeTab, onTabChange, onClos
           <button
             onClick={onClose}
             className="bar-btn"
-            style={{ color: 'var(--label2)', width: 36, height: 36, minWidth: 36, minHeight: 36, borderRadius: 10, background: 'rgba(120,120,128,0.10)' }}
+            aria-label="Menü schliessen"
+            style={{ color: 'var(--label2)', width: 44, height: 44, minWidth: 44, minHeight: 44, borderRadius: 12, background: 'rgba(120,120,128,0.10)' }}
           >
             <SFXmark />
           </button>
@@ -97,6 +98,7 @@ export default function Sidebar({ open: openProp, activeTab, onTabChange, onClos
             return (
               <button
                 key={item.id}
+                className="sidebar-item"
                 aria-current={active ? 'page' : undefined}
                 onClick={() => { onTabChange(item.id); onClose(); }}
                 style={{
