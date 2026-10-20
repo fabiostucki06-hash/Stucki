@@ -83,6 +83,10 @@
 
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overscroll-behavior:none}
+/* Dark canvas behind the fixed wallpaper (.bg, z-index:-1): fills the iOS status-bar /
+   safe-area region and rubber-band overscroll so no white strip shows. body stays
+   transparent — an opaque body would paint over the negative-z wallpaper. */
+html{background-color:#0f172a;color-scheme:dark}
 body{
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Arial,sans-serif;
   background:transparent;
