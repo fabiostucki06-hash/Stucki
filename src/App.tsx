@@ -11,7 +11,7 @@ import { useVersionCheck } from './hooks/useVersionCheck';
 import { useIsDesktop } from './hooks/useIsDesktop';
 import { offerteNr, nextVersion, sumPositions, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_BEDINGUNG, ANZAHLUNG_PROZENT } from './lib/offerte-docs';
 import { hardReload } from './lib/reload';
-import { computeRechnungTotals, withOffertePositionen } from './lib/rechnung-totals';
+import { computeRechnungTotals, withOffertePositionen, migrateAnzahlungEntwurf } from './lib/rechnung-totals';
 
 import Spinner from './components/ui/Spinner';
 import Sheet from './components/ui/Sheet';
@@ -255,6 +255,20 @@ export default function App() {
   useEffect(() => { setSelO((p) => (p && orders.find((x) => x.id === p.id)) || p); }, [orders]);
   useEffect(() => { setSelOff((p) => (p && offerten.find((x) => x.id === p.id)) || p); }, [offerten]);
   useEffect(() => { setSelR((p) => (p && rechnungen.find((x) => x.id === p.id)) || p); }, [rechnungen]);
+
+  // Old single-line Anzahlungsrechnung drafts are rewritten once with every Offerte position.
+  const migratedAnz = useRef(new Set<string>());
+  useEffect(() => {
+    if (loading) return;
+    for (const r of rechnungen) {
+      if (migratedAnz.current.has(r.id)) continue;
+      const upd = migrateAnzahlungEntwurf(r, offerten);
+      if (!upd) continue;
+      migratedAnz.current.add(r.id);
+      void updateRechnung(upd).catch(() => migratedAnz.current.delete(r.id));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, rechnungen, offerten]);
 
   const todos = orders.filter(needsAttention);
 

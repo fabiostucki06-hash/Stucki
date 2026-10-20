@@ -1,5 +1,5 @@
 import type { ArbeitPosition, Offerte, Position, Rechnung, RechnungKategorie } from '../types';
-import { ANZAHLUNG_PROZENT } from './offerte-docs';
+import { ANZAHLUNG_PROZENT, offerteNr } from './offerte-docs';
 
 /** Document name printed on PDFs, titles and file names. */
 export function rechnungDocName(r: Pick<Rechnung, 'art'>): string {
@@ -57,6 +57,33 @@ export function withOffertePositionen(r: Rechnung, offerten: Offerte[]): Rechnun
     positionen: pos,
     anzahlungProzent: ANZAHLUNG_PROZENT,
     kleinteilManuell: false,
+    totalArbeit: t.totalArbeit.toFixed(2),
+    totalMaterial: t.totalMaterial.toFixed(2),
+    totalZE: t.totalZE,
+  };
+}
+
+/**
+ * Old single-line Anzahlungsrechnung still in Entwurf: rebuilt with every
+ * position of its Offerte at 100% prices and ANZAHLUNG_PROZENT on document
+ * level, amount recalculated. Returns null when nothing is to be migrated —
+ * sent or paid invoices keep their billed amount (see withOffertePositionen).
+ */
+export function migrateAnzahlungEntwurf(r: Rechnung, offerten: Offerte[]): Rechnung | null {
+  if (r.art !== 'anzahlung' || r.anzahlungProzent || r.status !== 'entwurf') return null;
+  const offerte = offerten.find((o) => o.id === r.offertId);
+  const positionen = offerte?.positionen;
+  if (!offerte || !positionen?.length) return null;
+  const pos = positionen.map((p) => (p.typ === 'material' ? (({ bestellt, ...m }) => m)(p) : p));
+  const t = computeRechnungTotals(pos, undefined, false, ANZAHLUNG_PROZENT);
+  return {
+    ...r,
+    positionen: pos,
+    anzahlungProzent: ANZAHLUNG_PROZENT,
+    // The old note quoted the amounts; they are now in the totals section.
+    notizen: `Positionen gemäss Offerte / Auftragsbestätigung Nr. ${offerteNr(offerte)}.`,
+    kleinteilManuell: false,
+    totalBetrag: t.rechnungstotal.toFixed(2),
     totalArbeit: t.totalArbeit.toFixed(2),
     totalMaterial: t.totalMaterial.toFixed(2),
     totalZE: t.totalZE,
