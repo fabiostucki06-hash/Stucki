@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf';
 import { formatDateCH, buildDocumentFilename } from './utils';
 import { CO_NAME, CO_ADDR, CO_CITY, CO_PHONE, CO_LOC, STD_SATZ } from './company';
 import { PAGE_TOP, PAGE_BOTTOM, addPageNumbers } from './pdf-paging';
-import { offerteNr, offerteZahlungszeilen } from './offerte-docs';
+import { offerteNr, offerteZahlungszeilen, mitMaterialHinweis } from './offerte-docs';
 import { archiveToDrive } from './drive';
 import type { ArbeitPosition, Customer, MaterialPosition, Offerte } from '../types';
 
@@ -226,11 +226,12 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
   } else {
     tL('* Materialpreise gemäss aktuellem Lieferantenpreis', TL, y);
   }
-  if (offerte.notizen) {
+  const notizen = mitMaterialHinweis(offerte.notizen);
+  if (notizen) {
     y += 6;
     if (!fits(8)) newPage();
     bold(); fs(8.5); rgb(0, 0, 0); tL('Notizen:', TL, y); norm(); y += 4;
-    const lines = doc.splitTextToSize(offerte.notizen, TW);
+    const lines = doc.splitTextToSize(notizen, TW);
     for (const line of lines as string[]) {
       if (!fits(0)) { newPage(); norm(); fs(8.5); rgb(0, 0, 0); }
       tL(line, TL, y); y += 4;

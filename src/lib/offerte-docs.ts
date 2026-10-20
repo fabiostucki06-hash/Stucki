@@ -4,6 +4,21 @@ export const VORKASSE_BEDINGUNG = 'Zahlungsbedingung: 50% Vorkasse (Anzahlung in
 export const SCHLUSSRECHNUNG_NOTIZ = 'Zusatznotiz: Schlussrechnung (50%) Zahlungsbedingung 10 Tage netto';
 export const ANZAHLUNG_BEDINGUNG = 'Vorkasse – zahlbar vor Arbeitsbeginn (Bar, TWINT, E-Banking)';
 export const ANZAHLUNG_PROZENT = 50;
+export const MATERIAL_BESTELL_HINWEIS = 'Material wird erst bestellt wenn die Zahlung durchgeführt wurde';
+
+/** Notizen of Offerten, Materialofferten and Anzahlungsrechnungen always carry the
+    MATERIAL_BESTELL_HINWEIS; appended on its own line unless already present. */
+export function mitMaterialHinweis(notizen?: string): string {
+  const n = notizen?.trim() ?? '';
+  if (n.includes(MATERIAL_BESTELL_HINWEIS)) return n;
+  return n ? `${n}\n${MATERIAL_BESTELL_HINWEIS}` : MATERIAL_BESTELL_HINWEIS;
+}
+
+/** Offerte-Notizen carried over to an Auftrag or a regular Rechnung, without the hint. */
+export function ohneMaterialHinweis(notizen?: string): string | undefined {
+  const n = notizen?.replace(MATERIAL_BESTELL_HINWEIS, '').trim();
+  return n || undefined;
+}
 
 const fN = (v?: string | number) => parseFloat(String(v ?? '0')) || 0;
 

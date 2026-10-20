@@ -1,5 +1,5 @@
 import type { ArbeitPosition, Offerte, Position, Rechnung, RechnungKategorie } from '../types';
-import { ANZAHLUNG_PROZENT, offerteNr } from './offerte-docs';
+import { ANZAHLUNG_PROZENT, offerteNr, mitMaterialHinweis } from './offerte-docs';
 
 /** Document name printed on PDFs, titles and file names. */
 export function rechnungDocName(r: Pick<Rechnung, 'art'>): string {
@@ -100,7 +100,7 @@ export function migrateAnzahlungEntwurf(r: Rechnung, offerten: Offerte[]): Rechn
     offertId: offerte.id,
     titel: `Anzahlungsrechnung – Offerte #${offerteNr(offerte)}`,
     // The old note quoted the amounts; they are now in the totals section.
-    notizen: `Positionen gemäss Offerte / Auftragsbestätigung Nr. ${offerteNr(offerte)}.`,
+    notizen: mitMaterialHinweis(`Positionen gemäss Offerte / Auftragsbestätigung Nr. ${offerteNr(offerte)}.`),
     kleinteilManuell: false,
     totalBetrag: t.rechnungstotal.toFixed(2),
     totalArbeit: t.totalArbeit.toFixed(2),

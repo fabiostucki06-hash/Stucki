@@ -3,6 +3,7 @@ import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
 import { FormCard, FormBar, SummaryRow, VehicleChips, PositionenEditor, fCHF, type ArbeitRow, type MaterialRow } from '../ui/DocForm';
 import type { Customer, ArbeitPosition, MaterialPosition, Offerte, OfferteStatus } from '../../types';
+import { mitMaterialHinweis } from '../../lib/offerte-docs';
 
 type OfferteData = Omit<Offerte, 'id' | 'offertNumber' | 'createdAt'>;
 
@@ -78,7 +79,7 @@ export default function OfferteForm({ customers, onSave, onCancel, saving: savin
     if (!initial && prefillMaterial) return [{ ...prefillMaterial }];
     return [newMaterial()];
   });
-  const [notizen,    setNotizen]    = useState(initial?.notizen ?? '');
+  const [notizen,    setNotizen]    = useState(() => mitMaterialHinweis(initial?.notizen));
   const [gueltigBis, setGueltigBis] = useState(initial?.gueltigBis ?? '');
   const [zahlungsziel, setZahlungsziel] = useState(initial?.zahlungsziel ?? '10');
   const [status,     setStatus]     = useState<OfferteStatus>(initial?.status ?? 'entwurf');

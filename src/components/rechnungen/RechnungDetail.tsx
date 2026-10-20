@@ -6,6 +6,7 @@ import { SFPlus, SFXmark } from '../Icons';
 import { PartLink } from '../ui/DocForm';
 import { exportRechnungPDF } from '../../lib/pdf-rechnung';
 import { computeRechnungTotals, rechnungDocName, schlussReferenz, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../lib/rechnung-totals';
+import { mitMaterialHinweis } from '../../lib/offerte-docs';
 import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../lib/utils';
 import type { Customer, Rechnung, RechnungStatus, RechnungKategorie, Position, ArbeitPosition, MaterialPosition } from '../../types';
 
@@ -570,9 +571,9 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
         </div>
       </div>
 
-      {rechnung.notizen && (
-        <div style={{ background: 'var(--fill3)', borderRadius: 12, padding: '12px 14px', fontSize: 15, color: 'var(--label2)', marginBottom: 16 }}>
-          {rechnung.notizen}
+      {(isAnzahlung || rechnung.notizen) && (
+        <div style={{ background: 'var(--fill3)', borderRadius: 12, padding: '12px 14px', fontSize: 15, color: 'var(--label2)', marginBottom: 16, whiteSpace: 'pre-line' }}>
+          {isAnzahlung ? mitMaterialHinweis(rechnung.notizen) : rechnung.notizen}
         </div>
       )}
 

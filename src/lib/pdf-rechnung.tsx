@@ -2,6 +2,7 @@ import { jsPDF } from 'jspdf';
 import { PAGE_TOP, PAGE_BOTTOM, addPageNumbers } from './pdf-paging';
 import { SwissQRBill } from 'swissqrbill/svg';
 import { computeRechnungTotals, rechnungDocName, schlussReferenz, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from './rechnung-totals';
+import { mitMaterialHinweis } from './offerte-docs';
 import { formatDateCH, buildDocumentFilename } from './utils';
 import { getIban } from './settings';
 import { CO_NAME, CO_ADDR, CO_CITY, CO_PHONE, CO_LOC, CO_ZIP, CO_CITY_NAME, STD_SATZ } from './company';
@@ -259,11 +260,12 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
     ? `* Der verbleibende Restbetrag (${100 - (anzProzent ?? 50)}%) wird mit der Schlussrechnung verrechnet (10 Tage netto)`
     : isSchluss ? `* ${schlussReferenz(rechnung)} – die geleistete Anzahlung ist abgezogen`
     : '* Kleinmaterial-Pauschale wird bei <100 ZE hinzugefügt', TL, y);
-  if (rechnung.notizen) {
+  const notizen = rechnung.art === 'anzahlung' ? mitMaterialHinweis(rechnung.notizen) : rechnung.notizen;
+  if (notizen) {
     y += 6;
     if (!fits(4)) newPage();
     bold(); fs(8.5); rgb(0, 0, 0); tL('Notizen:', TL, y); norm(); y += 4;
-    const lines = doc.splitTextToSize(rechnung.notizen, TW);
+    const lines = doc.splitTextToSize(notizen, TW);
     for (const line of lines as string[]) {
       if (!fits(0)) { newPage(); norm(); fs(8.5); rgb(0, 0, 0); }
       tL(line, TL, y); y += 4;

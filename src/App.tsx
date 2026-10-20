@@ -9,7 +9,7 @@ import { useSettings } from './hooks/useSettings';
 import { cleanPartTitle } from './lib/partTitle';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { useIsDesktop } from './hooks/useIsDesktop';
-import { offerteNr, nextVersion, sumPositions, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_BEDINGUNG, ANZAHLUNG_PROZENT } from './lib/offerte-docs';
+import { offerteNr, nextVersion, sumPositions, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_BEDINGUNG, ANZAHLUNG_PROZENT, mitMaterialHinweis, ohneMaterialHinweis } from './lib/offerte-docs';
 import { hardReload } from './lib/reload';
 import { computeRechnungTotals, withOffertePositionen, migrateAnzahlungEntwurf, findQuellOfferte } from './lib/rechnung-totals';
 
@@ -396,7 +396,7 @@ export default function App() {
       titel: `Anzahlungsrechnung – Offerte #${nr}`,
       positionen: pos,
       // Gesamtbetrag, Anzahlung and Restbetrag are shown in the totals section.
-      notizen: `Positionen gemäss Offerte / Auftragsbestätigung Nr. ${nr}.`,
+      notizen: mitMaterialHinweis(`Positionen gemäss Offerte / Auftragsbestätigung Nr. ${nr}.`),
       // Vorkasse: due before work starts, so no "Tage netto" due date.
       zahlungsFrist: '0',
       zahlungsbedingung: ANZAHLUNG_BEDINGUNG,
@@ -464,7 +464,7 @@ export default function App() {
     await addOrder({
       customerId: offerte.customerId,
       beanstandungen: [offerteLabel, ...arbeitBeans],
-      notizen: offerte.notizen,
+      notizen: ohneMaterialHinweis(offerte.notizen),
       positionen: positions,
       offertId: offerte.id,
     });
@@ -490,7 +490,7 @@ export default function App() {
       customerId: offerte.customerId,
       titel: offerte.titel,
       positionen: positions,
-      notizen: offerte.notizen,
+      notizen: ohneMaterialHinweis(offerte.notizen),
       zahlungsFrist: '10',
       faelligAm: faelligDate.toISOString(),
       totalBetrag: (totalArbeit + totalMaterial).toFixed(2),
