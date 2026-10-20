@@ -626,7 +626,8 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .df-group-sum{margin-left:auto;font-size:13px;letter-spacing:-0.1px;text-transform:none;color:var(--label);font-variant-numeric:tabular-nums}
 .df-cols,.df-line{display:grid;gap:8px;align-items:center}
 .df-arbeit{grid-template-columns:minmax(0,1fr) 66px 30px 74px 104px 26px;grid-template-areas:"desc ze ki rate total del"}
-.df-material{grid-template-columns:minmax(0,1fr) 66px 96px 104px 26px;grid-template-areas:"desc qty price total del"}
+.df-material{grid-template-columns:minmax(0,1fr) 66px 96px 66px 104px 26px;grid-template-areas:"desc qty price ze total del"}
+.df-ze-hint{font-size:11.5px;font-weight:600;color:var(--label2);text-align:right;padding:0 34px 6px 0;margin-top:-2px;font-variant-numeric:tabular-nums}
 .df-bean{grid-template-columns:22px minmax(0,1fr) 26px}
 .df-cols{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--label3);padding-bottom:6px}
 .df-cols .r{text-align:right}
@@ -729,7 +730,8 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
   .df-cell-lbl{display:block}
   .df-line{align-items:end;padding:10px 0}
   .df-line.df-arbeit{grid-template-columns:minmax(0,1fr) 30px minmax(0,1fr) minmax(0,1.2fr) 26px;grid-template-areas:"desc desc desc desc del" "ze ki rate total total"}
-  .df-line.df-material{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr) 26px;grid-template-areas:"desc desc desc del" "qty price total total"}
+  .df-line.df-material{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr) 26px;grid-template-areas:"desc desc desc desc del" "qty price ze total total"}
+  .df-ze-hint{padding-right:0}
   .df-line.df-bean{align-items:center}
   .df-c-ki,.df-c-total{padding-bottom:10px}
   .df-c-del{align-self:center}

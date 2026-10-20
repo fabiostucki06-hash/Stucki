@@ -192,7 +192,9 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
     if (mp && fN(mp.menge))       tR(String(fN(mp.menge)),          x2 - PAD, ty);
     if (mp && fN(mp.stueckpreis)) tR(fN(mp.stueckpreis).toFixed(2), x3 - PAD, ty);
     if (mp && fN(mp.preis))       tR(fN(mp.preis).toFixed(2),       x4 - PAD, ty);
-    if (ap?.ze)                   tR(String(ap.ze),                 TR - PAD, ty);
+    // ZE column: Arbeit time, or the time billed with a material position.
+    const zeWert = fN(ap?.ze ?? mp?.ze);
+    if (zeWert)                   tR(String(zeWert),                TR - PAD, ty);
     rgb(0, 0, 0);
 
     hLine(y + rowH, TL, TR, 0.1);
@@ -260,6 +262,10 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
     ? `* Der verbleibende Restbetrag (${100 - (anzProzent ?? 50)}%) wird mit der Schlussrechnung verrechnet (10 Tage netto)`
     : isSchluss ? `* ${schlussReferenz(rechnung)} – die geleistete Anzahlung ist abgezogen`
     : '* Kleinmaterial-Pauschale wird bei <100 ZE hinzugefügt', TL, y);
+  if ((rechnung.positionen ?? []).some((p) => p.typ === 'material' && fN((p as MaterialPosition).ze))) {
+    y += 4;
+    tL(`* Material mit ZE: Preis = Menge × Stk.Preis + ZE (100 ZE = 60 Min. = CHF ${STD_SATZ})`, TL, y);
+  }
   const notizen = rechnung.art === 'anzahlung' ? mitMaterialHinweis(rechnung.notizen) : rechnung.notizen;
   if (notizen) {
     y += 6;

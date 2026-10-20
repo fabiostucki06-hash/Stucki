@@ -5,6 +5,7 @@ import { FormCard, FormBar, SummaryRow, VehicleChips, PositionenEditor, fCHF, ty
 import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../lib/rechnung-totals';
 import { offerteNr } from '../../lib/offerte-docs';
 import NummerField, { nummerBestaetigt, parseNummer } from '../ui/NummerField';
+import { materialPreis, materialZeSumme, zeMinuten } from '../../lib/ze';
 import type { Customer, Order, Offerte, ArbeitPosition, MaterialPosition, Rechnung, RechnungKategorie } from '../../types';
 
 type RechnungData = Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'> & { rechnungNumber: number };
@@ -117,8 +118,8 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
     const materialRows: MaterialRow[] = positions
       .filter((p): p is MaterialPosition => p.typ === 'material')
       .map((p) => {
-        const mg = parseFloat(p.menge) || 1; const sp = parseFloat(p.stueckpreis) || 0;
-        return { ...p, preis: p.preis || (sp ? (sp * mg).toFixed(2) : '') };
+        const fehlt = !p.preis && !(parseFloat(p.stueckpreis) || parseFloat(p.ze ?? ''));
+        return { ...p, preis: p.preis || (fehlt ? '' : materialPreis(p)) };
       });
     setArbeit(arbeitRows.length ? arbeitRows : [newArbeit()]);
     setMaterial(materialRows.length ? materialRows : [newMaterial()]);
@@ -142,8 +143,8 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
     const materialRows: MaterialRow[] = positions
       .filter((p): p is MaterialPosition => p.typ === 'material')
       .map((p) => {
-        const mg = parseFloat(p.menge) || 1; const sp = parseFloat(p.stueckpreis) || 0;
-        return { ...p, preis: p.preis || (sp ? (sp * mg).toFixed(2) : '') };
+        const fehlt = !p.preis && !(parseFloat(p.stueckpreis) || parseFloat(p.ze ?? ''));
+        return { ...p, preis: p.preis || (fehlt ? '' : materialPreis(p)) };
       });
     setArbeit(arbeitRows.length ? arbeitRows : [newArbeit()]);
     setMaterial(materialRows.length ? materialRows : [newMaterial()]);
@@ -188,11 +189,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
   const remM = (i: number) => setMaterial((m) => m.filter((_, j) => j !== i));
   const updM = (i: number, k: string, v: string) => setMaterial((m) => {
     const n = [...m]; n[i] = { ...n[i], [k]: v };
-    if (k === 'stueckpreis' || k === 'menge') {
-      const sp = parseFloat(k === 'stueckpreis' ? v : n[i].stueckpreis) || 0;
-      const mg = parseFloat(k === 'menge' ? v : n[i].menge) || 1;
-      n[i].preis = (sp * mg).toFixed(2);
-    }
+    if (k === 'stueckpreis' || k === 'menge' || k === 'ze') n[i].preis = materialPreis(n[i]);
     return n;
   });
 
@@ -363,6 +360,10 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onCa
           <div>
             <SummaryRow label="Arbeit" sub={totZE ? `${totZE} ZE` : null} value={fCHF(totArbeitBase)} />
             <SummaryRow label="Material" value={fCHF(totM)} />
+            {(() => {
+              const mz = materialZeSumme(material);
+              return mz.ze > 0 && <SummaryRow label="davon ZE zu Material" sub={`${mz.ze} ZE = ${Math.round(zeMinuten(mz.ze))} Min.`} value={fCHF(mz.betrag)} />;
+            })()}
             {/* Kleinteilepauschale: manual override of the per-Auftragsart default */}
             <SummaryRow
               label={

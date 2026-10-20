@@ -11,6 +11,7 @@ import { CO_NAME } from '../../lib/company';
 import { useSettings } from '../../hooks/useSettings';
 import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../lib/utils';
 import { offerteNr, sumPositions, todayISO, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_PROZENT, mitMaterialHinweis } from '../../lib/offerte-docs';
+import { materialPreis } from '../../lib/ze';
 import type { AuftragsBestaetigung, Customer, Offerte, OfferteStatus, Position, ArbeitPosition, MaterialPosition, Rechnung } from '../../types';
 
 interface OfferteDetailProps {
@@ -171,9 +172,9 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
         const sa = parseFloat(key === 'stundenansatz' ? val : (pos as ArbeitPosition).stundenansatz) || 0;
         if (ze && sa) pos.preis = ((ze / 100) * sa).toFixed(2);
       } else {
-        const mg = parseFloat(key === 'menge' ? val : (pos as MaterialPosition).menge) || 1;
-        const sp = parseFloat(key === 'stueckpreis' ? val : (pos as MaterialPosition).stueckpreis) || 0;
-        if (sp) pos.preis = (sp * mg).toFixed(2);
+        // Keeps the ZE share of the position (see materialPreis).
+        const mp = pos as MaterialPosition;
+        if (parseFloat(mp.stueckpreis) || parseFloat(mp.ze ?? '')) pos.preis = materialPreis(mp);
       }
       next[i] = pos;
       return next;

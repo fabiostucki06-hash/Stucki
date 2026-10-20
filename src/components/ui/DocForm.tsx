@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from 'react';
 import Spinner from './Spinner';
 import { SFPlus, SFXmark } from '../Icons';
 import { findPartLink, parsePartLink } from '../../lib/utils';
 import { cleanPartTitle, partNameFromUrl } from '../../lib/partTitle';
 import { getMargin } from '../../lib/settings';
 import type { ArbeitPosition, MaterialPosition } from '../../types';
+import { materialSatz, zeText } from '../../lib/ze';
 
 /* Shared building blocks for the Offerte / Rechnung / Auftrag creation forms
    (styles: `.df-*` in globals.css). */
@@ -242,12 +243,13 @@ export function PositionenEditor({
         <span className="df-group-sum">{fCHF(sum(material))}</span>
       </div>
       <div className="df-cols df-material">
-        <span>Beschreibung</span><span className="r">Menge</span><span className="r">Stk. CHF</span><span className="r">Total</span><span />
+        <span>Beschreibung</span><span className="r">Menge</span><span className="r">Stk. CHF</span><span className="r" title="Arbeitszeit zum Material: 100 ZE = 60 Min.">ZE</span><span className="r">Total</span><span />
       </div>
       {material.map((pos, i) => {
         const busy = !!pos.link && resolving.has(pos.link);
         return (
-        <div key={i} className="df-line df-material" onKeyDown={(e) => onEnterNextRow(e, i === material.length - 1, addMaterial)}>
+        <Fragment key={i}>
+        <div className="df-line df-material" onKeyDown={(e) => onEnterNextRow(e, i === material.length - 1, addMaterial)}>
           <div className="df-c-desc df-desc" aria-busy={busy}>
             <input
               className="df-inp" data-df-desc="material"
@@ -275,11 +277,26 @@ export function PositionenEditor({
               placeholder="0.00" aria-label="Stückpreis"
             />
           </label>
+          <label className="df-cell df-c-ze">
+            <span className="df-cell-lbl">ZE</span>
+            <input
+              className="df-inp num" type="number" inputMode="decimal" min={0}
+              value={pos.ze ?? ''} onChange={(e) => onMaterialChange(i, 'ze', e.target.value)}
+              placeholder="—" aria-label="Zeiteinheiten zum Material (100 ZE = 60 Min.)"
+            />
+          </label>
           <span className="df-total df-c-total">{pos.preis ? fCHF(parseFloat(pos.preis)) : '—'}</span>
           {material.length > 1
             ? <button type="button" className="mf-pos-del df-c-del" onClick={() => onMaterialRemove(i)} aria-label="Position entfernen"><SFXmark /></button>
             : <span className="df-c-del" />}
         </div>
+        {parseFloat(pos.ze ?? '') > 0 && (
+          <div className="df-ze-hint">
+            {parseFloat(pos.stueckpreis) > 0 && `Material CHF ${((parseFloat(pos.menge) || 1) * parseFloat(pos.stueckpreis)).toFixed(2)} + `}
+            {zeText(parseFloat(pos.ze!), materialSatz(pos))}
+          </div>
+        )}
+        </Fragment>
         );
       })}
       <button type="button" className="mf-add-pos green" onClick={addMaterial}><SFPlus size={12} /> Material</button>

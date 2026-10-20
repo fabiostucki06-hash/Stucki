@@ -169,7 +169,9 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
     if (mp && fN(mp.menge))       tR(String(fN(mp.menge)),            x2 - PAD, ty);
     if (mp && fN(mp.stueckpreis)) tR(fN(mp.stueckpreis).toFixed(2),   x3 - PAD, ty);
     if (fN(p.preis))              tR(fN(p.preis).toFixed(2),           x4 - PAD, ty);
-    if (ap?.ze)                   tR(String(ap.ze),                    TR - PAD,  ty);
+    // ZE column: Arbeit time, or the time billed with a material position.
+    const zeWert = fN(ap?.ze ?? mp?.ze);
+    if (zeWert)                   tR(String(zeWert),                   TR - PAD,  ty);
     rgb(0, 0, 0);
 
     hLine(y + RH, TL, TR, 0.1);
@@ -225,6 +227,10 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
     tL('* Kleinmaterial-Pauschale wird bei über 100 ZE automatisch hinzugefügt', TL, y);
   } else {
     tL('* Materialpreise gemäss aktuellem Lieferantenpreis', TL, y);
+  }
+  if (allPos.some((p) => p.typ === 'material' && fN((p as MaterialPosition).ze))) {
+    y += 4;
+    tL(`* Material mit ZE: Preis = Menge × Stk.Preis + ZE (100 ZE = 60 Min. = CHF ${STD_SATZ})`, TL, y);
   }
   const notizen = mitMaterialHinweis(offerte.notizen);
   if (notizen) {

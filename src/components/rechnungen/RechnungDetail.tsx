@@ -7,6 +7,7 @@ import { PartLink } from '../ui/DocForm';
 import { exportRechnungPDF } from '../../lib/pdf-rechnung';
 import { computeRechnungTotals, rechnungDocName, schlussReferenz, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../lib/rechnung-totals';
 import { mitMaterialHinweis } from '../../lib/offerte-docs';
+import { materialPreis } from '../../lib/ze';
 import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../lib/utils';
 import type { Customer, Rechnung, RechnungStatus, RechnungKategorie, Position, ArbeitPosition, MaterialPosition } from '../../types';
 
@@ -127,9 +128,9 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
         const sa = parseFloat(key === 'stundenansatz' ? val : (pos as ArbeitPosition).stundenansatz) || 0;
         if (ze && sa) pos.preis = ((ze / 100) * sa).toFixed(2);
       } else {
-        const mg = parseFloat(key === 'menge' ? val : (pos as MaterialPosition).menge) || 1;
-        const sp = parseFloat(key === 'stueckpreis' ? val : (pos as MaterialPosition).stueckpreis) || 0;
-        if (sp) pos.preis = (sp * mg).toFixed(2);
+        // Keeps the ZE share of the position (see materialPreis).
+        const mp = pos as MaterialPosition;
+        if (parseFloat(mp.stueckpreis) || parseFloat(mp.ze ?? '')) pos.preis = materialPreis(mp);
       }
       next[i] = pos;
       return next;

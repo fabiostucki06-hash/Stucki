@@ -71,7 +71,12 @@ export interface MaterialPosition {
   beschreibung: string;
   menge: string;
   stueckpreis: string;
+  /** Menge × Stückpreis plus the ZE share (see materialPreis). */
   preis: string;
+  /** Working time billed with the part, in ZE (100 ZE = 60 min). */
+  ze?: string;
+  /** CHF per 100 ZE for `ze`; STD_SATZ when unset. */
+  stundenansatz?: string;
   /** Shop page the part was sourced from (e.g. Autodoc). Internal reference only — never printed on customer documents. */
   link?: string;
   /** Purchase price and article number read from the shop page. Internal reference only, like `link`. */

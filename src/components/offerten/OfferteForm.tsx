@@ -5,6 +5,7 @@ import { FormCard, FormBar, SummaryRow, VehicleChips, PositionenEditor, fCHF, ty
 import type { Customer, ArbeitPosition, MaterialPosition, Offerte, OfferteStatus } from '../../types';
 import { mitMaterialHinweis } from '../../lib/offerte-docs';
 import NummerField, { nummerBestaetigt, parseNummer } from '../ui/NummerField';
+import { materialPreis, materialZeSumme, zeMinuten } from '../../lib/ze';
 
 type OfferteData = Omit<Offerte, 'id' | 'offertNumber' | 'createdAt'> & { offertNumber: number };
 
@@ -132,11 +133,7 @@ export default function OfferteForm({ customers, onSave, onCancel, saving: savin
   const remM = (i: number) => setMaterial((m) => m.filter((_, j) => j !== i));
   const updM = (i: number, k: string, v: string) => setMaterial((m) => {
     const n = [...m]; n[i] = { ...n[i], [k]: v };
-    if (k === 'stueckpreis' || k === 'menge') {
-      const sp = parseFloat(k === 'stueckpreis' ? v : n[i].stueckpreis) || 0;
-      const mg = parseFloat(k === 'menge' ? v : n[i].menge) || 1;
-      n[i].preis = (sp * mg).toFixed(2);
-    }
+    if (k === 'stueckpreis' || k === 'menge' || k === 'ze') n[i].preis = materialPreis(n[i]);
     return n;
   });
 
@@ -254,6 +251,10 @@ export default function OfferteForm({ customers, onSave, onCancel, saving: savin
           <div>
             <SummaryRow label="Arbeit" sub={totZE ? `${totZE} ZE` : null} value={fCHF(totA)} />
             <SummaryRow label="Material" value={fCHF(totM)} />
+            {(() => {
+              const mz = materialZeSumme(material);
+              return mz.ze > 0 && <SummaryRow label="davon ZE zu Material" sub={`${mz.ze} ZE = ${Math.round(zeMinuten(mz.ze))} Min.`} value={fCHF(mz.betrag)} />;
+            })()}
             {kleinteilActive && <SummaryRow label="Kleinteil Pauschale" sub="über 100 ZE" value={fCHF(kleinteilBetrag)} />}
             <SummaryRow label="Total" value={fCHF(total)} total />
           </div>
