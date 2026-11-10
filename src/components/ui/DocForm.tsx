@@ -151,7 +151,7 @@ export function PositionenEditor({
   const rootRef = useRef<HTMLDivElement>(null);
   // Set right before a row is appended; once it has rendered, its description
   // input takes focus so the user can keep typing without reaching for it.
-  const pendingFocus = useRef<'arbeit' | 'material' | null>(null);
+  const pendingFocus = useRef<'arbeit' | 'material' | 'pauschale' | null>(null);
 
   useEffect(() => {
     if (!pendingFocus.current) return;
@@ -232,26 +232,33 @@ export function PositionenEditor({
 
   const addArbeit   = () => { pendingFocus.current = 'arbeit';   onArbeitAdd(); };
   const addMaterial = () => { pendingFocus.current = 'material'; onMaterialAdd(); };
-  const insertMaterial = (row: MaterialRow) => { pendingFocus.current = 'material'; onMaterialInsert(row); };
+  const insertMaterial = (row: MaterialRow) => { pendingFocus.current = row.art === 'pauschale' ? 'pauschale' : 'material'; onMaterialInsert(row); };
+
+  // Pauschalen are stored with the material rows (fixed price, see
+  // sonderpositionen) but are services: they are edited under Arbeit.
+  const teile = material.filter((p) => p.art !== 'pauschale');
+  const letzteTeilZeile = material.reduce((last, p, i) => (p.art === 'pauschale' ? last : i), -1);
+  const pauschalZeilen = material.map((pos, i) => ({ pos, i })).filter(({ pos }) => pos.art === 'pauschale');
 
   return (
     <div ref={rootRef}>
       <div className="df-group-hdr">
         <span className="df-dot" style={{ background: 'var(--green)' }} />
         Material
-        <span className="df-group-sum">{fCHF(sum(material))}</span>
+        <span className="df-group-sum">{fCHF(sum(teile))}</span>
       </div>
       <div className="df-cols df-material">
         <span>Beschreibung</span><span className="r">Menge</span><span className="r" title="Einkaufspreis pro Stück (intern)">EK CHF</span><span className="r" title="Aufschlag auf den EK (intern)">Marge %</span><span className="r" title="Verkaufspreis pro Stück – erscheint auf dem PDF">VK CHF</span><span className="r" title="Arbeitszeit zum Material: 100 ZE = 60 Min.">ZE</span><span className="r">Total</span><span />
       </div>
       {material.map((pos, i) => {
+        if (pos.art === 'pauschale') return null;
         const busy = !!pos.link && resolving.has(pos.link);
-        // Versandkosten / Pauschale: fixed price, no EK / Marge / ZE.
+        // Versandkosten: fixed price, no EK / Marge / ZE.
         const fest = !!pos.art;
-        const festTitel = pos.art === 'versand' ? 'Versandkosten: Betrag wird 1:1 weiterverrechnet, ohne Marge' : 'Pauschale: Festpreis, ohne Marge und ZE';
+        const festTitel = 'Versandkosten: Betrag wird 1:1 weiterverrechnet, ohne Marge';
         return (
         <Fragment key={i}>
-        <div className={`df-line df-material${fest ? ' df-fest' : ''}`} onKeyDown={(e) => onEnterNextRow(e, i === material.length - 1, addMaterial)}>
+        <div className={`df-line df-material${fest ? ' df-fest' : ''}`} onKeyDown={(e) => onEnterNextRow(e, i === letzteTeilZeile, addMaterial)}>
           <div className="df-c-desc df-desc" aria-busy={busy}>
             {fest && <span className={`df-tag df-tag-${pos.art}`} title={festTitel}>{positionsArt(pos)}</span>}
             <input
@@ -261,7 +268,7 @@ export function PositionenEditor({
               // Full URLs that were typed, dropped or autofilled rather than pasted
               // (Enter moves focus to the next row, so it lands here too).
               onBlur={(e) => resolveMaterialLink(i, e.target.value)}
-              placeholder={pos.art === 'versand' ? 'Versandkosten (z.B. Lieferant)' : pos.art === 'pauschale' ? 'Pauschale…' : 'Ersatzteil / Material…'}
+              placeholder={pos.art === 'versand' ? 'Versandkosten (z.B. Lieferant)' : 'Ersatzteil / Material…'}
               aria-label={`Beschreibung ${positionsArt(pos)}`}
             />
             {busy && <span className="df-desc-busy" role="status" aria-label="Link wird geladen"><Spinner size={12} /></span>}
@@ -311,7 +318,7 @@ export function PositionenEditor({
             />
           </label>
           <span className="df-total df-c-total">{pos.preis ? fCHF(parseFloat(pos.preis)) : '—'}</span>
-          {material.length > 1
+          {teile.length > 1
             ? <button type="button" className="mf-pos-del df-c-del" onClick={() => onMaterialRemove(i)} aria-label="Position entfernen"><SFXmark /></button>
             : <span className="df-c-del" />}
         </div>
@@ -328,21 +335,6 @@ export function PositionenEditor({
         <button type="button" className="mf-add-pos orange" onClick={() => insertMaterial(neueVersandPosition())} title="Versandkosten werden 1:1 ohne Marge verrechnet">
           <SFPlus size={12} /> Versandkosten
         </button>
-        {pauschalen.length > 0 && (
-          <select
-            className="mf-add-pos df-pauschale-select" value="" aria-label="Pauschale einfügen"
-            title="Festpreis-Paket einfügen (ohne Stundensatz und Marge)"
-            onChange={(e) => {
-              const b = pauschalen.find((x) => x.id === e.target.value);
-              if (b) insertMaterial(pauschalePosition(b));
-            }}
-          >
-            <option value="">＋ Pauschale…</option>
-            {pauschalen.map((b) => (
-              <option key={b.id} value={b.id}>{b.name || 'Ohne Namen'} – {fCHF(parseFloat(b.preis) || 0)}</option>
-            ))}
-          </select>
-        )}
       </div>
 
       <div className="df-group-hdr">
@@ -384,7 +376,49 @@ export function PositionenEditor({
             : <span className="df-c-del" />}
         </div>
       ))}
-      <button type="button" className="mf-add-pos" onClick={addArbeit}><SFPlus size={12} /> Arbeit</button>
+      {pauschalZeilen.map(({ pos, i }) => (
+        <div key={`p${i}`} className="df-line df-arbeit df-fest">
+          <div className="df-c-desc df-desc">
+            <span className="df-tag df-tag-pauschale" title="Pauschale: Festpreis, ohne Stundensatz, ZE und Marge">Pauschale</span>
+            <input
+              className="df-inp" data-df-desc="pauschale"
+              value={pos.beschreibung} onChange={(e) => onMaterialChange(i, 'beschreibung', e.target.value)}
+              placeholder="Pauschale…" aria-label="Beschreibung Pauschale"
+            />
+          </div>
+          <span className="df-cell df-c-ze df-ze-min" title="Festpreis: keine ZE">—</span>
+          <span className="df-c-ki" />
+          <label className="df-cell df-c-rate">
+            <span className="df-cell-lbl">Festpreis CHF</span>
+            <input
+              className="df-inp num" type="number" inputMode="decimal" min={0}
+              value={pos.stueckpreis} onChange={(e) => onMaterialChange(i, 'stueckpreis', e.target.value)}
+              placeholder="0.00" aria-label="Festpreis der Pauschale in CHF"
+              title="Festpreis – ohne Stundensatz und Marge"
+            />
+          </label>
+          <span className="df-total df-c-total">{pos.preis ? fCHF(parseFloat(pos.preis)) : '—'}</span>
+          <button type="button" className="mf-pos-del df-c-del" onClick={() => onMaterialRemove(i)} aria-label="Pauschale entfernen"><SFXmark /></button>
+        </div>
+      ))}
+      <div className="df-add-row">
+        <button type="button" className="mf-add-pos" onClick={addArbeit}><SFPlus size={12} /> Arbeit</button>
+        {pauschalen.length > 0 && (
+          <select
+            className="mf-add-pos df-pauschale-select" value="" aria-label="Pauschale einfügen"
+            title="Festpreis-Paket einfügen (ohne Stundensatz und Marge)"
+            onChange={(e) => {
+              const b = pauschalen.find((x) => x.id === e.target.value);
+              if (b) insertMaterial(pauschalePosition(b));
+            }}
+          >
+            <option value="">＋ Pauschale…</option>
+            {pauschalen.map((b) => (
+              <option key={b.id} value={b.id}>{b.name || 'Ohne Namen'} – {fCHF(parseFloat(b.preis) || 0)}</option>
+            ))}
+          </select>
+        )}
+      </div>
     </div>
   );
 }

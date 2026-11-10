@@ -105,10 +105,17 @@ export function decodeMaybeDouble(v: string): string {
   return out;
 }
 
-/** Material positions before Arbeit; the order within each group is kept.
-    Documents saved before the Material-first order are listed the same way. */
-export const materialZuerst = <P extends Position>(pos: P[]): P[] =>
-  [...pos.filter((p) => p.typ === 'material'), ...pos.filter((p) => p.typ !== 'material')];
+/** Material positions before Arbeit, Pauschalen (fixed-price services) at the
+    end of the Arbeit group; the order within each group is kept. Documents
+    saved before the Material-first order are listed the same way. */
+export const materialZuerst = <P extends Position>(pos: P[]): P[] => {
+  const istPauschale = (p: Position) => p.typ === 'material' && p.art === 'pauschale';
+  return [
+    ...pos.filter((p) => p.typ === 'material' && !istPauschale(p)),
+    ...pos.filter((p) => p.typ !== 'material'),
+    ...pos.filter(istPauschale),
+  ];
+};
 
 export const sortCustomers = (a: Customer, b: Customer): number => {
   const na = `${a.nachname} ${a.vorname}`.toLowerCase();

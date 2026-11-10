@@ -7,7 +7,7 @@ import { materialPreis, materialZeSumme, zeBetrag, zeMinuten } from '../../lib/z
 import { setMaterialFeld } from '../../lib/marge';
 import { festpreisSummen } from '../../lib/sonderpositionen';
 import { useAutoSave } from '../../hooks/useAutoSave';
-import { echteBeanstandungen } from '../../lib/utils';
+import { echteBeanstandungen, materialZuerst } from '../../lib/utils';
 import type { Customer, Order, Offerte, ArbeitPosition, MaterialPosition, Rechnung, RechnungKategorie } from '../../types';
 
 type RechnungData = Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'> & { rechnungNumber: number };
@@ -248,7 +248,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
 
   const data: RechnungData | null = hinweis || nr == null ? null : {
     rechnungNumber: nr, customerId: cid, titel,
-    positionen: [...mp, ...ap.map(toArbeitPosition)], notizen,
+    positionen: materialZuerst([...mp, ...ap.map(toArbeitPosition)]), notizen,
     zahlungsFrist, faelligAm,
     kategorie: kategorie || undefined, kleinteilManuell,
     totalBetrag: rechnungstotal.toFixed(2), totalArbeit: totA.toFixed(2),
@@ -400,9 +400,9 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
           </div>
           <div>
             <SummaryRow label="Material" value={fCHF(totM - fest.versand - fest.pauschalen)} />
-            {fest.pauschalen > 0 && <SummaryRow label="Pauschalen" sub="Festpreis" value={fCHF(fest.pauschalen)} />}
             {fest.versand > 0 && <SummaryRow label="Versandkosten" sub="ohne Marge" value={fCHF(fest.versand)} />}
             <SummaryRow label="Arbeit" sub={totZE ? `${totZE} ZE` : null} value={fCHF(totA)} />
+            {fest.pauschalen > 0 && <SummaryRow label="Pauschalen" sub="Festpreis" value={fCHF(fest.pauschalen)} />}
             {(() => {
               const mz = materialZeSumme(material);
               return mz.ze > 0 && <SummaryRow label="inkl. ZE zu Material" sub={`${mz.ze} ZE = ${Math.round(zeMinuten(mz.ze))} Min.`} value={fCHF(mz.betrag)} />;

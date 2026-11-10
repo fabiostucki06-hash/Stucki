@@ -6,6 +6,7 @@ import NummerField, { parseNummer } from '../ui/NummerField';
 import { materialPreis, materialZeSumme, ohneMaterialZe, positionTotals, zeBetrag, zeMinuten } from '../../lib/ze';
 import { setMaterialFeld } from '../../lib/marge';
 import { festpreisSummen } from '../../lib/sonderpositionen';
+import { materialZuerst } from '../../lib/utils';
 import { useAutoSave } from '../../hooks/useAutoSave';
 
 type OfferteData = Omit<Offerte, 'id' | 'offertNumber' | 'createdAt'> & { offertNumber: number };
@@ -181,7 +182,7 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
     : [];
   const data: OfferteData | null = hinweis || nr == null ? null : {
     offertNumber: nr, customerId: cid, titel,
-    positionen: [...material.filter((p) => p.art || p.beschreibung.trim()), ...autoPauschale, ...arbeit.filter((p) => p.beschreibung.trim()).map(toArbeitPosition)],
+    positionen: materialZuerst([...material.filter((p) => p.art || p.beschreibung.trim()), ...autoPauschale, ...arbeit.filter((p) => p.beschreibung.trim()).map(toArbeitPosition)]),
     notizen, gueltigBis, zahlungsziel, status,
     ...zahlungsterms(),
     totalBetrag: (totA + totMeff).toFixed(2), totalArbeit: totA.toFixed(2),
@@ -318,9 +319,9 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
           </div>
           <div>
             <SummaryRow label="Material Total" value={fCHF(totM - fest.versand - fest.pauschalen)} />
-            {fest.pauschalen > 0 && <SummaryRow label="Pauschalen" sub="Festpreis" value={fCHF(fest.pauschalen)} />}
             {fest.versand > 0 && <SummaryRow label="Versandkosten" sub="ohne Marge" value={fCHF(fest.versand)} />}
             <SummaryRow label="Arbeit Total" sub={totZE ? `${totZE} ZE` : null} value={fCHF(totA)} />
+            {fest.pauschalen > 0 && <SummaryRow label="Pauschalen" sub="Festpreis" value={fCHF(fest.pauschalen)} />}
             {(() => {
               const mz = materialZeSumme(material);
               return mz.ze > 0 && <SummaryRow label="inkl. ZE zu Material" sub={`${mz.ze} ZE = ${Math.round(zeMinuten(mz.ze))} Min.`} value={fCHF(mz.betrag)} />;
