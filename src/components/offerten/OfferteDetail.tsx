@@ -3,6 +3,7 @@ import Sheet from '../ui/Sheet';
 import Spinner from '../ui/Spinner';
 import { SFPlus, SFXmark } from '../Icons';
 import { PartLink, SaveStatus } from '../ui/DocForm';
+import { DocActions, DocSummary, type DocAction } from '../ui/DocActions';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { ActiveOfferteBanner } from './ActiveOfferte';
 import PartsOrder from '../teile/PartsOrder';
@@ -114,7 +115,8 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   // Kleinteil Pauschale is a material position, listed on its own line in the totals.
   const acceptedKleinteil = positionen.filter((p, i) => posAccepted[i] && p.typ === 'material' && p.beschreibung === 'Kleinteil Pauschale')
     .reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
-  const acceptedMatPos = positionen.filter((p, i) => posAccepted[i] && p.typ === 'material');
+  // Parts (and their Versandkosten) for a Materialofferte; Pauschalen are services.
+  const acceptedMatPos = positionen.filter((p, i) => posAccepted[i] && p.typ === 'material' && p.art !== 'pauschale');
   // Versandkosten / Pauschalen: part of the material sum, listed on their own lines.
   const acceptedFest = festpreisSummen(positionen.filter((_, i) => posAccepted[i]));
   const hasTerms = !!(zahlungsbedingung || zusatznotiz);
@@ -130,6 +132,37 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   const showDocPdf = !isAbView;
   const showAbPdf = hasAb && (isAbView || offerte.art !== 'material');
   const printName = isAbView ? 'Auftragsbestätigung' : docName;
+
+  /* Follow-up documents from the accepted positions. The step that usually
+     comes next is shown as the one prominent button, the others are collapsed. */
+  const posSub = `${acceptedCount} Pos. · CHF ${acceptedTotal.toFixed(2)}`;
+  const schritte: Record<string, DocAction | null> = {
+    ab: !isAbView ? { key: 'ab', label: 'Auftragsbestätigung erstellen', sub: posSub, onClick: handleCreateAb, disabled: busy || acceptedCount === 0, busy: creatingAb } : null,
+    auftrag: onCreateAuftrag ? { key: 'auftrag', label: 'Auftrag erstellen', sub: posSub, onClick: handleCreateAuftrag, disabled: busy || acceptedCount === 0, busy: creatingAuftrag } : null,
+    rechnung: onCreateRechnung ? { key: 'rechnung', label: 'Rechnung erstellen', sub: posSub, tone: 'green', onClick: handleCreateRechnung, disabled: busy || acceptedCount === 0, busy: creatingRechnung } : null,
+    anzahlung: onCreateAnzahlung ? {
+      key: 'anzahlung', label: `Anzahlungsrechnung ${ANZAHLUNG_PROZENT}%`, tone: 'green',
+      sub: `CHF ${roundToRappen(acceptedTotal * ANZAHLUNG_PROZENT / 100).toFixed(2)}`,
+      onClick: handleCreateAnzahlung, disabled: busy || acceptedTotal <= 0, busy: creatingAnz,
+    } : null,
+    material: onCreateMaterialofferte && acceptedMatPos.length > 0 ? {
+      key: 'material', label: 'Materialofferte erstellen', sub: `${acceptedMatPos.length} Materialpositionen`,
+      onClick: handleCreateMaterialofferte, disabled: busy, busy: creatingMat,
+    } : null,
+    schluss: onCreateSchlussrechnung && anzahlung ? {
+      key: 'schluss', label: 'Schlussrechnung erstellen', sub: `abzgl. Anzahlung #${anzahlung.rechnungNumber}`,
+      onClick: handleCreateSchlussrechnung, disabled: busy || creatingSchluss, busy: creatingSchluss,
+    } : null,
+  };
+  const reihenfolge =
+    anzahlung ? ['schluss', 'auftrag', 'rechnung', 'ab', 'material', 'anzahlung']
+    : offerte.art === 'material' && mitAnzahlung ? ['anzahlung', 'ab', 'auftrag', 'rechnung', 'material', 'schluss']
+    : isAbView || offerte.status === 'angenommen' ? ['auftrag', 'rechnung', 'ab', 'anzahlung', 'material', 'schluss']
+    : ['ab', 'auftrag', 'rechnung', 'anzahlung', 'material', 'schluss'];
+  const verfuegbar = positionen.length > 0
+    ? reihenfolge.map((k) => schritte[k]).filter((a): a is DocAction => !!a)
+    : [];
+  const [naechsterSchritt, ...weitereSchritte] = verfuegbar;
 
   /* AB fields: name / ort / datum default to the customer, workshop and today. */
   const abName = ab.name ?? (customer ? `${customer.vorname} ${customer.nachname}` : '');
@@ -380,25 +413,23 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
     >
       <ActiveOfferteBanner offerte={offerte} customer={customer} />
 
-      <div className="glass-panel" style={{ padding: 16, marginBottom: 16 }}>
-        <div style={{ fontSize: 13, color: 'var(--label2)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Status</div>
-        <div style={{ fontSize: 24, fontWeight: 700, color: sc.c, letterSpacing: '0.34px' }}>{sc.l}</div>
-        {offerte.titel && <div style={{ fontSize: 15, color: 'var(--label2)', marginTop: 4 }}>{offerte.titel}</div>}
-        {(offerte.version ?? 1) > 1 && (
-          <div style={{ fontSize: 13, color: 'var(--label3)', marginTop: 4 }}>
-            Version {offerte.version}{offerte.art === 'material' ? ' · reine Materialofferte' : ''} · basiert auf Offerte #{offerte.offertNumber}
-          </div>
-        )}
-      </div>
-
       {isExpired && offerte.status === 'versendet' && (
-        <div className="alert-banner alert-danger" style={{ marginBottom: 12 }}>
+        <div className="alert-banner alert-danger" style={{ marginBottom: 10 }}>
           <span>⚠️</span><span className="sf-subhead">Offerte abgelaufen</span>
         </div>
       )}
 
-      <p className="section-header">Status ändern</p>
-      <div className="h-scroll" style={{ marginBottom: 20 }}>
+      <DocSummary
+        statusLabel={sc.l} statusColor={sc.c}
+        title={offerte.titel}
+        amount={`CHF ${acceptedTotal.toFixed(2)}`}
+        amountLabel={acceptedCount < positionen.length ? `${acceptedCount}/${positionen.length} Pos.` : 'Total'}
+        meta={[
+          customer && <><strong style={{ color: 'var(--label)' }}>{customer.vorname} {customer.nachname}</strong>{[customer.telefon, customer.kennzeichen].filter(Boolean).map((v) => ` · ${v}`).join('')}</>,
+          offerte.gueltigBis && <span style={{ color: isExpired ? 'var(--red)' : undefined }}>Gültig bis {formatDateCH(offerte.gueltigBis)}{isExpired ? ' (abgelaufen)' : ''}</span>,
+          (offerte.version ?? 1) > 1 && `Version ${offerte.version}${offerte.art === 'material' ? ' · reine Materialofferte' : ''} · basiert auf Offerte #${offerte.offertNumber}`,
+        ]}
+      >
         {(Object.entries(ST_META) as [OfferteStatus, StatusMeta][]).map(([s, meta]) => (
           <button
             key={s}
@@ -420,24 +451,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
             {saving && offerte.status === s ? <Spinner size={12} /> : meta.l}
           </button>
         ))}
-      </div>
-
-      {customer && (
-        <div className="inset-grouped-list" style={{ marginBottom: 16 }}>
-          <div className="list-row" style={{ cursor: 'default' }}>
-            <div style={{ flex: 1 }}>
-              <div className="sf-headline">{customer.vorname} {customer.nachname}</div>
-              <div className="sf-subhead" style={{ color: 'var(--label2)' }}>{customer.telefon} · {customer.kennzeichen}</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {offerte.gueltigBis && (
-        <div className="sf-subhead" style={{ color: isExpired ? 'var(--red)' : 'var(--label2)', marginBottom: 12 }}>
-          Gültig bis: {formatDateCH(offerte.gueltigBis)}{isExpired ? ' (abgelaufen)' : ''}
-        </div>
-      )}
+      </DocSummary>
 
       {anzahlungMoeglich(offerte) && <label
         className="glass-panel no-print"
@@ -747,83 +761,23 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
 
       {offerteNotizen(offerte.notizen, mitAnzahlung) && <div style={{ background: 'var(--fill3)', borderRadius: 12, padding: '12px 14px', fontSize: 15, color: 'var(--label2)', marginBottom: 16, whiteSpace: 'pre-line' }}>{offerteNotizen(offerte.notizen, mitAnzahlung)}</div>}
 
-      {/* ── Aktionen, gruppiert. Screen only: buttons never print, so the
-          group panels are left out of the printout entirely (no-print). ── */}
-
-      {/* PDF / Druck: one button per document, nothing twice. */}
-      <div className="glass-panel doc-group no-print">
-        <div className="ab-panel-title">Dokumente</div>
-        <div className="doc-btn-grid">
-          {showDocPdf && (
-            <button onClick={() => exportOffertePDF(buildPayload(), customer)} className={`btn-system btn-primary${showAbPdf ? '' : ' doc-btn-full'}`}>
-              {docName} als PDF
-            </button>
-          )}
-          {showAbPdf && (
-            <button onClick={handleExportAB} disabled={autoSave.status === 'saving' || acceptedCount === 0} className={`btn-system btn-primary${showDocPdf ? '' : ' doc-btn-full'}`}>
-              AB als PDF
-            </button>
-          )}
-          <button onClick={() => printWithFilename(buildDocumentFilename(customer, printName, nr))} className="btn-system btn-secondary doc-btn-full">
-            {isAbView ? 'AB drucken' : `${docName} drucken`}
-          </button>
-        </div>
-        <div className="doc-group-hint">PDFs werden zusätzlich auf Google Drive abgelegt (GarageOS / Dokumenttyp / Jahr).</div>
-      </div>
-
-      {/* Folgedokumente aus den angenommenen Positionen. */}
-      {positionen.length > 0 && (!isAbView || onCreateAuftrag || onCreateRechnung || onCreateMaterialofferte || onCreateAnzahlung || (onCreateSchlussrechnung && anzahlung)) && (
-        <div className="glass-panel doc-group no-print">
-          <div className="ab-panel-title">Weiterverarbeiten · {acceptedCount} Positionen</div>
-          <div className="doc-btn-grid">
-            {onCreateAuftrag && (
-              <button onClick={handleCreateAuftrag} disabled={busy || acceptedCount === 0} className="btn-system btn-primary">
-                {creatingAuftrag ? <><Spinner size={13} />&nbsp; Wird erstellt…</> : 'Auftrag erstellen'}
-              </button>
-            )}
-            {onCreateRechnung && (
-              <button onClick={handleCreateRechnung} disabled={busy || acceptedCount === 0} className="btn-system btn-green">
-                {creatingRechnung ? <><Spinner size={13} />&nbsp; Wird erstellt…</> : 'Rechnung erstellen'}
-              </button>
-            )}
-            {!isAbView && (
-              <button onClick={handleCreateAb} disabled={busy || acceptedCount === 0} className="btn-system btn-primary doc-btn-full">
-                {creatingAb ? <><Spinner size={13} />&nbsp; Wird erstellt…</> : 'Auftragsbestätigung erstellen'}
-              </button>
-            )}
-            {onCreateMaterialofferte && acceptedMatPos.length > 0 && (
-              <button onClick={handleCreateMaterialofferte} disabled={busy} className="btn-system btn-secondary doc-btn-full">
-                {creatingMat ? <><Spinner size={13} />&nbsp; Wird erstellt…</> : `Materialofferte erstellen (${acceptedMatPos.length} Pos.)`}
-              </button>
-            )}
-            {onCreateAnzahlung && (
-              <button onClick={handleCreateAnzahlung} disabled={busy || acceptedTotal <= 0} className="btn-system btn-green doc-btn-full">
-                {creatingAnz
-                  ? <><Spinner size={13} />&nbsp; Wird erstellt…</>
-                  : `Anzahlungsrechnung ${ANZAHLUNG_PROZENT}% · CHF ${roundToRappen(acceptedTotal * ANZAHLUNG_PROZENT / 100).toFixed(2)}`}
-              </button>
-            )}
-            {onCreateSchlussrechnung && anzahlung && (
-              <button onClick={handleCreateSchlussrechnung} disabled={busy || creatingSchluss} className="btn-system btn-primary doc-btn-full">
-                {creatingSchluss
-                  ? <><Spinner size={13} />&nbsp; Wird erstellt…</>
-                  : `Schlussrechnung erstellen (abzgl. Anzahlung #${anzahlung.rechnungNumber})`}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="glass-panel doc-group no-print">
-        <div className="ab-panel-title">Verwalten</div>
-        <div className="doc-btn-grid">
-          <button onClick={handleDuplicate} disabled={duplicating} className="btn-system btn-secondary">
-            {duplicating ? <><Spinner size={13} />&nbsp; Wird dupliziert…</> : 'Duplizieren'}
-          </button>
-          <button onClick={async () => { if (window.confirm(`${docName} löschen?`)) await onDelete(offerte.id); }} className="btn-system btn-destructive">Löschen</button>
-        </div>
-      </div>
-      <div style={{ marginTop: 16, fontSize: 13, color: 'var(--label3)', textAlign: 'center' }}>Erstellt: {formatDateCH(offerte.createdAt)} · {docName} #{nr}</div>
+      {/* ── Aktionen: one card (screen only). The next step is the single
+          prominent button, further follow-up documents are collapsed. ── */}
+      <DocActions
+        primary={naechsterSchritt}
+        more={weitereSchritte}
+        documents={[
+          ...(showDocPdf ? [{ key: 'pdf', label: `${docName} PDF`, onClick: () => exportOffertePDF(buildPayload(), customer) }] : []),
+          ...(showAbPdf ? [{ key: 'ab-pdf', label: 'AB PDF', onClick: handleExportAB, disabled: autoSave.status === 'saving' || acceptedCount === 0 }] : []),
+          { key: 'print', label: 'Drucken', tone: 'secondary' as const, onClick: () => printWithFilename(buildDocumentFilename(customer, printName, nr)) },
+        ]}
+        hint="PDFs werden zusätzlich auf Google Drive abgelegt."
+        manage={[
+          { key: 'dup', label: 'Duplizieren', onClick: handleDuplicate, busy: duplicating },
+          { key: 'del', label: 'Löschen', tone: 'destructive', onClick: async () => { if (window.confirm(`${docName} löschen?`)) await onDelete(offerte.id); } },
+        ]}
+      />
+      <div className="doc-foot">Erstellt: {formatDateCH(offerte.createdAt)} · {docName} #{nr}</div>
     </Sheet>
   );
 }

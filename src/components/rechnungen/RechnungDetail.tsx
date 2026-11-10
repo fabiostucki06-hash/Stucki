@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Sheet from '../ui/Sheet';
 import Spinner from '../ui/Spinner';
+import { DocActions, DocSummary } from '../ui/DocActions';
 import { SFPlus, SFXmark } from '../Icons';
 import { PartLink, SaveStatus } from '../ui/DocForm';
 import { useAutoSave } from '../../hooks/useAutoSave';
@@ -213,20 +214,22 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
       back
       barRight={<button onClick={bearbeiten} className="bar-btn">Bearbeiten</button>}
     >
-      <div className="glass-panel" style={{ padding: 16, marginBottom: 16 }}>
-        <div style={{ fontSize: 13, color: 'var(--label2)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Status</div>
-        <div style={{ fontSize: 24, fontWeight: 700, color: sc.c, letterSpacing: '-0.3px' }}>{sc.l}</div>
-        {rechnung.titel && <div style={{ fontSize: 15, color: 'var(--label2)', marginTop: 4 }}>{rechnung.titel}</div>}
-      </div>
-
       {isOverdue && (
-        <div className="alert-banner alert-danger" style={{ marginBottom: 12 }}>
+        <div className="alert-banner alert-danger" style={{ marginBottom: 10 }}>
           <span>⚠️</span><span className="sf-subhead">Rechnung überfällig</span>
         </div>
       )}
 
-      <p className="section-header">Status ändern</p>
-      <div className="h-scroll" style={{ marginBottom: 20 }}>
+      <DocSummary
+        statusLabel={sc.l} statusColor={sc.c}
+        title={rechnung.titel}
+        amount={`CHF ${fCHF(rechnungstotal)}`}
+        amountLabel={isAnzahlung ? 'Anzahlung' : isSchluss ? 'Restbetrag' : 'Total'}
+        meta={[
+          customer && <><strong style={{ color: 'var(--label)' }}>{customer.vorname} {customer.nachname}</strong>{[customer.telefon, customer.kennzeichen].filter(Boolean).map((v) => ` · ${v}`).join('')}</>,
+          faelligAm && <span style={{ color: isOverdue ? 'var(--red)' : undefined }}>Zahlbar bis {formatDateCH(faelligAm)}{isOverdue ? ' (überfällig)' : ''}</span>,
+        ]}
+      >
         {(Object.entries(ST_META) as [RechnungStatus, StatusMeta][]).map(([s, meta]) => (
           <button
             key={s}
@@ -238,24 +241,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
             {saving && rechnung.status === s ? <Spinner size={12} /> : meta.l}
           </button>
         ))}
-      </div>
-
-      {customer && (
-        <div className="inset-grouped-list" style={{ marginBottom: 16 }}>
-          <div className="list-row" style={{ cursor: 'default' }}>
-            <div style={{ flex: 1 }}>
-              <div className="sf-headline">{customer.vorname} {customer.nachname}</div>
-              <div className="sf-subhead" style={{ color: 'var(--label2)' }}>{customer.telefon} · {customer.kennzeichen}</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {faelligAm && (
-        <div className="sf-subhead" style={{ color: isOverdue ? 'var(--red)' : 'var(--label2)', marginBottom: 12 }}>
-          Zahlbar bis: {formatDateCH(faelligAm)}{isOverdue ? ' (überfällig)' : ''}
-        </div>
-      )}
+      </DocSummary>
 
       {isAnzahlung ? (
         <div className="glass-panel doc-terms">
@@ -581,52 +567,27 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
         </div>
       )}
 
-      {/* PDF / Druck: only this invoice's own document. */}
-      <div className="glass-panel doc-group no-print">
-        <div className="ab-panel-title">Dokumente</div>
-        <div className="doc-btn-grid">
-          <button onClick={() => exportRechnungPDF(rechnung, customer)} className="btn-system btn-green doc-btn-full">
-            {docName} als PDF
-          </button>
-          <button
-            onClick={() => printWithFilename(buildDocumentFilename(customer, docName, rechnung.rechnungNumber ?? ''))}
-            className="btn-system btn-secondary doc-btn-full"
-          >
-            {docName} drucken
-          </button>
-        </div>
-        <div className="doc-group-hint">PDFs werden zusätzlich auf Google Drive abgelegt (GarageOS / Dokumenttyp / Jahr).</div>
-      </div>
-
-      {/* Anzahlung → Schlussrechnung with the full positions minus the Anzahlung. */}
-      {isAnzahlung && onCreateSchlussrechnung && (
-        <div className="glass-panel doc-group no-print">
-          <div className="ab-panel-title">Weiterverarbeiten</div>
-          <div className="doc-btn-grid">
-            <button
-              onClick={async () => {
-                if (schlussrechnungNumber != null && !window.confirm(`Für diese Anzahlung existiert bereits Schlussrechnung #${schlussrechnungNumber}. Trotzdem eine weitere erstellen?`)) return;
-                setCreatingSchluss(true);
-                try { await onCreateSchlussrechnung(rechnung); } finally { setCreatingSchluss(false); }
-              }}
-              disabled={creatingSchluss}
-              className="btn-system btn-primary doc-btn-full"
-            >
-              {creatingSchluss ? <><Spinner size={13} />&nbsp; Wird erstellt…</> : `Schlussrechnung erstellen · CHF ${fCHF(restbetrag)}`}
-            </button>
-          </div>
-          {schlussrechnungNumber != null && <div className="doc-group-hint">Schlussrechnung #{schlussrechnungNumber} wurde bereits erstellt.</div>}
-        </div>
-      )}
-      <button
-        onClick={async () => { if (window.confirm(`${docName} löschen?`)) await onDelete(rechnung.id); }}
-        className="btn-system btn-destructive"
-      >
-        {docName} löschen
-      </button>
-      <div style={{ marginTop: 16, fontSize: 13, color: 'var(--label3)', textAlign: 'center' }}>
-        Erstellt: {formatDateCH(rechnung.createdAt)} · {docName} #{rechnung.rechnungNumber}
-      </div>
+      {/* ── Aktionen: one card (screen only). Anzahlung → Schlussrechnung is the next step. ── */}
+      <DocActions
+        primary={isAnzahlung && onCreateSchlussrechnung ? {
+          key: 'schluss', label: 'Schlussrechnung erstellen', sub: `Restbetrag CHF ${fCHF(restbetrag)}${schlussrechnungNumber != null ? ` · #${schlussrechnungNumber} existiert bereits` : ''}`,
+          busy: creatingSchluss,
+          onClick: async () => {
+            if (schlussrechnungNumber != null && !window.confirm(`Für diese Anzahlung existiert bereits Schlussrechnung #${schlussrechnungNumber}. Trotzdem eine weitere erstellen?`)) return;
+            setCreatingSchluss(true);
+            try { await onCreateSchlussrechnung(rechnung); } finally { setCreatingSchluss(false); }
+          },
+        } : undefined}
+        documents={[
+          { key: 'pdf', label: `${docName} PDF`, tone: 'green', onClick: () => exportRechnungPDF(rechnung, customer) },
+          { key: 'print', label: 'Drucken', tone: 'secondary', onClick: () => printWithFilename(buildDocumentFilename(customer, docName, rechnung.rechnungNumber ?? '')) },
+        ]}
+        hint="PDFs werden zusätzlich auf Google Drive abgelegt."
+        manage={[
+          { key: 'del', label: `${docName} löschen`, tone: 'destructive', onClick: async () => { if (window.confirm(`${docName} löschen?`)) await onDelete(rechnung.id); } },
+        ]}
+      />
+      <div className="doc-foot">Erstellt: {formatDateCH(rechnung.createdAt)} · {docName} #{rechnung.rechnungNumber}</div>
     </Sheet>
   );
 }

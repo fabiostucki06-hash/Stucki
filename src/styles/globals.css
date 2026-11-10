@@ -295,6 +295,60 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .doc-btn-grid>.doc-btn-full,.doc-btn-grid>.btn-system:only-child{grid-column:1/-1}
 @media (max-width:420px){.doc-btn-grid{grid-template-columns:1fr}}
 .doc-group-hint{margin-top:10px;font-size:12px;color:var(--label3);text-align:center}
+
+/* ── Document detail: summary card (DocSummary) ── */
+.ds-card{padding:14px 16px;margin-bottom:14px}
+.ds-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.ds-head{min-width:0;flex:1}
+.ds-status{display:inline-flex;align-items:center;gap:7px;font-size:17px;font-weight:700;letter-spacing:-0.3px;text-shadow:0 1px 3px rgba(0,0,0,0.25)}
+.ds-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;box-shadow:0 0 6px currentColor}
+.ds-title{font-size:15px;font-weight:600;color:var(--label);margin-top:3px;overflow-wrap:anywhere}
+.ds-amount{flex-shrink:0;text-align:right;font-size:20px;font-weight:800;letter-spacing:-0.4px;color:var(--blue);font-variant-numeric:tabular-nums;text-shadow:0 1px 4px rgba(0,0,0,0.22)}
+.ds-amount-lbl{display:block;font-size:10.5px;font-weight:700;color:var(--label3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:1px;text-shadow:none}
+.ds-meta{font-size:13.5px;color:var(--label2);margin-top:4px;overflow-wrap:anywhere}
+.ds-meta:first-of-type{margin-top:8px}
+.ds-pills{margin-top:12px;padding-top:12px;border-top:0.5px solid var(--sep);gap:8px}
+.ds-pills .pill-btn{padding:6px 12px;font-size:13px}
+
+/* ── Document detail: action card (DocActions) ── */
+.da-card{padding:4px 14px;margin-bottom:14px}
+.da-section{padding:12px 0}
+.da-section+.da-section{border-top:0.5px solid var(--sep)}
+.da-title{font-size:11.5px;font-weight:700;color:var(--label2);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;text-shadow:0 1px 3px rgba(0,0,0,0.30)}
+.btn-system.da-primary{height:auto;min-height:48px;padding:8px 14px;flex-direction:column;gap:1px;font-size:16px;line-height:1.2}
+.btn-system.btn-primary.da-primary:hover,.btn-system.btn-green.da-primary:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.btn-system.da-primary:active{transform:scale(0.98)}
+.da-primary-sub{font-size:12px;font-weight:600;opacity:0.88;letter-spacing:-0.1px}
+.da-more-toggle{display:flex;align-items:center;gap:8px;width:100%;margin-top:8px;padding:10px 12px;min-height:42px;border-radius:10px;cursor:pointer;font-family:inherit;font-size:14px;font-weight:600;color:var(--blue);text-align:left;background:var(--glass-light);border:var(--glass-border);box-shadow:var(--glass-shine);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);transition:background 0.15s,transform 0.15s}
+.da-more-toggle:hover{background:rgba(255,255,255,0.18)}
+.da-more-toggle:active{transform:scale(0.98)}
+.da-more-toggle>span:first-child{flex:1}
+.da-count{min-width:20px;height:20px;padding:0 6px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;background:linear-gradient(to bottom,#54a4ff 0%,#007aff 50%,#0056b3 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,0.6)}
+.da-chevron{font-size:20px;line-height:1;color:var(--label3);transition:transform 0.18s}
+.da-more-toggle[aria-expanded=true] .da-chevron{transform:rotate(90deg)}
+.da-more-list{margin-top:6px;border-radius:10px;overflow:hidden;background:var(--glass-light);border:var(--glass-border);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.da-row{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;min-height:46px;background:transparent;border:none;cursor:pointer;font-family:inherit;text-align:left;color:var(--label);transition:background 0.15s}
+.da-row+.da-row{border-top:0.5px solid var(--sep)}
+.da-row:hover{background:rgba(255,255,255,0.10)}
+.da-row:active{background:rgba(255,255,255,0.16)}
+.da-row:disabled{opacity:0.4;cursor:not-allowed}
+.da-row-text{flex:1;min-width:0;display:flex;flex-direction:column}
+.da-row-lbl{font-size:15px;font-weight:600;letter-spacing:-0.2px;display:inline-flex;align-items:center}
+.da-row-sub{font-size:12px;color:var(--label3);margin-top:1px}
+.da-row-primary .da-row-lbl{color:var(--blue)}
+.da-row-green .da-row-lbl{color:var(--green)}
+.da-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.btn-system.da-btn{height:42px;padding:0 10px;font-size:14.5px;min-width:0;border-radius:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.da-hint{margin-top:8px;font-size:11.5px;color:var(--label3);text-align:center}
+.da-manage{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.da-manage .da-small:only-child{grid-column:1/-1}
+.da-small{height:38px;border-radius:10px;cursor:pointer;font-family:inherit;font-size:14px;font-weight:600;color:var(--blue);background:var(--glass-light);border:var(--glass-border);box-shadow:var(--glass-shine);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);transition:background 0.15s,transform 0.15s}
+.da-small:hover{background:rgba(255,255,255,0.18);transform:translateY(-1px)}
+.da-small:active{transform:scale(0.98)}
+.da-small:disabled{opacity:0.4;cursor:not-allowed;transform:none}
+.da-small.danger{color:var(--red)}
+.da-small.danger:hover{background:rgba(255,59,48,0.12)}
+.doc-foot{margin-top:4px;font-size:12px;color:var(--label3);text-align:center}
 .btn-system.btn-primary{background:linear-gradient(to bottom,#54a4ff 0%,#007aff 50%,#0056b3 100%);border:1px solid #004fb0;box-shadow:inset 0 1px 0 rgba(255,255,255,0.6),inset 0 -1px 2px rgba(0,0,0,0.2),0 4px 6px rgba(0,0,0,0.15);text-shadow:0 -1px 0 rgba(0,0,0,0.3)}
 .btn-system.btn-primary:hover{background:linear-gradient(to bottom,#68c6ff 0%,#1a88ff 50%,#0062c8 100%);transform:translateY(-1px)}
 .btn-system.btn-primary:active{transform:scale(0.98);box-shadow:inset 0 1px 2px rgba(0,0,0,0.25),0 1px 3px rgba(0,0,0,0.10)}
@@ -413,14 +467,25 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 
   /* Offerte / Rechnung detail positions: description + delete on top, inputs and total below. */
   .pos-line{flex-wrap:wrap;row-gap:10px}
-  .pos-line-desc{flex:1 1 calc(100% - 56px);order:0}
+  /* !important: the rows set flex:1 inline for the desktop layout. */
+  .pos-line-desc{flex:1 1 calc(100% - 56px)!important;order:0}
   .pos-line-desc .sf-subhead{white-space:normal!important;overflow-wrap:anywhere}
   .pos-line .del-btn-visible{order:1}
   .pos-line-inputs{order:2;gap:8px!important}
   .pos-line-inputs .mf-pos-num{width:76px!important;min-height:40px;padding:6px 8px!important}
   .pos-line-total{order:3;margin-left:auto;align-self:flex-end;padding-bottom:10px}
   .pos-accept{width:100%}
-  .pos-accept button{flex:1;min-height:40px;font-size:13px!important}
+  .pos-accept button{flex:1;min-height:36px!important;padding-top:5px!important;padding-bottom:5px!important;font-size:13px!important}
+
+  /* Detail sheets: less vertical air between blocks. */
+  .sheet-content .section-header{padding:12px 4px 6px}
+  .sheet-content .inset-grouped-list{margin-bottom:12px}
+  .sheet-content .list-row{padding:10px 12px;min-height:48px}
+  .ds-card{padding:12px 14px;margin-bottom:12px}
+  .ds-amount{font-size:18px}
+  .da-card{padding:2px 12px;margin-bottom:12px}
+  .da-section{padding:10px 0}
+  .ds-pills .pill-btn{min-height:36px}
 }
 @media screen and (max-width:400px){
   .df-grid,.cf-grid-2,.cf-grid-21,.mf-row-2{grid-template-columns:minmax(0,1fr)}

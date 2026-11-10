@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import Sheet from '../ui/Sheet';
-import Badge from '../ui/Badge';
 import Spinner from '../ui/Spinner';
 import { SFPlus, SFXmark } from '../Icons';
 import { PartLink } from '../ui/DocForm';
+import { DocActions, DocSummary } from '../ui/DocActions';
 import PartsOrder from '../teile/PartsOrder';
 import { isOverdue, daysSince, hoursSince, formatDateCH, isOfferteRef, echteBeanstandungen } from '../../lib/utils';
 import { SC, SO } from '../../constants/statuses';
@@ -11,6 +11,12 @@ import { exportOrderPDF } from '../../lib/pdf-auftrag';
 import { sumPositions } from '../../lib/offerte-docs';
 import { positionsArt, positionsText } from '../../lib/sonderpositionen';
 import type { ArbeitPosition, Customer, MaterialPosition, Order, OrderItem, OrderStatus } from '../../types';
+
+/** sysColor of the status config → CSS colour. */
+const STATUS_FARBE: Record<string, string> = {
+  indigo: 'var(--indigo)', orange: 'var(--orange)', green: 'var(--green)', blue: 'var(--blue)',
+  purple: 'var(--purple)', gray: 'var(--label2)',
+};
 
 interface OrderDetailProps {
   order: Order;
@@ -41,6 +47,7 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
   const [editCust, setEditCust] = useState(false);
 
   const ov = isOverdue({ ...order, status });
+  const posTotal = sumPositions(order.positionen ?? []).total;
   const d = daysSince(order.statusChangedAt); const hh = hoursSince(order.statusChangedAt);
 
   const addB = () => setBs((p) => [...p, '']);
@@ -96,34 +103,35 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
         </div>
       )}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-        <Badge status={status} />
-        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--label2)' }}>{d < 1 ? `${hh} Std.` : `${d} Tage`}</span>
-        {saving && <Spinner size={16} />}
-      </div>
-
-      <p className="section-header">Status</p>
-      <div className="h-scroll" style={{ marginBottom: 20 }}>
+      <DocSummary
+        statusLabel={SC[status].label}
+        statusColor={STATUS_FARBE[SC[status].sysColor] ?? 'var(--label2)'}
+        amount={!edit && recB ? `CHF ${recB}` : !edit && posTotal > 0 ? `CHF ${posTotal.toFixed(2)}` : undefined}
+        amountLabel={recB ? 'Rechnung' : 'Positionen'}
+        meta={[
+          !edit && customer && <><strong style={{ color: 'var(--label)' }}>{customer.vorname} {customer.nachname}</strong>{[customer.telefon, customer.kennzeichen].filter(Boolean).map((v) => ` · ${v}`).join('')}</>,
+          <>Seit {d < 1 ? `${hh} Std.` : `${d} Tagen`} in diesem Status{saving && <>&nbsp;<Spinner size={12} /></>}</>,
+        ]}
+      >
         {SO.map((s) => (
           <button key={s} onClick={() => saveStatus(s)} disabled={saving} className={`pill-btn ${status === s ? 'pill-btn-active' : 'pill-btn-inactive'}`} style={{ opacity: saving ? 0.5 : 1 }}>
             {SC[s].short}
           </button>
         ))}
-      </div>
+      </DocSummary>
 
+      {edit && (
       <div className="inset-grouped-list" style={{ marginBottom: 16 }}>
         <div className="list-row" style={{ cursor: 'default' }}>
           <div style={{ flex: 1 }}>
-            <div className="sf-headline" style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.5px', textShadow: '0 1px 5px rgba(0,0,0,0.30)' }}>{customer?.vorname ?? ''} {customer?.nachname ?? ''}</div>
+            <div className="sf-headline">{customer?.vorname ?? ''} {customer?.nachname ?? ''}</div>
             <div className="sf-subhead" style={{ color: 'var(--label2)', marginTop: 3 }}>{customer?.telefon} · {customer?.kennzeichen}</div>
           </div>
-          {edit && (
-            <button onClick={() => setEditCust((p) => !p)} style={{ background: 'none', border: 'none', color: 'var(--blue)', fontSize: 14, fontWeight: 600, cursor: 'pointer', padding: '4px 8px' }}>
-              {editCust ? 'Fertig' : 'Bearbeiten'}
-            </button>
-          )}
+          <button onClick={() => setEditCust((p) => !p)} style={{ background: 'none', border: 'none', color: 'var(--blue)', fontSize: 14, fontWeight: 600, cursor: 'pointer', padding: '4px 8px' }}>
+            {editCust ? 'Fertig' : 'Bearbeiten'}
+          </button>
         </div>
-        {editCust && edit && (
+        {editCust && (
           <div style={{ padding: '12px 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {([['vorname', cv, setCv], ['nachname', cn, setCn], ['telefon', ct, setCt], ['kennzeichen', ck, setCk], ['marke', cma, setCma], ['modell', cm, setCm]] as [string, string, (v: string) => void][]).map(([k, v, setter]) => (
               <input key={k} value={v} onChange={(e) => setter(e.target.value)} placeholder={{ vorname: 'Vorname', nachname: 'Nachname', telefon: 'Telefon', kennzeichen: 'Kennzeichen', marke: 'Marke', modell: 'Modell' }[k]} style={inp2} />
@@ -131,6 +139,7 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
           </div>
         )}
       </div>
+      )}
 
       <p className="section-header">Beanstandungen</p>
       {edit ? (
@@ -209,10 +218,11 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
         onSave={(positionen, materialStatus) => onUpdate({ ...order, positionen, materialStatus }, null)}
       />
 
-      <p className="section-header">Rechnung</p>
-      {edit ? (
-        <div className="form-section" style={{ marginBottom: 20 }}>
-          <div style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+      {edit && (
+        <>
+        <p className="section-header">Rechnung</p>
+        <div className="form-section" style={{ marginBottom: 16 }}>
+          <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--label2)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>Rechnungsbetrag</div>
               <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--label2)' }}>Gesamtbetrag in CHF</div>
@@ -226,39 +236,12 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
                 placeholder="0.00"
                 min={0}
                 step="0.05"
-                style={{ background: 'var(--input-bg)', border: '1.5px solid var(--input-border)', outline: 'none', fontSize: 22, fontWeight: 700, color: '#ffffff', textAlign: 'right', width: 120, letterSpacing: '-0.4px', fontFamily: 'inherit', borderRadius: 8, padding: '4px 8px' }}
+                style={{ background: 'var(--input-bg)', border: '1.5px solid var(--input-border)', outline: 'none', fontSize: 20, fontWeight: 700, color: '#ffffff', textAlign: 'right', width: 120, letterSpacing: '-0.4px', fontFamily: 'inherit', borderRadius: 8, padding: '4px 8px' }}
               />
             </div>
           </div>
         </div>
-      ) : (
-        <div style={{
-          background: 'rgba(255,255,255,0.10)',
-          backdropFilter: 'blur(64px) saturate(240%)',
-          WebkitBackdropFilter: 'blur(64px) saturate(240%)',
-          border: '1px solid rgba(255,255,255,0.20)',
-          borderRadius: 16,
-          padding: '20px 22px',
-          marginBottom: 20,
-          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.65), 0 8px 32px rgba(0,0,0,0.08)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--label2)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6, textShadow: '0 1px 3px rgba(0,0,0,0.30)' }}>Total Rechnung</div>
-            <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-0.6px', color: recB ? 'var(--blue)' : 'var(--label2)', textShadow: '0 1px 6px rgba(0,0,0,0.25)' }}>
-              {recB ? `CHF ${recB}` : '–'}
-            </div>
-          </div>
-          <div style={{
-            width: 48, height: 48, borderRadius: 12,
-            background: recB ? 'rgba(0,122,255,0.10)' : 'rgba(0,0,0,0.04)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0,
-          }}>
-            🧾
-          </div>
-        </div>
+        </>
       )}
 
       {edit && (status === 'zahlung_versendet' || status === 'zahlung_erhalten') && (
@@ -296,9 +279,11 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
         <div style={{ background: 'var(--fill3)', borderRadius: 12, padding: '12px 14px', fontSize: 15, color: 'var(--label2)', marginBottom: 16 }}>{notizen}</div>
       ) : null}
 
-      <button onClick={() => exportOrderPDF(order, customer)} className="btn-system btn-secondary" style={{ marginBottom: 12 }}>↓  PDF herunterladen</button>
-      <button onClick={async () => { if (window.confirm('Auftrag wirklich löschen?')) await onDelete(order.id); }} className="btn-system btn-destructive" style={{ marginBottom: 12 }}>Auftrag löschen</button>
-      <div style={{ fontSize: 13, color: 'var(--label3)', textAlign: 'center', paddingBottom: 8 }}>Erstellt: {formatDateCH(order.createdAt)} · #{order.orderNumber}</div>
+      <DocActions
+        documents={[{ key: 'pdf', label: 'Auftrag PDF', onClick: () => exportOrderPDF(order, customer) }]}
+        manage={[{ key: 'del', label: 'Auftrag löschen', tone: 'destructive', onClick: async () => { if (window.confirm('Auftrag wirklich löschen?')) await onDelete(order.id); } }]}
+      />
+      <div className="doc-foot" style={{ paddingBottom: 8 }}>Erstellt: {formatDateCH(order.createdAt)} · #{order.orderNumber}</div>
     </Sheet>
   );
 }
