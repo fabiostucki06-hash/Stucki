@@ -63,7 +63,8 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
   // Versandkosten (1:1, no Marge) and Pauschalen get their own subtotal lines.
   const fest         = festpreisSummen(allPos);
   const pureMatTotal = totals.totalMaterial - kleinteilAmt - fest.versand - fest.pauschalen;
-  const totalArb     = totals.totalArbeit;
+  // Pauschalen are services: on the PDF they count towards Arbeit Total.
+  const totalArb     = totals.totalArbeit + fest.pauschalen;
   const totalBetrag  = totals.total;
 
   const norm  = () => doc.setFont('helvetica', 'normal');
@@ -202,7 +203,6 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
   const subRows: [string, number][] = [
     ...(hatMaterial || !hatArbeit ? [['Material Total', pureMatTotal] as [string, number]] : []),
     ...(hatArbeit || !hatMaterial ? [['Arbeit Total', totalArb] as [string, number]] : []),
-    ...(fest.pauschalen > 0 ? [['Pauschalen', fest.pauschalen] as [string, number]] : []),
     ...(fest.versand > 0 ? [['Versandkosten', fest.versand] as [string, number]] : []),
     ...(kleinteilAmt > 0 ? [['Kleinteil Pauschale', kleinteilAmt] as [string, number]] : []),
   ];

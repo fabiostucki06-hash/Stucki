@@ -209,8 +209,8 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
   // Zu zahlen stay together on one page.
   const subRows: [string, number][] = [
     ['Material Total', totM - fest.versand - fest.pauschalen],
-    ['Arbeit Total', totA],
-    ...(fest.pauschalen > 0 ? [['Pauschalen', fest.pauschalen] as [string, number]] : []),
+    // Pauschalen are services: on the PDF they count towards Arbeit Total.
+    ['Arbeit Total', totA + fest.pauschalen],
     ...(fest.versand > 0 ? [['Versandkosten', fest.versand] as [string, number]] : []),
     ...(kleinteil > 0 ? [[KLEINTEIL_LABEL, kleinteil] as [string, number]] : []),
   ];
