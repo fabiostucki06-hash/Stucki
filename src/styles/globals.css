@@ -728,6 +728,16 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .del-btn-visible{width:28px;height:28px;border-radius:8px;background:rgba(255,59,48,0.16);border:1px solid rgba(255,59,48,0.40);color:var(--red);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background 0.12s,transform 0.12s;font-family:inherit}
 .del-btn-visible:hover{background:rgba(255,59,48,0.28);transform:scale(1.05)}
 .del-btn-visible:active{transform:scale(0.94)}
+/* Detail views, view mode: ZE / Menge / Preis as static glass chips instead of inputs. */
+.pos-static{display:flex;align-items:center;gap:5px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+.pos-chip{display:inline-flex;align-items:center;font-size:12.5px;font-weight:600;color:var(--label);font-variant-numeric:tabular-nums;white-space:nowrap;padding:3px 8px;border-radius:7px;background:var(--fill3);border:1px solid rgba(255,255,255,0.18);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.ro-value{font-weight:700;color:var(--label);font-variant-numeric:tabular-nums}
+.ro-text{font-size:15px;color:var(--label);white-space:pre-line;overflow-wrap:anywhere}
+.ro-text.ro-empty{color:var(--label3)}
+/* Detail views, edit mode: banner above the editable content. */
+.edit-banner{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;margin-bottom:12px;border-radius:12px;background:rgb(var(--accent-rgb) / 0.12);border:1px solid rgb(var(--accent-rgb) / 0.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 8px 32px 0 rgba(0,0,0,0.1)}
+.edit-banner-txt{flex:1;min-width:180px;font-size:13.5px;font-weight:600;color:var(--label)}
+.edit-banner-txt small{display:block;font-size:12px;font-weight:500;color:var(--label2);margin-top:1px}
 .mf-add-pos{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;background:rgb(var(--accent-rgb) / 0.07);border:1px solid rgb(var(--accent-rgb) / 0.25);border-radius:8px;cursor:pointer;padding:4px 10px;margin-top:6px;font-family:inherit;letter-spacing:-0.1px;color:var(--blue);transition:background 0.15s,border-color 0.15s}
 .mf-add-pos:hover{background:rgb(var(--accent-rgb) / 0.14);border-color:rgb(var(--accent-rgb) / 0.40)}
 .mf-add-pos.green{color:var(--green);background:rgba(52,199,89,0.07);border-color:rgba(52,199,89,0.25)}

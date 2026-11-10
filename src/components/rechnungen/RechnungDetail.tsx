@@ -3,7 +3,7 @@ import Sheet from '../ui/Sheet';
 import Spinner from '../ui/Spinner';
 import { DocActions, DocSummary } from '../ui/DocActions';
 import { SFPlus, SFXmark } from '../Icons';
-import { PartLink, SaveStatus } from '../ui/DocForm';
+import { PartLink, PosWerte, SaveStatus } from '../ui/DocForm';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { exportRechnungPDF } from '../../lib/pdf-rechnung';
 import { computeRechnungTotals, rechnungDocName, schlussReferenz, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../lib/rechnung-totals';
@@ -71,6 +71,10 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
   const [kategorie, setKategorie] = useState<RechnungKategorie | ''>(rechnung.kategorie ?? '');
   const [kleinteilManuell, setKleinteilManuell] = useState<boolean | null>(rechnung.kleinteilManuell ?? null);
   const [dirty, setDirty] = useState(false);
+  /** View mode (default): positions, prices, Auftragsart, Kleinteile and Zahlungsziel
+      are read-only; only the status stays tappable. "Bearbeiten" unlocks inline
+      editing, "Fertig" saves and locks again. */
+  const [editing, setEditing] = useState(false);
 
   const [addingTyp, setAddingTyp] = useState<'arbeit' | 'material' | null>(null);
   const [newBeschreibung, setNewBeschreibung] = useState('');
@@ -198,9 +202,15 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
     () => onUpdate(buildPayload()),
   );
   /** The edit form starts from the inline edits, stored first so it can't overwrite them. */
-  async function bearbeiten() {
+  async function formularOeffnen() {
     if (!dirty) { onEdit(rechnung); return; }
     if (await autoSave.flush()) onEdit(buildPayload());
+  }
+  /** Leaves edit mode once the inline edits are stored; a failed save keeps it open. */
+  async function fertig() {
+    if (dirty && !(await autoSave.flush())) return;
+    resetNewPos();
+    setEditing(false);
   }
   useEffect(() => {
     if (autoSave.status === 'saved') setDirty(false);
@@ -212,7 +222,9 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
       onClose={onClose}
       full
       back
-      barRight={<button onClick={bearbeiten} className="bar-btn">Bearbeiten</button>}
+      barRight={editing
+        ? <button onClick={fertig} disabled={autoSave.status === 'saving'} className="bar-btn" style={{ fontWeight: 700 }}>Fertig</button>
+        : <button onClick={() => setEditing(true)} className="bar-btn">Bearbeiten</button>}
     >
       {isOverdue && (
         <div className="alert-banner alert-danger" style={{ marginBottom: 10 }}>
@@ -243,6 +255,16 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
         ))}
       </DocSummary>
 
+      {editing && (
+        <div className="edit-banner no-print">
+          <div className="edit-banner-txt">
+            Bearbeitungsmodus
+            <small>Positionen, Preise und Zahlungsziel sind bearbeitbar und werden automatisch gespeichert.</small>
+          </div>
+          <button onClick={formularOeffnen} className="mf-btn-cancel">Titel, Kunde &amp; Details…</button>
+        </div>
+      )}
+
       {isAnzahlung ? (
         <div className="glass-panel doc-terms">
           <div className="ab-panel-title">Anzahlungsrechnung · {anzProzent ?? 50}% Vorkasse</div>
@@ -260,37 +282,45 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
         </div>
       )}
       <p className="section-header">Auftragsart</p>
-      <div className="h-scroll" style={{ marginBottom: 16 }}>
-        {KATEGORIE_OPTS.map(([k, l]) => (
-          <button
-            key={k}
-            onClick={() => handleKategorieChange(kategorie === k ? '' : k)}
-            className={`pill-btn ${kategorie === k ? 'pill-btn-active' : 'pill-btn-inactive'}`}
-          >
-            {l}
-          </button>
-        ))}
-      </div>
+      {editing ? (
+        <div className="h-scroll" style={{ marginBottom: 16 }}>
+          {KATEGORIE_OPTS.map(([k, l]) => (
+            <button
+              key={k}
+              onClick={() => handleKategorieChange(kategorie === k ? '' : k)}
+              className={`pill-btn ${kategorie === k ? 'pill-btn-active' : 'pill-btn-inactive'}`}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div style={{ marginBottom: 16 }}>
+          <span className="pos-chip" style={{ fontSize: 14, padding: '5px 12px' }}>{kategorie ? KATEGORIE_LABEL[kategorie] : 'Keine Auftragsart'}</span>
+        </div>
+      )}
 
       <div style={{ background: 'rgba(52,199,89,0.09)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, border: '0.5px solid rgba(52,199,89,0.22)' }}>
         <span style={{ fontSize: 16, color: 'var(--green)' }}>✓</span>
         <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--green)' }}>Zahlungsziel:</span>
-        <input
-          type="number"
-          value={zahlungsFrist}
-          onChange={(e) => handleZahlungsFristChange(e.target.value)}
-          min={1}
-          style={{
-            width: 48, padding: '3px 6px', fontSize: 15, fontWeight: 700, color: '#ffffff',
-            background: 'var(--input-bg)', border: '1.5px solid rgba(52,199,89,0.55)',
-            borderRadius: 6, textAlign: 'center', outline: 'none',
-          }}
-        />
+        {editing ? (
+          <input
+            type="number"
+            value={zahlungsFrist}
+            onChange={(e) => handleZahlungsFristChange(e.target.value)}
+            min={1}
+            style={{
+              width: 48, padding: '3px 6px', fontSize: 15, fontWeight: 700, color: '#ffffff',
+              background: 'var(--input-bg)', border: '1.5px solid rgba(52,199,89,0.55)',
+              borderRadius: 6, textAlign: 'center', outline: 'none',
+            }}
+          />
+        ) : <span className="ro-value" style={{ fontSize: 15 }}>{zahlungsFrist || '—'}</span>}
         <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--green)' }}>Tage netto</span>
       </div>
       </>)}
 
-      {/* ── Positionen – inline editable ── */}
+      {/* ── Positionen – read-only; inline editable in edit mode ── */}
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 0 }}>
         <p className="section-header" style={{ margin: 0 }}>Positionen</p>
         {(dirty || autoSave.status !== 'idle') && (
@@ -322,8 +352,8 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
               </div>
             </div>
 
-            {/* Inline editable inputs */}
-            {pos.typ === 'arbeit' ? (
+            {/* Read-only values; inline inputs only in edit mode */}
+            {!editing ? <PosWerte pos={pos} /> : pos.typ === 'arbeit' ? (
               <div className="pos-line-inputs" style={{ display: 'flex', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                   <span style={HDR}>ZE</span>
@@ -377,15 +407,17 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
               {pos.typ === 'arbeit' ? '—' : `CHF ${fCHF(parseFloat(pos.preis || '0'))}`}
             </div>
 
-            {/* Delete position */}
-            <button
-              onClick={() => removePosition(i)}
-              className="del-btn-visible"
-              title="Position löschen"
-              aria-label="Position löschen"
-            >
-              <SFXmark />
-            </button>
+            {/* Delete position (edit mode only) */}
+            {editing && (
+              <button
+                onClick={() => removePosition(i)}
+                className="del-btn-visible"
+                title="Position löschen"
+                aria-label="Position löschen"
+              >
+                <SFXmark />
+              </button>
+            )}
           </div>
         ))}
 
@@ -414,8 +446,8 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
           </div>
         )}
 
-        {/* ── Kleinteilepauschale: manual override ── */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '0.5px solid var(--sep)' }}>
+        {/* ── Kleinteilepauschale: manual override (edit mode only) ── */}
+        {editing && <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '0.5px solid var(--sep)' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }}>
             <input
               type="checkbox"
@@ -434,10 +466,10 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
               Automatisch
             </button>
           )}
-        </div>
+        </div>}
 
-        {/* ── Add new position ── */}
-        <div style={{ padding: '10px 16px' }}>
+        {/* ── Add new position (edit mode only) ── */}
+        {editing && <div style={{ padding: '10px 16px' }}>
           {!addingTyp ? (
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setAddingTyp('arbeit')} className="mf-add-pos"><SFPlus size={12} /> Arbeitsposition</button>
@@ -484,7 +516,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
               </div>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* ── Totals breakdown ── */}
         <div style={{ borderTop: '0.5px solid var(--sep)' }}>

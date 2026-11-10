@@ -65,6 +65,27 @@ export function PartLink({ url }: { url?: string }) {
   );
 }
 
+/** Read-only ZE / Menge × Stückpreis of a position in a detail view (view mode).
+    Takes the place of the inline inputs until "Bearbeiten" is tapped, so a quantity
+    or price can't be changed by accident while reviewing a document. */
+export function PosWerte({ pos }: { pos: ArbeitPosition | MaterialPosition }) {
+  if (pos.typ === 'arbeit') {
+    return (
+      <div className="pos-line-inputs pos-static">
+        <span className="pos-chip">{pos.ze || '—'} ZE</span>
+      </div>
+    );
+  }
+  const preis = parseFloat(pos.stueckpreis);
+  return (
+    <div className="pos-line-inputs pos-static">
+      <span className="pos-chip">{pos.menge || '1'} ×</span>
+      <span className="pos-chip">CHF {isNaN(preis) ? '—' : preis.toFixed(2)}</span>
+      {parseFloat(pos.ze ?? '') > 0 && <span className="pos-chip">+ {pos.ze} ZE</span>}
+    </div>
+  );
+}
+
 /** Sticks to the bottom of the sheet's scroll area, so the running total, the
     save status and the actions stay reachable however long the position list gets. */
 export function FormBar({ label, value, status, children }: { label: string; value: string; status?: ReactNode; children: ReactNode }) {
