@@ -1,4 +1,6 @@
 import { ASSETS } from './supabase';
+import type { Pauschale } from '../types';
+import { DEFAULT_PAUSCHALEN, sanitizePauschalen } from './sonderpositionen';
 
 export type BgMode = 'image' | 'color';
 
@@ -25,6 +27,8 @@ export interface Settings {
   signature: string;
   /** Google Drive folder the PDF archive goes to; '' = server default. */
   driveFolderId: string;
+  /** Flat-rate packages offered in the position editor (Radwechsel, Reifenwechsel …). */
+  pauschalen: Pauschale[];
 }
 
 const KEYS: Record<keyof Settings, string> = {
@@ -36,7 +40,17 @@ const KEYS: Record<keyof Settings, string> = {
   margin: 'garage_margin',
   signature: 'garage_signature',
   driveFolderId: 'garage_drive_folder',
+  pauschalen: 'garage_pauschalen',
 };
+
+function readPauschalen(): Pauschale[] {
+  try {
+    const raw = localStorage.getItem(KEYS.pauschalen);
+    return (raw && sanitizePauschalen(JSON.parse(raw))) || DEFAULT_PAUSCHALEN;
+  } catch {
+    return DEFAULT_PAUSCHALEN;
+  }
+}
 const SETTING_NAMES = Object.keys(KEYS) as (keyof Settings)[];
 
 function readLocal(): Settings {
@@ -51,6 +65,7 @@ function readLocal(): Settings {
     margin: Number.isFinite(margin) ? margin : 30,
     signature: localStorage.getItem(KEYS.signature) ?? '',
     driveFolderId: localStorage.getItem(KEYS.driveFolderId) ?? '',
+    pauschalen: readPauschalen(),
   };
 }
 
@@ -63,9 +78,10 @@ function commit(patch: Partial<Settings>, fromRemote: boolean) {
   for (const k of SETTING_NAMES) {
     const v = patch[k];
     if (v === undefined || v === state[k]) continue;
+    if (typeof v === 'object' && JSON.stringify(v) === JSON.stringify(state[k])) continue;
     (changed as Record<string, unknown>)[k] = v;
     if (v === '') localStorage.removeItem(KEYS[k]);
-    else localStorage.setItem(KEYS[k], String(v));
+    else localStorage.setItem(KEYS[k], typeof v === 'object' ? JSON.stringify(v) : String(v));
   }
   if (!Object.keys(changed).length) return;
   state = { ...state, ...changed };
@@ -120,3 +136,5 @@ export const setSignature = (dataUrl: string): void => updateSettings({ signatur
 
 /** Pass '' to fall back to the server's default folder. */
 export const setDriveFolderId = (id: string): void => updateSettings({ driveFolderId: id });
+
+export const setPauschalen = (pauschalen: Pauschale[]): void => updateSettings({ pauschalen });

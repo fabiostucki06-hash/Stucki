@@ -27,6 +27,11 @@ export const margeVon = (p: Pick<MaterialPosition, 'marge'>): number =>
     default), a VK typed by hand recalculates the Marge. `preis` is left to
     the caller. */
 export function setMaterialFeld<P extends MaterialPosition>(p: P, key: string, value: string): P {
+  // Versandkosten / Pauschalen are fixed prices: no EK, no Marge, no ZE ever.
+  if (p.art) {
+    if (key === 'ek' || key === 'marge' || key === 'ze' || key === 'stundenansatz') return p;
+    return { ...p, [key]: value };
+  }
   const n = { ...p, [key]: value };
   const ek = fN(n.ek);
   if ((key === 'ek' || key === 'marge') && ek > 0) {

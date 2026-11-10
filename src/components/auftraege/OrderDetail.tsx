@@ -9,6 +9,7 @@ import { isOverdue, daysSince, hoursSince, formatDateCH, isOfferteRef, echteBean
 import { SC, SO } from '../../constants/statuses';
 import { exportOrderPDF } from '../../lib/pdf-auftrag';
 import { sumPositions } from '../../lib/offerte-docs';
+import { positionsArt, positionsText } from '../../lib/sonderpositionen';
 import type { ArbeitPosition, Customer, MaterialPosition, Order, OrderItem, OrderStatus } from '../../types';
 
 interface OrderDetailProps {
@@ -177,11 +178,11 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
               return (
                 <div key={i} className="list-row" style={{ cursor: 'default' }}>
                   <div style={{ flex: 1 }}>
-                    <div className="sf-subhead">{pos.beschreibung}</div>
+                    <div className="sf-subhead">{positionsText(pos)}</div>
                     <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--label2)', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       {ap
                         ? `Arbeit${ap.ze ? ` · ${ap.ze} ZE` : ''}`
-                        : `Material${mp?.menge ? ` · ${mp.menge}×` : ''}${mp?.stueckpreis ? ` · CHF ${mp.stueckpreis}/Stk` : ''}${mp?.ze ? ` · ${mp.ze} ZE` : ''}`
+                        : `${positionsArt(pos)}${mp?.menge ? ` · ${mp.menge}×` : ''}${mp?.stueckpreis ? ` · CHF ${mp.stueckpreis}/Stk` : ''}${mp?.ze ? ` · ${mp.ze} ZE` : ''}`
                       }
                       {mp && <> <PartLink url={mp.link} /></>}
                     </div>

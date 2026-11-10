@@ -68,6 +68,10 @@ export interface ArbeitPosition {
 
 export interface MaterialPosition {
   typ: 'material';
+  /** Fixed-price special position (see lib/sonderpositionen): 'versand' =
+      Versandkosten passed on 1:1 (never a Marge), 'pauschale' = flat-rate
+      package from the settings (no ZE / Stundensatz, no Marge). Unset = part. */
+  art?: 'versand' | 'pauschale';
   beschreibung: string;
   menge: string;
   stueckpreis: string;
@@ -184,6 +188,14 @@ export interface Rechnung {
   offertId?: string;
   /** Free-text payment terms; replace "<zahlungsFrist> Tage netto" when set. */
   zahlungsbedingung?: string;
+}
+
+/** Flat-rate service package offered in the position editor (Einstellungen → Pauschalen). */
+export interface Pauschale {
+  id: string;
+  name: string;
+  /** Fixed price in CHF, "0.00". */
+  preis: string;
 }
 
 export interface MaterialCatalogItem {

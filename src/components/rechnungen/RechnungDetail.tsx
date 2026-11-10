@@ -10,6 +10,7 @@ import { mitMaterialHinweis } from '../../lib/offerte-docs';
 import { materialPreis, zeBetrag } from '../../lib/ze';
 import { STD_SATZ } from '../../lib/company';
 import { setMaterialFeld } from '../../lib/marge';
+import { festpreisSummen, positionsArt, positionsText } from '../../lib/sonderpositionen';
 import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../lib/utils';
 import type { Customer, Rechnung, RechnungStatus, RechnungKategorie, Position, ArbeitPosition, MaterialPosition } from '../../types';
 
@@ -118,6 +119,8 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
   const anzProzent = rechnung.anzahlungProzent;
   const { totalMaterial: totM, totalArbeit: totA, totalZE: totZE, kleinteil, zwischensumme: total, gesamttotal, rechnungstotal, restbetrag, abzugAnzahlung, kleinteilApplied } =
     computeRechnungTotals(positionen, kategorie || undefined, kleinteilManuell, anzProzent, parseFloat(rechnung.anzahlungBetrag ?? '') || undefined);
+  // Versandkosten / Pauschalen: part of totM, shown on their own.
+  const fest = festpreisSummen(positionen);
 
   function updPos(i: number, key: string, val: string) {
     setPositionen((prev) => {
@@ -326,10 +329,10 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
             {/* Description + type badge */}
             <div className="pos-line-desc" style={{ flex: 1, minWidth: 0 }}>
               <div className="sf-subhead" style={{ overflowWrap: 'anywhere' }}>
-                {pos.beschreibung}
+                {positionsText(pos)}
               </div>
-              <div style={{ fontSize: 10, color: 'var(--label3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>
-                {pos.typ === 'arbeit' ? 'Arbeit' : <>Material <PartLink url={pos.link} /></>}
+              <div style={{ fontSize: 10, color: pos.typ === 'material' && pos.art === 'versand' ? 'var(--orange)' : 'var(--label3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>
+                {pos.typ === 'arbeit' ? 'Arbeit' : <>{positionsArt(pos)}{pos.art ? ' · ohne Marge' : ''} <PartLink url={pos.link} /></>}
               </div>
             </div>
 
@@ -505,8 +508,20 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 10, color: 'var(--label3)', marginBottom: 1 }}>Material</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--green)' }}>CHF {fCHF(totM)}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--green)' }}>CHF {fCHF(totM - fest.versand - fest.pauschalen)}</div>
               </div>
+              {fest.pauschalen > 0 && (
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 10, color: 'var(--label3)', marginBottom: 1 }}>Pauschalen</div>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>CHF {fCHF(fest.pauschalen)}</div>
+                </div>
+              )}
+              {fest.versand > 0 && (
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 10, color: 'var(--label3)', marginBottom: 1 }}>Versand</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--orange)' }}>CHF {fCHF(fest.versand)}</div>
+                </div>
+              )}
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 10, color: 'var(--label3)', marginBottom: 1 }}>
                   Arbeit{totZE > 0 ? ` · ${totZE} ZE` : ''}

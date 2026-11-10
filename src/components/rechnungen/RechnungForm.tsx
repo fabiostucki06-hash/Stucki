@@ -5,6 +5,7 @@ import { offerteNr } from '../../lib/offerte-docs';
 import NummerField, { parseNummer } from '../ui/NummerField';
 import { materialPreis, materialZeSumme, zeBetrag, zeMinuten } from '../../lib/ze';
 import { setMaterialFeld } from '../../lib/marge';
+import { festpreisSummen } from '../../lib/sonderpositionen';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { echteBeanstandungen } from '../../lib/utils';
 import type { Customer, Order, Offerte, ArbeitPosition, MaterialPosition, Rechnung, RechnungKategorie } from '../../types';
@@ -213,6 +214,11 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
 
   const addM = () => setMaterial((m) => [...m, newMaterial()]);
   const remM = (i: number) => setMaterial((m) => m.filter((_, j) => j !== i));
+  /** Versandkosten / Pauschale: replaces untouched empty rows, so the list doesn't keep a blank line. */
+  const insM = (row: MaterialRow) => setMaterial((m) => [
+    ...m.filter((p) => p.art || p.beschreibung.trim() || p.stueckpreis || p.ek || p.ze),
+    row,
+  ]);
   const updM = (i: number, k: string, v: string) => setMaterial((m) => {
     const n = [...m]; n[i] = setMaterialFeld(n[i], k, v);
     if (k === 'stueckpreis' || k === 'menge' || k === 'ze' || k === 'ek' || k === 'marge') n[i].preis = materialPreis(n[i]);
@@ -220,7 +226,9 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
   });
 
   const ap = arbeit.filter((p) => p.beschreibung.trim());
-  const mp = material.filter((p) => p.beschreibung.trim());
+  const mp = material.filter((p) => p.art || p.beschreibung.trim());
+  // Versandkosten / Pauschalen are in totM; shown on their own lines.
+  const fest = festpreisSummen(mp);
   const { totalMaterial: totM, totalArbeit: totA, totalZE: totZE, kleinteil, rechnungstotal, kleinteilApplied } =
     computeRechnungTotals([...ap, ...mp], kategorie || undefined, kleinteilManuell, initial?.anzahlungProzent, parseFloat(initial?.anzahlungBetrag ?? '') || undefined);
 
@@ -373,7 +381,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
         <PositionenEditor
           arbeit={arbeit} material={material}
           onArbeitChange={updA} onArbeitAdd={addA} onArbeitRemove={remA} onKiZE={kiZE}
-          onMaterialChange={updM} onMaterialAdd={addM} onMaterialRemove={remM}
+          onMaterialChange={updM} onMaterialAdd={addM} onMaterialRemove={remM} onMaterialInsert={insM}
         />
       </FormCard>
 
@@ -391,7 +399,9 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
             />
           </div>
           <div>
-            <SummaryRow label="Material" value={fCHF(totM)} />
+            <SummaryRow label="Material" value={fCHF(totM - fest.versand - fest.pauschalen)} />
+            {fest.pauschalen > 0 && <SummaryRow label="Pauschalen" sub="Festpreis" value={fCHF(fest.pauschalen)} />}
+            {fest.versand > 0 && <SummaryRow label="Versandkosten" sub="ohne Marge" value={fCHF(fest.versand)} />}
             <SummaryRow label="Arbeit" sub={totZE ? `${totZE} ZE` : null} value={fCHF(totA)} />
             {(() => {
               const mz = materialZeSumme(material);

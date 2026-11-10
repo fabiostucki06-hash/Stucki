@@ -13,6 +13,7 @@ import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../li
 import { offerteNr, sumPositions, todayISO, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_PROZENT, offerteNotizen, anzahlungErforderlich, anzahlungMoeglich, anzahlungAufteilung, sindVorkasseTerms } from '../../lib/offerte-docs';
 import { materialPreis, zeBetrag } from '../../lib/ze';
 import { setMaterialFeld } from '../../lib/marge';
+import { festpreisSummen, positionsArt, positionsText } from '../../lib/sonderpositionen';
 import type { AuftragsBestaetigung, Customer, Offerte, OfferteStatus, Position, ArbeitPosition, MaterialPosition, Rechnung } from '../../types';
 
 interface OfferteDetailProps {
@@ -114,6 +115,8 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   const acceptedKleinteil = positionen.filter((p, i) => posAccepted[i] && p.typ === 'material' && p.beschreibung === 'Kleinteil Pauschale')
     .reduce((s, p) => s + (parseFloat(p.preis || '0') || 0), 0);
   const acceptedMatPos = positionen.filter((p, i) => posAccepted[i] && p.typ === 'material');
+  // Versandkosten / Pauschalen: part of the material sum, listed on their own lines.
+  const acceptedFest = festpreisSummen(positionen.filter((_, i) => posAccepted[i]));
   const hasTerms = !!(zahlungsbedingung || zusatznotiz);
   const nr = offerteNr(offerte);
   const docName = offerte.art === 'material' ? 'Materialofferte' : 'Offerte';
@@ -511,9 +514,9 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
             >
               <div className="pos-line" style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 8 }}>
                 <div className="pos-line-desc" style={{ flex: 1, minWidth: 0 }}>
-                  <div className="sf-subhead" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pos.beschreibung}</div>
-                  <div style={{ fontSize: 11, color: 'var(--label3)', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    {pos.typ === 'arbeit' ? 'Arbeit' : <>Material <PartLink url={pos.link} /></>}
+                  <div className="sf-subhead" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{positionsText(pos)}</div>
+                  <div style={{ fontSize: 11, color: pos.typ === 'material' && pos.art === 'versand' ? 'var(--orange)' : 'var(--label3)', marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    {pos.typ === 'arbeit' ? 'Arbeit' : <>{positionsArt(pos)}{pos.art ? ' · ohne Marge' : ''} <PartLink url={pos.link} /></>}
                   </div>
                 </div>
 
@@ -655,8 +658,10 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
         {positionen.length > 0 && (
           <div className="list-row" style={{ cursor: 'default', background: 'rgba(0,122,255,0.06)', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
             {([
-              ['Material Total', acceptedMaterial - acceptedKleinteil, positionen.some((p) => p.typ === 'material' && p.beschreibung !== 'Kleinteil Pauschale')],
+              ['Material Total', acceptedMaterial - acceptedKleinteil - acceptedFest.versand - acceptedFest.pauschalen, positionen.some((p) => p.typ === 'material' && !p.art && p.beschreibung !== 'Kleinteil Pauschale')],
               ['Arbeit Total', acceptedArbeit, acceptedArbeit > 0 || positionen.some((p) => p.typ === 'arbeit')],
+              ['Pauschalen', acceptedFest.pauschalen, acceptedFest.pauschalen > 0],
+              ['Versandkosten', acceptedFest.versand, acceptedFest.versand > 0],
               ['Kleinteil Pauschale', acceptedKleinteil, acceptedKleinteil > 0],
             ] as [string, number, boolean][]).filter(([, , show]) => show).map(([label, betrag]) => (
               <div key={label} style={{ display: 'flex', width: '100%', alignItems: 'center' }}>

@@ -1,6 +1,7 @@
 import { RealtimeClient } from '@supabase/realtime-js';
 import { SUPA_URL, SUPA_KEY, db, getFreshToken } from './supabase';
 import { getSettings, applyRemoteSettings, onLocalSettingsChange, resetSettings, type Settings } from './settings';
+import { sanitizePauschalen } from './sonderpositionen';
 
 /* ── Cross-device settings sync ──
    Keeps the local settings store (settings.ts) and the user's row in
@@ -19,6 +20,11 @@ const OWNER_KEY = 'garage_settings_uid';
 const PUSH_DEBOUNCE_MS = 400;
 const POLL_MS = 20_000;
 
+/** Set once the database rejects the `pauschalen` column (migration
+    20261110100000 not applied yet): the bundles then stay on this device and
+    every other setting keeps syncing. */
+let pauschalenSpalteFehlt = false;
+
 type Row = Record<string, unknown>;
 
 function toRow(p: Partial<Settings>): Row {
@@ -31,6 +37,7 @@ function toRow(p: Partial<Settings>): Row {
   if (p.margin !== undefined) row.margin = p.margin;
   if (p.signature !== undefined) row.signature = p.signature;
   if (p.driveFolderId !== undefined) row.drive_folder_id = p.driveFolderId;
+  if (p.pauschalen !== undefined && !pauschalenSpalteFehlt) row.pauschalen = p.pauschalen;
   return row;
 }
 
@@ -45,6 +52,8 @@ function fromRow(row: Row): Partial<Settings> {
   if (typeof row.signature === 'string') p.signature = row.signature;
   if (typeof row.drive_folder_id === 'string') p.driveFolderId = row.drive_folder_id;
   if (row.margin != null && Number.isFinite(Number(row.margin))) p.margin = Number(row.margin);
+  const pauschalen = sanitizePauschalen(row.pauschalen);
+  if (pauschalen) p.pauschalen = pauschalen;
   return p;
 }
 
@@ -100,7 +109,15 @@ export function startSettingsSync(userId: string): () => void {
     try {
       const token = await getFreshToken();
       if (!token) throw new Error('no session');
-      await db.upsert(TABLE, { user_id: userId, ...toRow(patch), updated_at: new Date().toISOString() }, token);
+      const upsert = () => db.upsert(TABLE, { user_id: userId, ...toRow(patch), updated_at: new Date().toISOString() }, token);
+      try {
+        await upsert();
+      } catch (e) {
+        if (pauschalenSpalteFehlt || patch.pauschalen === undefined || !/pauschalen/i.test(String(e))) throw e;
+        console.warn('[Settings] column user_settings.pauschalen missing – Pauschalen stay on this device until the migration is applied.');
+        pauschalenSpalteFehlt = true;
+        await upsert();
+      }
     } catch (e) {
       // Keep it for the next attempt (wake-up / poll); newer local changes win.
       pending = { ...patch, ...pending };

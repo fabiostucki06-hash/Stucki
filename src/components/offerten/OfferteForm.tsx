@@ -5,6 +5,7 @@ import { offerteNotizen, anzahlungErforderlich, anzahlungMoeglich, anzahlungAuft
 import NummerField, { parseNummer } from '../ui/NummerField';
 import { materialPreis, materialZeSumme, ohneMaterialZe, positionTotals, zeBetrag, zeMinuten } from '../../lib/ze';
 import { setMaterialFeld } from '../../lib/marge';
+import { festpreisSummen } from '../../lib/sonderpositionen';
 import { useAutoSave } from '../../hooks/useAutoSave';
 
 type OfferteData = Omit<Offerte, 'id' | 'offertNumber' | 'createdAt'> & { offertNumber: number };
@@ -142,6 +143,11 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
 
   const addM = () => setMaterial((m) => [...m, newMaterial()]);
   const remM = (i: number) => setMaterial((m) => m.filter((_, j) => j !== i));
+  /** Versandkosten / Pauschale: replaces untouched empty rows, so the list doesn't keep a blank line. */
+  const insM = (row: MaterialRow) => setMaterial((m) => [
+    ...m.filter((p) => p.art || p.beschreibung.trim() || p.stueckpreis || p.ek || p.ze),
+    row,
+  ]);
   const updM = (i: number, k: string, v: string) => setMaterial((m) => {
     const n = [...m]; n[i] = setMaterialFeld(n[i], k, v);
     if (k === 'stueckpreis' || k === 'menge' || k === 'ze' || k === 'ek' || k === 'marge') n[i].preis = materialPreis(n[i]);
@@ -153,11 +159,13 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
   const kleinteilActive = totZE > 100;
   const kleinteilBetrag = kleinteilActive ? 10 : 0;
   const totMeff = totM + kleinteilBetrag;
+  // Versandkosten / Pauschalen are in totM; shown on their own lines.
+  const fest = festpreisSummen(material);
 
   const nr = parseNummer(nummer);
   // Only a changed number is checked: an existing duplicate doesn't block every save.
   const nrVergeben = nr != null && nr !== saved?.offertNumber && nummerVergeben(nr);
-  const hatInhalt = !!titel.trim() || arbeit.some((p) => p.beschreibung.trim()) || material.some((p) => p.beschreibung.trim());
+  const hatInhalt = !!titel.trim() || arbeit.some((p) => p.beschreibung.trim()) || material.some((p) => p.art || p.beschreibung.trim());
 
   /** Why the current input isn't saved (null: it is). A new Offerte is only
       created once there is a customer and something to offer. */
@@ -173,7 +181,7 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
     : [];
   const data: OfferteData | null = hinweis || nr == null ? null : {
     offertNumber: nr, customerId: cid, titel,
-    positionen: [...material.filter((p) => p.beschreibung.trim()), ...autoPauschale, ...arbeit.filter((p) => p.beschreibung.trim()).map(toArbeitPosition)],
+    positionen: [...material.filter((p) => p.art || p.beschreibung.trim()), ...autoPauschale, ...arbeit.filter((p) => p.beschreibung.trim()).map(toArbeitPosition)],
     notizen, gueltigBis, zahlungsziel, status,
     ...zahlungsterms(),
     totalBetrag: (totA + totMeff).toFixed(2), totalArbeit: totA.toFixed(2),
@@ -290,7 +298,7 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
         <PositionenEditor
           arbeit={arbeit} material={material}
           onArbeitChange={updA} onArbeitAdd={addA} onArbeitRemove={remA} onKiZE={kiZE}
-          onMaterialChange={updM} onMaterialAdd={addM} onMaterialRemove={remM}
+          onMaterialChange={updM} onMaterialAdd={addM} onMaterialRemove={remM} onMaterialInsert={insM}
           ohneZe={istMaterial}
         />
       </FormCard>
@@ -309,7 +317,9 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
             />
           </div>
           <div>
-            <SummaryRow label="Material Total" value={fCHF(totM)} />
+            <SummaryRow label="Material Total" value={fCHF(totM - fest.versand - fest.pauschalen)} />
+            {fest.pauschalen > 0 && <SummaryRow label="Pauschalen" sub="Festpreis" value={fCHF(fest.pauschalen)} />}
+            {fest.versand > 0 && <SummaryRow label="Versandkosten" sub="ohne Marge" value={fCHF(fest.versand)} />}
             <SummaryRow label="Arbeit Total" sub={totZE ? `${totZE} ZE` : null} value={fCHF(totA)} />
             {(() => {
               const mz = materialZeSumme(material);

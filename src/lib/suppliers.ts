@@ -34,7 +34,7 @@ export interface SupplierGroup {
 export function groupPartsBySupplier(positionen: Position[]): SupplierGroup[] {
   const groups = new Map<string, SupplierGroup>();
   positionen.forEach((pos, index) => {
-    if (pos.typ !== 'material') return;
+    if (pos.typ !== 'material' || pos.art) return;
     const link = parsePartLink(pos.link) ?? findPartLink(pos.beschreibung);
     const supplier = (link && KNOWN.find((s) => s.host.test(link.host))) || OTHER;
     const group = groups.get(supplier.id) ?? { supplier, parts: [] };
@@ -46,7 +46,7 @@ export function groupPartsBySupplier(positionen: Position[]): SupplierGroup[] {
 }
 
 export function materialProgress(positionen: Position[]): { total: number; ordered: number; status: MaterialStatus } {
-  const parts = positionen.filter((p): p is MaterialPosition => p.typ === 'material');
+  const parts = positionen.filter((p): p is MaterialPosition => p.typ === 'material' && !p.art);
   const ordered = parts.filter((p) => p.bestellt).length;
   const status: MaterialStatus = !ordered ? 'offen' : ordered < parts.length ? 'teilweise' : 'bestellt';
   return { total: parts.length, ordered, status };

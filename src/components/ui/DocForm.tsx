@@ -8,6 +8,8 @@ import { getMargin } from '../../lib/settings';
 import type { ArbeitPosition, MaterialPosition } from '../../types';
 import { materialSatz, zeMinuten, zeText } from '../../lib/ze';
 import { margeVon, vkAusEk } from '../../lib/marge';
+import { useSettings } from '../../hooks/useSettings';
+import { neueVersandPosition, pauschalePosition, positionsArt } from '../../lib/sonderpositionen';
 
 /* Shared building blocks for the Offerte / Rechnung / Auftrag creation forms
    (styles: `.df-*` in globals.css). */
@@ -131,6 +133,8 @@ interface PositionenEditorProps {
   onMaterialChange: (i: number, key: string, value: string) => void;
   onMaterialAdd: () => void;
   onMaterialRemove: (i: number) => void;
+  /** Inserts a ready-made fixed-price row (Versandkosten, Pauschale). */
+  onMaterialInsert: (row: MaterialRow) => void;
   /** Materialofferte: material prices only, no ZE on the parts. */
   ohneZe?: boolean;
 }
@@ -141,8 +145,9 @@ const zeSumme = (rows: { ze: string }[]) => rows.reduce((s, p) => s + (parseFloa
 export function PositionenEditor({
   arbeit, material,
   onArbeitChange, onArbeitAdd, onArbeitRemove, onKiZE,
-  onMaterialChange, onMaterialAdd, onMaterialRemove, ohneZe,
+  onMaterialChange, onMaterialAdd, onMaterialRemove, onMaterialInsert, ohneZe,
 }: PositionenEditorProps) {
+  const { pauschalen } = useSettings();
   const rootRef = useRef<HTMLDivElement>(null);
   // Set right before a row is appended; once it has rendered, its description
   // input takes focus so the user can keep typing without reaching for it.
@@ -167,6 +172,7 @@ export function PositionenEditor({
       /api/import-part. A VK already typed in is kept. Text entered next to
       the link stays as the description. Returns false for ordinary text. */
   function resolveMaterialLink(i: number, text: string): boolean {
+    if (materialRef.current[i]?.art) return false;
     const link = findPartLink(text);
     if (!link) return false;
 
@@ -226,6 +232,7 @@ export function PositionenEditor({
 
   const addArbeit   = () => { pendingFocus.current = 'arbeit';   onArbeitAdd(); };
   const addMaterial = () => { pendingFocus.current = 'material'; onMaterialAdd(); };
+  const insertMaterial = (row: MaterialRow) => { pendingFocus.current = 'material'; onMaterialInsert(row); };
 
   return (
     <div ref={rootRef}>
@@ -239,10 +246,14 @@ export function PositionenEditor({
       </div>
       {material.map((pos, i) => {
         const busy = !!pos.link && resolving.has(pos.link);
+        // Versandkosten / Pauschale: fixed price, no EK / Marge / ZE.
+        const fest = !!pos.art;
+        const festTitel = pos.art === 'versand' ? 'Versandkosten: Betrag wird 1:1 weiterverrechnet, ohne Marge' : 'Pauschale: Festpreis, ohne Marge und ZE';
         return (
         <Fragment key={i}>
-        <div className="df-line df-material" onKeyDown={(e) => onEnterNextRow(e, i === material.length - 1, addMaterial)}>
+        <div className={`df-line df-material${fest ? ' df-fest' : ''}`} onKeyDown={(e) => onEnterNextRow(e, i === material.length - 1, addMaterial)}>
           <div className="df-c-desc df-desc" aria-busy={busy}>
+            {fest && <span className={`df-tag df-tag-${pos.art}`} title={festTitel}>{positionsArt(pos)}</span>}
             <input
               className="df-inp" data-df-desc="material"
               value={pos.beschreibung} onChange={(e) => onMaterialDescChange(i, e.target.value)}
@@ -250,7 +261,8 @@ export function PositionenEditor({
               // Full URLs that were typed, dropped or autofilled rather than pasted
               // (Enter moves focus to the next row, so it lands here too).
               onBlur={(e) => resolveMaterialLink(i, e.target.value)}
-              placeholder="Ersatzteil / Material…" aria-label="Beschreibung Material"
+              placeholder={pos.art === 'versand' ? 'Versandkosten (z.B. Lieferant)' : pos.art === 'pauschale' ? 'Pauschale…' : 'Ersatzteil / Material…'}
+              aria-label={`Beschreibung ${positionsArt(pos)}`}
             />
             {busy && <span className="df-desc-busy" role="status" aria-label="Link wird geladen"><Spinner size={12} /></span>}
           </div>
@@ -265,26 +277,28 @@ export function PositionenEditor({
             <span className="df-cell-lbl">EK CHF</span>
             <input
               className="df-inp num" type="number" inputMode="decimal" min={0}
-              value={pos.ek ?? ''} onChange={(e) => onMaterialChange(i, 'ek', e.target.value)}
+              value={fest ? '' : pos.ek ?? ''} onChange={(e) => onMaterialChange(i, 'ek', e.target.value)}
               placeholder="—" aria-label="Einkaufspreis pro Stück (intern)"
+              disabled={fest} title={fest ? festTitel : undefined}
             />
           </label>
           <label className="df-cell df-c-marge">
             <span className="df-cell-lbl">Marge %</span>
             <input
               className="df-inp num" type="number" inputMode="decimal"
-              value={pos.marge ?? ''} onChange={(e) => onMaterialChange(i, 'marge', e.target.value)}
-              placeholder={String(getMargin())} disabled={!(parseFloat(pos.ek ?? '') > 0)}
-              title={parseFloat(pos.ek ?? '') > 0 ? 'Aufschlag auf den EK, ergibt den VK' : 'Zuerst EK eingeben'}
+              value={fest ? '' : pos.marge ?? ''} onChange={(e) => onMaterialChange(i, 'marge', e.target.value)}
+              placeholder={fest ? '0' : String(getMargin())} disabled={fest || !(parseFloat(pos.ek ?? '') > 0)}
+              title={fest ? festTitel : parseFloat(pos.ek ?? '') > 0 ? 'Aufschlag auf den EK, ergibt den VK' : 'Zuerst EK eingeben'}
               aria-label="Marge in Prozent (intern)"
             />
           </label>
           <label className="df-cell df-c-price">
-            <span className="df-cell-lbl">VK CHF</span>
+            <span className="df-cell-lbl">{pos.art === 'versand' ? 'Betrag CHF' : 'VK CHF'}</span>
             <input
               className="df-inp num" type="number" inputMode="decimal"
               value={pos.stueckpreis} onChange={(e) => onMaterialChange(i, 'stueckpreis', e.target.value)}
-              placeholder="0.00" aria-label="Verkaufspreis pro Stück"
+              placeholder="0.00" aria-label={pos.art === 'versand' ? 'Versandkosten netto (ohne Marge)' : 'Verkaufspreis pro Stück'}
+              title={fest ? festTitel : undefined}
             />
           </label>
           <label className="df-cell df-c-ze">
@@ -293,7 +307,7 @@ export function PositionenEditor({
               className="df-inp num" type="number" inputMode="decimal" min={0}
               value={pos.ze ?? ''} onChange={(e) => onMaterialChange(i, 'ze', e.target.value)}
               placeholder="—" aria-label="Zeiteinheiten zum Material (100 ZE = 60 Min.)"
-              disabled={ohneZe} title={ohneZe ? 'Materialofferte: nur Materialpreise, keine ZE' : undefined}
+              disabled={ohneZe || fest} title={fest ? festTitel : ohneZe ? 'Materialofferte: nur Materialpreise, keine ZE' : undefined}
             />
           </label>
           <span className="df-total df-c-total">{pos.preis ? fCHF(parseFloat(pos.preis)) : '—'}</span>
@@ -301,7 +315,7 @@ export function PositionenEditor({
             ? <button type="button" className="mf-pos-del df-c-del" onClick={() => onMaterialRemove(i)} aria-label="Position entfernen"><SFXmark /></button>
             : <span className="df-c-del" />}
         </div>
-        {parseFloat(pos.ze ?? '') > 0 && (
+        {!fest && parseFloat(pos.ze ?? '') > 0 && (
           <div className="df-ze-hint">
             Einbauzeit {zeText(parseFloat(pos.ze!), materialSatz(pos))} – zählt zu Arbeit Total
           </div>
@@ -309,7 +323,27 @@ export function PositionenEditor({
         </Fragment>
         );
       })}
-      <button type="button" className="mf-add-pos green" onClick={addMaterial}><SFPlus size={12} /> Material</button>
+      <div className="df-add-row">
+        <button type="button" className="mf-add-pos green" onClick={addMaterial}><SFPlus size={12} /> Material</button>
+        <button type="button" className="mf-add-pos orange" onClick={() => insertMaterial(neueVersandPosition())} title="Versandkosten werden 1:1 ohne Marge verrechnet">
+          <SFPlus size={12} /> Versandkosten
+        </button>
+        {pauschalen.length > 0 && (
+          <select
+            className="mf-add-pos df-pauschale-select" value="" aria-label="Pauschale einfügen"
+            title="Festpreis-Paket einfügen (ohne Stundensatz und Marge)"
+            onChange={(e) => {
+              const b = pauschalen.find((x) => x.id === e.target.value);
+              if (b) insertMaterial(pauschalePosition(b));
+            }}
+          >
+            <option value="">＋ Pauschale…</option>
+            {pauschalen.map((b) => (
+              <option key={b.id} value={b.id}>{b.name || 'Ohne Namen'} – {fCHF(parseFloat(b.preis) || 0)}</option>
+            ))}
+          </select>
+        )}
+      </div>
 
       <div className="df-group-hdr">
         <span className="df-dot" style={{ background: 'var(--blue)' }} />

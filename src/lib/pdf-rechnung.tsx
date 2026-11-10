@@ -8,6 +8,7 @@ import { formatDateCH, buildDocumentFilename, materialZuerst } from './utils';
 import { getIban } from './settings';
 import { CO_NAME, CO_ADDR, CO_CITY, CO_PHONE, CO_LOC, CO_ZIP, CO_CITY_NAME, STD_SATZ } from './company';
 import { archiveToDrive } from './drive';
+import { festpreisSummen, positionsText } from './sonderpositionen';
 import type { ArbeitPosition, Customer, MaterialPosition, Position, Rechnung } from '../types';
 
 const MIN_ROWS = 15;
@@ -52,6 +53,9 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
   const positionen = (rechnung.positionen ?? []).map(ohneZeAnteil);
   const { totalMaterial: totM, totalArbeit: totA, kleinteil, zwischensumme: total, gesamttotal, rechnungstotal, restbetrag, abzugAnzahlung } =
     computeRechnungTotals(positionen, rechnung.kategorie, rechnung.kleinteilManuell, anzProzent, parseFloat(rechnung.anzahlungBetrag ?? '') || undefined);
+
+  // Versandkosten (1:1, no Marge) and Pauschalen: own subtotal lines, out of Material Total.
+  const fest = festpreisSummen(positionen);
 
   // The Kleinteil-Pauschale is listed in the totals below, not as a position.
   const rows: (Position | undefined)[] = materialZuerst(positionen);
@@ -171,7 +175,8 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
   // ── POSITION ROWS (min 15) ────────────────────────────────────────────────
   // Long descriptions wrap onto further lines instead of being cut off.
   for (const pos of rows) {
-    const descLines = pos?.beschreibung ? wrap(pos.beschreibung, wBez - PAD * 2) : [];
+    const descText = pos ? positionsText(pos) : '';
+    const descLines = descText ? wrap(descText, wBez - PAD * 2) : [];
     const rowH = RH + Math.max(0, descLines.length - 1) * LH;
     if (!fits(rowH)) {
       if (!pos) break; // only empty filler rows left: end the table here
@@ -203,8 +208,10 @@ function drawDoc(doc: jsPDF, rechnung: Rechnung, customer: Customer | undefined)
   // of material positions) at the Std.Satz. Subtotals, Gesamtbetrag, Abzug and
   // Zu zahlen stay together on one page.
   const subRows: [string, number][] = [
-    ['Material Total', totM],
+    ['Material Total', totM - fest.versand - fest.pauschalen],
     ['Arbeit Total', totA],
+    ...(fest.pauschalen > 0 ? [['Pauschalen', fest.pauschalen] as [string, number]] : []),
+    ...(fest.versand > 0 ? [['Versandkosten', fest.versand] as [string, number]] : []),
     ...(kleinteil > 0 ? [[KLEINTEIL_LABEL, kleinteil] as [string, number]] : []),
   ];
   if (!fits(RH_S * subRows.length + RH_S + RH_T + (anzProzent || isSchluss ? RH_S : 0))) newPage();

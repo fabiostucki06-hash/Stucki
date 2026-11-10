@@ -393,9 +393,10 @@ export default function App() {
   }
   async function handleCreateMaterialofferte(offerte: Offerte, positionen: Position[]) {
     // Reine Materialofferte: same offertNumber, next version, only the material
-    // positions, and the 50% Vorkasse terms as default remarks.
+    // positions (with their Versandkosten; Pauschalen are services, not material),
+    // and the 50% Vorkasse terms as default remarks.
     const mat = positionen
-      .filter((p): p is MaterialPosition => p.typ === 'material')
+      .filter((p): p is MaterialPosition => p.typ === 'material' && p.art !== 'pauschale')
       .map(({ bestellt, ...p }) => ohneMaterialZe(p));
     const t = sumPositions(mat);
     const { id, offertNumber, status, createdAt, ab, materialStatus, ...rest } = offerte;

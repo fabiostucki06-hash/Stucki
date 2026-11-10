@@ -732,6 +732,16 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .df-ze-min{align-self:center;font-size:13px;text-align:right;white-space:nowrap;color:var(--label3);font-variant-numeric:tabular-nums}
 .df-idx{font-size:12px;font-weight:700;color:var(--label3);text-align:center}
 .df .mf-add-pos,.df .mf-add-bean{padding:7px 12px;font-size:13px;margin-top:10px}
+/* Versandkosten / Pauschalen: fixed-price rows and their add controls */
+.df-add-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.mf-add-pos.orange{color:var(--orange);background:rgba(255,149,0,0.08);border-color:rgba(255,149,0,0.28)}
+.mf-add-pos.orange:hover{background:rgba(255,149,0,0.15);border-color:rgba(255,149,0,0.45);transform:translateY(-1px)}
+.mf-add-pos:active{transform:scale(0.98)}
+select.mf-add-pos.df-pauschale-select{-webkit-appearance:none;appearance:none;color:var(--blue);padding-right:12px;max-width:100%}
+.df-desc:has(.df-tag){display:flex;align-items:center;gap:6px}
+.df-tag{flex-shrink:0;font-size:10.5px;font-weight:700;letter-spacing:0.02em;border-radius:6px;padding:3px 7px;white-space:nowrap;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:inset 0 1px 0 rgba(255,255,255,0.35)}
+.df-tag-versand{color:var(--orange);background:rgba(255,149,0,0.12);border:1px solid rgba(255,149,0,0.35)}
+.df-tag-pauschale{color:var(--blue);background:rgb(var(--accent-rgb) / 0.12);border:1px solid rgb(var(--accent-rgb) / 0.30)}
 
 /* ── AKTIVE OFFERTE ── */
 .ao-pill{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:980px;font-family:inherit;font-size:13px;font-weight:600;letter-spacing:-0.1px;white-space:nowrap;cursor:pointer;color:#fff;background:linear-gradient(to bottom,rgba(98,224,128,0.62) 0%,rgba(52,199,89,0.46) 50%,rgba(30,150,62,0.50) 100%);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid rgba(52,199,89,0.70);box-shadow:inset 0 1px 0 rgba(255,255,255,0.6),inset 0 -1px 2px rgba(0,0,0,0.2),0 0 14px rgba(52,199,89,0.38),0 4px 6px rgba(0,0,0,0.15);text-shadow:0 -1px 0 rgba(0,0,0,0.3);transition:transform 0.15s ease,box-shadow 0.15s ease,filter 0.15s ease}

@@ -15,6 +15,7 @@ import { BUILD_DATE, BUILD_SHA } from '../../lib/buildInfo';
 import { hardReload } from '../../lib/reload';
 import { SFCheckmark, SFWrench, SFDocCheck, SFCloud, SFGear } from '../Icons';
 import ShortcutKeySection from './ShortcutKeySection';
+import PauschalenSection from './PauschalenSection';
 import type { SyncStatus } from '../../types';
 
 const WALLPAPERS = [
@@ -38,7 +39,7 @@ const HEX_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 type SectionId = 'werkstatt' | 'dokumente' | 'integrationen' | 'system';
 
 const SECTIONS: { id: SectionId; icon: React.ReactNode; label: string; short: string; hint: string }[] = [
-  { id: 'werkstatt',     icon: <SFWrench />,   label: 'Werkstatt & Firmendaten', short: 'Werkstatt',     hint: 'Adresse, IBAN, Stundensatz, Marge' },
+  { id: 'werkstatt',     icon: <SFWrench />,   label: 'Werkstatt & Firmendaten', short: 'Werkstatt',     hint: 'Adresse, IBAN, Stundensatz, Marge, Pauschalen' },
   { id: 'dokumente',     icon: <SFDocCheck />, label: 'Unterschrift & Dokumente', short: 'Dokumente',     hint: 'Unterschrift, Zahlungsbedingungen' },
   { id: 'integrationen', icon: <SFCloud />,    label: 'Integrationen & Cloud',   short: 'Integrationen', hint: 'Sync, Google Drive, Teile-Import' },
   { id: 'system',        icon: <SFGear />,     label: 'System & App-Info',       short: 'System',        hint: 'Hintergrund, Layout, Build' },
@@ -341,6 +342,14 @@ export default function SettingsView({ currentWallpaper, onWallpaperChange, bgMo
           </div>
           <Hint>
             Wird bei jeder Materialposition und beim Import eines Teils auf den Einkaufspreis (EK) aufgeschlagen und ergibt den Verkaufspreis (VK). Pro Position im Feld „Marge %“ anpassbar. Auf Offerte und Rechnung erscheint nur der VK.
+            Versandkosten und Pauschalen sind davon ausgenommen – sie werden immer 1:1 verrechnet.
+          </Hint>
+        </Card>
+
+        <Card title="Pauschalen (Festpreis-Pakete)">
+          <PauschalenSection />
+          <Hint>
+            Erscheinen in jeder Offerte und Rechnung unter „+ Pauschale…“ und werden als Festpreis-Position eingefügt – ohne Stundensatz, ZE und Marge.
           </Hint>
         </Card>
       </>)}

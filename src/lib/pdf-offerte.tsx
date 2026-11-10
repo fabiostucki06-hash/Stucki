@@ -5,6 +5,7 @@ import { PAGE_TOP, PAGE_BOTTOM, addPageNumbers } from './pdf-paging';
 import { offerteNr, offerteZahlungszeilen, offerteNotizen, anzahlungErforderlich, anzahlungAufteilung, sumPositions, ANZAHLUNG_PROZENT } from './offerte-docs';
 import { ohneMaterialZe, ohneZeAnteil } from './ze';
 import { archiveToDrive } from './drive';
+import { festpreisSummen, positionsText } from './sonderpositionen';
 import type { ArbeitPosition, Customer, MaterialPosition, Offerte } from '../types';
 
 const todayCH = () => formatDateCH(new Date());
@@ -59,7 +60,9 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
   // Material Total = Menge × Stk.Preis only; Arbeit Total = all ZE (incl. those
   // of material positions) at the Std.Satz; the Kleinteil Pauschale on its own.
   const totals       = sumPositions(allPos);
-  const pureMatTotal = totals.totalMaterial - kleinteilAmt;
+  // Versandkosten (1:1, no Marge) and Pauschalen get their own subtotal lines.
+  const fest         = festpreisSummen(allPos);
+  const pureMatTotal = totals.totalMaterial - kleinteilAmt - fest.versand - fest.pauschalen;
   const totalArb     = totals.totalArbeit;
   const totalBetrag  = totals.total;
 
@@ -170,7 +173,7 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
     const ty = y + RH * BL;
 
     rgb(0, 0, 0);
-    tL(clip(p.beschreibung, wBez - PAD * 2), x0 + PAD, ty);
+    tL(clip(positionsText(p), wBez - PAD * 2), x0 + PAD, ty);
     rgb(50, 50, 50);
     if (mp && fN(mp.menge))       tR(String(fN(mp.menge)),            x2 - PAD, ty);
     if (mp && fN(mp.stueckpreis)) tR(fN(mp.stueckpreis).toFixed(2),   x3 - PAD, ty);
@@ -194,11 +197,13 @@ function drawDoc(doc: jsPDF, offerte: Offerte, customer: Customer | undefined, m
   // One right-aligned row each, so the split between parts and labour shows at
   // a glance; a type without positions (e.g. Materialofferte: no Arbeit) is left
   // out. Subtotals, Total and Anzahlung stay together on one page.
-  const hatMaterial = filteredPos.some((p) => p.typ === 'material') || pureMatTotal > 0;
+  const hatMaterial = filteredPos.some((p) => p.typ === 'material' && !p.art) || pureMatTotal > 0;
   const hatArbeit   = filteredPos.some((p) => p.typ === 'arbeit')   || totalArb > 0;
   const subRows: [string, number][] = [
     ...(hatMaterial || !hatArbeit ? [['Material Total', pureMatTotal] as [string, number]] : []),
     ...(hatArbeit || !hatMaterial ? [['Arbeit Total', totalArb] as [string, number]] : []),
+    ...(fest.pauschalen > 0 ? [['Pauschalen', fest.pauschalen] as [string, number]] : []),
+    ...(fest.versand > 0 ? [['Versandkosten', fest.versand] as [string, number]] : []),
     ...(kleinteilAmt > 0 ? [['Kleinteil Pauschale', kleinteilAmt] as [string, number]] : []),
   ];
   const mitAnzahlung = anzahlungErforderlich(offerte);
