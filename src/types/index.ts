@@ -49,7 +49,7 @@ export interface ServiceItem {
   letztesDatum?: string;
   letzteKm?: string;
   /** Next due date / mileage: derived from the last service plus the interval
-      when ticked off, editable (e.g. the date of the MFK-Aufgebot). */
+      when ticked off, editable (e.g. a date agreed with the customer). */
   faelligDatum?: string;
   faelligKm?: string;
   notiz?: string;
