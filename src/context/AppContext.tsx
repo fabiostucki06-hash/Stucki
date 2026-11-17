@@ -7,7 +7,7 @@ import { alsReineMaterialofferte, mitGetrenntenTotals } from '../lib/ze';
 import { hoechsteRechnungNr, rechnungArt, rechnungDocName } from '../lib/rechnung-totals';
 import { hatFahrzeugDaten, kundeMitFahrzeug, legacyFahrzeug, sortiereFahrzeuge, splitFahrzeug } from '../lib/vehicles';
 import { mitWartungsplan, profilSignatur } from '../lib/wartung';
-import type { Customer, FahrzeugFelder, Order, Offerte, Rechnung, RechnungArt, MaterialCatalogItem, SyncStatus, Vehicle } from '../types';
+import type { Customer, FahrzeugFelder, Order, Offerte, Rechnung, RechnungArt, MaterialCatalogItem, SyncStatus, Vehicle, WartungSpec } from '../types';
 
 /** Anything that belongs to a customer's vehicle: Auftrag, Offerte, Rechnung. */
 type FahrzeugDok = { customerId: string; vehicleId?: string };
@@ -25,6 +25,9 @@ interface AppContextValue {
   addVehicle: (customerId: string, data: FahrzeugFelder) => Promise<Vehicle>;
   updateVehicle: (v: Vehicle) => Promise<void>;
   deleteVehicle: (v: Vehicle) => Promise<void>;
+  /** Intervals checked against the OEM schedule, per Motorkennbuchstabe (lib/wartung). */
+  wartungSpecs: WartungSpec[];
+  saveWartungSpec: (s: WartungSpec) => Promise<void>;
   orders: Order[];
   offerten: Offerte[];
   rechnungen: Rechnung[];
@@ -86,6 +89,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
      outdated client) may still carry vehicle fields; see legacyFahrzeug. */
   const [kunden, setKunden] = useState<Customer[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [wartungSpecs, setWartungSpecs] = useState<WartungSpec[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [offerten, setOfferten] = useState<Offerte[]>([]);
   const [rechnungen, setRechnungen] = useState<Rechnung[]>([]);
@@ -144,19 +148,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const sync = async () => {
       lastSyncAt.current = Date.now();
       const seq = writeSeq.current;
-      const [cr, vr, or, cnt, offr, rechr] = await Promise.all([
+      const [cr, vr, or, cnt, offr, rechr, specr] = await Promise.all([
         db.get('customers', token),
         db.get('vehicles', token).catch((e) => { console.error('[Supabase] get(vehicles):', e); return null; }),
         db.get('orders', token),
         db.getCounter(token),
         db.get('offerten', token).catch((e) => { console.error('[Supabase] get(offerten):', e); return null; }),
         db.get('rechnungen', token).catch((e) => { console.error('[Supabase] get(rechnungen):', e); return null; }),
+        db.get('maintenance_specs', token).catch((e) => { console.error('[Supabase] get(maintenance_specs):', e); return null; }),
       ]);
       // A save overlapped this fetch: the response may predate it and would revert local state.
       if (cancelled || writesInFlight.current > 0 || seq !== writeSeq.current) return;
       // db.get resolves with an error object on HTTP errors; never let that wipe good data.
       if (Array.isArray(cr)) setKunden(parseRows(cr) as Customer[]);
       if (Array.isArray(vr)) setVehicles(parseRows(vr) as Vehicle[]);
+      if (Array.isArray(specr)) setWartungSpecs(parseRows(specr) as unknown as WartungSpec[]);
       if (Array.isArray(or)) setOrders((parseRows(or) as Order[]).map(mitGetrenntenTotals));
       setOrderNum((p) => Math.max(p, cnt));
       if (Array.isArray(offr)) {
@@ -272,7 +278,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   async function addVehicle(customerId: string, data: FahrzeugFelder): Promise<Vehicle> {
     await migrateLegacy(customerId);
-    const v = mitWartungsplan({ ...data, id: `v_${Date.now()}`, customerId, createdAt: new Date().toISOString() });
+    const v = mitWartungsplan({ ...data, id: `v_${Date.now()}`, customerId, createdAt: new Date().toISOString() }, undefined, wartungSpecs);
     await syncOk(() => upsertVehicle(v));
     setVehicles((p) => [...p, v]);
     return v;
@@ -283,7 +289,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await migrateLegacy(neu.customerId);
     // Changed technical data (Marke, Modell, Antrieb, Getriebe, VIN, …): the
     // Wartungsplan is matched to the vehicle's new profile.
-    const v = vorher && profilSignatur(vorher) !== profilSignatur(neu) ? mitWartungsplan(neu, vorher) : neu;
+    const v = vorher && profilSignatur(vorher, wartungSpecs) !== profilSignatur(neu, wartungSpecs) ? mitWartungsplan(neu, vorher, wartungSpecs) : neu;
     await syncOk(() => upsertVehicle(v));
     setVehicles((p) => (p.some((x) => x.id === v.id) ? p.map((x) => (x.id === v.id ? v : x)) : [...p, v]));
   }
@@ -292,6 +298,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await migrateLegacy(v.customerId);
     await syncOk(() => db.delete('vehicles', v.id, token!));
     setVehicles((p) => p.filter((x) => x.id !== v.id));
+  }
+
+  /** Stores an interval checked for an engine; vehicles with that
+      Motorkennbuchstabe pick it up when their plan is matched. */
+  async function saveWartungSpec(spec: WartungSpec) {
+    const s: WartungSpec = { ...spec, geprueftVon: spec.geprueftVon ?? userEmail ?? undefined };
+    await syncOk(() => db.upsert('maintenance_specs', { id: s.id, data: s, updated_at: new Date().toISOString() }, token!));
+    setWartungSpecs((p) => [...p.filter((x) => x.id !== s.id), s]);
   }
 
   /* ── Customers ── */
@@ -303,7 +317,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await syncOk(() => db.upsert('customers', { id, data: newC }, token!));
     setKunden((p) => [...p, newC]);
     if (fahrzeug && hatFahrzeugDaten(fahrzeug)) {
-      const v = mitWartungsplan({ ...fahrzeug, id: `v_${Date.now()}`, customerId: id, createdAt: newC.createdAt });
+      const v = mitWartungsplan({ ...fahrzeug, id: `v_${Date.now()}`, customerId: id, createdAt: newC.createdAt }, undefined, wartungSpecs);
       await syncOk(() => upsertVehicle(v));
       setVehicles((p) => [...p, v]);
     }
@@ -434,7 +448,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AppContext.Provider value={{ customers, vehicles, vehiclesOf, docVehicle, docKunde, addVehicle, updateVehicle, deleteVehicle, orders, offerten, rechnungen, orderNum, offertNum, rechnungNum, loading, syncStatus, token, userEmail, authChecked, sessionExpired, updateToken, addCustomer, updateCustomer, deleteCustomer, addOrder, updateOrder, deleteOrder, addOfferte, updateOfferte, deleteOfferte, addRechnung, updateRechnung, deleteRechnung, addMaterial, handleLogin, handleLogout }}>
+    <AppContext.Provider value={{ customers, vehicles, vehiclesOf, docVehicle, docKunde, addVehicle, updateVehicle, deleteVehicle, wartungSpecs, saveWartungSpec, orders, offerten, rechnungen, orderNum, offertNum, rechnungNum, loading, syncStatus, token, userEmail, authChecked, sessionExpired, updateToken, addCustomer, updateCustomer, deleteCustomer, addOrder, updateOrder, deleteOrder, addOfferte, updateOfferte, deleteOfferte, addRechnung, updateRechnung, deleteRechnung, addMaterial, handleLogin, handleLogout }}>
       {children}
     </AppContext.Provider>
   );

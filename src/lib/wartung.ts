@@ -1,11 +1,20 @@
 import { neueServiceId, plusMonate } from './vehicles';
-import type { Antrieb, Getriebe, ServiceItem, Steuertrieb, Vehicle } from '../types';
+import type { Antrieb, Getriebe, IntervallQuelle, ServiceItem, Steuertrieb, Vehicle, WartungSpec } from '../types';
 
 /* ── Fahrzeugprofil: what the Wartungsplan is generated from ──
    Antrieb / Getriebe / Steuertrieb are stored on the vehicle when known; else
-   they are inferred from Marke, Modell, Motor and the VIN (Stammnummer). The
-   intervals below are workshop Richtwerte per manufacturer, not OEM data: every
-   item stays editable, and an edited interval is kept (intervallManuell). */
+   they are inferred from the Motorkennbuchstabe (MOTOREN), Marke, Modell, Motor
+   and the VIN (WMI + model year only; the rest of a VIN is manufacturer-coded).
+
+   No OEM / TecDoc / Autodata data is built in, so every interval carries its
+   source (ServiceItem.quelle):
+   - 'standard':  generic value, the vehicle data isn't enough for more;
+   - 'richtwert': workshop Richtwert for the manufacturer / engine family;
+   - 'geprueft':  checked by the workshop against the OEM schedule. Checked
+     intervals are stored per Motorkennbuchstabe (table maintenance_specs,
+     WartungSpec) and used for every vehicle with that engine.
+   Only 'geprueft' counts as verified; the UI asks to check the others. Every
+   item stays editable, and an interval set by hand is kept (intervallManuell). */
 
 export const ANTRIEBE: { value: Antrieb; label: string }[] = [
   { value: 'benzin',  label: 'Benzin' },
@@ -83,21 +92,84 @@ const norm = (s?: string) => (s ?? '').trim().toLowerCase();
 const RE_ELEKTRO = /\b(e-?tron|electric|elektro|bev|ev|id\.?\s?\d|e-golf|e-up|leaf|zoe|i3|i4|ix\d?|eqa|eqb|eqc|eqe|eqs|kona electric|ioniq\s?[56]|mach-e|enyaq|e-208|e-2008|model [3sxy])\b/;
 const RE_PLUGIN = /\b(phev|plug-?in|gte|e-?hybrid|recharge|twin engine|\d{3}e)\b/;
 const RE_HYBRID = /\b(hybrid|hev|mhev)\b/;
-const RE_DIESEL = /\b(\d{2,3}d|tdi|cdi|dci|hdi|bluehdi|crdi|tdci|jtd|jtdm|multijet|d-4d|i-dtec|skyactiv-d|bluetec|diesel|d[2-5]|cdti|sdv\d|tdv\d)\b/;
+const RE_DIESEL = /\b(\d{2,3} ?d|tdi|cdi|dci|hdi|bluehdi|crdi|tdci|jtd|jtdm|multijet|d-4d|i-dtec|skyactiv-d|bluetec|diesel|d[2-5]|cdti|sdv\d|tdv\d)\b/;
 const RE_GAS = /\b(cng|g-tec|tgi|erdgas|natural power)\b/;
 const RE_BENZIN = /\b(\d{3}i|tsi|tfsi|fsi|gti|tce|puretech|ecoboost|vti|thp|t-?jet|skyactiv-g|benzin|turbo petrol)\b/;
 
+/** Engine families whose Steuertrieb is documented. Matched on the
+    Motorkennbuchstabe (`code`, prefix) or the Motor / Modell text. First match
+    wins, so exceptions come before the rule of their manufacturer. */
+interface Motor { name: string; antrieb?: 'benzin' | 'diesel'; steuertrieb: Steuertrieb; nass?: boolean; zahnriemen?: Intervall }
+const MOTOREN: { gruppen: Gruppe[]; code?: RegExp; text?: RegExp; m: Motor }[] = [
+  // VAG
+  { gruppen: ['vag'], code: /^(CAV|CAX|CBZ|CTH|BMY|BLG)/, m: { name: 'EA111 TSI', antrieb: 'benzin', steuertrieb: 'kette' } },
+  { gruppen: ['vag'], code: /^(CHZ|DKR|CJZ|CZC|CZD|CZE|CPT|CHP|DAD|DPC|CHY|CWV)/, m: { name: 'EA211', antrieb: 'benzin', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['vag'], code: /^(CCZ|CDA|CJS|CJX|CHH|CZP)/, m: { name: 'EA888', antrieb: 'benzin', steuertrieb: 'kette' } },
+  { gruppen: ['vag'], code: /^(CAY|CFF|CFG|CBA|CBD|CLH|CRB|CRL|CRK|DFG)/, m: { name: 'EA189 / EA288 TDI', antrieb: 'diesel', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['vag'], text: /\b(1\.[2-9]|2\.0) ?tdi\b/, m: { name: 'TDI R3/R4', antrieb: 'diesel', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['vag'], text: /\b[34]\.0 ?tdi\b/, m: { name: 'TDI V6/V8', antrieb: 'diesel', steuertrieb: 'kette' } },
+  // BMW / Mini (Mini Cooper D up to 2010: PSA 1.6 HDi)
+  { gruppen: ['bmw'], code: /^W16D16/, m: { name: 'PSA DV6', antrieb: 'diesel', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['bmw'], code: /^[NBS]\d{2}/, m: { name: 'BMW N/B', steuertrieb: 'kette' } },
+  // Mercedes: OM607 / OM608 are the Renault 1.5 dCi (K9K)
+  { gruppen: ['mercedes'], code: /^OM60[78]/, m: { name: 'OM607/608 (K9K)', antrieb: 'diesel', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['mercedes'], code: /^OM6\d\d/, m: { name: 'Mercedes OM', antrieb: 'diesel', steuertrieb: 'kette' } },
+  { gruppen: ['mercedes'], code: /^M2\d\d/, m: { name: 'Mercedes M', antrieb: 'benzin', steuertrieb: 'kette' } },
+  // Stellantis (incl. Opel)
+  { gruppen: ['stellantis'], code: /^EB[02]/, text: /\bpuretech\b/, m: { name: 'PureTech EB (Nassriemen)', antrieb: 'benzin', steuertrieb: 'zahnriemen', nass: true, zahnriemen: [100000, 72] } },
+  { gruppen: ['stellantis'], code: /^EP6/, text: /\b1\.6 ?(thp|vti)\b/, m: { name: 'EP6 (Prince)', antrieb: 'benzin', steuertrieb: 'kette' } },
+  { gruppen: ['stellantis'], code: /^(DV4|DV6|DW10|DW12)/, text: /\b(1\.4|1\.6|2\.0|2\.2) ?(blue)?hdi\b/, m: { name: 'HDi DV/DW', antrieb: 'diesel', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['stellantis'], code: /^[AB]20DT/, m: { name: 'Opel 2.0 CDTI', antrieb: 'diesel', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['stellantis'], code: /^[AB]14N[EF]T/, m: { name: 'Opel 1.4 Turbo', antrieb: 'benzin', steuertrieb: 'kette' } },
+  { gruppen: ['stellantis'], code: /^B16DT/, m: { name: 'Opel 1.6 CDTI', antrieb: 'diesel', steuertrieb: 'kette' } },
+  // Ford
+  { gruppen: ['ford'], text: /\b1\.0 ?ecoboost\b/, m: { name: '1.0 EcoBoost (Nassriemen)', antrieb: 'benzin', steuertrieb: 'zahnriemen', nass: true } },
+  { gruppen: ['ford'], text: /\b2\.0 ?ecoblue\b/, m: { name: '2.0 EcoBlue (Nassriemen)', antrieb: 'diesel', steuertrieb: 'zahnriemen', nass: true } },
+  // Renault / Dacia / Nissan
+  { gruppen: ['renault', 'nissan'], code: /^K9K/, text: /\b1\.5 ?(blue)?dci\b/, m: { name: 'K9K 1.5 dCi', antrieb: 'diesel', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['renault', 'nissan'], code: /^D4F/, m: { name: 'D4F 1.2 16V', antrieb: 'benzin', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['renault', 'nissan'], code: /^(H4B|H4D|H4M|H5F|H5H)/, text: /\b(0\.9|1\.3) ?tce\b/, m: { name: 'Renault-Nissan H', antrieb: 'benzin', steuertrieb: 'kette' } },
+  { gruppen: ['renault', 'nissan'], code: /^(R9M|M9R)/, m: { name: 'Renault R9M / M9R dCi', antrieb: 'diesel', steuertrieb: 'kette' } },
+  // Fiat engines, also in Opel (1.3 CDTI) and Suzuki (1.3 DDiS)
+  { gruppen: ['fiat', 'stellantis', 'suzuki'], text: /\b1\.3 ?(multijet|mjet|jtd|jtdm|cdti|ddis)\b/, m: { name: '1.3 Multijet', antrieb: 'diesel', steuertrieb: 'kette' } },
+  { gruppen: ['fiat'], text: /\b0\.9 ?twinair\b/, m: { name: '0.9 TwinAir', antrieb: 'benzin', steuertrieb: 'kette' } },
+  { gruppen: ['fiat'], text: /\b((1\.6|2\.0) ?(multijet|jtd|jtdm)|1\.4 ?(t-?jet|16v|8v|fire)|1\.2 ?(8v|fire))\b/, m: { name: 'Fiat Fire / Multijet R4', steuertrieb: 'zahnriemen' } },
+  // Asian makers
+  { gruppen: ['toyota'], code: /^(\d?(KR|NR|ZR|NZ|ZZ|AR|GR|AD|ND|WW)|M15A|M20A|A25A)/, text: /\b1\.4 ?d-?4d\b/, m: { name: 'Toyota KR/NR/ZR/Dynamic Force', steuertrieb: 'kette' } },
+  { gruppen: ['honda'], code: /^J\d{2}/, m: { name: 'Honda J (V6)', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['honda'], code: /^[KLRN]\d{2}/, m: { name: 'Honda K/L/R/N', steuertrieb: 'kette' } },
+  { gruppen: ['hyundai'], code: /^(D[34]F|D4H)/, m: { name: 'Hyundai U / R CRDi', antrieb: 'diesel', steuertrieb: 'kette' } },
+  // Volvo
+  { gruppen: ['volvo'], code: /^([BD]42\d\dT|D52\d\dT)/, m: { name: 'Volvo VEA / D5', steuertrieb: 'zahnriemen' } },
+];
+
+/** "cff b" / "CFF-B" → "CFFB". */
+export const normMotorcode = (c?: string) => (c ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+function motorVon(g: Gruppe, code: string, text: string): Motor | undefined {
+  return MOTOREN.find((x) => x.gruppen.includes(g) && ((!!code && !!x.code?.test(code)) || !!x.text?.test(text)))?.m;
+}
+
 export interface FahrzeugProfil {
   gruppe: Gruppe;
+  /** Manufacturer key of maintenance_specs: the group, else the Marke. */
+  hersteller: string;
+  motorcode?: string;
+  /** Engine family recognized from the Motorkennbuchstabe / Motor text. */
+  motor?: Motor;
   antrieb?: Antrieb;
   getriebe?: Getriebe;
   steuertrieb?: Steuertrieb;
+  /** Where the Steuertrieb comes from: stored, engine family, or assumed from the Marke. */
+  steuertriebQuelle?: 'fahrzeug' | 'motor' | 'marke';
   baujahr?: number;
   /** Which of the above were inferred rather than stored. */
   erkannt: { marke?: string; antrieb?: boolean; getriebe?: boolean; steuertrieb?: boolean; baujahr?: boolean };
+  /** Vehicle data missing to match the OEM schedule exactly. */
+  fehlt: string[];
 }
 
-type ProfilQuelle = Partial<Pick<Vehicle, 'marke' | 'modell' | 'motor' | 'chassisnummer' | 'erstzulassung' | 'antrieb' | 'getriebe' | 'steuertrieb'>>;
+type ProfilQuelle = Partial<Pick<Vehicle, 'marke' | 'modell' | 'motor' | 'motorcode' | 'chassisnummer' | 'erstzulassung' | 'antrieb' | 'getriebe' | 'steuertrieb'>>;
 
 /** Profile a vehicle's maintenance schedule is derived from. */
 export function fahrzeugProfil(v: ProfilQuelle): FahrzeugProfil {
@@ -109,10 +181,13 @@ export function fahrzeugProfil(v: ProfilQuelle): FahrzeugProfil {
   }
   const gruppe: Gruppe = GRUPPE_VON[marke] ?? GRUPPE_VON[marke.split(/\s+/)[0]] ?? 'andere';
   const text = `${norm(v.modell)} ${norm(v.motor)}`;
+  const motorcode = normMotorcode(v.motorcode) || undefined;
+  const motor = motorVon(gruppe, motorcode ?? '', text);
 
   let antrieb = v.antrieb;
   if (!antrieb) {
     antrieb = gruppe === 'tesla' ? 'elektro'
+      : motor?.antrieb && !RE_HYBRID.test(text) && !RE_PLUGIN.test(text) ? motor.antrieb
       : RE_ELEKTRO.test(text) ? 'elektro'
       : RE_PLUGIN.test(text) ? 'plugin'
       : RE_HYBRID.test(text) ? 'hybrid'
@@ -140,16 +215,28 @@ export function fahrzeugProfil(v: ProfilQuelle): FahrzeugProfil {
   }
 
   let steuertrieb = v.steuertrieb;
+  let steuertriebQuelle: FahrzeugProfil['steuertriebQuelle'] = steuertrieb && 'fahrzeug';
   if (!steuertrieb && antrieb !== 'elektro') {
-    steuertrieb = steuerketteBekannt(gruppe, antrieb, baujahr) ? 'kette' : undefined;
+    if (motor) { steuertrieb = motor.steuertrieb; steuertriebQuelle = 'motor'; }
+    else if (steuerketteBekannt(gruppe, antrieb, baujahr)) { steuertrieb = 'kette'; steuertriebQuelle = 'marke'; }
     if (steuertrieb) erkannt.steuertrieb = true;
   }
 
-  return { gruppe, antrieb, getriebe, steuertrieb, baujahr, erkannt };
+  const fehlt: string[] = [];
+  if (antrieb !== 'elektro') {
+    if (!motorcode) fehlt.push('Motorkennbuchstabe');
+    if (!v.getriebe) fehlt.push('Getriebe');
+  }
+  if (!v.antrieb) fehlt.push('Antrieb');
+  if (!/^\d{4}/.test(v.erstzulassung ?? '')) fehlt.push('1. Inverkehrsetzung');
+
+  const hersteller = gruppe !== 'andere' ? gruppe : marke;
+  return { gruppe, hersteller, motorcode, motor, antrieb, getriebe, steuertrieb, steuertriebQuelle, baujahr, erkannt, fehlt };
 }
 
-/** Engine families that (as a rule) run a maintenance-free timing chain. Unknown
-    stays unknown: the Zahnriemen item is then kept, to be on the safe side. */
+/** Manufacturers whose engines (as a rule) run a maintenance-free timing chain.
+    Only an assumption (steuertriebQuelle 'marke'): the Motorkennbuchstabe
+    decides. Unknown stays unknown: the Zahnriemen item is then kept. */
 function steuerketteBekannt(g: Gruppe, a: Antrieb | undefined, bj?: number): boolean {
   const benziner = a === 'benzin' || a === 'hybrid' || a === 'plugin' || a === 'gas';
   if (g === 'bmw' || g === 'mercedes' || g === 'porsche') return true;
@@ -164,7 +251,17 @@ function steuerketteBekannt(g: Gruppe, a: Antrieb | undefined, bj?: number): boo
 
 export type VorlageKey = NonNullable<ServiceItem['vorlage']>;
 
-export interface Vorlage { key: VorlageKey; name: string; intervallKm?: number; intervallMonate?: number }
+export interface Vorlage {
+  key: VorlageKey;
+  name: string;
+  intervallKm?: number;
+  intervallMonate?: number;
+  quelle: IntervallQuelle;
+  /** Reference of a checked interval (WartungSpec.quelleText). */
+  quelleText?: string;
+  /** What to check / which vehicle detail is missing. */
+  hinweis?: string;
+}
 
 type Intervall = [km: number | undefined, monate: number | undefined];
 
@@ -179,8 +276,15 @@ const ZAHNRIEMEN: Partial<Record<Gruppe, Intervall>> = {
   ford: [160000, 120], stellantis: [150000, 120], volvo: [150000, 120], renault: [120000, 72], fiat: [120000, 60],
 };
 
-/** The items that apply to this vehicle, with its intervals. */
-export function wartungsVorlagen(v: ProfilQuelle): Vorlage[] {
+export const HINWEIS_STANDARD = 'Standardwert – bitte anhand Motorkennbuchstabe/VIN prüfen';
+export const HINWEIS_RICHTWERT = 'Richtwert – mit Herstellervorgabe (Serviceheft / Motorkennbuchstabe) abgleichen';
+
+/** "vag|CFFB|zahnriemen" */
+export const specId = (hersteller: string, motorcode: string, key: VorlageKey) => `${hersteller}|${normMotorcode(motorcode)}|${key}`;
+
+/** The items that apply to this vehicle, with intervals and their source.
+    Intervals checked for the vehicle's engine (specs) replace the Richtwerte. */
+export function wartungsVorlagen(v: ProfilQuelle, specs: WartungSpec[] = []): Vorlage[] {
   const p = fahrzeugProfil(v);
   const { gruppe: g, antrieb: a, getriebe, baujahr: bj } = p;
   const verbrenner = a !== 'elektro';
@@ -188,41 +292,68 @@ export function wartungsVorlagen(v: ProfilQuelle): Vorlage[] {
   const alt = bj != null && bj < 2005;
   const longlife = g === 'vag' || g === 'bmw' || g === 'mercedes' || g === 'porsche';
   const out: Vorlage[] = [];
-  const add = (key: VorlageKey, name: string, [intervallKm, intervallMonate]: Intervall) => out.push({ key, name, intervallKm, intervallMonate });
+  // The manufacturer's Richtwert when there is one, else the generic Standardwert.
+  const add = (key: VorlageKey, name: string, richtwert: Intervall | undefined, standard: Intervall, hinweis?: string) => {
+    const [intervallKm, intervallMonate] = richtwert ?? standard;
+    const quelle: IntervallQuelle = richtwert ? 'richtwert' : 'standard';
+    out.push({ key, name, intervallKm, intervallMonate, quelle, hinweis: hinweis ?? (richtwert ? HINWEIS_RICHTWERT : HINWEIS_STANDARD) });
+  };
 
   if (verbrenner) {
-    add('oel', 'Motoröl & Ölfilter', OEL[g] ?? [15000, 12]);
-    add('luftfilter', 'Luftfilter', longlife ? [60000, 48] : [30000, 24]);
+    add('oel', 'Motoröl & Ölfilter', OEL[g], [15000, 12],
+      longlife ? 'Richtwert LongLife – fixes oder flexibles Intervall und Ölnorm laut Serviceheft prüfen' : undefined);
+    add('luftfilter', 'Luftfilter', longlife ? [60000, 48] : undefined, [30000, 24]);
   }
-  add('innenraumfilter', 'Innenraumfilter / Pollenfilter', longlife ? [30000, 24] : [15000, 12]);
+  add('innenraumfilter', 'Innenraumfilter / Pollenfilter', longlife ? [30000, 24] : undefined, [15000, 12]);
 
   // Petrol filters sit in the tank for life on modern cars; diesel ones are changed.
-  if (a === 'diesel') add('kraftstofffilter', 'Kraftstofffilter', g === 'bmw' || g === 'mercedes' ? [100000, 72] : [60000, 48]);
-  else if (verbrenner && alt) add('kraftstofffilter', 'Kraftstofffilter', [60000, 48]);
+  if (a === 'diesel') add('kraftstofffilter', 'Kraftstofffilter', g === 'bmw' || g === 'mercedes' ? [100000, 72] : undefined, [60000, 48]);
+  else if (verbrenner && alt) add('kraftstofffilter', 'Kraftstofffilter', undefined, [60000, 48],
+    'Standardwert – bei vielen Benzinern im Tank verbaut (lebenslang), anhand Motorkennbuchstabe prüfen');
 
-  if (funken) add('zuendkerzen', 'Zündkerzen', ZUENDKERZEN[g] ?? [60000, 48]);
+  if (funken) add('zuendkerzen', 'Zündkerzen', ZUENDKERZEN[g], [60000, 48],
+    a === undefined ? 'Antrieb unbekannt – entfällt bei Diesel; Intervall anhand Motorkennbuchstabe prüfen' : undefined);
 
-  add('bremsfluessigkeit', 'Bremsflüssigkeit', [undefined, g === 'tesla' ? 48 : 24]);
+  add('bremsfluessigkeit', 'Bremsflüssigkeit', g !== 'andere' ? [undefined, g === 'tesla' ? 48 : 24] : undefined, [undefined, 24]);
 
   if (verbrenner && p.steuertrieb !== 'kette') {
-    const iv = g === 'vag' ? ((bj ?? 0) >= 2013 ? [210000, 120] as Intervall : [120000, 60] as Intervall) : ZAHNRIEMEN[g] ?? [120000, 72];
-    add('zahnriemen', 'Zahnriemen / Wasserpumpe', iv);
+    const m = p.motor?.steuertrieb === 'zahnriemen' ? p.motor : undefined;
+    const iv = m?.zahnriemen
+      ?? (g === 'vag' ? ((bj ?? 0) >= 2013 ? [210000, 120] as Intervall : [120000, 60] as Intervall) : ZAHNRIEMEN[g]);
+    // Without a known Zahnriemen the item is only kept to be on the safe side.
+    const bekannt = p.steuertrieb === 'zahnriemen';
+    add('zahnriemen', m?.nass ? 'Zahnriemen (Nassriemen) / Wasserpumpe' : 'Zahnriemen / Wasserpumpe', bekannt ? iv : undefined, iv ?? [120000, 72],
+      !bekannt ? 'Steuertrieb unbekannt – Motorkennbuchstabe angeben (bei Steuerkette entfällt die Position)'
+        : m?.nass ? `${m.name}: Riemen läuft im Öl – Ölnorm und Herstellervorgabe beachten`
+        : undefined);
   }
 
   // Manual gearboxes are filled for life (older ones excepted); EVs have a sealed reduction gear.
   if (verbrenner) {
-    if (getriebe === 'dsg') add('getriebeoel', 'Getriebeöl (DSG)', [60000, undefined]);
-    else if (getriebe === 'cvt') add('getriebeoel', 'Getriebeöl (CVT)', [60000, undefined]);
-    else if (getriebe === 'automat') add('getriebeoel', 'Getriebeöl (Automat)', [g === 'mercedes' ? 125000 : 80000, undefined]);
-    else if (getriebe === undefined || alt) add('getriebeoel', 'Getriebeöl', [60000, undefined]);
+    if (getriebe === 'dsg') add('getriebeoel', 'Getriebeöl (DSG)', g === 'vag' ? [60000, undefined] : undefined, [60000, undefined],
+      'Nasskupplung (z.B. DQ250/DQ381/DQ500): Wechsel nach Vorgabe; Trockenkupplung (DQ200): kein Wechselintervall – Getriebecode prüfen');
+    else if (getriebe === 'cvt') add('getriebeoel', 'Getriebeöl (CVT)', undefined, [60000, undefined]);
+    else if (getriebe === 'automat') add('getriebeoel', 'Getriebeöl (Automat)', g === 'mercedes' ? [125000, undefined] : undefined, [80000, undefined],
+      'Viele Wandlerautomaten sind laut Hersteller lebenslang befüllt – Getriebecode prüfen');
+    else if (getriebe === undefined) add('getriebeoel', 'Getriebeöl', undefined, [60000, undefined], 'Getriebe unbekannt – Getriebeart angeben');
+    else if (alt) add('getriebeoel', 'Getriebeöl', undefined, [60000, undefined]);
+  }
+
+  // Intervals checked against the OEM schedule for this engine.
+  if (p.motorcode) {
+    const geprueft = new Map(specs.filter((s) => s.hersteller === p.hersteller && s.motorcode === p.motorcode).map((s) => [s.vorlage, s]));
+    for (const x of out) {
+      const s = geprueft.get(x.key);
+      if (s) Object.assign(x, { intervallKm: s.intervallKm, intervallMonate: s.intervallMonate, quelle: 'geprueft', quelleText: s.quelleText, hinweis: undefined });
+    }
   }
   return out;
 }
 
 /** Identifies the vehicle's profile: stored on the vehicle when its plan was
     last matched to it (Vehicle.wartungsprofil). */
-export const profilSignatur = (v: ProfilQuelle): string =>
-  wartungsVorlagen(v).map((x) => `${x.key}:${x.intervallKm ?? ''}/${x.intervallMonate ?? ''}`).join(',');
+export const profilSignatur = (v: ProfilQuelle, specs: WartungSpec[] = []): string =>
+  wartungsVorlagen(v, specs).map((x) => `${x.key}:${x.intervallKm ?? ''}/${x.intervallMonate ?? ''}${x.quelle === 'geprueft' ? '!' : ''}`).join(',');
 
 /** Generic defaults of earlier versions: an item still carrying them was never adjusted by hand. */
 const LEGACY: Record<VorlageKey, { name: string; iv: Intervall }> = {
@@ -241,14 +372,17 @@ export function vorlageVon(i: ServiceItem): VorlageKey | undefined {
   if (i.vorlage) return i.vorlage;
   const n = i.name.trim();
   if (n.startsWith('Getriebeöl')) return 'getriebeoel';
+  if (n.startsWith('Zahnriemen')) return 'zahnriemen';
   return (Object.keys(LEGACY) as VorlageKey[]).find((k) => LEGACY[k].name === n);
 }
 
-const ausVorlage = (x: Vorlage): ServiceItem =>
-  ({ id: neueServiceId(), vorlage: x.key, name: x.name, status: 'faellig', intervallKm: x.intervallKm, intervallMonate: x.intervallMonate });
+const ausVorlage = (x: Vorlage): ServiceItem => ({
+  id: neueServiceId(), vorlage: x.key, name: x.name, status: 'faellig', intervallKm: x.intervallKm, intervallMonate: x.intervallMonate,
+  quelle: x.quelle, ...(x.quelleText ? { quelleText: x.quelleText } : {}),
+});
 
 /** A fresh Wartungsplan with only the items that apply to the vehicle. */
-export const wartungsplanFuer = (v: ProfilQuelle): ServiceItem[] => wartungsVorlagen(v).map(ausVorlage);
+export const wartungsplanFuer = (v: ProfilQuelle, specs: WartungSpec[] = []): ServiceItem[] => wartungsVorlagen(v, specs).map(ausVorlage);
 
 /** Never done, never edited: safe to drop when it no longer applies. */
 const unberuehrt = (i: ServiceItem) =>
@@ -258,14 +392,15 @@ const gleich = (i: ServiceItem, [km, mt]: Intervall) => (i.intervallKm ?? undefi
 
 /** Matches an existing plan to the vehicle's (new) profile:
     - items that don't apply any more are dropped, unless they carry history or edits;
-    - items still on the profile's (or an earlier default) interval get the new
-      one, and a due date / mileage that followed from the old interval moves along;
+    - items not set by hand (generated, or still on an earlier default) get the
+      new interval and its source, and a due date / mileage that followed from
+      the old interval moves along;
     - applicable items missing from the plan are added;
-    - own positions and intervals edited by hand stay as they are.
+    - own positions and intervals edited or checked by hand stay as they are.
     `vorher` is the vehicle before the change (its profile counts as "not edited"). */
-export function wartungsplanAbgleichen(items: ServiceItem[], v: ProfilQuelle, vorher?: ProfilQuelle): ServiceItem[] {
-  const soll = new Map(wartungsVorlagen(v).map((x) => [x.key, x]));
-  const alt = new Map(vorher ? wartungsVorlagen(vorher).map((x) => [x.key, x]) : []);
+export function wartungsplanAbgleichen(items: ServiceItem[], v: ProfilQuelle, vorher?: ProfilQuelle, specs: WartungSpec[] = []): ServiceItem[] {
+  const soll = new Map(wartungsVorlagen(v, specs).map((x) => [x.key, x]));
+  const alt = new Map(vorher ? wartungsVorlagen(vorher, specs).map((x) => [x.key, x]) : []);
   const gesehen = new Set<VorlageKey>();
   const out: ServiceItem[] = [];
 
@@ -276,10 +411,12 @@ export function wartungsplanAbgleichen(items: ServiceItem[], v: ProfilQuelle, vo
     const s = soll.get(key);
     if (!s) { if (!unberuehrt(i)) out.push(i); continue; }
     const a = alt.get(key);
-    const auto = !i.intervallManuell && (gleich(i, LEGACY[key].iv) || (a && gleich(i, [a.intervallKm, a.intervallMonate])));
+    const auto = !i.intervallManuell && (i.quelle != null || gleich(i, LEGACY[key].iv) || (a && gleich(i, [a.intervallKm, a.intervallMonate])));
     if (!auto) { out.push({ ...i, vorlage: key }); continue; }
 
-    const n: ServiceItem = { ...i, vorlage: key, name: s.name, intervallKm: s.intervallKm, intervallMonate: s.intervallMonate };
+    const n: ServiceItem = { ...i, vorlage: key, name: s.name, intervallKm: s.intervallKm, intervallMonate: s.intervallMonate, quelle: s.quelle };
+    if (s.quelleText) n.quelleText = s.quelleText; else delete n.quelleText;
+    delete n.geprueftAm;
     // Due values set by "Gemacht" (last service + old interval) follow the new interval.
     if (i.letztesDatum && i.faelligDatum && i.intervallMonate && i.faelligDatum === plusMonate(i.letztesDatum, i.intervallMonate))
       n.faelligDatum = s.intervallMonate ? plusMonate(i.letztesDatum, s.intervallMonate) : undefined;
@@ -294,7 +431,17 @@ export function wartungsplanAbgleichen(items: ServiceItem[], v: ProfilQuelle, vo
 
 /** The vehicle with its plan matched to its profile (created when it has none
     yet) and the profile signature recorded. */
-export function mitWartungsplan(v: Vehicle, vorher?: Vehicle): Vehicle {
-  const service = v.service ? wartungsplanAbgleichen(v.service, v, vorher) : wartungsplanFuer(v);
-  return { ...v, service, wartungsprofil: profilSignatur(v) };
+export function mitWartungsplan(v: Vehicle, vorher?: Vehicle, specs: WartungSpec[] = []): Vehicle {
+  const service = v.service ? wartungsplanAbgleichen(v.service, v, vorher, specs) : wartungsplanFuer(v, specs);
+  return { ...v, service, wartungsprofil: profilSignatur(v, specs) };
+}
+
+/** Source of an item's interval for display: stored on newer items; older
+    generated items take the one of their Vorlage while they carry its
+    interval, else count as Standardwert. Own positions and intervals set by
+    hand without a check have none. */
+export function quelleVon(i: ServiceItem, vorlage?: Vorlage): IntervallQuelle | undefined {
+  if (i.quelle) return i.quelle;
+  if (!vorlageVon(i) || i.intervallManuell) return undefined;
+  return vorlage && gleich(i, [vorlage.intervallKm, vorlage.intervallMonate]) ? vorlage.quelle : 'standard';
 }

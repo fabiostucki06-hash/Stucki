@@ -7,8 +7,12 @@ import {
   formatKm, naechsteFaelligkeit, neueServiceId, ohneEntfernteService, serviceErledigt, serviceZuruecksetzen, serviceZustand,
   type ServiceZustand,
 } from '../../lib/vehicles';
-import { mitWartungsplan, profilSignatur, wartungsVorlagen } from '../../lib/wartung';
-import type { ServiceItem, Vehicle } from '../../types';
+import {
+  HINWEIS_STANDARD, fahrzeugProfil, mitWartungsplan, profilSignatur, quelleVon, specId, vorlageVon, wartungsVorlagen,
+  type FahrzeugProfil, type Vorlage,
+} from '../../lib/wartung';
+import { useApp } from '../../context/AppContext';
+import type { IntervallQuelle, ServiceItem, Vehicle, WartungSpec } from '../../types';
 
 /** Status groups, in display order. "Jetzt fällig" = overdue or due soon. */
 type Gruppe = 'faellig' | 'geplant' | 'erledigt';
@@ -27,6 +31,27 @@ const BADGE: Record<ServiceZustand, { label: string; cls: string }> = {
   faellig:      { label: 'In Zukunft',  cls: 'sp-badge-accent' },
   gemacht:      { label: 'Erledigt',    cls: 'sp-badge-green' },
 };
+
+/** Source of an interval: checked against the OEM schedule, manufacturer Richtwert, generic Standardwert. */
+const QUELLE: Record<IntervallQuelle, { label: string; dot: string }> = {
+  geprueft:  { label: 'Herstellervorgabe geprüft', dot: 'var(--green)' },
+  richtwert: { label: 'Richtwert – prüfen',        dot: 'var(--accent)' },
+  standard:  { label: 'Standardwert – prüfen',     dot: 'var(--orange)' },
+};
+
+/** What is missing / only assumed to match the plan to the OEM schedule. */
+function profilHinweis(p: FahrzeugProfil): string | null {
+  const annahmen = [
+    p.steuertriebQuelle === 'marke' && 'Steuerkette (nach Marke)',
+    p.erkannt.antrieb && 'Antrieb (aus Modell/Motor)',
+    p.erkannt.getriebe && 'Getriebe (aus Modell/Motor)',
+  ].filter(Boolean);
+  const teile = [
+    p.fehlt.length > 0 && `Für exakte Herstellervorgaben fehlt: ${p.fehlt.join(', ')}.`,
+    annahmen.length > 0 && `Angenommen: ${annahmen.join(', ')}.`,
+  ].filter(Boolean);
+  return teile.length ? `${teile.join(' ')} Unter «Bearbeiten» ergänzen.` : null;
+}
 
 /** "05/2027" */
 const monatJahr = (iso: string) => { const [y, m] = iso.split('-'); return `${m}/${y}`; };
@@ -56,7 +81,12 @@ interface WartungsplanProps {
     and undo live in the editor behind the pencil. Due dates / mileages follow
     from the last service plus the interval. */
 export default function Wartungsplan({ vehicle, onSave, onOfferte }: WartungsplanProps) {
+  const { wartungSpecs, saveWartungSpec } = useApp();
   const items = ohneEntfernteService(vehicle.service ?? []);
+  const profil = fahrzeugProfil(vehicle);
+  const vorlagen = wartungsVorlagen(vehicle, wartungSpecs);
+  const vorlageZu = (it: ServiceItem) => vorlagen.find((x) => x.key === vorlageVon(it));
+  const hinweis = profilHinweis(profil);
   const [edit, setEdit] = useState<{ item: ServiceItem; neu: boolean } | null>(null);
   const [km, setKm] = useState(vehicle.km ?? '');
   const [busy, setBusy] = useState(false);
@@ -81,9 +111,20 @@ export default function Wartungsplan({ vehicle, onSave, onOfferte }: Wartungspla
     save({ km: kmAktuell || undefined, service: ersetze(serviceErledigt(it, todayISO(), kmAktuell)) });
   const vormerken = (it: ServiceItem) => setItems(ersetze({ ...it, status: 'faellig' }));
 
-  function speichern(it: ServiceItem) {
-    void setItems(edit?.neu ? [...items, it] : ersetze(it));
+  /** `teilen`: the checked interval becomes the one of every vehicle with this Motorkennbuchstabe. */
+  async function speichern(it: ServiceItem, teilen: boolean) {
+    const service = edit?.neu ? [...items, it] : ersetze(it);
     setEdit(null);
+    const key = vorlageVon(it);
+    if (!teilen || !key || !profil.motorcode || it.quelle !== 'geprueft') { void setItems(service); return; }
+    const spec: WartungSpec = {
+      id: specId(profil.hersteller, profil.motorcode, key), hersteller: profil.hersteller, motorcode: profil.motorcode, vorlage: key,
+      intervallKm: it.intervallKm, intervallMonate: it.intervallMonate, quelleText: it.quelleText, geprueftAm: it.geprueftAm ?? todayISO(),
+    };
+    try { await saveWartungSpec(spec); } catch { return; /* toast shown by the context */ }
+    // This plan already carries the checked interval: it stays matched to the profile.
+    const specs = [...wartungSpecs.filter((x) => x.id !== spec.id), spec];
+    void save({ service, wartungsprofil: profilSignatur(vehicle, specs) });
   }
   function rueckgaengig(it: ServiceItem) {
     void setItems(ersetze(serviceZuruecksetzen(it)));
@@ -98,9 +139,9 @@ export default function Wartungsplan({ vehicle, onSave, onOfferte }: Wartungspla
 
   // The plan follows the vehicle's technical data (lib/wartung). Plans made
   // before that, or before the data changed, can be matched on request.
-  const anlegen = () => save(mitWartungsplan({ ...vehicle, service: undefined }));
-  const veraltet = items.length > 0 && vehicle.wartungsprofil !== profilSignatur(vehicle);
-  const anpassen = () => save(mitWartungsplan({ ...vehicle, service: items }));
+  const anlegen = () => save(mitWartungsplan({ ...vehicle, service: undefined }, undefined, wartungSpecs));
+  const veraltet = items.length > 0 && vehicle.wartungsprofil !== profilSignatur(vehicle, wartungSpecs);
+  const anpassen = () => save(mitWartungsplan({ ...vehicle, service: items }, undefined, wartungSpecs));
 
   const mitZustand = items
     .map((item) => ({ item, zustand: serviceZustand(item, vehicle) }))
@@ -117,15 +158,16 @@ export default function Wartungsplan({ vehicle, onSave, onOfferte }: Wartungspla
 
   const sheet = edit && (
     <WartungsplanEditor
-      item={edit.item} neu={edit.neu} busy={busy}
-      onSave={speichern} onUndo={() => rueckgaengig(edit.item)} onDelete={() => entfernen(edit.item)} onClose={() => setEdit(null)}
+      item={edit.item} neu={edit.neu} busy={busy} vorlage={vorlageZu(edit.item)} motorcode={profil.motorcode}
+      onSave={(it, teilen) => void speichern(it, teilen)} onUndo={() => rueckgaengig(edit.item)} onDelete={() => entfernen(edit.item)} onClose={() => setEdit(null)}
     />
   );
 
   if (!items.length) {
     return (
       <div className="sp sp-empty">
-        <p>Noch kein Wartungsplan. Für dieses Fahrzeug passen: {wartungsVorlagen(vehicle).map((x) => x.name).join(', ')} – mit Richtwerten nach Marke, Antrieb und Getriebe, alles anpassbar.</p>
+        <p>Noch kein Wartungsplan. Für dieses Fahrzeug passen: {vorlagen.map((x) => x.name).join(', ')} – mit Richtwerten nach Marke, Motor, Antrieb und Getriebe. Jedes Intervall ist als Standardwert, Richtwert oder geprüfte Herstellervorgabe markiert und anpassbar.</p>
+        {hinweis && <p className="sp-hinweis">{hinweis}</p>}
         <button className="btn-system btn-primary" disabled={busy} onClick={anlegen}>Wartungsplan anlegen</button>
         <button className="sp-text-btn" disabled={busy} onClick={neuePosition}><SFPlus size={12} /> Eigene Position</button>
         {sheet}
@@ -161,6 +203,7 @@ export default function Wartungsplan({ vehicle, onSave, onOfferte }: Wartungspla
           <span className="sp-offerte-count">{faellige.length}</span>
         </button>
       </div>
+      {hinweis && <p className="sp-hinweis">{hinweis}</p>}
 
       {GRUPPEN.map(({ key, label, dot }) => {
         const tiles = mitZustand.filter((x) => GRUPPE_VON[x.zustand] === key);
@@ -177,6 +220,7 @@ export default function Wartungsplan({ vehicle, onSave, onOfferte }: Wartungspla
               {tiles.map(({ item, zustand }) => (
                 <WartungsplanKachel
                   key={item.id} item={item} naechste={naechsteText(item, vehicle)} zustand={zustand} busy={busy}
+                  vorlage={vorlageZu(item)}
                   onGemacht={() => gemacht(item)}
                   onVormerken={() => vormerken(item)}
                   onOpen={() => setEdit({ item, neu: false })}
@@ -197,6 +241,8 @@ interface KachelProps {
   naechste: string;
   zustand: ServiceZustand;
   busy: boolean;
+  /** The Vorlage the item was made from: source and what to check. */
+  vorlage?: Vorlage;
   onGemacht: () => void;
   onVormerken: () => void;
   onOpen: () => void;
@@ -205,13 +251,18 @@ interface KachelProps {
 /** Tile: name + badge · Intervall / Nächste · status switch + pencil.
     "Gemacht" ticks the item off (again, when it is due); "In Zukunft" flags a
     done item as upcoming. The active side shows the current status. */
-function WartungsplanKachel({ item, naechste, zustand, busy, onGemacht, onVormerken, onOpen }: KachelProps) {
+function WartungsplanKachel({ item, naechste, zustand, busy, vorlage, onGemacht, onVormerken, onOpen }: KachelProps) {
   const badge = BADGE[zustand];
   const intervall = intervallText(item);
   const zuletzt = datumKm(item.letztesDatum, item.letzteKm);
   const istGemacht = zustand === 'gemacht';
   const istZukunft = zustand === 'faellig';
   const fuss = [zuletzt && `Zuletzt ${zuletzt}`, item.notiz].filter(Boolean).join(' · ');
+  const q = quelleVon(item, vorlage);
+  const quelle = q && QUELLE[q];
+  const quelleTitel = q === 'geprueft'
+    ? [item.quelleText, item.geprueftAm && `geprüft ${formatDateCH(item.geprueftAm)}`].filter(Boolean).join(' · ') || undefined
+    : vorlage?.hinweis ?? HINWEIS_STANDARD;
 
   return (
     <li className={`sp-tile sp-tile-${zustand}`}>
@@ -225,6 +276,12 @@ function WartungsplanKachel({ item, naechste, zustand, busy, onGemacht, onVormer
         <div><dt>Nächste</dt><dd className={naechste ? undefined : 'sp-leer'}>{naechste || '–'}</dd></div>
       </dl>
       {fuss && <p className="sp-foot">{fuss}</p>}
+      {quelle && (
+        <p className="sp-quelle" title={quelleTitel}>
+          <span className="dot" style={{ background: quelle.dot }} />
+          {quelle.label}{q === 'geprueft' && item.quelleText ? ` · ${item.quelleText}` : ''}
+        </p>
+      )}
 
       <div className="sp-tile-actions">
         <div className="sp-switch" role="group" aria-label={`Status ${item.name}`}>
@@ -254,14 +311,19 @@ interface EditorProps {
   item: ServiceItem;
   neu: boolean;
   busy: boolean;
-  onSave: (it: ServiceItem) => void;
+  /** The Vorlage the item was made from: hint on what to check. */
+  vorlage?: Vorlage;
+  /** The vehicle's Motorkennbuchstabe: a checked interval can be stored for it. */
+  motorcode?: string;
+  /** `teilen`: store the checked interval for every vehicle with this Motorkennbuchstabe. */
+  onSave: (it: ServiceItem, teilen: boolean) => void;
   /** Undoes the last "Gemacht". */
   onUndo: () => void;
   onDelete: () => void;
   onClose: () => void;
 }
 
-function WartungsplanEditor({ item, neu, busy, onSave, onUndo, onDelete, onClose }: EditorProps) {
+function WartungsplanEditor({ item, neu, busy, vorlage, motorcode, onSave, onUndo, onDelete, onClose }: EditorProps) {
   const [f, setF] = useState({
     name: item.name,
     intervallKm: item.intervallKm ? String(item.intervallKm) : '',
@@ -271,8 +333,13 @@ function WartungsplanEditor({ item, neu, busy, onSave, onUndo, onDelete, onClose
     faelligDatum: item.faelligDatum ?? '',
     faelligKm: item.faelligKm ?? '',
     notiz: item.notiz ?? '',
+    quelleText: item.quelleText ?? '',
   });
+  const [geprueft, setGeprueft] = useState(item.quelle === 'geprueft');
+  const [teilen, setTeilen] = useState(true);
   const s = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF((p) => ({ ...p, [k]: e.target.value }));
+  const q = quelleVon(item, vorlage);
+  const kannTeilen = !!motorcode && !!vorlageVon(item);
   const num = (v: string) => (parseInt(v, 10) > 0 ? parseInt(v, 10) : undefined);
   const opt = (v: string) => v.trim() || undefined;
   const ok = !!f.name.trim() && !busy;
@@ -280,19 +347,27 @@ function WartungsplanEditor({ item, neu, busy, onSave, onUndo, onDelete, onClose
   function submit() {
     if (!ok) return;
     const intervallKm = num(f.intervallKm), intervallMonate = num(f.intervallMonate);
+    const geaendert = intervallKm !== item.intervallKm || intervallMonate !== item.intervallMonate;
+    const warGeprueft = item.quelle === 'geprueft';
+    // Checked against the OEM schedule: verified. Edited without the check:
+    // the vehicle's own value, without a source.
+    const quelle: IntervallQuelle | undefined = geprueft ? 'geprueft' : geaendert || warGeprueft ? undefined : item.quelle;
     onSave({
       ...item,
       name: f.name.trim(),
       intervallKm,
       intervallMonate,
-      // An edited interval is the vehicle's own: kept when its profile changes.
-      intervallManuell: item.intervallManuell || intervallKm !== item.intervallKm || intervallMonate !== item.intervallMonate || undefined,
+      // An edited or checked interval is the vehicle's own: kept when its profile changes.
+      intervallManuell: item.intervallManuell || geaendert || (geprueft && !warGeprueft) || undefined,
+      quelle,
+      quelleText: geprueft ? opt(f.quelleText) : undefined,
+      geprueftAm: geprueft ? (warGeprueft && !geaendert && item.geprueftAm ? item.geprueftAm : todayISO()) : undefined,
       letztesDatum: opt(f.letztesDatum),
       letzteKm: opt(f.letzteKm),
       faelligDatum: opt(f.faelligDatum),
       faelligKm: opt(f.faelligKm),
       notiz: opt(f.notiz),
-    });
+    }, geprueft && kannTeilen && teilen);
   }
 
   const historie = [...(item.historie ?? [])].reverse();
@@ -313,6 +388,32 @@ function WartungsplanEditor({ item, neu, busy, onSave, onUndo, onDelete, onClose
           <div className="cf-field"><label className="cf-label" htmlFor="sp-ikm">Alle … km</label><input id="sp-ikm" className="cf-input" type="number" inputMode="numeric" value={f.intervallKm} onChange={s('intervallKm')} placeholder="15000" /></div>
           <div className="cf-field"><label className="cf-label" htmlFor="sp-imt">Alle … Monate</label><input id="sp-imt" className="cf-input" type="number" inputMode="numeric" value={f.intervallMonate} onChange={s('intervallMonate')} placeholder="12" /></div>
         </div>
+
+        {q !== 'geprueft' && (vorlage?.hinweis || q === 'standard') && <p className="sp-hinweis">{vorlage?.hinweis ?? HINWEIS_STANDARD}</p>}
+        <label className="sp-check">
+          <input type="checkbox" checked={geprueft} onChange={(e) => setGeprueft(e.target.checked)} />
+          <span>
+            <span className="sp-check-title">Intervall nach Herstellervorgabe geprüft</span>
+            <span className="sp-check-sub">
+              {item.quelle === 'geprueft' && item.geprueftAm ? `Geprüft am ${formatDateCH(item.geprueftAm)}` : 'Serviceheft, Herstellerportal, Autodata, HaynesPro, TecDoc …'}
+            </span>
+          </span>
+        </label>
+        {geprueft && (
+          <div className="cf-field">
+            <label className="cf-label" htmlFor="sp-quelle">Quelle</label>
+            <input id="sp-quelle" className="cf-input" value={f.quelleText} onChange={s('quelleText')} placeholder="z.B. VW Serviceplan, Autodata" />
+          </div>
+        )}
+        {geprueft && kannTeilen && (
+          <label className="sp-check">
+            <input type="checkbox" checked={teilen} onChange={(e) => setTeilen(e.target.checked)} />
+            <span>
+              <span className="sp-check-title">Für alle Fahrzeuge mit Motor {motorcode} übernehmen</span>
+              <span className="sp-check-sub">Wird gespeichert und bei diesen Fahrzeugen statt des Richtwerts verwendet</span>
+            </span>
+          </label>
+        )}
 
         <p className="sp-editor-head">Zuletzt gemacht</p>
         <div className="cf-grid-2">

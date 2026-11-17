@@ -8,7 +8,7 @@ export interface VehicleDocument {
 /** The vehicle fields of a Customer: since the vehicles table they belong to a
     Vehicle; on a Customer they mirror the vehicle a view or document refers to
     (see lib/vehicles), and they are never stored on the customer row. */
-export type FahrzeugFeld = 'marke' | 'modell' | 'kennzeichen' | 'km' | 'chassisnummer' | 'erstzulassung' | 'antrieb' | 'getriebe' | 'steuertrieb' | 'motor';
+export type FahrzeugFeld = 'marke' | 'modell' | 'kennzeichen' | 'km' | 'chassisnummer' | 'erstzulassung' | 'antrieb' | 'getriebe' | 'steuertrieb' | 'motor' | 'motorcode';
 export type FahrzeugFelder = Pick<Vehicle, FahrzeugFeld>;
 
 /** Technical data the Wartungsplan is derived from (lib/wartung); inferred from
@@ -33,6 +33,7 @@ export interface Customer {
   getriebe?: Getriebe;
   steuertrieb?: Steuertrieb;
   motor?: string;
+  motorcode?: string;
   createdAt: string;
   vehicleDocuments?: VehicleDocument[];
 }
@@ -41,6 +42,24 @@ export interface Customer {
     'gemacht' = done (at the last visit), 'faellig' = due in the future. The
     item counts as due anyway once faelligDatum or faelligKm is reached. */
 export type ServiceStatus = 'gemacht' | 'faellig';
+
+export type IntervallQuelle = 'standard' | 'richtwert' | 'geprueft';
+
+/** An interval checked against the OEM schedule for one engine (table
+    `maintenance_specs`): every vehicle with that Motorkennbuchstabe gets it. */
+export interface WartungSpec {
+  /** `${hersteller}|${motorcode}|${vorlage}` (lib/wartung specId). */
+  id: string;
+  /** Manufacturer group (lib/wartung), else the normalized Marke. */
+  hersteller: string;
+  motorcode: string;
+  vorlage: NonNullable<ServiceItem['vorlage']>;
+  intervallKm?: number;
+  intervallMonate?: number;
+  quelleText?: string;
+  geprueftAm: string;
+  geprueftVon?: string;
+}
 
 export interface ServiceEintrag {
   /** ISO date (yyyy-mm-dd). */
@@ -59,6 +78,13 @@ export interface ServiceItem {
   intervallMonate?: number;
   /** Interval edited by hand: kept when the vehicle's profile changes. */
   intervallManuell?: boolean;
+  /** Where the interval comes from (lib/wartung): generic Standardwert,
+      Richtwert per manufacturer, or checked against the OEM schedule. */
+  quelle?: IntervallQuelle;
+  /** Reference of a checked interval, e.g. "Serviceheft", "Autodata". */
+  quelleText?: string;
+  /** ISO date the interval was checked. */
+  geprueftAm?: string;
   /** Last time it was done. ISO date. */
   letztesDatum?: string;
   letzteKm?: string;
@@ -85,8 +111,10 @@ export interface Vehicle {
   antrieb?: Antrieb;
   getriebe?: Getriebe;
   steuertrieb?: Steuertrieb;
-  /** Free text, e.g. "2.0 TDI 150 PS" or the engine code. */
+  /** Free text, e.g. "2.0 TDI 150 PS". */
   motor?: string;
+  /** Motorkennbuchstabe / engine code, e.g. "CFFB", "B47D20", "OM651". */
+  motorcode?: string;
   createdAt: string;
   service?: ServiceItem[];
   /** Profile (lib/wartung profilSignatur) the plan was last matched to. */

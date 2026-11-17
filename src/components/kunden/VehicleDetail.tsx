@@ -60,7 +60,10 @@ export default function VehicleDetail({ vehicle, customer, onClose, onOrderClick
         {zeile('Antrieb', technik(labelVon(ANTRIEBE, profil.antrieb), profil.erkannt.antrieb))}
         {zeile('Getriebe', technik(labelVon(GETRIEBE, profil.getriebe), profil.erkannt.getriebe))}
         {zeile('Motor', vehicle.motor)}
-        {zeile('Steuertrieb', technik(labelVon(STEUERTRIEBE, profil.steuertrieb), profil.erkannt.steuertrieb))}
+        {zeile('Motorkennbuchstabe', [vehicle.motorcode, profil.motor && `(${profil.motor.name})`].filter(Boolean).join(' ') || undefined)}
+        {zeile('Steuertrieb', profil.steuertriebQuelle === 'marke'
+          ? `${labelVon(STEUERTRIEBE, profil.steuertrieb)} (angenommen)`
+          : technik(labelVon(STEUERTRIEBE, profil.steuertrieb), profil.erkannt.steuertrieb))}
       </div>
 
       <p className="section-header" style={{ padding: '0 0 8px' }}>Wartungsplan</p>

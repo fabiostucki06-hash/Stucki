@@ -62,8 +62,15 @@ export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k
       <div className="cf-grid-2" style={{ marginTop: 10 }}>
         <div className="cf-field">
           <label className="cf-label">Motor</label>
-          <input className="cf-input" value={f.motor ?? ''} onChange={s('motor')} placeholder="z.B. 2.0 TDI / B47" />
+          <input className="cf-input" value={f.motor ?? ''} onChange={s('motor')} placeholder="z.B. 2.0 TDI 150 PS" />
         </div>
+        <div className="cf-field">
+          <label className="cf-label">Motorkennbuchstabe</label>
+          <input className="cf-input" value={f.motorcode ?? ''} onChange={s('motorcode')} placeholder="z.B. CFFB / B47D20 / OM651" autoCapitalize="characters" />
+        </div>
+      </div>
+      {p.motor && <p className="cf-hint" style={{ margin: '6px 2px 0', fontSize: 12, color: 'var(--label3)' }}>Erkannt: {p.motor.name}</p>}
+      <div className="cf-grid-2" style={{ marginTop: 10 }}>
         <div className="cf-field">
           <label className="cf-label">Steuertrieb</label>
           <select className="cf-select" value={f.steuertrieb ?? ''} onChange={s('steuertrieb')}>
@@ -94,6 +101,7 @@ export default function VehicleForm({ initial, onSave, onCancel }: VehicleFormPr
     getriebe:      initial?.getriebe,
     steuertrieb:   initial?.steuertrieb,
     motor:         initial?.motor         ?? '',
+    motorcode:     initial?.motorcode     ?? '',
   });
   const [busy, setBusy] = useState(false);
 

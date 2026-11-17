@@ -3,7 +3,7 @@ import { STD_SATZ } from './company';
 import type { ArbeitPosition, Customer, FahrzeugFeld, FahrzeugFelder, ServiceItem, Vehicle } from '../types';
 
 /** The vehicle fields that used to live on the Customer (see FahrzeugFeld). */
-export const FAHRZEUG_FELDER: FahrzeugFeld[] = ['marke', 'modell', 'kennzeichen', 'km', 'chassisnummer', 'erstzulassung', 'antrieb', 'getriebe', 'steuertrieb', 'motor'];
+export const FAHRZEUG_FELDER: FahrzeugFeld[] = ['marke', 'modell', 'kennzeichen', 'km', 'chassisnummer', 'erstzulassung', 'antrieb', 'getriebe', 'steuertrieb', 'motor', 'motorcode'];
 
 export const hatFahrzeugDaten = (f: Partial<FahrzeugFelder>): boolean =>
   FAHRZEUG_FELDER.some((k) => String(f[k] ?? '').trim() !== '');
@@ -61,7 +61,7 @@ export const fahrzeugChips = (v: Partial<FahrzeugFelder> | undefined): string[] 
 
 /** "Marke Modell Motor Kennzeichen 85000km", for the KI-ZE estimate. */
 export const fahrzeugText = (v: Partial<FahrzeugFelder> | undefined): string =>
-  v ? [v.marke, v.modell, v.motor, v.antrieb, v.kennzeichen, v.km ? v.km + 'km' : ''].filter(Boolean).join(' ') || 'unbekannt' : 'unbekannt';
+  v ? [v.marke, v.modell, v.motor, v.motorcode, v.antrieb, v.kennzeichen, v.km ? v.km + 'km' : ''].filter(Boolean).join(' ') || 'unbekannt' : 'unbekannt';
 
 /** 85000 → "85'000" (Swiss thousands separator). */
 export function formatKm(km: string | number | undefined): string {
