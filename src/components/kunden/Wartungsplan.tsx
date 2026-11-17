@@ -9,17 +9,17 @@ import {
 } from '../../lib/vehicles';
 import type { ServiceItem, Vehicle } from '../../types';
 
-/** Status groups, in display order. "Fällig" = overdue or due soon. */
+/** Status groups, in display order. "Jetzt fällig" = overdue or due soon. */
 type Gruppe = 'faellig' | 'geplant' | 'erledigt';
 const GRUPPE_VON: Record<ServiceZustand, Gruppe> = { ueberfaellig: 'faellig', bald: 'faellig', faellig: 'geplant', gemacht: 'erledigt' };
-const GRUPPEN: { key: Gruppe; label: string }[] = [
-  { key: 'faellig',  label: 'Fällig' },
-  { key: 'geplant',  label: 'In Zukunft fällig' },
-  { key: 'erledigt', label: 'Erledigt' },
+const GRUPPEN: { key: Gruppe; label: string; dot: string }[] = [
+  { key: 'faellig',  label: 'Jetzt fällig',      dot: 'var(--orange)' },
+  { key: 'geplant',  label: 'In Zukunft fällig', dot: 'var(--accent)' },
+  { key: 'erledigt', label: 'Erledigt',          dot: 'var(--green)' },
 ];
 const RANG: Record<ServiceZustand, number> = { ueberfaellig: 0, bald: 1, faellig: 2, gemacht: 3 };
 
-/** Status badge of a card: tinted background + coloured text. */
+/** Status badge of a tile: tinted background + coloured text. */
 const BADGE: Record<ServiceZustand, { label: string; cls: string }> = {
   ueberfaellig: { label: 'Überfällig',  cls: 'sp-badge-red' },
   bald:         { label: 'Bald fällig', cls: 'sp-badge-orange' },
@@ -30,14 +30,11 @@ const BADGE: Record<ServiceZustand, { label: string; cls: string }> = {
 /** "05/2027" */
 const monatJahr = (iso: string) => { const [y, m] = iso.split('-'); return `${m}/${y}`; };
 
-/** Interval / last / next service of a card, one part per line ("15'000 km", "12 Mt."). */
-const intervallTeile = (i: ServiceItem) =>
-  [i.intervallKm ? `${formatKm(i.intervallKm)} km` : '', i.intervallMonate ? `${i.intervallMonate} Mt.` : ''].filter(Boolean);
-const zuletztTeile = (i: ServiceItem) =>
-  [i.letztesDatum ? formatDateCH(i.letztesDatum) : '', i.letzteKm ? `${formatKm(i.letzteKm)} km` : ''].filter(Boolean);
-const naechsteTeile = (i: ServiceItem) =>
-  [i.faelligKm ? `${formatKm(i.faelligKm)} km` : '', i.faelligDatum ? monatJahr(i.faelligDatum) : ''].filter(Boolean);
-
+/** "15'000 km · 12 Mt." / "100'000 km · 11/2027" / "17.11.2026 · 85'000 km" */
+const intervallText = (i: ServiceItem) =>
+  [i.intervallKm ? `${formatKm(i.intervallKm)} km` : '', i.intervallMonate ? `${i.intervallMonate} Mt.` : ''].filter(Boolean).join(' · ');
+const naechsteText = (i: ServiceItem) =>
+  [i.faelligKm ? `${formatKm(i.faelligKm)} km` : '', i.faelligDatum ? monatJahr(i.faelligDatum) : ''].filter(Boolean).join(' · ');
 const datumKm = (datum?: string, km?: string) =>
   [datum ? formatDateCH(datum) : '', km ? `${formatKm(km)} km` : ''].filter(Boolean).join(' · ');
 
@@ -47,11 +44,12 @@ interface WartungsplanProps {
   onSave: (v: Vehicle) => Promise<void>;
 }
 
-/** Wartungsplan of a vehicle: service items as compact cards (two columns on
-    wide screens), grouped by status. Each card shows status, interval, last
-    and next service; "Gemacht" ticks it off, "In Zukunft fällig" flags a done
-    item again, the pencil opens the editor. Due dates / mileages follow from
-    the last service plus the interval. */
+/** Wartungsplan of a vehicle: one tile per service item (two columns on wide
+    screens), grouped into Jetzt fällig / In Zukunft fällig / Erledigt. A tile
+    shows interval and next due; its status switch sets "Gemacht" (ticked off
+    today at the current mileage) or "In Zukunft" in one tap. Details, history
+    and undo live in the editor behind the pencil. Due dates / mileages follow
+    from the last service plus the interval. */
 export default function Wartungsplan({ vehicle, onSave }: WartungsplanProps) {
   const items = ohneEntfernteService(vehicle.service ?? []);
   const [edit, setEdit] = useState<{ item: ServiceItem; neu: boolean } | null>(null);
@@ -66,6 +64,7 @@ export default function Wartungsplan({ vehicle, onSave }: WartungsplanProps) {
     finally { setBusy(false); }
   }
   const setItems = (service: ServiceItem[]) => save({ service });
+  const ersetze = (it: ServiceItem) => items.map((x) => (x.id === it.id ? it : x));
 
   // The current mileage is entered at the visit; it dates every item ticked off.
   const kmAktuell = km.trim() || vehicle.km;
@@ -73,16 +72,16 @@ export default function Wartungsplan({ vehicle, onSave }: WartungsplanProps) {
     if (km.trim() !== (vehicle.km ?? '')) void save({ km: km.trim() || undefined });
   }
 
-  /** Done items are undone, everything else (incl. a done item that is due
-      again) is ticked off today at the current mileage. */
-  function toggleGemacht(it: ServiceItem, zustand: ServiceZustand) {
-    const neu = zustand === 'gemacht' ? serviceZuruecksetzen(it) : serviceErledigt(it, todayISO(), kmAktuell);
-    void save({ km: kmAktuell || undefined, service: items.map((x) => (x.id === it.id ? neu : x)) });
-  }
-  const vormerken = (it: ServiceItem) => setItems(items.map((x) => (x.id === it.id ? { ...it, status: 'faellig' } : x)));
+  const gemacht = (it: ServiceItem) =>
+    save({ km: kmAktuell || undefined, service: ersetze(serviceErledigt(it, todayISO(), kmAktuell)) });
+  const vormerken = (it: ServiceItem) => setItems(ersetze({ ...it, status: 'faellig' }));
 
   function speichern(it: ServiceItem) {
-    void setItems(edit?.neu ? [...items, it] : items.map((x) => (x.id === it.id ? it : x)));
+    void setItems(edit?.neu ? [...items, it] : ersetze(it));
+    setEdit(null);
+  }
+  function rueckgaengig(it: ServiceItem) {
+    void setItems(ersetze(serviceZuruecksetzen(it)));
     setEdit(null);
   }
   function entfernen(it: ServiceItem) {
@@ -99,14 +98,14 @@ export default function Wartungsplan({ vehicle, onSave }: WartungsplanProps) {
   const sheet = edit && (
     <WartungsplanEditor
       item={edit.item} neu={edit.neu} busy={busy}
-      onSave={speichern} onDelete={() => entfernen(edit.item)} onClose={() => setEdit(null)}
+      onSave={speichern} onUndo={() => rueckgaengig(edit.item)} onDelete={() => entfernen(edit.item)} onClose={() => setEdit(null)}
     />
   );
 
   if (!items.length) {
     return (
       <div className="sp sp-empty">
-        <p>Noch kein Wartungsplan. Der Standard-Wartungsplan enthält Motoröl, Filter, Zündkerzen, Bremsflüssigkeit, Zahnriemen, und Getriebeöl mit üblichen Intervallen – alles anpassbar.</p>
+        <p>Noch kein Wartungsplan. Der Standard-Wartungsplan enthält Motoröl, Filter, Zündkerzen, Bremsflüssigkeit, Zahnriemen und Getriebeöl mit üblichen Intervallen – alles anpassbar.</p>
         <button className="btn-system btn-primary" disabled={busy} onClick={() => setItems(standardWartungsplan())}>Standard-Wartungsplan anlegen</button>
         <button className="sp-text-btn" disabled={busy} onClick={neuePosition}><SFPlus size={12} /> Eigene Position</button>
         {sheet}
@@ -128,24 +127,22 @@ export default function Wartungsplan({ vehicle, onSave }: WartungsplanProps) {
         <button className="sp-text-btn" disabled={busy} onClick={neuePosition}><SFPlus size={12} /> Position</button>
       </div>
 
-      {GRUPPEN.map(({ key, label }) => {
-        const cards = mitZustand.filter((x) => GRUPPE_VON[x.zustand] === key);
-        if (!cards.length) return null;
-        const dot = key === 'erledigt' ? 'var(--green)'
-          : key === 'geplant' ? 'var(--accent)'
-          : cards.some((x) => x.zustand === 'ueberfaellig') ? 'var(--red)' : 'var(--orange)';
+      {GRUPPEN.map(({ key, label, dot }) => {
+        const tiles = mitZustand.filter((x) => GRUPPE_VON[x.zustand] === key);
+        if (!tiles.length) return null;
+        const farbe = key === 'faellig' && tiles.some((x) => x.zustand === 'ueberfaellig') ? 'var(--red)' : dot;
         return (
           <section key={key} className="sp-group" aria-label={label}>
             <h4 className="sp-group-head">
-              <span className="dot" style={{ background: dot }} />
+              <span className="dot" style={{ background: farbe }} />
               {label}
-              <span className="sp-group-count">{cards.length}</span>
+              <span className="sp-group-count">{tiles.length}</span>
             </h4>
             <ul className="sp-grid">
-              {cards.map(({ item, zustand }) => (
-                <WartungsplanKarte
+              {tiles.map(({ item, zustand }) => (
+                <WartungsplanKachel
                   key={item.id} item={item} zustand={zustand} busy={busy}
-                  onToggle={() => toggleGemacht(item, zustand)}
+                  onGemacht={() => gemacht(item)}
                   onVormerken={() => vormerken(item)}
                   onOpen={() => setEdit({ item, neu: false })}
                 />
@@ -159,58 +156,57 @@ export default function Wartungsplan({ vehicle, onSave }: WartungsplanProps) {
   );
 }
 
-interface KarteProps {
+interface KachelProps {
   item: ServiceItem;
   zustand: ServiceZustand;
   busy: boolean;
-  onToggle: () => void;
+  onGemacht: () => void;
   onVormerken: () => void;
   onOpen: () => void;
 }
 
-/** Card: name + status badge · Intervall / Zuletzt / Nächste · actions. */
-function WartungsplanKarte({ item, zustand, busy, onToggle, onVormerken, onOpen }: KarteProps) {
-  const done = zustand === 'gemacht';
+/** Tile: name + badge · Intervall / Nächste · status switch + pencil.
+    "Gemacht" ticks the item off (again, when it is due); "In Zukunft" flags a
+    done item as upcoming. The active side shows the current status. */
+function WartungsplanKachel({ item, zustand, busy, onGemacht, onVormerken, onOpen }: KachelProps) {
   const badge = BADGE[zustand];
-  const meta: { label: string; teile: string[] }[] = [
-    { label: 'Intervall', teile: intervallTeile(item) },
-    { label: 'Zuletzt',   teile: zuletztTeile(item) },
-    { label: 'Nächste',   teile: naechsteTeile(item) },
-  ];
+  const intervall = intervallText(item);
+  const naechste = naechsteText(item);
+  const zuletzt = datumKm(item.letztesDatum, item.letzteKm);
+  const istGemacht = zustand === 'gemacht';
+  const istZukunft = zustand === 'faellig';
+  const fuss = [zuletzt && `Zuletzt ${zuletzt}`, item.notiz].filter(Boolean).join(' · ');
 
   return (
-    <li className={`sp-card sp-card-${zustand}`}>
-      <div className="sp-card-head">
+    <li className={`sp-tile sp-tile-${zustand}`}>
+      <div className="sp-tile-head">
         <span className="sp-name">{item.name}</span>
         <span className={`sp-badge ${badge.cls}`}>{badge.label}</span>
       </div>
 
-      <dl className="sp-meta">
-        {meta.map(({ label, teile }) => (
-          <div key={label}>
-            <dt>{label}</dt>
-            {teile.length ? teile.map((t) => <dd key={t}>{t}</dd>) : <dd className="sp-meta-leer">–</dd>}
-          </div>
-        ))}
+      <dl className="sp-facts">
+        <div><dt>Intervall</dt><dd className={intervall ? undefined : 'sp-leer'}>{intervall || '–'}</dd></div>
+        <div><dt>Nächste</dt><dd className={naechste ? undefined : 'sp-leer'}>{naechste || '–'}</dd></div>
       </dl>
-      {item.notiz && <p className="sp-note">{item.notiz}</p>}
+      {fuss && <p className="sp-foot">{fuss}</p>}
 
-      <div className="sp-actions">
-        {done ? (
-          <>
-            <button className="sp-act" disabled={busy} onClick={onVormerken} aria-label={`${item.name}: In Zukunft fällig`}>
-              <span aria-hidden="true"><SFClock size={14} /></span> In Zukunft fällig
-            </button>
-            <button className="sp-act sp-act-text" disabled={busy} onClick={onToggle} aria-label={`${item.name}: Gemacht rückgängig`} title="Gemacht rückgängig machen">
-              Rückgängig
-            </button>
-          </>
-        ) : (
-          <button className="sp-act sp-act-done" disabled={busy} onClick={onToggle} aria-label={`${item.name}: Gemacht`}>
+      <div className="sp-tile-actions">
+        <div className="sp-switch" role="group" aria-label={`Status ${item.name}`}>
+          <button
+            className={`sp-switch-btn sp-switch-done${istGemacht ? ' active' : ''}`} aria-pressed={istGemacht}
+            disabled={busy || istGemacht} onClick={onGemacht}
+          >
             <span aria-hidden="true"><SFCheckmark /></span> Gemacht
           </button>
-        )}
-        <button className="sp-act-icon" onClick={onOpen} aria-label={`${item.name} bearbeiten`} title="Bearbeiten">
+          <button
+            className={`sp-switch-btn${istZukunft ? ' active' : ''}`} aria-pressed={istZukunft}
+            disabled={busy || !istGemacht} onClick={onVormerken}
+            title={istGemacht ? 'Wieder als in Zukunft fällig vormerken' : undefined}
+          >
+            <span aria-hidden="true"><SFClock size={13} /></span> In Zukunft
+          </button>
+        </div>
+        <button className="sp-icon-btn" onClick={onOpen} aria-label={`${item.name} bearbeiten`} title="Bearbeiten">
           <span aria-hidden="true"><SFPencil size={15} /></span>
         </button>
       </div>
@@ -223,11 +219,13 @@ interface EditorProps {
   neu: boolean;
   busy: boolean;
   onSave: (it: ServiceItem) => void;
+  /** Undoes the last "Gemacht". */
+  onUndo: () => void;
   onDelete: () => void;
   onClose: () => void;
 }
 
-function WartungsplanEditor({ item, neu, busy, onSave, onDelete, onClose }: EditorProps) {
+function WartungsplanEditor({ item, neu, busy, onSave, onUndo, onDelete, onClose }: EditorProps) {
   const [f, setF] = useState({
     name: item.name,
     intervallKm: item.intervallKm ? String(item.intervallKm) : '',
@@ -302,6 +300,7 @@ function WartungsplanEditor({ item, neu, busy, onSave, onDelete, onClose }: Edit
                 <li key={i}><span className="sp-history-check"><SFCheckmark /></span>{datumKm(h.datum, h.km)}</li>
               ))}
             </ul>
+            <button type="button" className="sp-text-btn sp-undo" onClick={onUndo} disabled={busy}>Letztes «Gemacht» rückgängig</button>
           </div>
         )}
 
