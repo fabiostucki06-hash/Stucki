@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Sheet from '../ui/Sheet';
-import { SFCheckmark, SFChevron, SFClock, SFPlus } from '../Icons';
+import { SFCheckmark, SFClock, SFPencil, SFPlus } from '../Icons';
 import { formatDateCH } from '../../lib/utils';
 import { todayISO } from '../../lib/offerte-docs';
 import {
@@ -19,14 +19,24 @@ const GRUPPEN: { key: Gruppe; label: string }[] = [
 ];
 const RANG: Record<ServiceZustand, number> = { ueberfaellig: 0, bald: 1, faellig: 2, gemacht: 3 };
 
+/** Status badge of a card: tinted background + coloured text. */
+const BADGE: Record<ServiceZustand, { label: string; cls: string }> = {
+  ueberfaellig: { label: 'Überfällig',  cls: 'sp-badge-red' },
+  bald:         { label: 'Bald fällig', cls: 'sp-badge-orange' },
+  faellig:      { label: 'In Zukunft',  cls: 'sp-badge-accent' },
+  gemacht:      { label: 'Erledigt',    cls: 'sp-badge-green' },
+};
+
 /** "05/2027" */
 const monatJahr = (iso: string) => { const [y, m] = iso.split('-'); return `${m}/${y}`; };
 
-/** "Alle 15'000 km / 12 Mt." */
-const intervallText = (i: ServiceItem) => {
-  const t = [i.intervallKm ? `${formatKm(i.intervallKm)} km` : '', i.intervallMonate ? `${i.intervallMonate} Mt.` : ''].filter(Boolean).join(' / ');
-  return t ? `Alle ${t}` : '';
-};
+/** Interval / last / next service of a card, one part per line ("15'000 km", "12 Mt."). */
+const intervallTeile = (i: ServiceItem) =>
+  [i.intervallKm ? `${formatKm(i.intervallKm)} km` : '', i.intervallMonate ? `${i.intervallMonate} Mt.` : ''].filter(Boolean);
+const zuletztTeile = (i: ServiceItem) =>
+  [i.letztesDatum ? formatDateCH(i.letztesDatum) : '', i.letzteKm ? `${formatKm(i.letzteKm)} km` : ''].filter(Boolean);
+const naechsteTeile = (i: ServiceItem) =>
+  [i.faelligKm ? `${formatKm(i.faelligKm)} km` : '', i.faelligDatum ? monatJahr(i.faelligDatum) : ''].filter(Boolean);
 
 const datumKm = (datum?: string, km?: string) =>
   [datum ? formatDateCH(datum) : '', km ? `${formatKm(km)} km` : ''].filter(Boolean).join(' · ');
@@ -37,10 +47,11 @@ interface WartungsplanProps {
   onSave: (v: Vehicle) => Promise<void>;
 }
 
-/** Wartungsplan of a vehicle: standard service items and wear parts, grouped
-    by status. One tap ticks an item off ("Gemacht") or flags it again for the
-    future ("In Zukunft fällig"); intervals and details are edited in a sheet.
-    Due dates / mileages follow from the last service plus the interval. */
+/** Wartungsplan of a vehicle: service items as compact cards (two columns on
+    wide screens), grouped by status. Each card shows status, interval, last
+    and next service; "Gemacht" ticks it off, "In Zukunft fällig" flags a done
+    item again, the pencil opens the editor. Due dates / mileages follow from
+    the last service plus the interval. */
 export default function Wartungsplan({ vehicle, onSave }: WartungsplanProps) {
   const items = vehicle.service ?? [];
   const [edit, setEdit] = useState<{ item: ServiceItem; neu: boolean } | null>(null);
@@ -62,7 +73,7 @@ export default function Wartungsplan({ vehicle, onSave }: WartungsplanProps) {
     if (km.trim() !== (vehicle.km ?? '')) void save({ km: km.trim() || undefined });
   }
 
-  /** Checked items are undone, everything else (incl. a done item that is due
+  /** Done items are undone, everything else (incl. a done item that is due
       again) is ticked off today at the current mileage. */
   function toggleGemacht(it: ServiceItem, zustand: ServiceZustand) {
     const neu = zustand === 'gemacht' ? serviceZuruecksetzen(it) : serviceErledigt(it, todayISO(), kmAktuell);
@@ -95,7 +106,7 @@ export default function Wartungsplan({ vehicle, onSave }: WartungsplanProps) {
   if (!items.length) {
     return (
       <div className="sp sp-empty">
-        <p>Noch kein Wartungsplan. Der Standard-Wartungsplan enthält Öl, Filter, Bremsflüssigkeit, Zahnriemen, MFK u.a. mit üblichen Intervallen – alles anpassbar.</p>
+        <p>Noch kein Wartungsplan. Der Standard-Wartungsplan enthält Motoröl, Filter, Zündkerzen, Bremsflüssigkeit, Zahnriemen, Getriebeöl und Batterie mit üblichen Intervallen – alles anpassbar.</p>
         <button className="btn-system btn-primary" disabled={busy} onClick={() => setItems(standardWartungsplan())}>Standard-Wartungsplan anlegen</button>
         <button className="sp-text-btn" disabled={busy} onClick={neuePosition}><SFPlus size={12} /> Eigene Position</button>
         {sheet}
@@ -118,21 +129,21 @@ export default function Wartungsplan({ vehicle, onSave }: WartungsplanProps) {
       </div>
 
       {GRUPPEN.map(({ key, label }) => {
-        const rows = mitZustand.filter((x) => GRUPPE_VON[x.zustand] === key);
-        if (!rows.length) return null;
+        const cards = mitZustand.filter((x) => GRUPPE_VON[x.zustand] === key);
+        if (!cards.length) return null;
         const dot = key === 'erledigt' ? 'var(--green)'
-          : key === 'geplant' ? 'var(--label3)'
-          : rows.some((x) => x.zustand === 'ueberfaellig') ? 'var(--red)' : 'var(--orange)';
+          : key === 'geplant' ? 'var(--accent)'
+          : cards.some((x) => x.zustand === 'ueberfaellig') ? 'var(--red)' : 'var(--orange)';
         return (
           <section key={key} className="sp-group" aria-label={label}>
             <h4 className="sp-group-head">
               <span className="dot" style={{ background: dot }} />
               {label}
-              <span className="sp-group-count">{rows.length}</span>
+              <span className="sp-group-count">{cards.length}</span>
             </h4>
-            <ul className="sp-list">
-              {rows.map(({ item, zustand }) => (
-                <WartungsplanZeile
+            <ul className="sp-grid">
+              {cards.map(({ item, zustand }) => (
+                <WartungsplanKarte
                   key={item.id} item={item} zustand={zustand} busy={busy}
                   onToggle={() => toggleGemacht(item, zustand)}
                   onVormerken={() => vormerken(item)}
@@ -148,7 +159,7 @@ export default function Wartungsplan({ vehicle, onSave }: WartungsplanProps) {
   );
 }
 
-interface ZeileProps {
+interface KarteProps {
   item: ServiceItem;
   zustand: ServiceZustand;
   busy: boolean;
@@ -157,50 +168,52 @@ interface ZeileProps {
   onOpen: () => void;
 }
 
-/** Checklist row: check circle · name + interval · next due (right). */
-function WartungsplanZeile({ item, zustand, busy, onToggle, onVormerken, onOpen }: ZeileProps) {
+/** Card: name + status badge · Intervall / Zuletzt / Nächste · actions. */
+function WartungsplanKarte({ item, zustand, busy, onToggle, onVormerken, onOpen }: KarteProps) {
   const done = zustand === 'gemacht';
-  const offen = zustand === 'ueberfaellig' || zustand === 'bald';
-  const sub = done && (item.letztesDatum || item.letzteKm)
-    ? `Gemacht ${datumKm(item.letztesDatum, item.letzteKm)}`
-    : [intervallText(item), item.notiz].filter(Boolean).join(' · ');
-  const faellig = [
-    item.faelligKm ? `${formatKm(item.faelligKm)} km` : '',
-    item.faelligDatum ? monatJahr(item.faelligDatum) : '',
-  ].filter(Boolean);
+  const badge = BADGE[zustand];
+  const meta: { label: string; teile: string[] }[] = [
+    { label: 'Intervall', teile: intervallTeile(item) },
+    { label: 'Zuletzt',   teile: zuletztTeile(item) },
+    { label: 'Nächste',   teile: naechsteTeile(item) },
+  ];
 
   return (
-    <li className={`sp-row sp-row-${zustand}`}>
-      <button
-        className={`sp-check${done ? ' on' : ''}`} disabled={busy} onClick={onToggle}
-        aria-pressed={done} aria-label={`${item.name}: ${done ? 'Gemacht rückgängig' : 'Gemacht'}`}
-        title={done ? 'Gemacht – rückgängig machen' : 'Als gemacht abhaken'}
-      >
-        <span className="sp-circle">{done && <SFCheckmark />}</span>
-      </button>
+    <li className={`sp-card sp-card-${zustand}`}>
+      <div className="sp-card-head">
+        <span className="sp-name">{item.name}</span>
+        <span className={`sp-badge ${badge.cls}`}>{badge.label}</span>
+      </div>
 
-      <button className="sp-main" onClick={onOpen} aria-label={`${item.name} bearbeiten`}>
-        <span className="sp-text">
-          <span className="sp-name">{item.name}</span>
-          {sub && <span className="sp-sub">{sub}</span>}
-        </span>
-        <span className="sp-due">
-          {offen && (
-            <span className={`sp-badge ${zustand === 'ueberfaellig' ? 'sp-badge-red' : 'sp-badge-orange'}`}>
-              {zustand === 'ueberfaellig' ? 'Überfällig' : 'Bald fällig'}
-            </span>
-          )}
-          {!offen && faellig.length > 0 && <span className="sp-due-label">{done ? 'Nächste' : 'Fällig'}</span>}
-          {faellig.map((t) => <span key={t} className="sp-due-val">{t}</span>)}
-        </span>
-        <span className="sp-chevron" aria-hidden="true"><SFChevron size={14} /></span>
-      </button>
+      <dl className="sp-meta">
+        {meta.map(({ label, teile }) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            {teile.length ? teile.map((t) => <dd key={t}>{t}</dd>) : <dd className="sp-meta-leer">–</dd>}
+          </div>
+        ))}
+      </dl>
+      {item.notiz && <p className="sp-note">{item.notiz}</p>}
 
-      {done && (
-        <button className="sp-flag" disabled={busy} onClick={onVormerken} aria-label={`${item.name}: In Zukunft fällig`} title="In Zukunft fällig">
-          <SFClock size={16} />
+      <div className="sp-actions">
+        {done ? (
+          <>
+            <button className="sp-act" disabled={busy} onClick={onVormerken} aria-label={`${item.name}: In Zukunft fällig`}>
+              <span aria-hidden="true"><SFClock size={14} /></span> In Zukunft fällig
+            </button>
+            <button className="sp-act sp-act-text" disabled={busy} onClick={onToggle} aria-label={`${item.name}: Gemacht rückgängig`} title="Gemacht rückgängig machen">
+              Rückgängig
+            </button>
+          </>
+        ) : (
+          <button className="sp-act sp-act-done" disabled={busy} onClick={onToggle} aria-label={`${item.name}: Gemacht`}>
+            <span aria-hidden="true"><SFCheckmark /></span> Gemacht
+          </button>
+        )}
+        <button className="sp-act-icon" onClick={onOpen} aria-label={`${item.name} bearbeiten`} title="Bearbeiten">
+          <span aria-hidden="true"><SFPencil size={15} /></span>
         </button>
-      )}
+      </div>
     </li>
   );
 }

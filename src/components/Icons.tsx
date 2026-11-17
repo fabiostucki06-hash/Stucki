@@ -136,6 +136,12 @@ export const SFClock = ({ size = 16 }: { size?: number }) => (
   </svg>
 );
 
+export const SFPencil = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+    <path d="M10.5 2.5l3 3L5.5 13.5H2.5v-3l8-8zM9 4l3 3" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 export const SFTrash =({ size = 16 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
     <path d="M3 4.5h10M6.5 4.5V3a1 1 0 011-1h1a1 1 0 011 1v1.5m-6.5 0L4.3 13a1 1 0 001 .9h5.4a1 1 0 001-.9l.8-8.5" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/>

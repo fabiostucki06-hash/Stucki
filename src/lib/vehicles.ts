@@ -83,15 +83,9 @@ export const STANDARD_SERVICE: { name: string; intervallKm?: number; intervallMo
   { name: 'Kraftstofffilter',         intervallKm: 60000,  intervallMonate: 48 },
   { name: 'Zündkerzen',               intervallKm: 60000,  intervallMonate: 48 },
   { name: 'Bremsflüssigkeit',         intervallMonate: 24 },
-  { name: 'Bremsbeläge & -scheiben prüfen', intervallKm: 30000, intervallMonate: 24 },
-  { name: 'Kühlflüssigkeit',          intervallMonate: 48 },
   { name: 'Zahnriemen / Wasserpumpe', intervallKm: 120000, intervallMonate: 72 },
   { name: 'Getriebeöl',               intervallKm: 60000 },
-  { name: 'Klimaservice',             intervallMonate: 24 },
   { name: 'Batterie prüfen',          intervallMonate: 12 },
-  { name: 'Wischerblätter',           intervallMonate: 12 },
-  { name: 'Reifenwechsel Sommer/Winter', intervallMonate: 6 },
-  { name: 'MFK / Fahrzeugprüfung',    intervallMonate: 36 },
 ];
 
 export const neueServiceId = () => `s_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
