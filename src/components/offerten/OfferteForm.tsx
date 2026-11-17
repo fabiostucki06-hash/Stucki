@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { FormCard, FormBar, SaveStatus, SummaryRow, VehicleChips, PositionenEditor, fCHF, type ArbeitRow, type MaterialRow } from '../ui/DocForm';
+import { FormCard, FormBar, SaveStatus, SummaryRow, VehicleSelect, PositionenEditor, fCHF, type ArbeitRow, type MaterialRow } from '../ui/DocForm';
 import type { Customer, ArbeitPosition, MaterialPosition, Offerte, OfferteStatus } from '../../types';
 import { offerteNotizen, anzahlungErforderlich, anzahlungMoeglich, anzahlungAufteilung, sindVorkasseTerms, ANZAHLUNG_PROZENT, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ } from '../../lib/offerte-docs';
 import NummerField, { parseNummer } from '../ui/NummerField';
@@ -8,6 +8,8 @@ import { setMaterialFeld } from '../../lib/marge';
 import { festpreisSummen } from '../../lib/sonderpositionen';
 import { materialZuerst } from '../../lib/utils';
 import { useAutoSave } from '../../hooks/useAutoSave';
+import { useApp } from '../../context/AppContext';
+import { fahrzeugText } from '../../lib/vehicles';
 
 type OfferteData = Omit<Offerte, 'id' | 'offertNumber' | 'createdAt'> & { offertNumber: number };
 
@@ -87,7 +89,9 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
   // Only a Materialofferte offers the 50% Anzahlung; a new Offerte from this form is a normal one.
   const istMaterial = !!initial && anzahlungMoeglich(initial);
   const [mitAnzahlung, setMitAnzahlung] = useState(() => (initial ? anzahlungErforderlich(initial) : false));
+  const { vehiclesOf, docVehicle } = useApp();
   const [cid,        setCid]        = useState(initial?.customerId ?? prefillCustomerId ?? '');
+  const [vid,        setVid]        = useState(() => (initial ? docVehicle(initial)?.id ?? '' : ''));
   const [titel,      setTitel]      = useState(initial?.titel ?? '');
   const [arbeit,     setArbeit]     = useState<ArbeitRow[]>(() => {
     const ap = (initial?.positionen ?? []).filter((p): p is ArbeitPosition => p.typ === 'arbeit');
@@ -107,11 +111,7 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
   const [zahlungsziel, setZahlungsziel] = useState(initial?.zahlungsziel ?? '10');
   const [status,     setStatus]     = useState<OfferteStatus>(initial?.status ?? 'entwurf');
 
-  const selectedCustomer = customers.find((c) => c.id === cid) ?? null;
-  const vehicleChips = selectedCustomer
-    ? [selectedCustomer.marke, selectedCustomer.modell, selectedCustomer.kennzeichen,
-       selectedCustomer.km ? selectedCustomer.km + ' km' : ''].filter(Boolean)
-    : [];
+  const selectedVehicle = vehiclesOf(cid).find((v) => v.id === vid);
 
   const addA = () => setArbeit((a) => [...a, newArbeit()]);
   const remA = (i: number) => setArbeit((a) => a.filter((_, j) => j !== i));
@@ -127,10 +127,7 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
     const pos = arbeit[i]; if (!pos.beschreibung.trim()) return;
     setArbeit((a) => { const n = [...a]; n[i] = { ...n[i], zeLoading: true }; return n; });
     try {
-      const fz = selectedCustomer
-        ? [selectedCustomer.marke, selectedCustomer.modell, selectedCustomer.kennzeichen,
-           selectedCustomer.km ? selectedCustomer.km + 'km' : ''].filter(Boolean).join(' ')
-        : 'unbekannt';
+      const fz = fahrzeugText(selectedVehicle);
       const r = await schaetzeZEmitKI(pos.beschreibung, fz);
       setArbeit((a) => {
         const n = [...a]; const ze = parseFloat(r.ze) || 0;
@@ -181,7 +178,7 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
     ? [{ typ: 'material', beschreibung: 'Kleinteil Pauschale', menge: '1', stueckpreis: '10', preis: '10.00' }]
     : [];
   const data: OfferteData | null = hinweis || nr == null ? null : {
-    offertNumber: nr, customerId: cid, titel,
+    offertNumber: nr, customerId: cid, vehicleId: vid || undefined, titel,
     positionen: materialZuerst([...material.filter((p) => p.art || p.beschreibung.trim()), ...autoPauschale, ...arbeit.filter((p) => p.beschreibung.trim()).map(toArbeitPosition)]),
     notizen, gueltigBis, zahlungsziel, status,
     ...zahlungsterms(),
@@ -240,11 +237,11 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
             >
               <option value="">Auswählen…</option>
               {customers.map((c) => (
-                <option key={c.id} value={c.id}>{c.vorname} {c.nachname} – {c.kennzeichen}</option>
+                <option key={c.id} value={c.id}>{c.vorname} {c.nachname}{c.kennzeichen ? ` – ${c.kennzeichen}` : ''}{vehiclesOf(c.id).length > 1 ? ` (+${vehiclesOf(c.id).length - 1})` : ''}</option>
               ))}
             </select>
           </div>
-          {vehicleChips.length > 0 && <div className="df-span2"><VehicleChips chips={vehicleChips} /></div>}
+          <VehicleSelect customerId={cid} vehicleId={vid} onChange={setVid} />
           <NummerField
             label="Offerte-Nr." value={nummer} onChange={setNummer} vorschlag={vorschlag}
             suffix={initial?.version && initial.version > 1 ? `_${initial.version}` : undefined}

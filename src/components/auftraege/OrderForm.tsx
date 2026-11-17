@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
-import { FormCard, FormBar, VehicleChips, onEnterNextRow } from '../ui/DocForm';
+import { FormCard, FormBar, VehicleSelect, onEnterNextRow } from '../ui/DocForm';
+import { useApp } from '../../context/AppContext';
 import { SFPlus, SFXmark } from '../Icons';
 import type { Customer, Order } from '../../types';
 
-type OrderData = Pick<Order, 'customerId' | 'beanstandungen' | 'notizen'>;
+type OrderData = Pick<Order, 'customerId' | 'vehicleId' | 'beanstandungen' | 'notizen'>;
 
 interface OrderFormProps {
   customers: Customer[];
@@ -16,7 +17,9 @@ interface OrderFormProps {
 }
 
 export default function OrderForm({ customers, customerId: preCid, onSave, onCancel, saving }: OrderFormProps) {
+  const { vehiclesOf } = useApp();
   const [cid,     setCid]     = useState(preCid ?? '');
+  const [vid,     setVid]     = useState('');
   const [bs,      setBs]      = useState(['']);
   const [notizen, setNotizen] = useState('');
   const [savingLocal, setSavingLocal] = useState(false);
@@ -43,7 +46,7 @@ export default function OrderForm({ customers, customerId: preCid, onSave, onCan
     if (!b.length) { showToast('Mindestens eine Beanstandung eingeben', 'error'); return; }
     setSavingLocal(true);
     try {
-      await onSave({ customerId: cid, beanstandungen: b, notizen });
+      await onSave({ customerId: cid, vehicleId: vid || undefined, beanstandungen: b, notizen });
     } catch (e) {
       console.error('[Auftrag] save failed:', e);
     } finally {
@@ -52,11 +55,6 @@ export default function OrderForm({ customers, customerId: preCid, onSave, onCan
   }
 
   const selectedCustomer = customers.find((c) => c.id === cid) ?? null;
-  const vehicleChips = selectedCustomer
-    ? [selectedCustomer.marke, selectedCustomer.modell, selectedCustomer.kennzeichen,
-       selectedCustomer.km ? selectedCustomer.km + ' km' : ''].filter(Boolean)
-    : [];
-
   const filled = bs.filter((x) => x.trim()).length;
 
   return (
@@ -78,12 +76,12 @@ export default function OrderForm({ customers, customerId: preCid, onSave, onCan
               >
                 <option value="">Kunde auswählen…</option>
                 {customers.map((c) => (
-                  <option key={c.id} value={c.id}>{c.vorname} {c.nachname} – {c.kennzeichen}</option>
+                  <option key={c.id} value={c.id}>{c.vorname} {c.nachname}{c.kennzeichen ? ` – ${c.kennzeichen}` : ''}{vehiclesOf(c.id).length > 1 ? ` (+${vehiclesOf(c.id).length - 1})` : ''}</option>
                 ))}
               </select>
             )}
           </div>
-          {vehicleChips.length > 0 && <div className="df-span2"><VehicleChips chips={vehicleChips} /></div>}
+          <VehicleSelect customerId={cid} vehicleId={vid} onChange={setVid} />
         </div>
       </FormCard>
 

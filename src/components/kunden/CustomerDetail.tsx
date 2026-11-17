@@ -3,7 +3,10 @@ import Sheet from '../ui/Sheet';
 import Badge from '../ui/Badge';
 import Spinner from '../ui/Spinner';
 import DocumentViewerModal from '../ui/DocumentViewerModal';
-import { SFChevron, SFPaperclip, SFDownload, SFTrash } from '../Icons';
+import VehicleDetail from './VehicleDetail';
+import VehicleForm from './VehicleForm';
+import { SFChevron, SFPaperclip, SFDownload, SFTrash, SFPlus } from '../Icons';
+import { anstehendeServices, fahrzeugTitel, formatKm } from '../../lib/vehicles';
 import { isOverdue, formatDateCH } from '../../lib/utils';
 import { showToast } from '../ui/Toast';
 import { useApp } from '../../context/AppContext';
@@ -30,7 +33,12 @@ interface CustomerDetailProps {
 }
 
 export default function CustomerDetail({ customer, orders, onClose, onEdit, onNewOrder, onOrderClick, onDelete }: CustomerDetailProps) {
-  const { token, updateCustomer } = useApp();
+  const { token, updateCustomer, vehiclesOf, addVehicle, docVehicle } = useApp();
+  const fahrzeuge = vehiclesOf(customer.id);
+  // By id, so the open profile follows every save of the vehicle.
+  const [fahrzeugId, setFahrzeugId] = useState<string | null>(null);
+  const offenesFahrzeug = fahrzeuge.find((v) => v.id === fahrzeugId);
+  const [neuesFahrzeug, setNeuesFahrzeug] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [busyPath, setBusyPath] = useState<string | null>(null);
@@ -141,21 +149,37 @@ export default function CustomerDetail({ customer, orders, onClose, onEdit, onNe
             {customer.email && <div className="sf-footnote" style={{ color: 'var(--label3)' }}>{customer.email}</div>}
           </div>
         </div>
-        <div style={{ background: 'rgba(255,255,255,0.45)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.60)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.70),0 4px 16px rgba(0,0,0,0.08)', borderRadius: 12, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <span style={{ fontSize: 18 }}>🚗</span>
-          <span style={{ fontSize: 15, fontWeight: 500 }}>{customer.marke ?? ''} {customer.modell ?? ''} · {customer.kennzeichen ?? ''}</span>
-          {customer.km && <span style={{ fontSize: 13, color: 'var(--label2)', marginLeft: 'auto' }}>{Number(customer.km).toLocaleString()} km</span>}
-        </div>
-        <div style={{ background: 'rgba(255,255,255,0.45)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.60)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.70),0 4px 16px rgba(0,0,0,0.08)', borderRadius: 12, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-            <span style={{ color: 'var(--label2)' }}>Chassisnummer</span>
-            <span style={{ fontWeight: 600 }}>{customer.chassisnummer || '–'}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-            <span style={{ color: 'var(--label2)' }}>1. Inv. Setzung</span>
-            <span style={{ fontWeight: 600 }}>{customer.erstzulassung ? formatDateCH(customer.erstzulassung) : '–'}</span>
-          </div>
-        </div>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingBottom: 8 }}>
+        <p className="section-header" style={{ padding: 0 }}>Fahrzeuge ({fahrzeuge.length})</p>
+        <button className="sp-add-vehicle" onClick={() => setNeuesFahrzeug(true)}><SFPlus size={12} /> Fahrzeug hinzufügen</button>
+      </div>
+      <div className="glass-panel" style={{ marginBottom: 20, overflow: 'hidden' }}>
+        {!fahrzeuge.length && (
+          <div style={{ textAlign: 'center', padding: '18px 12px', color: 'var(--label3)', fontSize: 15 }}>Noch kein Fahrzeug erfasst.</div>
+        )}
+        {fahrzeuge.map((v) => {
+          const offen = anstehendeServices(v);
+          const rot = offen.some((x) => x.zustand === 'ueberfaellig');
+          return (
+            <div key={v.id} className="list-row" tabIndex={0} onClick={() => setFahrzeugId(v.id)}>
+              <span className="list-row-icon" style={{ background: 'rgb(var(--accent-rgb) / 0.12)' }}>🚗</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="sf-subhead" style={{ fontWeight: 600 }}>{fahrzeugTitel(v)}{v.kennzeichen && <span style={{ color: 'var(--label2)', fontWeight: 500 }}> · {v.kennzeichen}</span>}</div>
+                <div className="sf-footnote" style={{ color: 'var(--label3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {[v.chassisnummer && `VIN ${v.chassisnummer}`, v.km && `${formatKm(v.km)} km`].filter(Boolean).join(' · ') || 'Keine weiteren Angaben'}
+                </div>
+                {offen.length > 0 && (
+                  <div className="sf-footnote" style={{ color: rot ? 'var(--red)' : 'var(--orange)', fontWeight: 600, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {rot ? 'Wartung fällig' : 'Wartung bald fällig'}: {offen.map((x) => x.item.name).join(', ')}
+                  </div>
+                )}
+              </div>
+              <span style={{ color: 'var(--label3)' }}><SFChevron /></span>
+            </div>
+          );
+        })}
       </div>
 
       <p className="section-header" style={{ padding: '0 0 8px' }}>Fahrzeugpapiere</p>
@@ -234,13 +258,34 @@ export default function CustomerDetail({ customer, orders, onClose, onEdit, onNe
             <div style={{ flex: 1 }}>
               {isOverdue(o) && <div style={{ fontSize: 11, color: 'var(--red)', fontWeight: 600, marginBottom: 2 }}>Frist überschritten</div>}
               <div className="sf-subhead" style={{ fontWeight: 600 }}>Auftrag #{o.orderNumber}</div>
-              <div className="sf-footnote" style={{ color: 'var(--label3)' }}>{formatDateCH(o.createdAt)}</div>
+              <div className="sf-footnote" style={{ color: 'var(--label3)' }}>
+                {formatDateCH(o.createdAt)}{fahrzeuge.length > 1 && docVehicle(o) ? ` · ${fahrzeugTitel(docVehicle(o)!)}` : ''}
+              </div>
             </div>
             <Badge status={o.status} small />
             <span style={{ color: 'var(--label3)', marginLeft: 6 }}><SFChevron /></span>
           </div>
         ))}
       </div>
+
+      {offenesFahrzeug && (
+        <VehicleDetail
+          vehicle={offenesFahrzeug} customer={customer}
+          onClose={() => setFahrzeugId(null)}
+          onOrderClick={(o) => { setFahrzeugId(null); onOrderClick(o); }}
+        />
+      )}
+
+      {neuesFahrzeug && (
+        <Sheet title="Neues Fahrzeug" onClose={() => setNeuesFahrzeug(false)}
+          barRight={<button onClick={() => setNeuesFahrzeug(false)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
+          <VehicleForm onCancel={() => setNeuesFahrzeug(false)} onSave={async (data) => {
+            const v = await addVehicle(customer.id, data);
+            setNeuesFahrzeug(false);
+            setFahrzeugId(v.id);
+          }} />
+        </Sheet>
+      )}
 
       {viewerDoc && (
         <DocumentViewerModal

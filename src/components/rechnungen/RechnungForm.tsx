@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { FormCard, FormBar, SaveStatus, SummaryRow, VehicleChips, PositionenEditor, fCHF, type ArbeitRow, type MaterialRow } from '../ui/DocForm';
+import { FormCard, FormBar, SaveStatus, SummaryRow, VehicleSelect, PositionenEditor, fCHF, type ArbeitRow, type MaterialRow } from '../ui/DocForm';
 import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../lib/rechnung-totals';
 import { offerteNr } from '../../lib/offerte-docs';
 import NummerField, { parseNummer } from '../ui/NummerField';
@@ -7,6 +7,8 @@ import { materialPreis, materialZeSumme, zeBetrag, zeMinuten } from '../../lib/z
 import { setMaterialFeld } from '../../lib/marge';
 import { festpreisSummen } from '../../lib/sonderpositionen';
 import { useAutoSave } from '../../hooks/useAutoSave';
+import { useApp } from '../../context/AppContext';
+import { fahrzeugText } from '../../lib/vehicles';
 import { echteBeanstandungen, materialZuerst } from '../../lib/utils';
 import type { Customer, Order, Offerte, ArbeitPosition, MaterialPosition, Rechnung, RechnungKategorie } from '../../types';
 
@@ -94,7 +96,9 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
   const [dupOk, setDupOk] = useState<number | null>(null);
   const [selectedAuftragId, setSelectedAuftragId] = useState(initial?.auftragId ?? '');
   const [selectedOfferteId, setSelectedOfferteId] = useState('');
+  const { vehiclesOf, docVehicle } = useApp();
   const [cid,          setCid]          = useState(initial?.customerId ?? '');
+  const [vid,          setVid]          = useState(() => (initial ? docVehicle(initial)?.id ?? '' : ''));
   const [titel,        setTitel]        = useState(initial?.titel ?? '');
   const [arbeit,       setArbeit]       = useState<ArbeitRow[]>(() => {
     const ap = (initial?.positionen ?? []).filter((p): p is ArbeitPosition => p.typ === 'arbeit');
@@ -112,11 +116,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
     () => initial?.faelligAm ?? calcFaelligAm(initial?.zahlungsFrist ?? '10')
   );
 
-  const selectedCustomer = customers.find((c) => c.id === cid) ?? null;
-  const vehicleChips = selectedCustomer
-    ? [selectedCustomer.marke, selectedCustomer.modell, selectedCustomer.kennzeichen,
-       selectedCustomer.km ? selectedCustomer.km + ' km' : ''].filter(Boolean)
-    : [];
+  const selectedVehicle = vehiclesOf(cid).find((v) => v.id === vid);
 
   const sortedAuftraege = [...orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   const sortedOfferten  = [...offerten].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -128,6 +128,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
     const auftrag = orders.find((o) => o.id === auftragId);
     if (!auftrag) return;
     setCid(auftrag.customerId);
+    setVid(docVehicle(auftrag)?.id ?? '');
     const positions = auftrag.positionen ?? [];
     const arbeitRows: ArbeitRow[] = positions
       .filter((p): p is ArbeitPosition => p.typ === 'arbeit')
@@ -160,6 +161,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
     const off = offerten.find((o) => o.id === offerteId);
     if (!off) return;
     setCid(off.customerId);
+    setVid(docVehicle(off)?.id ?? '');
     if (!initial?.titel) setTitel(off.titel ?? `Offerte #${offerteNr(off)}`);
     const positions = off.positionen ?? [];
     const arbeitRows: ArbeitRow[] = positions
@@ -197,10 +199,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
     const pos = arbeit[i]; if (!pos.beschreibung.trim()) return;
     setArbeit((a) => { const n = [...a]; n[i] = { ...n[i], zeLoading: true }; return n; });
     try {
-      const fz = selectedCustomer
-        ? [selectedCustomer.marke, selectedCustomer.modell, selectedCustomer.kennzeichen,
-           selectedCustomer.km ? selectedCustomer.km + 'km' : ''].filter(Boolean).join(' ')
-        : 'unbekannt';
+      const fz = fahrzeugText(selectedVehicle);
       const r = await schaetzeZEmitKI(pos.beschreibung, fz);
       setArbeit((a) => {
         const n = [...a]; const ze = parseFloat(r.ze) || 0;
@@ -247,7 +246,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
     : null;
 
   const data: RechnungData | null = hinweis || nr == null ? null : {
-    rechnungNumber: nr, customerId: cid, titel,
+    rechnungNumber: nr, customerId: cid, vehicleId: vid || undefined, titel,
     positionen: materialZuerst([...mp, ...ap.map(toArbeitPosition)]), notizen,
     zahlungsFrist, faelligAm,
     kategorie: kategorie || undefined, kleinteilManuell,
@@ -340,11 +339,11 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
             >
               <option value="">Auswählen…</option>
               {customers.map((c) => (
-                <option key={c.id} value={c.id}>{c.vorname} {c.nachname} – {c.kennzeichen}</option>
+                <option key={c.id} value={c.id}>{c.vorname} {c.nachname}{c.kennzeichen ? ` – ${c.kennzeichen}` : ''}{vehiclesOf(c.id).length > 1 ? ` (+${vehiclesOf(c.id).length - 1})` : ''}</option>
               ))}
             </select>
           </div>
-          {vehicleChips.length > 0 && <div className="df-span2"><VehicleChips chips={vehicleChips} /></div>}
+          <VehicleSelect customerId={cid} vehicleId={vid} onChange={setVid} />
           <NummerField
             label="Rechnungs-Nr." value={nummer} onChange={setNummer} vorschlag={vorschlag}
             vergeben={nrVergeben}

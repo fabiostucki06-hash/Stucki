@@ -58,7 +58,7 @@ export default function App() {
     addOfferte, updateOfferte, deleteOfferte,
     addRechnung, updateRechnung, deleteRechnung,
     offertNum, rechnungNum,
-    addMaterial,
+    addMaterial, docKunde,
   } = useApp();
 
   const updateAvailable = useVersionCheck();
@@ -325,7 +325,7 @@ export default function App() {
   }
 
   /* ── Order handlers ── */
-  async function handleAddOrder(data: Pick<Order, 'customerId' | 'beanstandungen' | 'notizen'>) {
+  async function handleAddOrder(data: Pick<Order, 'customerId' | 'vehicleId' | 'beanstandungen' | 'notizen'>) {
     await addOrder(data);
     setShowNO(false); setNewOCid(null);
   }
@@ -429,6 +429,7 @@ export default function App() {
     const betrag = roundToRappen(t.total * ANZAHLUNG_PROZENT / 100).toFixed(2);
     await addRechnung({
       customerId: offerte.customerId,
+      vehicleId: offerte.vehicleId,
       offertId: offerte.id,
       art: 'anzahlung',
       anzahlungProzent: ANZAHLUNG_PROZENT,
@@ -462,6 +463,7 @@ export default function App() {
     const t = computeRechnungTotals(pos, undefined, false, undefined, anzBetrag);
     await addRechnung({
       customerId: anz.customerId,
+      vehicleId: anz.vehicleId,
       offertId: anz.offertId,
       art: 'schluss',
       anzahlungRechnungId: anz.id,
@@ -502,6 +504,7 @@ export default function App() {
       .filter(Boolean);
     await addOrder({
       customerId: offerte.customerId,
+      vehicleId: offerte.vehicleId,
       beanstandungen: [offerteLabel, ...arbeitBeans],
       notizen: ohneMaterialHinweis(offerte.notizen),
       positionen: positions,
@@ -519,6 +522,7 @@ export default function App() {
     faelligDate.setDate(faelligDate.getDate() + 10);
     await addRechnung({
       customerId: offerte.customerId,
+      vehicleId: offerte.vehicleId,
       titel: offerte.titel,
       positionen: positions,
       notizen: ohneMaterialHinweis(offerte.notizen),
@@ -769,7 +773,7 @@ export default function App() {
         <OfferteDetail
           key={selOff.id}
           offerte={selOff}
-          customer={customers.find((c) => c.id === selOff.customerId)}
+          customer={docKunde(selOff)}
           onClose={() => setSelOff(null)}
           onUpdate={handleUpdateOfferte}
           onDelete={handleDeleteOfferte}
@@ -789,7 +793,7 @@ export default function App() {
 
       {editOff && (
         <Sheet title={`Offerte #${offerteNr(editOff)} bearbeiten`} onClose={() => setEditOff(null)} full>
-          <ActiveOfferteBanner offerte={editOff} customer={customers.find((c) => c.id === editOff.customerId)} />
+          <ActiveOfferteBanner offerte={editOff} customer={docKunde(editOff)} />
           <OfferteForm key={editOff.id} customers={customers} initial={editOff} onSave={handleSaveOfferte} onDone={(saved) => { setEditOff(null); if (saved) setSelOff(saved); }} nummerVorschlag={editOff.offertNumber} nummerVergeben={offertNrVergeben(editOff)} />
         </Sheet>
       )}
@@ -797,7 +801,7 @@ export default function App() {
       {selR && (
         <RechnungDetail
           rechnung={withOffertePositionen(selR, offerten)}
-          customer={customers.find((c) => c.id === selR.customerId)}
+          customer={docKunde(selR)}
           onClose={() => setSelR(null)}
           onUpdate={handleUpdateRechnung}
           onDelete={handleDeleteRechnung}
@@ -844,7 +848,7 @@ export default function App() {
       {selO && (
         <OrderDetail
           order={selO}
-          customer={customers.find((c) => c.id === selO.customerId)}
+          customer={docKunde(selO)}
           onClose={() => { setSelO(null); setSelOInEdit(false); }}
           onUpdate={handleUpdateOrder}
           onDelete={handleDeleteOrder}

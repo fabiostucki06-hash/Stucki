@@ -6,6 +6,7 @@ import { useActiveOfferte } from '../../hooks/useActiveOfferte';
 import { useSettings } from '../../hooks/useSettings';
 import { offerteNr } from '../../lib/offerte-docs';
 import type { Customer, Offerte, OfferteStatus } from '../../types';
+import { useApp } from '../../context/AppContext';
 
 /** 'alle' = regular Offerten only (no Materialofferten), 'material' = only Materialofferten,
     'ab' = accepted Offerten as Auftragsbestätigungen. */
@@ -38,6 +39,7 @@ const isMaterialofferte = (o: Offerte) => o.art === 'material' || /^Materialoffe
 interface Group { key: string; label: string; color: string; items: Offerte[] }
 
 export default function OfferteList({ offerten, customers, onOfferteClick, onEdit, onNew, onImportPdf, variant = 'alle' }: OfferteListProps) {
+  const { docKunde } = useApp();
   const active = useActiveOfferte(offerten);
   const { signature } = useSettings();
   const isAB = variant === 'ab';
@@ -109,7 +111,7 @@ export default function OfferteList({ offerten, customers, onOfferteClick, onEdi
                     </div>
                     {!isAB && <ActiveOfferteToggle offerte={off} />}
                     <button
-                      onClick={(e) => { e.stopPropagation(); if (isAB) exportAuftragsbestaetigungPDF(off, c, signature); else exportOffertePDF(off, c); }}
+                      onClick={(e) => { e.stopPropagation(); if (isAB) exportAuftragsbestaetigungPDF(off, docKunde(off), signature); else exportOffertePDF(off, docKunde(off)); }}
                       className="excel-btn"
                       title="PDF herunterladen"
                     >PDF</button>

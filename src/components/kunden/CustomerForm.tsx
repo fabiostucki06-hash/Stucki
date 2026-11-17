@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { showToast } from '../ui/Toast';
+import { VehicleFields } from './VehicleForm';
+import { FAHRZEUG_FELDER } from '../../lib/vehicles';
 import type { Customer } from '../../types';
 
 type CustomerData = Omit<Customer, 'id' | 'createdAt'>;
@@ -27,7 +29,7 @@ export default function CustomerForm({ initial, onSave, onCancel, saving }: Cust
 
   const [busy, setBusy] = useState(false);
 
-  const s = (k: keyof CustomerData) => (e: React.ChangeEvent<HTMLInputElement>) =>
+  const s = (k: 'vorname' | 'nachname' | 'telefon' | 'email') => (e: React.ChangeEvent<HTMLInputElement>) =>
     setF((p) => ({ ...p, [k]: e.target.value }));
 
   async function submit() {
@@ -37,7 +39,14 @@ export default function CustomerForm({ initial, onSave, onCancel, saving }: Cust
     }
     setBusy(true);
     try {
-      await onSave(f);
+      // Editing changes the contact only: the vehicles are edited on their own.
+      if (initial) {
+        const kontakt = { ...f };
+        for (const k of FAHRZEUG_FELDER) delete kontakt[k];
+        await onSave(kontakt);
+      } else {
+        await onSave(f);
+      }
     } catch {
       // Error toast already shown by the context (syncOk). Form stays open, input intact.
     } finally {
@@ -71,39 +80,14 @@ export default function CustomerForm({ initial, onSave, onCancel, saving }: Cust
         </div>
       </div>
 
-      <div className="cf-section-title">Fahrzeug</div>
-      <div className="cf-group">
-        <div className="cf-grid-2">
-          <div className="cf-field">
-            <label className="cf-label">Marke</label>
-            <input className="cf-input" value={f.marke} onChange={s('marke')} placeholder="z.B. BMW" />
-          </div>
-          <div className="cf-field">
-            <label className="cf-label">Modell</label>
-            <input className="cf-input" value={f.modell} onChange={s('modell')} placeholder="z.B. 320d" />
-          </div>
-        </div>
-        <div className="cf-grid-2" style={{ marginTop: 10 }}>
-          <div className="cf-field">
-            <label className="cf-label">Kennzeichen</label>
-            <input className="cf-input" value={f.kennzeichen} onChange={s('kennzeichen')} placeholder="ZH 123456" />
-          </div>
-          <div className="cf-field">
-            <label className="cf-label">KM-Stand</label>
-            <input className="cf-input" type="number" value={String(f.km ?? '')} onChange={s('km')} placeholder="85000" />
-          </div>
-        </div>
-        <div className="cf-grid-2" style={{ marginTop: 10 }}>
-          <div className="cf-field">
-            <label className="cf-label">Chassisnummer</label>
-            <input className="cf-input" value={f.chassisnummer} onChange={s('chassisnummer')} placeholder="WBA12345678901234" />
-          </div>
-          <div className="cf-field">
-            <label className="cf-label">1. Inv. Setzung</label>
-            <input className="cf-input" type="date" value={f.erstzulassung} onChange={s('erstzulassung')} />
-          </div>
-        </div>
-      </div>
+      {/* A new customer's vehicle becomes their first vehicle; later ones are
+          managed in the Kundenakte (Fahrzeuge). */}
+      {!initial && (
+        <>
+          <div className="cf-section-title">Fahrzeug</div>
+          <VehicleFields f={f} onChange={(k, v) => setF((p) => ({ ...p, [k]: v }))} />
+        </>
+      )}
 
       <div className="cf-actions">
         <button className="cf-btn-save" onClick={submit} disabled={saving || busy}>

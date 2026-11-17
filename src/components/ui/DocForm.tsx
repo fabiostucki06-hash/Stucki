@@ -10,6 +10,8 @@ import { materialSatz, zeMinuten, zeText } from '../../lib/ze';
 import { margeVon, vkAusEk } from '../../lib/marge';
 import { useSettings } from '../../hooks/useSettings';
 import { neueVersandPosition, pauschalePosition, positionsArt } from '../../lib/sonderpositionen';
+import { anstehendeServices, fahrzeugChips, fahrzeugLabel } from '../../lib/vehicles';
+import { useApp } from '../../context/AppContext';
 
 /* Shared building blocks for the Offerte / Rechnung / Auftrag creation forms
    (styles: `.df-*` in globals.css). */
@@ -40,6 +42,41 @@ export function VehicleChips({ chips }: { chips: (string | undefined)[] }) {
         {chips.map((v, i) => <span key={i} className="mf-chip">{v}</span>)}
       </div>
     </div>
+  );
+}
+
+/** Picks which of the customer's vehicles the document is for (select only
+    with more than one), shows its data and any maintenance due. Renders the
+    `.df-span2` cells of a `.df-grid`. */
+export function VehicleSelect({ customerId, vehicleId, onChange }: { customerId: string; vehicleId: string; onChange: (id: string) => void }) {
+  const { vehiclesOf } = useApp();
+  const vs = customerId ? vehiclesOf(customerId) : [];
+  const v = vs.find((x) => x.id === vehicleId) ?? vs[0];
+  // Keeps the stored choice in step with what is shown (new customer → main vehicle).
+  useEffect(() => {
+    if ((v?.id ?? '') !== vehicleId) onChange(v?.id ?? '');
+  }, [v?.id, vehicleId]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!customerId) return null;
+  const offen = anstehendeServices(v);
+  const rot = offen.some((x) => x.zustand === 'ueberfaellig');
+  return (
+    <>
+      {vs.length > 1 && (
+        <div className="cf-field df-span2">
+          <label className="cf-label">Fahrzeug *</label>
+          <select className="cf-select" value={v?.id ?? ''} onChange={(e) => onChange(e.target.value)}>
+            {vs.map((x) => <option key={x.id} value={x.id}>{fahrzeugLabel(x)}</option>)}
+          </select>
+        </div>
+      )}
+      {v && fahrzeugChips(v).length > 0 && <div className="df-span2"><VehicleChips chips={fahrzeugChips(v)} /></div>}
+      {!vs.length && <div className="df-span2 df-hint" style={{ textAlign: 'left' }}>Kein Fahrzeug erfasst – in der Kundenakte unter „Fahrzeuge“ hinzufügen.</div>}
+      {offen.length > 0 && (
+        <div className={`df-span2 df-service-hint ${rot ? 'red' : 'orange'}`}>
+          {rot ? 'Wartung fällig' : 'Wartung bald fällig'}: {offen.map((x) => x.item.name).join(', ')}
+        </div>
+      )}
+    </>
   );
 }
 

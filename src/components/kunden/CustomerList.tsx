@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Badge from '../ui/Badge';
 import { SFChevron, SFXmark } from '../Icons';
 import { getActiveStatus } from '../../lib/utils';
+import { useApp } from '../../context/AppContext';
 import type { Customer, Order, OrderStatus } from '../../types';
 
 interface CustomerListProps {
@@ -12,12 +13,15 @@ interface CustomerListProps {
 }
 
 export default function CustomerList({ customers, orders, onCustomerClick, onNew }: CustomerListProps) {
+  const { vehiclesOf } = useApp();
   const [search, setSearch] = useState('');
   const [filterK, setFilterK] = useState<'all' | 'active' | 'inactive'>('all');
 
   const filtered = customers.filter((c) => {
     const q = search.toLowerCase();
-    const match = !q || `${c.vorname} ${c.nachname} ${c.telefon} ${c.kennzeichen} ${c.marke ?? ''} ${c.modell ?? ''}`.toLowerCase().includes(q);
+    // Every vehicle of the customer is searchable (plate, make, model, VIN).
+    const fz = vehiclesOf(c.id).map((v) => `${v.kennzeichen ?? ''} ${v.marke ?? ''} ${v.modell ?? ''} ${v.chassisnummer ?? ''}`).join(' ');
+    const match = !q || `${c.vorname} ${c.nachname} ${c.telefon} ${fz}`.toLowerCase().includes(q);
     const as = getActiveStatus(orders, c.id);
     if (filterK === 'active' && !as) return false;
     if (filterK === 'inactive' && as) return false;
@@ -69,7 +73,7 @@ export default function CustomerList({ customers, orders, onCustomerClick, onNew
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: 16 }}>{c.vorname} {c.nachname}</div>
                   <div style={{ fontSize: 13, color: 'var(--label2)', marginTop: 1 }}>{c.telefon}</div>
-                  <div style={{ fontSize: 12, color: 'var(--label3)', marginTop: 1 }}>{c.kennzeichen}{c.marke ? ' · ' + c.marke : ''}</div>
+                  <div style={{ fontSize: 12, color: 'var(--label3)', marginTop: 1 }}>{c.kennzeichen}{c.marke ? ' · ' + c.marke : ''}{vehiclesOf(c.id).length > 1 ? ` · +${vehiclesOf(c.id).length - 1} Fahrzeug${vehiclesOf(c.id).length > 2 ? 'e' : ''}` : ''}</div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
                   {as ? <Badge status={as} small /> : <span style={{ fontSize: 11, color: 'var(--label3)' }}>Inaktiv</span>}

@@ -3,6 +3,7 @@ import { exportRechnungPDF } from '../../lib/pdf-rechnung';
 import { formatDateCH } from '../../lib/utils';
 import { rechnungArt, rechnungDocName } from '../../lib/rechnung-totals';
 import type { Customer, Rechnung, RechnungArt, RechnungStatus } from '../../types';
+import { useApp } from '../../context/AppContext';
 
 interface RechnungenListProps {
   rechnungen: Rechnung[];
@@ -31,6 +32,7 @@ const STATUS_COLORS: Record<RechnungStatus, string> = {
 };
 
 export default function RechnungenList({ rechnungen: all, customers, onRechnungClick, onEdit, onNew, onImportPdf, variant = 'standard' }: RechnungenListProps) {
+  const { docKunde } = useApp();
   const isAnz = variant === 'anzahlung';
   const isSchluss = variant === 'schluss';
   const rechnungen = all.filter((r) => rechnungArt(r) === variant);
@@ -98,7 +100,7 @@ export default function RechnungenList({ rechnungen: all, customers, onRechnungC
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        exportRechnungPDF(rec, c);
+                        exportRechnungPDF(rec, docKunde(rec));
                       }}
                       className="excel-btn"
                       title="Drucken / PDF exportieren"

@@ -5,6 +5,12 @@ export interface VehicleDocument {
   size: number;
 }
 
+/** The vehicle fields of a Customer: since the vehicles table they belong to a
+    Vehicle; on a Customer they mirror the vehicle a view or document refers to
+    (see lib/vehicles), and they are never stored on the customer row. */
+export type FahrzeugFeld = 'marke' | 'modell' | 'kennzeichen' | 'km' | 'chassisnummer' | 'erstzulassung';
+export type FahrzeugFelder = Pick<Vehicle, FahrzeugFeld>;
+
 export interface Customer {
   id: string;
   vorname: string;
@@ -19,6 +25,51 @@ export interface Customer {
   erstzulassung?: string;
   createdAt: string;
   vehicleDocuments?: VehicleDocument[];
+}
+
+/** One entry of a vehicle's Service-Wartungsplan (wear part or service job).
+    'gemacht' = done (at the last visit), 'faellig' = due in the future. The
+    item counts as due anyway once faelligDatum or faelligKm is reached. */
+export type ServiceStatus = 'gemacht' | 'faellig';
+
+export interface ServiceEintrag {
+  /** ISO date (yyyy-mm-dd). */
+  datum: string;
+  km?: string;
+}
+
+export interface ServiceItem {
+  id: string;
+  name: string;
+  status: ServiceStatus;
+  /** Interval after which the item is due again (either or both). */
+  intervallKm?: number;
+  intervallMonate?: number;
+  /** Last time it was done. ISO date. */
+  letztesDatum?: string;
+  letzteKm?: string;
+  /** Next due date / mileage: derived from the last service plus the interval
+      when ticked off, editable (e.g. the date of the MFK-Aufgebot). */
+  faelligDatum?: string;
+  faelligKm?: string;
+  notiz?: string;
+  /** Every time it was ticked off, newest last. */
+  historie?: ServiceEintrag[];
+}
+
+/** A customer's vehicle (1:n, table `vehicles` with FK customer_id). */
+export interface Vehicle {
+  id: string;
+  customerId: string;
+  marke?: string;
+  modell?: string;
+  kennzeichen?: string;
+  km?: string;
+  chassisnummer?: string;
+  /** ISO date of the 1. Inverkehrsetzung. */
+  erstzulassung?: string;
+  createdAt: string;
+  service?: ServiceItem[];
 }
 
 export interface OrderItem {
@@ -39,6 +90,8 @@ export interface Order {
   id: string;
   orderNumber: number;
   customerId: string;
+  /** The customer's vehicle this document is for; unset = the first one (see lib/vehicles). */
+  vehicleId?: string;
   status: OrderStatus;
   statusChangedAt: string;
   createdAt: string;
@@ -123,6 +176,8 @@ export interface Offerte {
   /** The Offerte this version was derived from. */
   basisOffertId?: string;
   customerId: string;
+  /** See Order.vehicleId. */
+  vehicleId?: string;
   status: OfferteStatus;
   createdAt: string;
   titel?: string;
@@ -155,6 +210,8 @@ export interface Rechnung {
   id: string;
   rechnungNumber: number;
   customerId: string;
+  /** See Order.vehicleId. */
+  vehicleId?: string;
   auftragId?: string;
   status: RechnungStatus;
   createdAt: string;
