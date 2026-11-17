@@ -4,7 +4,7 @@ import { SFCheckmark, SFClock, SFPencil, SFPlus } from '../Icons';
 import { formatDateCH } from '../../lib/utils';
 import { todayISO } from '../../lib/offerte-docs';
 import {
-  formatKm, neueServiceId, ohneEntfernteService, serviceErledigt, serviceZuruecksetzen, serviceZustand, standardWartungsplan,
+  formatKm, naechsteFaelligkeit, neueServiceId, ohneEntfernteService, serviceErledigt, serviceZuruecksetzen, serviceZustand, standardWartungsplan,
   type ServiceZustand,
 } from '../../lib/vehicles';
 import type { ServiceItem, Vehicle } from '../../types';
@@ -33,8 +33,10 @@ const monatJahr = (iso: string) => { const [y, m] = iso.split('-'); return `${m}
 /** "15'000 km · 12 Mt." / "100'000 km · 11/2027" / "17.11.2026 · 85'000 km" */
 const intervallText = (i: ServiceItem) =>
   [i.intervallKm ? `${formatKm(i.intervallKm)} km` : '', i.intervallMonate ? `${i.intervallMonate} Mt.` : ''].filter(Boolean).join(' · ');
-const naechsteText = (i: ServiceItem) =>
-  [i.faelligKm ? `${formatKm(i.faelligKm)} km` : '', i.faelligDatum ? monatJahr(i.faelligDatum) : ''].filter(Boolean).join(' · ');
+const naechsteText = (i: ServiceItem, v: Vehicle) => {
+  const n = naechsteFaelligkeit(i, v);
+  return [n.km != null ? `${formatKm(n.km)} km` : '', n.datum ? monatJahr(n.datum) : ''].filter(Boolean).join(' · ');
+};
 const datumKm = (datum?: string, km?: string) =>
   [datum ? formatDateCH(datum) : '', km ? `${formatKm(km)} km` : ''].filter(Boolean).join(' · ');
 
@@ -92,7 +94,7 @@ export default function Wartungsplan({ vehicle, onSave }: WartungsplanProps) {
   const neuePosition = () => setEdit({ item: { id: neueServiceId(), name: '', status: 'faellig' }, neu: true });
 
   const mitZustand = items
-    .map((item) => ({ item, zustand: serviceZustand(item, vehicle.km) }))
+    .map((item) => ({ item, zustand: serviceZustand(item, vehicle) }))
     .sort((a, b) => RANG[a.zustand] - RANG[b.zustand]);
 
   const sheet = edit && (
@@ -141,7 +143,7 @@ export default function Wartungsplan({ vehicle, onSave }: WartungsplanProps) {
             <ul className="sp-grid">
               {tiles.map(({ item, zustand }) => (
                 <WartungsplanKachel
-                  key={item.id} item={item} zustand={zustand} busy={busy}
+                  key={item.id} item={item} naechste={naechsteText(item, vehicle)} zustand={zustand} busy={busy}
                   onGemacht={() => gemacht(item)}
                   onVormerken={() => vormerken(item)}
                   onOpen={() => setEdit({ item, neu: false })}
@@ -158,6 +160,8 @@ export default function Wartungsplan({ vehicle, onSave }: WartungsplanProps) {
 
 interface KachelProps {
   item: ServiceItem;
+  /** Next due mileage / date, stored or derived (naechsteFaelligkeit). */
+  naechste: string;
   zustand: ServiceZustand;
   busy: boolean;
   onGemacht: () => void;
@@ -168,10 +172,9 @@ interface KachelProps {
 /** Tile: name + badge · Intervall / Nächste · status switch + pencil.
     "Gemacht" ticks the item off (again, when it is due); "In Zukunft" flags a
     done item as upcoming. The active side shows the current status. */
-function WartungsplanKachel({ item, zustand, busy, onGemacht, onVormerken, onOpen }: KachelProps) {
+function WartungsplanKachel({ item, naechste, zustand, busy, onGemacht, onVormerken, onOpen }: KachelProps) {
   const badge = BADGE[zustand];
   const intervall = intervallText(item);
-  const naechste = naechsteText(item);
   const zuletzt = datumKm(item.letztesDatum, item.letzteKm);
   const istGemacht = zustand === 'gemacht';
   const istZukunft = zustand === 'faellig';
