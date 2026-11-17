@@ -1,5 +1,6 @@
 import { todayISO } from './offerte-docs';
-import type { Customer, FahrzeugFeld, FahrzeugFelder, ServiceItem, Vehicle } from '../types';
+import { STD_SATZ } from './company';
+import type { ArbeitPosition, Customer, FahrzeugFeld, FahrzeugFelder, ServiceItem, Vehicle } from '../types';
 
 /** The vehicle fields that used to live on the Customer (see FahrzeugFeld). */
 export const FAHRZEUG_FELDER: FahrzeugFeld[] = ['marke', 'modell', 'kennzeichen', 'km', 'chassisnummer', 'erstzulassung'];
@@ -209,3 +210,14 @@ export function anstehendeServices(v: Vehicle | undefined): { item: ServiceItem;
     .filter((x) => x.zustand === 'ueberfaellig' || x.zustand === 'bald')
     .sort((a, b) => rang[a.zustand] - rang[b.zustand]);
 }
+
+/** Offerte positions for Wartungsplan items: one Arbeit line each (note
+    appended), without ZE / price yet, so the Offerte is priced afterwards. */
+export const wartungsPositionen = (items: ServiceItem[]): ArbeitPosition[] =>
+  items.map((i) => ({
+    typ: 'arbeit',
+    beschreibung: [i.name, i.notiz].filter(Boolean).join(' – '),
+    ze: '',
+    stundenansatz: STD_SATZ,
+    preis: '0.00',
+  }));

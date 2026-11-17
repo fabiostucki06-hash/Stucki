@@ -11,7 +11,7 @@ import { isOverdue, formatDateCH } from '../../lib/utils';
 import { showToast } from '../ui/Toast';
 import { useApp } from '../../context/AppContext';
 import { storage } from '../../lib/supabase';
-import type { Customer, Order, VehicleDocument } from '../../types';
+import type { Customer, Order, ServiceItem, Vehicle, VehicleDocument } from '../../types';
 
 const DOCS_BUCKET = 'vehicle-documents';
 const ACCEPTED_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
@@ -29,10 +29,12 @@ interface CustomerDetailProps {
   onEdit: () => void;
   onNewOrder: () => void;
   onOrderClick: (o: Order) => void;
+  /** Creates a draft Offerte from due Wartungsplan items and opens it. */
+  onOfferteAusWartungsplan: (v: Vehicle, items: ServiceItem[]) => Promise<void>;
   onDelete: () => void;
 }
 
-export default function CustomerDetail({ customer, orders, onClose, onEdit, onNewOrder, onOrderClick, onDelete }: CustomerDetailProps) {
+export default function CustomerDetail({ customer, orders, onClose, onEdit, onNewOrder, onOrderClick, onOfferteAusWartungsplan, onDelete }: CustomerDetailProps) {
   const { token, updateCustomer, vehiclesOf, addVehicle, docVehicle } = useApp();
   const fahrzeuge = vehiclesOf(customer.id);
   // By id, so the open profile follows every save of the vehicle.
@@ -264,6 +266,7 @@ export default function CustomerDetail({ customer, orders, onClose, onEdit, onNe
           vehicle={offenesFahrzeug} customer={customer}
           onClose={() => setFahrzeugId(null)}
           onOrderClick={(o) => { setFahrzeugId(null); onOrderClick(o); }}
+          onOfferte={(items) => onOfferteAusWartungsplan(offenesFahrzeug, items)}
         />
       )}
 

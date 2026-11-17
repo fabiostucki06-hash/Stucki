@@ -44,6 +44,8 @@ interface WartungsplanProps {
   vehicle: Vehicle;
   /** Stores the vehicle with the changed plan / mileage. */
   onSave: (v: Vehicle) => Promise<void>;
+  /** Creates a draft Offerte from the due items and opens it. */
+  onOfferte: (items: ServiceItem[]) => Promise<void>;
 }
 
 /** Wartungsplan of a vehicle: one tile per service item (two columns on wide
@@ -52,7 +54,7 @@ interface WartungsplanProps {
     today at the current mileage) or "In Zukunft" in one tap. Details, history
     and undo live in the editor behind the pencil. Due dates / mileages follow
     from the last service plus the interval. */
-export default function Wartungsplan({ vehicle, onSave }: WartungsplanProps) {
+export default function Wartungsplan({ vehicle, onSave, onOfferte }: WartungsplanProps) {
   const items = ohneEntfernteService(vehicle.service ?? []);
   const [edit, setEdit] = useState<{ item: ServiceItem; neu: boolean } | null>(null);
   const [km, setKm] = useState(vehicle.km ?? '');
@@ -96,6 +98,15 @@ export default function Wartungsplan({ vehicle, onSave }: WartungsplanProps) {
   const mitZustand = items
     .map((item) => ({ item, zustand: serviceZustand(item, vehicle) }))
     .sort((a, b) => RANG[a.zustand] - RANG[b.zustand]);
+  const faellige = mitZustand.filter((x) => GRUPPE_VON[x.zustand] === 'faellig').map((x) => x.item);
+
+  async function offerteErstellen() {
+    if (busy || !faellige.length) return;
+    setBusy(true);
+    try { await onOfferte(faellige); }
+    catch { /* toast shown by the context */ }
+    finally { setBusy(false); }
+  }
 
   const sheet = edit && (
     <WartungsplanEditor
@@ -127,6 +138,13 @@ export default function Wartungsplan({ vehicle, onSave }: WartungsplanProps) {
           />
         </label>
         <button className="sp-text-btn" disabled={busy} onClick={neuePosition}><SFPlus size={12} /> Position</button>
+        <button
+          className="btn-tinted sp-offerte" disabled={busy || !faellige.length} onClick={offerteErstellen}
+          title={faellige.length ? `Offerte mit ${faellige.length} fälligen Positionen erstellen` : 'Keine fälligen Positionen'}
+        >
+          Offerte erstellen
+          <span className="sp-offerte-count">{faellige.length}</span>
+        </button>
       </div>
 
       {GRUPPEN.map(({ key, label, dot }) => {

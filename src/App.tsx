@@ -42,7 +42,8 @@ import RechnungenList from './components/rechnungen/RechnungenList';
 import RechnungForm from './components/rechnungen/RechnungForm';
 import RechnungDetail from './components/rechnungen/RechnungDetail';
 
-import type { MaterialPosition, Customer, Order, Offerte, Position, Rechnung, TabId } from './types';
+import type { MaterialPosition, Customer, Order, Offerte, Position, Rechnung, ServiceItem, TabId, Vehicle } from './types';
+import { wartungsPositionen } from './lib/vehicles';
 
 export default function App() {
   const {
@@ -332,6 +333,20 @@ export default function App() {
   async function handleDeleteOfferte(id: string) {
     await deleteOfferte(id); setSelOff(null);
     if (getActiveOfferteId() === id) setActiveOfferteId('');
+  }
+  /** "Offerte erstellen" in the Wartungsplan: a draft for the vehicle with one
+      position per due item, opened in the Offerten tab for pricing. */
+  async function handleOfferteAusWartungsplan(vehicle: Vehicle, items: ServiceItem[]) {
+    const positionen = wartungsPositionen(items);
+    const t = sumPositions(positionen);
+    const created = await addOfferte({
+      customerId: vehicle.customerId, vehicleId: vehicle.id,
+      titel: 'Wartung gemäss Wartungsplan', positionen,
+      zahlungsziel: '10',
+      totalBetrag: t.total.toFixed(2), totalArbeit: t.totalArbeit.toFixed(2),
+      totalMaterial: t.totalMaterial.toFixed(2), totalZE: t.totalZE,
+    });
+    setSelC(null); setTab('offerten'); setSelOff(created);
   }
   async function handleDuplicateOfferte(offerte: Offerte) {
     // A copy based on an existing Offerte is its next version ("12_2"),
@@ -764,6 +779,7 @@ export default function App() {
           onEdit={() => setEditC(selC)}
           onNewOrder={() => { setNewOCid(selC.id); setShowNO(true); setSelC(null); }}
           onOrderClick={(o) => { setSelO(o); setSelC(null); }}
+          onOfferteAusWartungsplan={handleOfferteAusWartungsplan}
           onDelete={() => handleDeleteCustomer(selC.id)}
         />
       )}

@@ -924,10 +924,15 @@ select.mf-add-pos.df-pauschale-select{-webkit-appearance:none;appearance:none;co
    Status groups (Jetzt fällig / In Zukunft fällig / Erledigt) of tiles, two
    columns from 700px: name + badge · Intervall / Nächste · status switch. */
 .sp{margin-bottom:20px}
-.sp-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 8px 8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg)}
+.sp-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 10px;padding:8px 8px 8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg)}
 .sp-km{display:flex;align-items:center;gap:10px;min-width:0}
 .sp-km>span{font-size:12.5px;color:var(--label2);white-space:nowrap}
 .sp-km .cf-input{width:120px;height:34px;padding:0 10px;font-variant-numeric:tabular-nums}
+.sp-km{margin-right:auto}
+.sp-offerte{gap:7px}
+.sp-offerte:disabled{opacity:0.45;cursor:default;background:var(--accent);transform:none}
+.sp-offerte-count{min-width:20px;height:18px;padding:0 6px;border-radius:980px;background:#fff;color:var(--accent);font-size:11.5px;font-weight:600;line-height:18px;text-align:center;font-variant-numeric:tabular-nums}
+@media (max-width:520px){.sp-offerte{width:100%}}
 .sp-text-btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;height:34px;padding:0 10px;border:none;border-radius:var(--radius-sm);background:transparent;color:var(--accent-text);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;transition:background 0.12s}
 .sp-text-btn:hover{background:var(--surface-hover)}
 .sp-text-btn:active{transform:scale(0.98)}
