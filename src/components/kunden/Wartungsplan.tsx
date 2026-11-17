@@ -4,7 +4,7 @@ import { SFCheckmark, SFClock, SFPencil, SFPlus } from '../Icons';
 import { formatDateCH } from '../../lib/utils';
 import { todayISO } from '../../lib/offerte-docs';
 import {
-  formatKm, neueServiceId, serviceErledigt, serviceZuruecksetzen, serviceZustand, standardWartungsplan,
+  formatKm, neueServiceId, ohneEntfernteService, serviceErledigt, serviceZuruecksetzen, serviceZustand, standardWartungsplan,
   type ServiceZustand,
 } from '../../lib/vehicles';
 import type { ServiceItem, Vehicle } from '../../types';
@@ -53,7 +53,7 @@ interface WartungsplanProps {
     item again, the pencil opens the editor. Due dates / mileages follow from
     the last service plus the interval. */
 export default function Wartungsplan({ vehicle, onSave }: WartungsplanProps) {
-  const items = vehicle.service ?? [];
+  const items = ohneEntfernteService(vehicle.service ?? []);
   const [edit, setEdit] = useState<{ item: ServiceItem; neu: boolean } | null>(null);
   const [km, setKm] = useState(vehicle.km ?? '');
   const [busy, setBusy] = useState(false);
@@ -106,7 +106,7 @@ export default function Wartungsplan({ vehicle, onSave }: WartungsplanProps) {
   if (!items.length) {
     return (
       <div className="sp sp-empty">
-        <p>Noch kein Wartungsplan. Der Standard-Wartungsplan enthält Motoröl, Filter, Zündkerzen, Bremsflüssigkeit, Zahnriemen, Getriebeöl und Batterie mit üblichen Intervallen – alles anpassbar.</p>
+        <p>Noch kein Wartungsplan. Der Standard-Wartungsplan enthält Motoröl, Filter, Zündkerzen, Bremsflüssigkeit, Zahnriemen, und Getriebeöl mit üblichen Intervallen – alles anpassbar.</p>
         <button className="btn-system btn-primary" disabled={busy} onClick={() => setItems(standardWartungsplan())}>Standard-Wartungsplan anlegen</button>
         <button className="sp-text-btn" disabled={busy} onClick={neuePosition}><SFPlus size={12} /> Eigene Position</button>
         {sheet}

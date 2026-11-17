@@ -85,8 +85,22 @@ export const STANDARD_SERVICE: { name: string; intervallKm?: number; intervallMo
   { name: 'Bremsflüssigkeit',         intervallMonate: 24 },
   { name: 'Zahnriemen / Wasserpumpe', intervallKm: 120000, intervallMonate: 72 },
   { name: 'Getriebeöl',               intervallKm: 60000 },
-  { name: 'Batterie prüfen',          intervallMonate: 12 },
 ];
+
+/** Former defaults, no longer part of any Wartungsplan; filtered out when an
+    existing plan is shown (see the wartungsplan_defaults migrations). */
+const ENTFERNTE_SERVICE = new Set([
+  'MFK / Fahrzeugprüfung',
+  'Reifenwechsel Sommer/Winter',
+  'Wischerblätter',
+  'Klimaservice',
+  'Kühlflüssigkeit',
+  'Bremsbeläge & -scheiben prüfen',
+  'Batterie prüfen',
+]);
+
+export const ohneEntfernteService = (items: ServiceItem[]): ServiceItem[] =>
+  items.filter((i) => !ENTFERNTE_SERVICE.has(i.name.trim()));
 
 export const neueServiceId = () => `s_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
@@ -154,7 +168,7 @@ function plusTage(iso: string, n: number): string {
 export function anstehendeServices(v: Vehicle | undefined): { item: ServiceItem; zustand: ServiceZustand }[] {
   if (!v?.service?.length) return [];
   const rang: Record<ServiceZustand, number> = { ueberfaellig: 0, bald: 1, faellig: 2, gemacht: 3 };
-  return v.service
+  return ohneEntfernteService(v.service)
     .map((item) => ({ item, zustand: serviceZustand(item, v.km) }))
     .filter((x) => x.zustand === 'ueberfaellig' || x.zustand === 'bald')
     .sort((a, b) => rang[a.zustand] - rang[b.zustand]);
