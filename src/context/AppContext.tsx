@@ -6,6 +6,7 @@ import { offerteNr } from '../lib/offerte-docs';
 import { alsReineMaterialofferte, mitGetrenntenTotals } from '../lib/ze';
 import { hoechsteRechnungNr, rechnungArt, rechnungDocName } from '../lib/rechnung-totals';
 import { hatFahrzeugDaten, kundeMitFahrzeug, legacyFahrzeug, sortiereFahrzeuge, splitFahrzeug } from '../lib/vehicles';
+import { mitWartungsplan, profilSignatur } from '../lib/wartung';
 import type { Customer, FahrzeugFelder, Order, Offerte, Rechnung, RechnungArt, MaterialCatalogItem, SyncStatus, Vehicle } from '../types';
 
 /** Anything that belongs to a customer's vehicle: Auftrag, Offerte, Rechnung. */
@@ -271,14 +272,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   async function addVehicle(customerId: string, data: FahrzeugFelder): Promise<Vehicle> {
     await migrateLegacy(customerId);
-    const v: Vehicle = { ...data, id: `v_${Date.now()}`, customerId, createdAt: new Date().toISOString() };
+    const v = mitWartungsplan({ ...data, id: `v_${Date.now()}`, customerId, createdAt: new Date().toISOString() });
     await syncOk(() => upsertVehicle(v));
     setVehicles((p) => [...p, v]);
     return v;
   }
 
-  async function updateVehicle(v: Vehicle) {
-    await migrateLegacy(v.customerId);
+  async function updateVehicle(neu: Vehicle) {
+    const vorher = vehiclesOf(neu.customerId).find((x) => x.id === neu.id);
+    await migrateLegacy(neu.customerId);
+    // Changed technical data (Marke, Modell, Antrieb, Getriebe, VIN, …): the
+    // Wartungsplan is matched to the vehicle's new profile.
+    const v = vorher && profilSignatur(vorher) !== profilSignatur(neu) ? mitWartungsplan(neu, vorher) : neu;
     await syncOk(() => upsertVehicle(v));
     setVehicles((p) => (p.some((x) => x.id === v.id) ? p.map((x) => (x.id === v.id ? v : x)) : [...p, v]));
   }
@@ -298,7 +303,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await syncOk(() => db.upsert('customers', { id, data: newC }, token!));
     setKunden((p) => [...p, newC]);
     if (fahrzeug && hatFahrzeugDaten(fahrzeug)) {
-      const v: Vehicle = { ...fahrzeug, id: `v_${Date.now()}`, customerId: id, createdAt: newC.createdAt };
+      const v = mitWartungsplan({ ...fahrzeug, id: `v_${Date.now()}`, customerId: id, createdAt: newC.createdAt });
       await syncOk(() => upsertVehicle(v));
       setVehicles((p) => [...p, v]);
     }

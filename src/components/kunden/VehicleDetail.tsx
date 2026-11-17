@@ -5,7 +5,8 @@ import VehicleForm from './VehicleForm';
 import Wartungsplan from './Wartungsplan';
 import { SFChevron } from '../Icons';
 import { formatDateCH } from '../../lib/utils';
-import { fahrzeugTitel, formatKm } from '../../lib/vehicles';
+import { FAHRZEUG_FELDER, fahrzeugTitel, formatKm } from '../../lib/vehicles';
+import { ANTRIEBE, GETRIEBE, STEUERTRIEBE, fahrzeugProfil, labelVon } from '../../lib/wartung';
 import { useApp } from '../../context/AppContext';
 import type { Customer, Order, ServiceItem, Vehicle } from '../../types';
 
@@ -26,6 +27,10 @@ export default function VehicleDetail({ vehicle, customer, onClose, onOrderClick
   const auftraege = orders
     .filter((o) => o.customerId === customer.id && docVehicle(o)?.id === vehicle.id)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  // Inferred technical data is marked as such; it drives the Wartungsplan.
+  const profil = fahrzeugProfil(vehicle);
+  const technik = (label?: string, erkannt?: boolean) => label && (erkannt ? `${label} (erkannt)` : label);
 
   const zeile = (label: string, value?: string) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 14 }}>
@@ -52,6 +57,10 @@ export default function VehicleDetail({ vehicle, customer, onClose, onOrderClick
         {zeile('Chassisnummer (VIN)', vehicle.chassisnummer)}
         {zeile('KM-Stand', vehicle.km ? `${formatKm(vehicle.km)} km` : undefined)}
         {zeile('1. Inv. Setzung', vehicle.erstzulassung ? formatDateCH(vehicle.erstzulassung) : undefined)}
+        {zeile('Antrieb', technik(labelVon(ANTRIEBE, profil.antrieb), profil.erkannt.antrieb))}
+        {zeile('Getriebe', technik(labelVon(GETRIEBE, profil.getriebe), profil.erkannt.getriebe))}
+        {zeile('Motor', vehicle.motor)}
+        {zeile('Steuertrieb', technik(labelVon(STEUERTRIEBE, profil.steuertrieb), profil.erkannt.steuertrieb))}
       </div>
 
       <p className="section-header" style={{ padding: '0 0 8px' }}>Wartungsplan</p>
@@ -80,7 +89,9 @@ export default function VehicleDetail({ vehicle, customer, onClose, onOrderClick
         <Sheet title="Fahrzeug bearbeiten" onClose={() => setEdit(false)}
           barRight={<button onClick={() => setEdit(false)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
           <VehicleForm initial={vehicle} onCancel={() => setEdit(false)} onSave={async (data) => {
-            const upd: Vehicle = { id: vehicle.id, customerId: vehicle.customerId, createdAt: vehicle.createdAt, service: vehicle.service, ...data };
+            // The form holds all vehicle fields: cleared ones are dropped, the rest (plan, profile) kept.
+            const upd: Vehicle = { ...vehicle, ...data };
+            for (const k of FAHRZEUG_FELDER) if (!(k in data)) delete upd[k];
             await updateVehicle(upd);
             setEdit(false);
           }} />

@@ -3,7 +3,7 @@ import { STD_SATZ } from './company';
 import type { ArbeitPosition, Customer, FahrzeugFeld, FahrzeugFelder, ServiceItem, Vehicle } from '../types';
 
 /** The vehicle fields that used to live on the Customer (see FahrzeugFeld). */
-export const FAHRZEUG_FELDER: FahrzeugFeld[] = ['marke', 'modell', 'kennzeichen', 'km', 'chassisnummer', 'erstzulassung'];
+export const FAHRZEUG_FELDER: FahrzeugFeld[] = ['marke', 'modell', 'kennzeichen', 'km', 'chassisnummer', 'erstzulassung', 'antrieb', 'getriebe', 'steuertrieb', 'motor'];
 
 export const hatFahrzeugDaten = (f: Partial<FahrzeugFelder>): boolean =>
   FAHRZEUG_FELDER.some((k) => String(f[k] ?? '').trim() !== '');
@@ -11,7 +11,7 @@ export const hatFahrzeugDaten = (f: Partial<FahrzeugFelder>): boolean =>
 /** Splits Customer data into the customer row and its vehicle fields (null: none given). */
 export function splitFahrzeug<T extends Partial<Customer>>(data: T): { kunde: Omit<T, FahrzeugFeld>; fahrzeug: FahrzeugFelder | null } {
   const kunde = { ...data };
-  const fahrzeug: FahrzeugFelder = {};
+  const fahrzeug: Record<string, string> = {};
   let given = false;
   for (const k of FAHRZEUG_FELDER) {
     if (!(k in kunde)) continue;
@@ -20,7 +20,7 @@ export function splitFahrzeug<T extends Partial<Customer>>(data: T): { kunde: Om
     if (v) fahrzeug[k] = v;
     delete kunde[k];
   }
-  return { kunde, fahrzeug: given ? fahrzeug : null };
+  return { kunde, fahrzeug: given ? fahrzeug as FahrzeugFelder : null };
 }
 
 /** Oldest first: the first vehicle is the customer's main one. */
@@ -33,7 +33,7 @@ export const sortiereFahrzeuge = (vs: Vehicle[]): Vehicle[] =>
 export function legacyFahrzeug(c: Customer): Vehicle | null {
   if (!hatFahrzeugDaten(c)) return null;
   const v: Vehicle = { id: `v_${c.id}`, customerId: c.id, createdAt: c.createdAt };
-  for (const k of FAHRZEUG_FELDER) if (c[k]) v[k] = String(c[k]);
+  for (const k of FAHRZEUG_FELDER) if (c[k]) (v as unknown as Record<string, string>)[k] = String(c[k]);
   return v;
 }
 
@@ -42,7 +42,7 @@ export function legacyFahrzeug(c: Customer): Vehicle | null {
 export function kundeMitFahrzeug(c: Customer, v: Vehicle | undefined): Customer {
   const out: Customer = { ...c };
   for (const k of FAHRZEUG_FELDER) {
-    if (v?.[k]) out[k] = v[k];
+    if (v?.[k]) (out as unknown as Record<string, string>)[k] = v[k]!;
     else delete out[k];
   }
   return out;
@@ -59,9 +59,9 @@ export const fahrzeugLabel = (v: Partial<FahrzeugFelder>): string =>
 export const fahrzeugChips = (v: Partial<FahrzeugFelder> | undefined): string[] =>
   v ? [v.marke, v.modell, v.kennzeichen, v.km ? `${formatKm(v.km)} km` : ''].filter((x): x is string => !!x) : [];
 
-/** "Marke Modell Kennzeichen 85000km", for the KI-ZE estimate. */
+/** "Marke Modell Motor Kennzeichen 85000km", for the KI-ZE estimate. */
 export const fahrzeugText = (v: Partial<FahrzeugFelder> | undefined): string =>
-  v ? [v.marke, v.modell, v.kennzeichen, v.km ? v.km + 'km' : ''].filter(Boolean).join(' ') || 'unbekannt' : 'unbekannt';
+  v ? [v.marke, v.modell, v.motor, v.antrieb, v.kennzeichen, v.km ? v.km + 'km' : ''].filter(Boolean).join(' ') || 'unbekannt' : 'unbekannt';
 
 /** 85000 → "85'000" (Swiss thousands separator). */
 export function formatKm(km: string | number | undefined): string {
@@ -75,18 +75,6 @@ const kmZahl = (km: string | number | undefined): number | null => {
 };
 
 /* ── Wartungsplan ── */
-
-/** Usual intervals for a passenger car in Switzerland; adjustable per vehicle. */
-export const STANDARD_SERVICE: { name: string; intervallKm?: number; intervallMonate?: number }[] = [
-  { name: 'Motoröl & Ölfilter',       intervallKm: 15000,  intervallMonate: 12 },
-  { name: 'Luftfilter',               intervallKm: 30000,  intervallMonate: 24 },
-  { name: 'Innenraumfilter / Pollenfilter', intervallKm: 15000, intervallMonate: 12 },
-  { name: 'Kraftstofffilter',         intervallKm: 60000,  intervallMonate: 48 },
-  { name: 'Zündkerzen',               intervallKm: 60000,  intervallMonate: 48 },
-  { name: 'Bremsflüssigkeit',         intervallMonate: 24 },
-  { name: 'Zahnriemen / Wasserpumpe', intervallKm: 120000, intervallMonate: 72 },
-  { name: 'Getriebeöl',               intervallKm: 60000 },
-];
 
 /** Former defaults, no longer part of any Wartungsplan; filtered out when an
     existing plan is shown (see the wartungsplan_defaults migrations). */
@@ -104,10 +92,6 @@ export const ohneEntfernteService = (items: ServiceItem[]): ServiceItem[] =>
   items.filter((i) => !ENTFERNTE_SERVICE.has(i.name.trim()));
 
 export const neueServiceId = () => `s_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-
-export function standardWartungsplan(): ServiceItem[] {
-  return STANDARD_SERVICE.map((s) => ({ id: neueServiceId(), name: s.name, status: 'faellig', intervallKm: s.intervallKm, intervallMonate: s.intervallMonate }));
-}
 
 /** ISO date + n months (end of month clamps, 31.01. + 1 → 28./29.02.). */
 export function plusMonate(iso: string, n: number): string {

@@ -8,8 +8,14 @@ export interface VehicleDocument {
 /** The vehicle fields of a Customer: since the vehicles table they belong to a
     Vehicle; on a Customer they mirror the vehicle a view or document refers to
     (see lib/vehicles), and they are never stored on the customer row. */
-export type FahrzeugFeld = 'marke' | 'modell' | 'kennzeichen' | 'km' | 'chassisnummer' | 'erstzulassung';
+export type FahrzeugFeld = 'marke' | 'modell' | 'kennzeichen' | 'km' | 'chassisnummer' | 'erstzulassung' | 'antrieb' | 'getriebe' | 'steuertrieb' | 'motor';
 export type FahrzeugFelder = Pick<Vehicle, FahrzeugFeld>;
+
+/** Technical data the Wartungsplan is derived from (lib/wartung); inferred from
+    Marke / Modell / VIN when not set. */
+export type Antrieb = 'benzin' | 'diesel' | 'hybrid' | 'plugin' | 'elektro' | 'gas';
+export type Getriebe = 'manuell' | 'automat' | 'dsg' | 'cvt';
+export type Steuertrieb = 'zahnriemen' | 'kette';
 
 export interface Customer {
   id: string;
@@ -23,6 +29,10 @@ export interface Customer {
   km?: string;
   chassisnummer?: string;
   erstzulassung?: string;
+  antrieb?: Antrieb;
+  getriebe?: Getriebe;
+  steuertrieb?: Steuertrieb;
+  motor?: string;
   createdAt: string;
   vehicleDocuments?: VehicleDocument[];
 }
@@ -42,9 +52,13 @@ export interface ServiceItem {
   id: string;
   name: string;
   status: ServiceStatus;
+  /** The vehicle-specific Vorlage it was made from (lib/wartung); unset = own position. */
+  vorlage?: 'oel' | 'luftfilter' | 'innenraumfilter' | 'kraftstofffilter' | 'zuendkerzen' | 'bremsfluessigkeit' | 'zahnriemen' | 'getriebeoel';
   /** Interval after which the item is due again (either or both). */
   intervallKm?: number;
   intervallMonate?: number;
+  /** Interval edited by hand: kept when the vehicle's profile changes. */
+  intervallManuell?: boolean;
   /** Last time it was done. ISO date. */
   letztesDatum?: string;
   letzteKm?: string;
@@ -68,8 +82,15 @@ export interface Vehicle {
   chassisnummer?: string;
   /** ISO date of the 1. Inverkehrsetzung. */
   erstzulassung?: string;
+  antrieb?: Antrieb;
+  getriebe?: Getriebe;
+  steuertrieb?: Steuertrieb;
+  /** Free text, e.g. "2.0 TDI 150 PS" or the engine code. */
+  motor?: string;
   createdAt: string;
   service?: ServiceItem[];
+  /** Profile (lib/wartung profilSignatur) the plan was last matched to. */
+  wartungsprofil?: string;
 }
 
 export interface OrderItem {

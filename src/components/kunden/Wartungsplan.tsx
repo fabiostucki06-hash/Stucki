@@ -4,9 +4,10 @@ import { SFCheckmark, SFClock, SFPencil, SFPlus } from '../Icons';
 import { formatDateCH } from '../../lib/utils';
 import { todayISO } from '../../lib/offerte-docs';
 import {
-  formatKm, naechsteFaelligkeit, neueServiceId, ohneEntfernteService, serviceErledigt, serviceZuruecksetzen, serviceZustand, standardWartungsplan,
+  formatKm, naechsteFaelligkeit, neueServiceId, ohneEntfernteService, serviceErledigt, serviceZuruecksetzen, serviceZustand,
   type ServiceZustand,
 } from '../../lib/vehicles';
+import { mitWartungsplan, profilSignatur, wartungsVorlagen } from '../../lib/wartung';
 import type { ServiceItem, Vehicle } from '../../types';
 
 /** Status groups, in display order. "Jetzt fällig" = overdue or due soon. */
@@ -95,6 +96,12 @@ export default function Wartungsplan({ vehicle, onSave, onOfferte }: Wartungspla
   }
   const neuePosition = () => setEdit({ item: { id: neueServiceId(), name: '', status: 'faellig' }, neu: true });
 
+  // The plan follows the vehicle's technical data (lib/wartung). Plans made
+  // before that, or before the data changed, can be matched on request.
+  const anlegen = () => save(mitWartungsplan({ ...vehicle, service: undefined }));
+  const veraltet = items.length > 0 && vehicle.wartungsprofil !== profilSignatur(vehicle);
+  const anpassen = () => save(mitWartungsplan({ ...vehicle, service: items }));
+
   const mitZustand = items
     .map((item) => ({ item, zustand: serviceZustand(item, vehicle) }))
     .sort((a, b) => RANG[a.zustand] - RANG[b.zustand]);
@@ -118,8 +125,8 @@ export default function Wartungsplan({ vehicle, onSave, onOfferte }: Wartungspla
   if (!items.length) {
     return (
       <div className="sp sp-empty">
-        <p>Noch kein Wartungsplan. Der Standard-Wartungsplan enthält Motoröl, Filter, Zündkerzen, Bremsflüssigkeit, Zahnriemen und Getriebeöl mit üblichen Intervallen – alles anpassbar.</p>
-        <button className="btn-system btn-primary" disabled={busy} onClick={() => setItems(standardWartungsplan())}>Standard-Wartungsplan anlegen</button>
+        <p>Noch kein Wartungsplan. Für dieses Fahrzeug passen: {wartungsVorlagen(vehicle).map((x) => x.name).join(', ')} – mit Richtwerten nach Marke, Antrieb und Getriebe, alles anpassbar.</p>
+        <button className="btn-system btn-primary" disabled={busy} onClick={anlegen}>Wartungsplan anlegen</button>
         <button className="sp-text-btn" disabled={busy} onClick={neuePosition}><SFPlus size={12} /> Eigene Position</button>
         {sheet}
       </div>
@@ -137,6 +144,14 @@ export default function Wartungsplan({ vehicle, onSave, onOfferte }: Wartungspla
             onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
           />
         </label>
+        {veraltet && (
+          <button
+            className="sp-text-btn" disabled={busy} onClick={anpassen}
+            title="Positionen und Intervalle an Antrieb, Getriebe und Marke anpassen. Erledigte Positionen und eigene Intervalle bleiben."
+          >
+            An Fahrzeug anpassen
+          </button>
+        )}
         <button className="sp-text-btn" disabled={busy} onClick={neuePosition}><SFPlus size={12} /> Position</button>
         <button
           className="btn-tinted sp-offerte" disabled={busy || !faellige.length} onClick={offerteErstellen}
@@ -264,11 +279,14 @@ function WartungsplanEditor({ item, neu, busy, onSave, onUndo, onDelete, onClose
 
   function submit() {
     if (!ok) return;
+    const intervallKm = num(f.intervallKm), intervallMonate = num(f.intervallMonate);
     onSave({
       ...item,
       name: f.name.trim(),
-      intervallKm: num(f.intervallKm),
-      intervallMonate: num(f.intervallMonate),
+      intervallKm,
+      intervallMonate,
+      // An edited interval is the vehicle's own: kept when its profile changes.
+      intervallManuell: item.intervallManuell || intervallKm !== item.intervallKm || intervallMonate !== item.intervallMonate || undefined,
       letztesDatum: opt(f.letztesDatum),
       letzteKm: opt(f.letzteKm),
       faelligDatum: opt(f.faelligDatum),
