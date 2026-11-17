@@ -131,16 +131,9 @@ export default function CustomerDetail({ customer, orders, onClose, onEdit, onNe
 
   return (
     <Sheet title="Kundenakte" onClose={onClose} full back barRight={<button onClick={onEdit} className="bar-btn">Bearbeiten</button>}>
-      <div className="glass-panel" style={{ padding: 16, marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
-          <div style={{
-            width: 52, height: 52, borderRadius: 26,
-            background: 'linear-gradient(to bottom,#54a4ff,#0056b3)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 20, fontWeight: 700, color: '#fff', flexShrink: 0,
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.5),0 3px 8px rgba(0,86,179,0.35)',
-            textShadow: '0 -1px 0 rgba(0,0,0,0.3)',
-          }}>
+      <div className="glass-panel" style={{ padding: '12px 14px', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="avatar avatar-lg">
             {(customer.vorname?.[0] ?? '').toUpperCase()}{(customer.nachname?.[0] ?? '').toUpperCase()}
           </div>
           <div>
@@ -164,7 +157,6 @@ export default function CustomerDetail({ customer, orders, onClose, onEdit, onNe
           const rot = offen.some((x) => x.zustand === 'ueberfaellig');
           return (
             <div key={v.id} className="list-row" tabIndex={0} onClick={() => setFahrzeugId(v.id)}>
-              <span className="list-row-icon" style={{ background: 'rgb(var(--accent-rgb) / 0.12)' }}>🚗</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="sf-subhead" style={{ fontWeight: 600 }}>{fahrzeugTitel(v)}{v.kennzeichen && <span style={{ color: 'var(--label2)', fontWeight: 500 }}> · {v.kennzeichen}</span>}</div>
                 <div className="sf-footnote" style={{ color: 'var(--label3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -182,8 +174,8 @@ export default function CustomerDetail({ customer, orders, onClose, onEdit, onNe
         })}
       </div>
 
-      <p className="section-header" style={{ padding: '0 0 8px' }}>Fahrzeugpapiere</p>
-      <div className="glass-panel" style={{ padding: 16, marginBottom: 20 }}>
+      <p className="section-header" style={{ padding: '0 0 6px' }}>Fahrzeugpapiere</p>
+      <div className="glass-panel" style={{ padding: 10, marginBottom: 16 }}>
         <input
           ref={fileInputRef}
           type="file"
@@ -197,9 +189,9 @@ export default function CustomerDetail({ customer, orders, onClose, onEdit, onNe
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => { e.preventDefault(); if (!uploading) handleFilesSelected(e.dataTransfer.files); }}
           style={{
-            border: '1.5px dashed var(--sep-opaque)', borderRadius: 12, padding: '18px 12px',
+            border: '1px dashed var(--border-strong)', borderRadius: 8, padding: '10px 12px',
             textAlign: 'center', cursor: uploading ? 'default' : 'pointer',
-            background: 'rgba(255,255,255,0.35)', marginBottom: docs.length ? 14 : 0,
+            background: 'var(--surface)', marginBottom: docs.length ? 14 : 0,
           }}
         >
           {uploading ? (
@@ -208,10 +200,9 @@ export default function CustomerDetail({ customer, orders, onClose, onEdit, onNe
               <span className="sf-footnote" style={{ color: 'var(--label2)' }}>Wird hochgeladen…</span>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: 'var(--label2)' }}>
-              <SFPaperclip size={22} />
-              <span className="sf-subhead">Dateien auswählen oder hierher ziehen</span>
-              <span className="sf-footnote" style={{ color: 'var(--label3)' }}>PDF, PNG, JPG</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: 'var(--label2)' }}>
+              <SFPaperclip size={16} />
+              <span className="sf-footnote">Dateien auswählen oder hierher ziehen <span style={{ color: 'var(--label3)' }}>· PDF, PNG, JPG</span></span>
             </div>
           )}
         </div>
@@ -242,13 +233,6 @@ export default function CustomerDetail({ customer, orders, onClose, onEdit, onNe
       </div>
 
       <button onClick={onNewOrder} className="btn-system" style={{ marginBottom: 12 }}>Neuer Auftrag</button>
-      <button
-        onClick={() => { if (window.confirm('Kunden löschen? Dies kann nicht rückgängig gemacht werden.')) onDelete(); }}
-        className="btn-system btn-destructive"
-        style={{ marginBottom: 20 }}
-      >
-        Kunden löschen
-      </button>
 
       <p className="section-header">Aufträge ({cos.length})</p>
       {!cos.length && <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--label3)', fontSize: 15 }}>Noch keine Aufträge.</div>}
@@ -267,6 +251,13 @@ export default function CustomerDetail({ customer, orders, onClose, onEdit, onNe
           </div>
         ))}
       </div>
+
+      <button
+        onClick={() => { if (window.confirm('Kunden löschen? Dies kann nicht rückgängig gemacht werden.')) onDelete(); }}
+        className="text-danger-btn"
+      >
+        Kunden löschen
+      </button>
 
       {offenesFahrzeug && (
         <VehicleDetail

@@ -80,7 +80,7 @@ export default function ShortcutKeySection() {
         />
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6, flexWrap: 'wrap' }}>
           <button type="button" className="mf-btn-save" onClick={handleCopy}>JavaScript kopieren</button>
-          {copied && <span style={{ fontSize: 12, color: '#34C759' }}>Kopiert.</span>}
+          {copied && <span style={{ fontSize: 12, color: 'var(--green)' }}>Kopiert.</span>}
         </div>
       </div>
     </>

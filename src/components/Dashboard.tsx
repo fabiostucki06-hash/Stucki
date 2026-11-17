@@ -15,22 +15,21 @@ export default function Dashboard({ customers, orders, onOrderClick }: Dashboard
 
   return (
     <div>
-      <div style={{ padding: '16px 16px 0', marginBottom: 4 }}>
-        <h1 className="sf-title1" style={{ paddingTop: 8 }}>Übersicht</h1>
+      <div style={{ padding: '14px 16px 0' }}>
+        <h1 className="sf-title1">Übersicht</h1>
       </div>
 
-      <div style={{ padding: '8px 16px' }}>
+      <div style={{ padding: '10px 16px' }}>
         <div className="stat-grid">
           {[
-            { label: 'Kunden',          v: customers.length,                                    color: 'var(--blue)',   icon: '👤' },
-            { label: 'Aktive Aufträge', v: activeOrders.length,                                 color: 'var(--orange)', icon: '🔧' },
-            { label: 'Nachzuhaken',     v: todos.length,                                        color: 'var(--red)',    icon: '⚠️' },
-            { label: 'Abgeschlossen',   v: orders.filter((o) => o.status === 'abgeschlossen').length, color: 'var(--green)',  icon: '✅' },
+            { label: 'Kunden',          v: customers.length },
+            { label: 'Aktive Aufträge', v: activeOrders.length },
+            { label: 'Nachzuhaken',     v: todos.length, warn: todos.length > 0 },
+            { label: 'Abgeschlossen',   v: orders.filter((o) => o.status === 'abgeschlossen').length },
           ].map((s) => (
             <div key={s.label} className="stat-card">
-              <div className="stat-icon">{s.icon}</div>
-              <div className="stat-number" style={{ color: s.color }}>{s.v}</div>
-              <div className="stat-label">{s.label}</div>
+              <div className="stat-label" style={{ marginTop: 0, marginBottom: 6 }}>{s.label}</div>
+              <div className="stat-number" style={s.warn ? { color: 'var(--red)' } : undefined}>{s.v}</div>
             </div>
           ))}
         </div>
@@ -74,7 +73,7 @@ export default function Dashboard({ customers, orders, onOrderClick }: Dashboard
               const c = customers.find((x) => x.id === o.customerId);
               const dv = daysSince(o.statusChangedAt);
               return (
-                <div key={o.id} className="list-row" tabIndex={0} onClick={() => onOrderClick(o)} style={{ background: isOverdue(o) ? 'rgba(255,59,48,0.06)' : 'transparent' }}>
+                <div key={o.id} className="list-row" tabIndex={0} onClick={() => onOrderClick(o)} style={isOverdue(o) ? { boxShadow: 'inset 2px 0 0 var(--red)' } : undefined}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: 16 }}>{c?.vorname ?? ''} {c?.nachname ?? ''}</div>
                     <div style={{ fontSize: 13, color: 'var(--label3)', marginTop: 1 }}>#{o.orderNumber} · {dv < 1 ? 'heute' : `${dv}T`}</div>

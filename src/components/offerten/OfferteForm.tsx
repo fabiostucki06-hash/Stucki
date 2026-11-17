@@ -263,13 +263,13 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
             className="df-span2"
             style={{
               display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, cursor: 'pointer',
-              background: mitAnzahlung ? 'rgba(0,122,255,0.12)' : 'var(--fill3)',
-              border: `1px solid ${mitAnzahlung ? 'rgba(0,122,255,0.45)' : 'transparent'}`,
+              background: mitAnzahlung ? 'rgba(59,130,246,0.12)' : 'var(--fill3)',
+              border: `1px solid ${mitAnzahlung ? 'rgba(59,130,246,0.45)' : 'transparent'}`,
             }}
           >
             <input
               type="checkbox" checked={mitAnzahlung} onChange={(e) => toggleAnzahlung(e.target.checked)}
-              style={{ width: 22, height: 22, accentColor: '#007AFF', flexShrink: 0, cursor: 'pointer' }}
+              style={{ width: 22, height: 22, accentColor: '#3b82f6', flexShrink: 0, cursor: 'pointer' }}
             />
             <span style={{ flex: 1 }}>
               <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: 'var(--label)' }}>{ANZAHLUNG_PROZENT}% Anzahlung erforderlich</span>

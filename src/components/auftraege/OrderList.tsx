@@ -38,9 +38,9 @@ export default function OrderList({ orders, customers, onOrderClick, onEditClick
   const done = filtered.filter((o) => o.status === 'abgeschlossen').sort(sortByName);
 
   return (
-    <div style={{ padding: '16px 16px 0' }}>
+    <div style={{ padding: '14px 16px 0' }}>
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-        <h1 className="sf-title1" style={{ marginBottom: 8, paddingTop: 8 }}>Aufträge</h1>
+        <h1 className="sf-title1">Aufträge</h1>
         <button onClick={onNew} className="btn-tinted">+ Neue</button>
       </div>
 
@@ -72,14 +72,14 @@ export default function OrderList({ orders, customers, onOrderClick, onEditClick
                 const c = customers.find((x) => x.id === o.customerId);
                 const ov = isOverdue(o); const dv = daysSince(o.statusChangedAt);
                 return (
-                  <div key={o.id} className="list-row" tabIndex={0} onClick={() => onOrderClick(o)} style={{ background: ov ? 'rgba(255,59,48,0.06)' : 'transparent' }}>
+                  <div key={o.id} className="list-row" tabIndex={0} onClick={() => onOrderClick(o)} style={ov ? { boxShadow: 'inset 2px 0 0 var(--red)' } : undefined}>
                     <div style={{ flex: 1 }}>
                       {ov && <div style={{ fontSize: 11, color: 'var(--red)', fontWeight: 600, marginBottom: 2 }}>Frist überschritten</div>}
                       <div style={{ fontWeight: 600, fontSize: 16 }}>#{o.orderNumber} – {c?.vorname ?? ''} {c?.nachname ?? ''}</div>
                       <div style={{ fontSize: 13, color: 'var(--label3)', marginTop: 1 }}>{docKunde(o)?.kennzeichen ?? ''} · {dv < 1 ? 'heute' : `${dv}T`}</div>
                     </div>
                     <button onClick={(e) => { e.stopPropagation(); exportOrderPDF(o, docKunde(o)); }} className="excel-btn" title="PDF herunterladen">PDF</button>
-                    <button onClick={(e) => { e.stopPropagation(); onEditClick(o); }} className="excel-btn" style={{ background: 'rgba(0,122,255,0.12)', color: 'var(--blue)', border: '1px solid rgba(0,122,255,0.25)' }} title="Bearbeiten">✎</button>
+                    <button onClick={(e) => { e.stopPropagation(); onEditClick(o); }} className="excel-btn" title="Bearbeiten">✎</button>
                     <span style={{ color: 'var(--label3)', marginLeft: 4 }}><SFChevron /></span>
                   </div>
                 );
@@ -104,7 +104,7 @@ export default function OrderList({ orders, customers, onOrderClick, onEditClick
                     <div style={{ fontSize: 12, color: 'var(--label3)' }}>{formatDateCH(o.createdAt)}</div>
                   </div>
                   <button onClick={(e) => { e.stopPropagation(); exportOrderPDF(o, docKunde(o)); }} className="excel-btn" title="PDF herunterladen">PDF</button>
-                  <button onClick={(e) => { e.stopPropagation(); onEditClick(o); }} className="excel-btn" style={{ background: 'rgba(0,122,255,0.12)', color: 'var(--blue)', border: '1px solid rgba(0,122,255,0.25)' }} title="Bearbeiten">✎</button>
+                  <button onClick={(e) => { e.stopPropagation(); onEditClick(o); }} className="excel-btn" title="Bearbeiten">✎</button>
                   <span style={{ color: 'var(--label3)' }}><SFChevron /></span>
                 </div>
               );

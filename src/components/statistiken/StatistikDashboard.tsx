@@ -104,9 +104,8 @@ export default function StatistikDashboard({ orders, offerten, rechnungen, custo
     setViewMonth(nm); setViewYear(ny);
   }
 
-  const BAR_COLORS = ['var(--blue)','var(--teal)','var(--green)','var(--orange)','var(--purple)','var(--indigo)','var(--red)','var(--yellow)'];
 
-  const miniLabel = { fontSize: 11, fontWeight: 600 as const, color: 'var(--label2)', textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginBottom: 8 };
+  const miniLabel = { fontSize: 11.5, fontWeight: 500 as const, color: 'var(--label2)', marginBottom: 6 };
 
   return (
     <div>
@@ -116,19 +115,19 @@ export default function StatistikDashboard({ orders, offerten, rechnungen, custo
           <LockIcon />
           <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--label3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Chef-Blick</span>
         </div>
-        <h1 className="sf-title1" style={{ paddingTop: 2 }}>Statistiken</h1>
+        <h1 className="sf-title1">Statistiken</h1>
       </div>
 
       <div style={{ padding: '12px 16px 0' }}>
 
         {/* ── Monatsnavigation ── */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, background: 'rgba(255,255,255,0.45)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.60)', borderRadius: 12, padding: '10px 16px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.70), 0 4px 12px rgba(0,0,0,0.06)' }}>
-          <button onClick={() => navMonth(-1)} style={{ width: 32, height: 32, background: 'rgba(0,122,255,0.10)', border: 'none', borderRadius: 8, color: 'var(--blue)', cursor: 'pointer', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '6px 8px' }}>
+          <button onClick={() => navMonth(-1)} style={{ width: 30, height: 30, background: 'transparent', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--label2)', cursor: 'pointer', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.4px', color: 'var(--label)' }}>{MONTHS_DE[viewMonth]} {viewYear}</div>
-            {isCurrentMonth && <div style={{ fontSize: 10, color: 'var(--blue)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', marginTop: 1 }}>Aktueller Monat</div>}
+            <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--label)' }}>{MONTHS_DE[viewMonth]} {viewYear}</div>
+            {isCurrentMonth && <div style={{ fontSize: 10, color: 'var(--label3)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', marginTop: 1 }}>Aktueller Monat</div>}
           </div>
-          <button onClick={() => navMonth(1)} disabled={isCurrentMonth} style={{ width: 32, height: 32, background: isCurrentMonth ? 'transparent' : 'rgba(0,122,255,0.10)', border: 'none', borderRadius: 8, color: isCurrentMonth ? 'var(--label4)' : 'var(--blue)', cursor: isCurrentMonth ? 'default' : 'pointer', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+          <button onClick={() => navMonth(1)} disabled={isCurrentMonth} style={{ width: 32, height: 32, background: 'transparent', border: '1px solid var(--border)', borderRadius: 6, color: isCurrentMonth ? 'var(--label4)' : 'var(--label2)', cursor: isCurrentMonth ? 'default' : 'pointer', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
         </div>
 
         {/* ── Reiner Gewinn (nur Arbeit bezahlter Rechnungen, Material ausgeklammert) ── */}
@@ -137,7 +136,7 @@ export default function StatistikDashboard({ orders, offerten, rechnungen, custo
           {/* Current month */}
           <div className="stat-card" style={{ position: 'relative', overflow: 'hidden' }}>
             <div style={miniLabel}>Dieser Monat</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--blue)', letterSpacing: '-0.5px', lineHeight: 1, marginBottom: 6 }}>{fCHF(curTotal)}</div>
+            <div style={{ fontSize: 22, fontWeight: 650, color: 'var(--label)', letterSpacing: '-0.5px', lineHeight: 1, marginBottom: 6, fontVariantNumeric: 'tabular-nums' }}>{fCHF(curTotal)}</div>
             {delta !== null ? (
               <div style={{ fontSize: 12, fontWeight: 600, color: delta >= 0 ? 'var(--green)' : 'var(--red)' }}>
                 {delta >= 0 ? '▲' : '▼'} {Math.abs(delta).toFixed(1)}% vs. Vormonat
@@ -145,22 +144,20 @@ export default function StatistikDashboard({ orders, offerten, rechnungen, custo
             ) : (
               <div style={{ fontSize: 12, color: 'var(--label3)' }}>Kein Vormonat</div>
             )}
-            <div style={{ position: 'absolute', right: -8, bottom: -10, fontSize: 48, opacity: 0.06 }}>💰</div>
           </div>
           {/* Previous month */}
           <div className="stat-card" style={{ position: 'relative', overflow: 'hidden' }}>
             <div style={miniLabel}>{MONTHS_DE[prevMonth]}</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--label2)', letterSpacing: '-0.5px', lineHeight: 1, marginBottom: 6 }}>{fCHF(prevTotal)}</div>
+            <div style={{ fontSize: 22, fontWeight: 650, color: 'var(--label2)', letterSpacing: '-0.5px', lineHeight: 1, marginBottom: 6, fontVariantNumeric: 'tabular-nums' }}>{fCHF(prevTotal)}</div>
             <div style={{ fontSize: 12, color: 'var(--label3)' }}>Vormonat</div>
-            <div style={{ position: 'absolute', right: -8, bottom: -10, fontSize: 48, opacity: 0.06 }}>📊</div>
           </div>
         </div>
 
         {/* Aufschlüsselung: was in den reinen Gewinn eingeflossen ist */}
-        <div className="glass-panel" style={{ padding: '14px 16px', marginBottom: 16 }}>
+        <div className="glass-panel" style={{ padding: '10px 14px', marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--label2)' }}>Bezahlte Rechnungen</span>
-            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--blue)', letterSpacing: '-0.3px' }}>{curPaidCount}</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--label)' }}>{curPaidCount}</span>
           </div>
           <div style={{ height: '0.5px', background: 'var(--sep)', marginBottom: 10 }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -171,18 +168,17 @@ export default function StatistikDashboard({ orders, offerten, rechnungen, custo
 
         {/* ── Aktivität ── */}
         <p className="section-header" style={{ paddingLeft: 0 }}>Aktivität</p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 8, marginBottom: 16 }}>
           {[
-            { label: 'Aufträge',   value: monthOrders.length,      icon: '🔧', color: 'var(--blue)'   },
-            { label: 'Erledigt',   value: doneOrders.length,       icon: '✅', color: 'var(--green)'  },
-            { label: 'Neu Kunden', value: newCustomers.length,     icon: '👤', color: 'var(--purple)' },
-            { label: 'Offerten',   value: monthOfferten.length,    icon: '📄', color: 'var(--orange)' },
-            { label: 'Angenommen', value: acceptedOfferten.length, icon: '🤝', color: 'var(--teal)'   },
+            { label: 'Aufträge',   value: monthOrders.length },
+            { label: 'Erledigt',   value: doneOrders.length },
+            { label: 'Neu Kunden', value: newCustomers.length },
+            { label: 'Offerten',   value: monthOfferten.length },
+            { label: 'Angenommen', value: acceptedOfferten.length },
           ].map((s) => (
-            <div key={s.label} className="glass-panel" style={{ padding: '12px 8px', textAlign: 'center' }}>
-              <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: s.color, letterSpacing: '-0.4px', lineHeight: 1 }}>{s.value}</div>
-              <div style={{ fontSize: 10, color: 'var(--label2)', marginTop: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em' }}>{s.label}</div>
+            <div key={s.label} className="glass-panel" style={{ padding: '10px 12px' }}>
+              <div style={{ fontSize: 11.5, color: 'var(--label2)', fontWeight: 500, marginBottom: 4 }}>{s.label}</div>
+              <div style={{ fontSize: 20, fontWeight: 650, color: 'var(--label)', letterSpacing: '-0.4px', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{s.value}</div>
             </div>
           ))}
         </div>
@@ -194,17 +190,17 @@ export default function StatistikDashboard({ orders, offerten, rechnungen, custo
             Noch keine Daten vorhanden.
           </div>
         ) : (
-          <div className="glass-panel" style={{ padding: '18px 16px', marginBottom: 20 }}>
+          <div className="glass-panel" style={{ padding: '12px 14px', marginBottom: 16 }}>
             {serviceEntries.map(([label, count], idx) => {
               const pct = Math.round((count / maxCount) * 100);
-              const color = BAR_COLORS[idx % BAR_COLORS.length];
+              const color = idx === 0 ? 'var(--accent)' : 'var(--border-strong)';
               return (
                 <div key={label} style={{ marginBottom: idx < serviceEntries.length - 1 ? 14 : 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 }}>
                     <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--label)', letterSpacing: '-0.2px' }}>{label}</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color, flexShrink: 0, marginLeft: 8 }}>{Math.floor(count)}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--label2)', flexShrink: 0, marginLeft: 8, fontVariantNumeric: 'tabular-nums' }}>{Math.floor(count)}</span>
                   </div>
-                  <div style={{ height: 7, background: 'rgba(0,0,0,0.06)', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ height: 5, background: 'var(--surface-2)', borderRadius: 3, overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 4, transition: 'width 0.7s cubic-bezier(0.16,1,0.3,1)' }} />
                   </div>
                 </div>

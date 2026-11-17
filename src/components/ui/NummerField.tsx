@@ -39,8 +39,8 @@ export default function NummerField({ label, value, onChange, vorschlag, suffix,
           </button>
         )}
       </div>
-      {(ungueltig || value.trim() === '') && <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600, color: '#FF3B30' }}>Bitte eine ganze Zahl ab 1 eingeben</div>}
-      {!ungueltig && vergeben && <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600, color: '#FF9500' }}>Achtung: Diese Nummer existiert bereits</div>}
+      {(ungueltig || value.trim() === '') && <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600, color: 'var(--red)' }}>Bitte eine ganze Zahl ab 1 eingeben</div>}
+      {!ungueltig && vergeben && <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600, color: 'var(--orange)' }}>Achtung: Diese Nummer existiert bereits</div>}
     </div>
   );
 }

@@ -120,7 +120,8 @@ export function DocActions({ primary, more = [], documents, manage = [], hint, m
           {documents.map((a) => (
             <button
               key={a.key} type="button" onClick={a.onClick} disabled={a.disabled || a.busy}
-              className={`btn-system ${a.tone === 'secondary' ? 'btn-secondary' : `btn-${a.tone ?? 'primary'}`} da-btn`}
+              // Documents are secondary: the one accent button on the card is the next step above.
+              className="btn-system btn-secondary da-btn"
             >
               {busyLabel(a, 'Bitte warten…')}
             </button>

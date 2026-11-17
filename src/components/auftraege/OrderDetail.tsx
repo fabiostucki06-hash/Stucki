@@ -153,13 +153,13 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
                 style={{ ...inp2, flex: 1, resize: 'none', overflow: 'hidden', fontFamily: 'inherit', lineHeight: 1.35 }}
               />
               {bs.length > 1 && (
-                <button onClick={() => remB(i)} style={{ background: 'rgba(255,59,48,0.10)', border: '1px solid rgba(255,59,48,0.22)', borderRadius: 9, width: 38, height: 38, color: 'var(--red)', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <button onClick={() => remB(i)} style={{ background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.22)', borderRadius: 9, width: 38, height: 38, color: 'var(--red)', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <SFXmark />
                 </button>
               )}
             </div>
           ))}
-          <button onClick={addB} style={{ width: '100%', background: 'rgba(255,255,255,0.50)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1.5px dashed rgba(0,122,255,0.38)', borderRadius: 12, padding: 10, cursor: 'pointer', color: 'var(--blue)', fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          <button onClick={addB} style={{ width: '100%', background: 'var(--surface)', border: '1px dashed var(--border-strong)', borderRadius: 12, padding: 10, cursor: 'pointer', color: 'var(--blue)', fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             <SFPlus size={16} /> Hinzufügen
           </button>
         </div>
@@ -202,9 +202,9 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
                 </div>
               );
             })}
-            <div className="list-row" style={{ cursor: 'default', background: 'rgba(0,122,255,0.12)' }}>
-              <div className="sf-headline" style={{ flex: 1, textShadow: '0 1px 4px rgba(0,0,0,0.22)' }}>Total Positionen</div>
-              <div style={{ fontWeight: 800, fontSize: 22, color: 'var(--blue)', textShadow: '0 1px 5px rgba(0,0,0,0.22)', letterSpacing: '-0.4px' }}>
+            <div className="list-row" style={{ cursor: 'default', background: 'var(--surface-2)' }}>
+              <div className="sf-headline" style={{ flex: 1 }}>Total Positionen</div>
+              <div style={{ fontWeight: 650, fontSize: 20, color: 'var(--label)', letterSpacing: '-0.4px', fontVariantNumeric: 'tabular-nums' }}>
                 CHF {sumPositions(order.positionen ?? []).total.toFixed(2)}
               </div>
             </div>

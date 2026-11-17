@@ -48,7 +48,7 @@ export default function NavBar({ syncStatus, todosCount, offerten, customers, on
             src={ASSETS.logo}
             alt="Werkstatt"
             className="werkstatt-logo"
-            style={{ maxHeight: 48, width: 'auto', objectFit: 'contain', filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.18))' }}
+            style={{ maxHeight: 32, width: 'auto', objectFit: 'contain' }}
             onError={(e) => {
               const img = e.currentTarget;
               if (!img.dataset.fb) { img.dataset.fb = '1'; img.src = '/icon_image.jpg'; }
@@ -57,12 +57,12 @@ export default function NavBar({ syncStatus, todosCount, offerten, customers, on
         </button>
 
         {/* Right side: sync indicator + todo badge */}
-        <div className="nav-actions" style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
+        <div className="nav-actions" style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
           <ActiveOffertePill offerten={offerten} customers={customers} />
           <button
             onClick={hardReload}
             className="bar-btn"
-            style={{ color: 'var(--label)' }}
+            style={{ color: 'var(--label2)' }}
             title="Seite neu laden"
             aria-label="Seite neu laden"
           >
@@ -72,7 +72,7 @@ export default function NavBar({ syncStatus, todosCount, offerten, customers, on
             <SFCloud />
           </div>
           {todosCount > 0 && (
-            <div style={{ background: 'var(--red)', color: '#fff', borderRadius: 10, padding: '2px 8px', fontSize: 13, fontWeight: 600 }}>
+            <div title="Aufträge mit Handlungsbedarf" style={{ background: 'var(--red-tint)', color: 'var(--red)', borderRadius: 980, padding: '1px 8px', fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
               {todosCount}
             </div>
           )}

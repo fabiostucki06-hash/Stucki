@@ -67,13 +67,13 @@ export default function OfferteList({ offerten, customers, onOfferteClick, onEdi
       ));
 
   return (
-    <div style={{ padding: '16px 16px 0' }}>
+    <div style={{ padding: '14px 16px 0' }}>
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 12 }}>
-        <h1 className="sf-title1" style={{ paddingTop: 8 }}>{TITLES[variant]}</h1>
+        <h1 className="sf-title1">{TITLES[variant]}</h1>
         {/* Materialofferten and ABs are derived from an existing Offerte, not created from scratch. */}
         {variant === 'alle' && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            {onImportPdf && <button onClick={onImportPdf} className="btn-tinted">PDF importieren</button>}
+            {onImportPdf && <button onClick={onImportPdf} className="btn-tinted btn-quiet">PDF importieren</button>}
             <button onClick={onNew} className="btn-tinted">+ Neue</button>
           </div>
         )}
@@ -91,7 +91,7 @@ export default function OfferteList({ offerten, customers, onOfferteClick, onEdi
         if (!grp.length) return null;
         return (
           <div key={key}>
-            <p className="section-header" style={{ paddingLeft: 0, color }}>{label} ({grp.length})</p>
+            <p className="section-header" style={{ paddingLeft: 0, display: 'flex', alignItems: 'center', gap: 6 }}><span className="dot" style={{ background: color }} />{label} ({grp.length})</p>
             <div className="inset-grouped-list" style={{ marginBottom: 4 }}>
               {/* Column labels for the desktop table layout (hidden on touch). */}
               <div className="doc-table-head" aria-hidden="true"><span className="doc-row-title">Dokument</span><span className="doc-row-sub">Kunde</span><span className="doc-row-amount">Betrag</span></div>
@@ -101,13 +101,13 @@ export default function OfferteList({ offerten, customers, onOfferteClick, onEdi
                 return (
                   <div key={off.id} className={`list-row${off.id === active?.id ? ' ao-active' : ''}`} tabIndex={0} onClick={() => onOfferteClick(off)}>
                     <div className="doc-row-main" style={{ flex: 1 }}>
-                      <div className="doc-row-title" style={{ fontWeight: 600, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div className="doc-row-title" style={{ fontWeight: 600, fontSize: 14.5, display: 'flex', alignItems: 'center', gap: 8 }}>
                         {docName} #{offerteNr(off)}
                         {off.id === active?.id && <ActiveOfferteBadge />}
                       </div>
                       <div className="doc-row-sub" style={{ fontSize: 13, color: 'var(--label2)', marginTop: 1 }}>{c ? `${c.vorname} ${c.nachname}` : 'Kein Kunde'}</div>
                       {isAB && off.ab?.fertigstellung && <div className="doc-row-extra" style={{ fontSize: 13, color: 'var(--label2)', marginTop: 1 }}>Fertigstellung: {off.ab.fertigstellung}</div>}
-                      {off.totalBetrag && <div className="doc-row-amount" style={{ fontSize: 13, fontWeight: 600, color: 'var(--blue)', marginTop: 1 }}>CHF {off.totalBetrag}</div>}
+                      {off.totalBetrag && <div className="doc-row-amount" style={{ fontSize: 13, fontWeight: 600, color: 'var(--label)', fontVariantNumeric: 'tabular-nums', marginTop: 1 }}>CHF {off.totalBetrag}</div>}
                     </div>
                     {!isAB && <ActiveOfferteToggle offerte={off} />}
                     <button
@@ -115,7 +115,7 @@ export default function OfferteList({ offerten, customers, onOfferteClick, onEdi
                       className="excel-btn"
                       title="PDF herunterladen"
                     >PDF</button>
-                    {!isAB && <button onClick={(e) => { e.stopPropagation(); onEdit(off); }} className="excel-btn" style={{ background: 'rgba(0,122,255,0.12)', color: 'var(--blue)', border: '1px solid rgba(0,122,255,0.25)' }} title="Bearbeiten">✎</button>}
+                    {!isAB && <button onClick={(e) => { e.stopPropagation(); onEdit(off); }} className="excel-btn" title="Bearbeiten">✎</button>}
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, marginLeft: 4 }}>
                       <div style={{ fontSize: 12, color: 'var(--label3)' }}>{formatDateCH(isAB && off.ab?.datum ? off.ab.datum : off.createdAt)}</div>
                       <span style={{ color: 'var(--label3)' }}><SFChevron /></span>

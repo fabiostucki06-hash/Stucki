@@ -39,9 +39,8 @@ export default function VehicleDetail({ vehicle, customer, onClose, onOrderClick
 
   return (
     <Sheet title={fahrzeugTitel(vehicle)} onClose={onClose} full back barRight={<button onClick={() => setEdit(true)} className="bar-btn">Bearbeiten</button>}>
-      <div className="glass-panel" style={{ padding: 16, marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div className="glass-panel" style={{ padding: '12px 14px', marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-          <span style={{ fontSize: 26 }}>🚗</span>
           <div style={{ minWidth: 0 }}>
             <div className="sf-title3">{fahrzeugTitel(vehicle)}</div>
             <div className="sf-footnote" style={{ color: 'var(--label2)' }}>{customer.vorname} {customer.nachname}</div>
@@ -73,7 +72,7 @@ export default function VehicleDetail({ vehicle, customer, onClose, onOrderClick
         </div>
       )}
 
-      <button onClick={remove} className="btn-system btn-destructive" style={{ marginBottom: 20 }}>Fahrzeug löschen</button>
+      <button onClick={remove} className="text-danger-btn">Fahrzeug löschen</button>
 
       {edit && (
         <Sheet title="Fahrzeug bearbeiten" onClose={() => setEdit(false)}

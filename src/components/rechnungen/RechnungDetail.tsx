@@ -60,7 +60,6 @@ const HDR: React.CSSProperties = {
   fontSize: 9, fontWeight: 700, color: 'var(--label3)',
   textTransform: 'uppercase', letterSpacing: '0.06em',
   marginBottom: 2, display: 'block',
-  textShadow: '0 1px 3px rgba(0,0,0,0.30)',
 };
 
 export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, onDelete, onEdit, onCreateSchlussrechnung, schlussrechnungNumber }: RechnungDetailProps) {
@@ -300,9 +299,8 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
         </div>
       )}
 
-      <div style={{ background: 'rgba(52,199,89,0.09)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, border: '0.5px solid rgba(52,199,89,0.22)' }}>
-        <span style={{ fontSize: 16, color: 'var(--green)' }}>✓</span>
-        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--green)' }}>Zahlungsziel:</span>
+      <div style={{ padding: '2px 2px 0', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 13.5, color: 'var(--label2)' }}>
+        <span>Zahlungsziel</span>
         {editing ? (
           <input
             type="number"
@@ -310,13 +308,13 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
             onChange={(e) => handleZahlungsFristChange(e.target.value)}
             min={1}
             style={{
-              width: 48, padding: '3px 6px', fontSize: 15, fontWeight: 700, color: '#ffffff',
-              background: 'var(--input-bg)', border: '1.5px solid rgba(52,199,89,0.55)',
+              width: 48, padding: '3px 6px', fontSize: 14, fontWeight: 600, color: 'var(--label)',
+              background: 'var(--input-bg)', border: '1px solid var(--border)',
               borderRadius: 6, textAlign: 'center', outline: 'none',
             }}
           />
-        ) : <span className="ro-value" style={{ fontSize: 15 }}>{zahlungsFrist || '—'}</span>}
-        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--green)' }}>Tage netto</span>
+        ) : <span style={{ color: 'var(--label)', fontWeight: 600 }}>{zahlungsFrist || '—'}</span>}
+        <span>Tage netto</span>
       </div>
       </>)}
 
@@ -399,8 +397,8 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
 
             {/* Live line total */}
             <div className="pos-line-total" style={{
-              fontWeight: 700, fontSize: 14,
-              color: pos.typ === 'arbeit' ? 'var(--blue)' : 'var(--green)',
+              fontWeight: 600, fontSize: 14, fontVariantNumeric: 'tabular-nums',
+              color: 'var(--label)',
               flexShrink: 0, minWidth: 68, textAlign: 'right',
               letterSpacing: '-0.2px',
             }}>
@@ -440,7 +438,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
                   : `Automatisch · ${kategorie ? KATEGORIE_LABEL[kategorie] : '—'}`}
               </div>
             </div>
-            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--blue)', flexShrink: 0, minWidth: 68, textAlign: 'right', letterSpacing: '-0.2px' }}>
+            <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--label)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 68, textAlign: 'right', letterSpacing: '-0.2px' }}>
               CHF {fCHF(KLEINTEIL_BETRAG)}
             </div>
           </div>
@@ -526,7 +524,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 10, color: 'var(--label3)', marginBottom: 1 }}>Material</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--green)' }}>CHF {fCHF(totM - fest.versand - fest.pauschalen)}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--label)', fontVariantNumeric: 'tabular-nums' }}>CHF {fCHF(totM - fest.versand - fest.pauschalen)}</div>
               </div>
               {fest.pauschalen > 0 && (
                 <div style={{ textAlign: 'right' }}>
@@ -544,7 +542,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
                 <div style={{ fontSize: 10, color: 'var(--label3)', marginBottom: 1 }}>
                   Arbeit{totZE > 0 ? ` · ${totZE} ZE` : ''}
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--blue)' }}>CHF {fCHF(totA)}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--label)', fontVariantNumeric: 'tabular-nums' }}>CHF {fCHF(totA)}</div>
               </div>
               {kleinteil > 0 && (
                 <div style={{ textAlign: 'right' }}>
@@ -581,12 +579,12 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
           ) : null}
 
           {/* Row 3: Rechnungstotal (Swiss-rounded to 0.05 CHF) */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(0,122,255,0.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--surface-2)' }}>
             <div>
               <div className="sf-headline">{anzProzent ? `Anzahlung ${anzProzent}%` : isSchluss ? 'Restbetrag (zu bezahlen)' : 'Rechnungstotal'}</div>
               <div style={{ fontSize: 10, color: 'var(--label3)', marginTop: 1 }}>gerundet auf 5 Rp.</div>
             </div>
-            <div style={{ fontWeight: 800, fontSize: 22, color: 'var(--blue)', letterSpacing: '-0.5px' }}>
+            <div style={{ fontWeight: 650, fontSize: 20, color: 'var(--label)', letterSpacing: '-0.4px', fontVariantNumeric: 'tabular-nums' }}>
               CHF {fCHF(rechnungstotal)}
             </div>
           </div>

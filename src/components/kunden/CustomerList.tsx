@@ -35,7 +35,7 @@ export default function CustomerList({ customers, orders, onCustomerClick, onNew
   return (
     <div>
       <div style={{ padding: '16px 16px 0', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-        <h1 className="sf-title1" style={{ marginBottom: 8, paddingTop: 8 }}>Kunden</h1>
+        <h1 className="sf-title1">Kunden</h1>
         <button onClick={onNew} className="btn-tinted">+ Neue</button>
       </div>
 
@@ -67,7 +67,7 @@ export default function CustomerList({ customers, orders, onCustomerClick, onNew
             const as = getActiveStatus(orders, c.id) as OrderStatus | null;
             return (
               <div key={c.id} className="list-row" tabIndex={0} onClick={() => onCustomerClick(c)}>
-                <div style={{ width: 36, height: 36, borderRadius: 18, background: 'linear-gradient(to bottom,#54a4ff,#007aff)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.5),0 2px 6px rgba(0,86,179,0.30)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#fff', flexShrink: 0, textShadow: '0 -1px 0 rgba(0,0,0,0.25)' }}>
+                <div className="avatar">
                   {(c.vorname?.[0] ?? '').toUpperCase()}{(c.nachname?.[0] ?? '').toUpperCase()}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>

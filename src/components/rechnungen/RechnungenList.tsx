@@ -46,12 +46,12 @@ export default function RechnungenList({ rechnungen: all, customers, onRechnungC
   };
 
   return (
-    <div style={{ padding: '16px 16px 0' }}>
+    <div style={{ padding: '14px 16px 0' }}>
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 12 }}>
-        <h1 className="sf-title1" style={{ paddingTop: 8 }}>{titel}</h1>
+        <h1 className="sf-title1">{titel}</h1>
         {(onNew || onImportPdf) && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            {onImportPdf && <button onClick={onImportPdf} className="btn-tinted">PDF importieren</button>}
+            {onImportPdf && <button onClick={onImportPdf} className="btn-tinted btn-quiet">PDF importieren</button>}
             {onNew && <button onClick={onNew} className="btn-tinted">+ Neue</button>}
           </div>
         )}
@@ -76,7 +76,7 @@ export default function RechnungenList({ rechnungen: all, customers, onRechnungC
         if (!grp.length) return null;
         return (
           <div key={st}>
-            <p className="section-header" style={{ paddingLeft: 0, color: STATUS_COLORS[st] }}>
+            <p className="section-header" style={{ paddingLeft: 0, display: 'flex', alignItems: 'center', gap: 6 }}><span className="dot" style={{ background: STATUS_COLORS[st] }} />
               {STATUS_LABELS[st]} ({grp.length})
             </p>
             <div className="inset-grouped-list" style={{ marginBottom: 4 }}>
@@ -92,7 +92,7 @@ export default function RechnungenList({ rechnungen: all, customers, onRechnungC
                         {c ? `${c.vorname} ${c.nachname}` : 'Kein Kunde'}
                       </div>
                       {rec.totalBetrag && (
-                        <div className="doc-row-amount" style={{ fontSize: 13, fontWeight: 600, color: 'var(--blue)', marginTop: 1 }}>
+                        <div className="doc-row-amount" style={{ fontSize: 13, fontWeight: 600, color: 'var(--label)', fontVariantNumeric: 'tabular-nums', marginTop: 1 }}>
                           CHF {rec.totalBetrag}
                         </div>
                       )}
@@ -110,7 +110,7 @@ export default function RechnungenList({ rechnungen: all, customers, onRechnungC
                     <button
                       onClick={(e) => { e.stopPropagation(); onEdit(rec); }}
                       className="excel-btn"
-                      style={{ background: 'rgba(0,122,255,0.12)', color: 'var(--blue)', border: '1px solid rgba(0,122,255,0.25)' }}
+                     
                       title="Bearbeiten"
                     >
                       ✎

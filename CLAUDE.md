@@ -1,46 +1,62 @@
-# GarageOS – Design System: Apple Liquid Glass (Aqua)
+# GarageOS – Design System: Minimal Dark (Zinc / Slate)
 
-## PFLICHT: Jede visuelle Änderung MUSS diesem Design-Skill folgen.
+## PFLICHT: Jede visuelle Änderung MUSS diesem System folgen.
+
+Flach, ruhig, platzsparend. Eine dunkle Fläche, zwei leise Erhöhungen, eine Akzentfarbe.
+Alle Tokens stehen in `src/styles/globals.css` (`:root`). Keine Hex-Werte oder rgba-Farben
+inline in Komponenten, wenn ein Token existiert.
 
 ---
 
-## CSS Design Tokens – Apple Aqua / Liquid Glass
+## Tokens
 
-### 3D-Glanzbuttons (Primary Action)
+### Flächen & Linien
 ```css
-background: linear-gradient(to bottom, #54a4ff 0%, #007aff 50%, #0056b3 100%);
-box-shadow: inset 0 1px 0px rgba(255,255,255,0.6), inset 0 -1px 2px rgba(0,0,0,0.2), 0 4px 6px rgba(0,0,0,0.15);
-border: 1px solid #004fb0;
-text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.3);
+--bg:            #09090b;  /* App-Hintergrund */
+--surface:       #121217;  /* Cards, Listen, Panels */
+--surface-2:     #18181b;  /* Inputs, Segment-Controls, Sticky-Bars */
+--surface-hover: #1f1f23;
+--border:        #27272a;  /* 1px Trennung */
+--border-strong: #3f3f46;
 ```
 
-### Milchglas-Arbeitsbereiche (Glass Container)
+### Text
 ```css
-background: rgba(255, 255, 255, 0.7);
-backdrop-filter: blur(12px);
--webkit-backdrop-filter: blur(12px);
-border: 1px solid rgba(255, 255, 255, 0.5);
-box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+--label:  #f8fafc;  /* Primärinhalt, Beträge */
+--label2: #94a3b8;  /* Sekundär: Labels, Metadaten */
+--label3: #64748b;  /* Hinweise, Section-Header */
+--label4: #475569;  /* Disabled */
+```
+
+### Akzent & Semantik
+```css
+--accent: #3b82f6;  --accent-hover: #60a5fa;  --accent-text: #93c5fd;  --accent-soft: rgba(59,130,246,0.12);
+--green:  #4ade80 / --green-tint   --orange: #fbbf24 / --orange-tint
+--red:    #f87171 / --red-tint     --purple: #c4b5fd / --purple-tint
 ```
 
 ---
 
 ## Regeln
 
-- Alle Buttons: 3D-Glanzeffekt mit dem obigen Gradient + inset Shine + text-shadow
-- Alle Container/Cards/Sheets: Glassmorphism mit rgba(255,255,255,0.7) + blur(12px)
-- Keine flachen, einfarbigen CSS-Klassen
-- Kein reines Weiß als Hintergrund – immer transluzent
-- Hover-States: leicht aufgehellt (`#68C6FF` oben) + leicht angehoben (translateY(-1px))
-- Active-States: scale(0.98) + reduzierter Schatten
-- Dark Mode: dunkle Glasgradients (`rgba(28–48, 32–54, 50–82, 0.78–0.90)`)
-- Immer -webkit-backdrop-filter UND backdrop-filter setzen
+- **Keine** backdrop-filter / Glas-Effekte, Glanz-Gradients, inset-Shines oder text-shadows.
+  Einzige Ausnahme: Nav-Bar (leicht transluzent + blur).
+- Trennung über `1px solid var(--border)`, nicht über Schatten. Schatten nur für schwebende
+  Ebenen (Dialoge, Menüs, Toasts, Sticky-Bars): `var(--shadow-lg)`.
+- **Eine** gefüllte Akzent-Schaltfläche pro Bereich (`.btn-system` / `.btn-primary`) für die
+  nächste Hauptaktion. Alles andere: `.btn-secondary` (Surface + Border) oder Text-Button.
+- Selten benötigte destruktive Aktionen: `.text-danger-btn` (roter Text), kein grosser roter Button.
+- Status-Badges: getönter Hintergrund (`--*-tint`) + farbiger Text, keine gefüllten Farbflächen.
+  Gruppen-Header: neutraler Text + kleiner Farbpunkt (`.dot`).
+- Beträge und Zahlen in `--label`, mit `font-variant-numeric: tabular-nums`. Nicht blau/grün einfärben.
+- Keine Emojis als Icons in Karten/Listen; SVG-Icons aus `Icons.tsx` oder gar kein Icon.
+- Radien klein: 6–10px (`--radius-sm` … `--radius-lg`), Pills nur für Badges/Chips.
+- Kompakt: Listenzeilen ~44px (Touch 48px), Card-Padding 12–14px, Section-Header 11px uppercase `--label3`.
+- Hover: `--surface-hover`, kein Anheben/Verschieben. Active: `scale(0.98)`.
+- Fokus: `border-color: var(--accent)` + `box-shadow: 0 0 0 3px var(--ring)`.
+- Inputs auf Touch-Geräten ≥16px Schrift (sonst zoomt iOS).
 
-## Farbpalette
-- Primary Blue: #007AFF
-- Light Blue: #54A4FF
-- Dark Blue: #0056B3
-- Border Blue: #004FB0
-- Success Green: #34C759
-- Warning Orange: #FF9500
-- Danger Red: #FF3B30
+## Farbpalette (Kurzreferenz)
+- Canvas #09090b · Surface #121217 · Surface-2 #18181b · Border #27272a
+- Text #f8fafc · Sekundär #94a3b8
+- Akzent #3B82F6 · Erfolg #4ADE80 · Warnung #FBBF24 · Fehler #F87171

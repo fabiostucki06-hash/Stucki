@@ -38,18 +38,13 @@ export default function ReauthModal({ email, onResolved }: ReauthModalProps) {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: 20,
       background: 'rgba(0,0,0,0.35)',
-      backdropFilter: 'blur(6px)',
-      WebkitBackdropFilter: 'blur(6px)',
     }}>
       <div style={{
         width: '100%', maxWidth: 360,
         borderRadius: 20,
         padding: '28px 24px',
-        background: 'rgba(255,255,255,0.7)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        border: '1px solid rgba(255,255,255,0.5)',
-        boxShadow: '0 8px 32px 0 rgba(0,0,0,0.25)',
+        background: 'var(--surface)',
+        border: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)',
       }}>
         <div style={{ textAlign: 'center', marginBottom: 20 }}>
           <h2 className="sf-title3" style={{ marginBottom: 6 }}>Sitzung abgelaufen</h2>

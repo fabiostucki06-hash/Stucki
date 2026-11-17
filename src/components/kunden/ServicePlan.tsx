@@ -79,7 +79,7 @@ export default function ServicePlan({ vehicle, onSave }: ServicePlanProps) {
     .sort((a, b) => RANG[a.zustand] - RANG[b.zustand]);
 
   return (
-    <div className="glass-panel sp" style={{ padding: 16, marginBottom: 20 }}>
+    <div className="glass-panel sp" style={{ padding: 12, marginBottom: 16 }}>
       <div className="sp-head">
         <div className="cf-field" style={{ flex: '1 1 140px' }}>
           <label className="cf-label">KM-Stand heute</label>

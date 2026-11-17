@@ -176,20 +176,16 @@ export default function ImportPartSheet({ payload, customers, offerten, defaultO
   }
 
   const gc: React.CSSProperties = {
-    background: 'rgba(255,255,255,0.10)',
-    backdropFilter: 'blur(64px) saturate(240%)',
-    WebkitBackdropFilter: 'blur(64px) saturate(240%)',
-    border: '1px solid rgba(255,255,255,0.20)',
+    background: 'var(--surface)',
+    border: '1px solid var(--border)',
     borderRadius: 18,
     padding: '10px 12px',
     marginBottom: 16,
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.65), 0 4px 24px rgba(0,0,0,0.06)',
   };
   const gcHdr: React.CSSProperties = {
     fontSize: 11, fontWeight: 700, color: 'var(--label2)',
     textTransform: 'uppercase', letterSpacing: '0.08em',
     marginBottom: 9, display: 'block',
-    textShadow: '0 1px 3px rgba(0,0,0,0.30)',
   };
 
   if (loading) {
@@ -210,7 +206,7 @@ export default function ImportPartSheet({ payload, customers, offerten, defaultO
       )}
 
       {debugInfo && (
-        <div style={{ fontSize: 11, color: 'var(--label3)', marginBottom: 12, wordBreak: 'break-all', background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.25)', borderRadius: 10, padding: '8px 10px' }}>
+        <div style={{ fontSize: 11, color: 'var(--label3)', marginBottom: 12, wordBreak: 'break-all', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 10, padding: '8px 10px' }}>
           <strong style={{ color: 'var(--red)' }}>Debug – automatische Erkennung fehlgeschlagen</strong><br />
           Erhalten: {debugInfo.raw || '(leer)'}<br />
           Entschlüsselt: {debugInfo.decoded || '(leer)'}

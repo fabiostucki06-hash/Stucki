@@ -1,12 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useApp } from './context/AppContext';
 import { showToast } from './components/ui/Toast';
-import { ASSETS } from './lib/supabase';
 import { needsAttention, decodeMaybeDouble } from './lib/utils';
-import { sampleImageColor, applyBgTheme, hexToRgb, type WallpaperThemeId } from './lib/theme';
-import { updateSettings, getActiveOfferteId, setActiveOfferteId, getMargin } from './lib/settings';
+import { getActiveOfferteId, setActiveOfferteId, getMargin } from './lib/settings';
 import { vkAusEk } from './lib/marge';
-import { useSettings } from './hooks/useSettings';
 import { cleanPartTitle } from './lib/partTitle';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { useIsDesktop } from './hooks/useIsDesktop';
@@ -86,50 +83,6 @@ export default function App() {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, []);
-
-  // Synced per user: a change on another device re-renders the background here.
-  const { wallpaper, bgMode, bgColor } = useSettings();
-  const [bgSrc, setBgSrc] = useState(wallpaper);
-  const prevBlobRef = useRef<string>('');
-
-  useEffect(() => {
-    if (bgMode !== 'image') return;
-    let cancelled = false;
-    const themeId: WallpaperThemeId =
-      wallpaper === ASSETS.wallpaper2 ? 'wallpaper-2' :
-      wallpaper === ASSETS.wallpaper3 ? 'wallpaper-3' :
-      'wallpaper-1'; // default asset + wallpaper1 both use the classic-blue theme
-    fetch(wallpaper, { cache: 'no-cache' })
-      .then(r => r.blob())
-      .then(blob => {
-        if (cancelled) return;
-        const url = URL.createObjectURL(blob);
-        if (prevBlobRef.current) URL.revokeObjectURL(prevBlobRef.current);
-        prevBlobRef.current = url;
-        setBgSrc(url);
-        // Sample the local blob (same-origin, won't taint the canvas) so text/card
-        // tokens adapt to how bright the chosen wallpaper actually is, while the
-        // accent hue itself comes from the curated per-wallpaper palette.
-        sampleImageColor(url).then((c) => applyBgTheme(c, themeId)).catch(() => {});
-      })
-      .catch(() => { if (!cancelled) setBgSrc(wallpaper); });
-    return () => { cancelled = true; };
-  }, [wallpaper, bgMode]);
-
-  // Flat color mode: no photo to sample, the chosen color itself drives the
-  // text/card/accent theme derivation (same function the wallpaper path uses).
-  useEffect(() => {
-    if (bgMode !== 'color') return;
-    applyBgTheme(hexToRgb(bgColor));
-  }, [bgMode, bgColor]);
-
-  function handleWallpaperChange(url: string) {
-    updateSettings({ wallpaper: url, bgMode: 'image' });
-  }
-
-  function handleBgColorChange(hex: string) {
-    updateSettings({ bgColor: hex, bgMode: 'color' });
-  }
 
   const [showNC,   setShowNC]   = useState(false);
   const [showNO,   setShowNO]   = useState(false);
@@ -626,22 +579,8 @@ export default function App() {
   }
 
   return (
-    <div className={`app-shell${isDesktop ? ' is-desktop' : ''}`} style={{ minHeight: '100dvh', paddingBottom: 'calc(55px + env(safe-area-inset-bottom))' }}>
+    <div className={`app-shell${isDesktop ? ' is-desktop' : ''}`} style={{ minHeight: '100dvh', paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}>
       {sessionExpired && <ReauthModal email={userEmail} onResolved={updateToken} />}
-
-      {/* Background */}
-      <div className={`bg${bgMode === 'color' ? ' flat' : ''}`} style={bgMode === 'color' ? { backgroundColor: bgColor } : undefined}>
-        {bgMode === 'image' && (
-          <img
-            src={bgSrc}
-            alt=""
-            onError={(e) => {
-              const img = e.currentTarget;
-              if (!img.dataset.fb) { img.dataset.fb = '1'; img.src = '/mac_wallpaper.png'; }
-            }}
-          />
-        )}
-      </div>
 
       <NavBar syncStatus={syncStatus} todosCount={todos.length} offerten={offerten} customers={customers} onMenuToggle={isDesktop ? undefined : () => setSidebarOpen((p) => !p)} onLogoClick={() => setTab('dashboard')} />
 
@@ -667,11 +606,6 @@ export default function App() {
         {tab === 'statistiken'   && <StatistikDashboard orders={orders} offerten={offerten} rechnungen={rechnungen} customers={customers} />}
         {tab === 'einstellungen' && (
           <SettingsView
-            currentWallpaper={wallpaper}
-            onWallpaperChange={handleWallpaperChange}
-            bgMode={bgMode}
-            bgColor={bgColor}
-            onBgColorChange={handleBgColorChange}
             syncStatus={syncStatus}
             userEmail={userEmail}
           />

@@ -77,10 +77,8 @@ export default function PdfImportSheet({ token, defaultZiel, onImported }: PdfIm
         style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
           minHeight: 180, padding: 24, borderRadius: 16, textAlign: 'center', cursor: busy ? 'default' : 'pointer',
-          background: dragOver ? 'rgba(0,122,255,0.14)' : 'var(--card-bg)',
-          WebkitBackdropFilter: 'blur(12px)', backdropFilter: 'blur(12px)',
-          border: `2px dashed ${dragOver ? '#007AFF' : 'rgba(0,122,255,0.35)'}`,
-          boxShadow: '0 8px 32px 0 rgba(0,0,0,0.1)',
+          background: dragOver ? 'rgba(59,130,246,0.14)' : 'var(--card-bg)',
+          border: `1px dashed ${dragOver ? 'var(--accent)' : 'var(--border-strong)'}`,
           transition: 'background 0.15s ease, border-color 0.15s ease',
         }}
       >
@@ -101,7 +99,7 @@ export default function PdfImportSheet({ token, defaultZiel, onImported }: PdfIm
       <input ref={inputRef} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => void handleFile(e.target.files?.[0])} />
 
       {error && (
-        <div style={{ marginTop: 14, padding: '10px 14px', borderRadius: 12, background: 'rgba(255,59,48,0.12)', color: '#FF3B30', fontSize: 14, fontWeight: 600 }}>
+        <div style={{ marginTop: 14, padding: '10px 14px', borderRadius: 12, background: 'rgba(239,68,68,0.12)', color: 'var(--red)', fontSize: 14, fontWeight: 600 }}>
           {error}
         </div>
       )}

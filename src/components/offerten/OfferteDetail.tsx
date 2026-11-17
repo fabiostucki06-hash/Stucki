@@ -47,7 +47,6 @@ const HDR: React.CSSProperties = {
   fontSize: 9, fontWeight: 700, color: 'var(--label3)',
   textTransform: 'uppercase', letterSpacing: '0.06em',
   marginBottom: 2, display: 'block',
-  textShadow: '0 1px 3px rgba(0,0,0,0.30)',
 };
 
 type StatusMeta = { c: string; l: string };
@@ -482,7 +481,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
         <input
           type="checkbox" checked={mitAnzahlung} onChange={(e) => toggleAnzahlung(e.target.checked)}
           disabled={!editing}
-          style={{ width: 22, height: 22, accentColor: '#007AFF', flexShrink: 0, cursor: editing ? 'pointer' : 'default' }}
+          style={{ width: 22, height: 22, accentColor: '#3b82f6', flexShrink: 0, cursor: editing ? 'pointer' : 'default' }}
         />
         <span style={{ flex: 1 }}>
           <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: 'var(--label)' }}>{ANZAHLUNG_PROZENT}% Anzahlung erforderlich</span>
@@ -516,9 +515,8 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
           )}
         </div>
       ) : (
-      <div style={{ background: 'rgba(52,199,89,0.09)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, border: '0.5px solid rgba(52,199,89,0.22)', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 16, color: 'var(--green)' }}>✓</span>
-        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--green)' }}>Zahlungsziel:</span>
+      <div style={{ padding: '2px 2px 0', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 13.5, color: 'var(--label2)' }}>
+        <span>Zahlungsziel</span>
         {editing ? (
           <input
             type="number"
@@ -526,13 +524,13 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
             onChange={(e) => handleZahlungszielChange(e.target.value)}
             min={1}
             style={{
-              width: 48, padding: '3px 6px', fontSize: 15, fontWeight: 700, color: '#ffffff',
-              background: 'var(--input-bg)', border: '1.5px solid rgba(52,199,89,0.55)',
+              width: 48, padding: '3px 6px', fontSize: 14, fontWeight: 600, color: 'var(--label)',
+              background: 'var(--input-bg)', border: '1px solid var(--border)',
               borderRadius: 6, textAlign: 'center', outline: 'none',
             }}
           />
-        ) : <span className="ro-value" style={{ fontSize: 15 }}>{zahlungsziel || '—'}</span>}
-        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--green)' }}>Tage netto</span>
+        ) : <span style={{ color: 'var(--label)', fontWeight: 600 }}>{zahlungsziel || '—'}</span>}
+        <span>Tage netto</span>
       </div>
       )}
 
@@ -630,9 +628,9 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
                   onClick={() => togglePos(i, true)}
                   style={{
                     fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 100, cursor: 'pointer',
-                    background: accepted ? 'rgba(52,199,89,0.15)' : 'var(--fill3)',
+                    background: accepted ? 'var(--green-tint)' : 'transparent',
                     color: accepted ? 'var(--green)' : 'var(--label3)',
-                    border: accepted ? '1px solid rgba(52,199,89,0.3)' : '1px solid rgba(0,0,0,0.08)',
+                    border: accepted ? '1px solid rgba(34,197,94,0.3)' : '1px solid var(--border)',
                     transition: 'all 0.12s',
                   }}
                 >✓ Angenommen</button>
@@ -640,9 +638,9 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
                   onClick={() => togglePos(i, false)}
                   style={{
                     fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 100, cursor: 'pointer',
-                    background: !accepted ? 'rgba(255,59,48,0.12)' : 'var(--fill3)',
+                    background: !accepted ? 'var(--red-tint)' : 'transparent',
                     color: !accepted ? 'var(--red)' : 'var(--label3)',
-                    border: !accepted ? '1px solid rgba(255,59,48,0.25)' : '1px solid rgba(0,0,0,0.08)',
+                    border: !accepted ? '1px solid rgba(239,68,68,0.25)' : '1px solid var(--border)',
                     transition: 'all 0.12s',
                   }}
                 >✕ Abgelehnt</button>
@@ -703,7 +701,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
 
         {/* Accepted subtotal */}
         {positionen.length > 0 && (
-          <div className="list-row" style={{ cursor: 'default', background: 'rgba(0,122,255,0.06)', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+          <div className="list-row" style={{ cursor: 'default', background: 'var(--surface-2)', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
             {([
               ['Material Total', acceptedMaterial - acceptedKleinteil - acceptedFest.versand - acceptedFest.pauschalen, positionen.some((p) => p.typ === 'material' && !p.art && p.beschreibung !== 'Kleinteil Pauschale')],
               ['Arbeit Total', acceptedArbeit, acceptedArbeit > 0 || positionen.some((p) => p.typ === 'arbeit')],
@@ -723,7 +721,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
                   ({acceptedCount}/{positionen.length})
                 </span>
               </div>
-              <div style={{ fontWeight: 700, fontSize: 20, color: 'var(--blue)' }}>
+              <div style={{ fontWeight: 700, fontSize: 20, color: 'var(--label)', fontVariantNumeric: 'tabular-nums' }}>
                 CHF {acceptedTotal.toFixed(2)}
               </div>
             </div>

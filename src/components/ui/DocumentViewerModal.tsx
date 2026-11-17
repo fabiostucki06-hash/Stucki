@@ -35,7 +35,7 @@ export default function DocumentViewerModal({ doc, url, loading, error, deleting
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 900, display: 'flex', flexDirection: 'column', background: 'rgba(10,12,20,0.92)', animation: 'fade-in 0.15s ease' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 900, display: 'flex', flexDirection: 'column', background: 'rgba(9,9,11,0.96)', animation: 'fade-in 0.15s ease' }}
       onClick={onClose}
     >
       <div
@@ -43,8 +43,8 @@ export default function DocumentViewerModal({ doc, url, loading, error, deleting
         style={{
           display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px',
           paddingTop: 'calc(12px + env(safe-area-inset-top))',
-          background: 'rgba(28,32,50,0.80)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-          borderBottom: '1px solid rgba(255,255,255,0.12)', flexShrink: 0,
+          background: 'var(--surface-2)',
+          borderBottom: '1px solid var(--border)', flexShrink: 0,
         }}
       >
         <button onClick={onClose} className="bar-btn" style={{ color: '#fff' }} aria-label="Schliessen"><SFXmark /></button>

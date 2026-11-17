@@ -30,168 +30,39 @@ export default function Sidebar({ open: openProp, activeTab, onTabChange, onClos
   const open = docked || openProp;
   return (
     <>
-      {/* Backdrop */}
-      {!docked && <div
-        onClick={onClose}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 300,
-          background: 'rgba(0,0,0,0.14)',
-          backdropFilter: 'blur(6px)',
-          WebkitBackdropFilter: 'blur(6px)',
-          opacity: open ? 1 : 0,
-          pointerEvents: open ? 'auto' : 'none',
-          transition: 'opacity 0.25s ease',
-        }}
-      />}
+      {!docked && <div className={`sb-backdrop${open ? ' open' : ''}`} onClick={onClose} />}
 
-      {/* Sidebar Panel */}
-      <div
-        className={docked ? 'sidebar-docked no-print' : 'no-print'}
-        style={{
-          position: 'fixed',
-          top: docked ? 'calc(60px + env(safe-area-inset-top))' : 0,
-          left: 0,
-          bottom: 0,
-          width: docked ? 260 : 'min(292px, 86vw)',
-          zIndex: docked ? 150 : 400,
-          background: 'rgba(255,255,255,0.10)',
-          backdropFilter: 'blur(80px) saturate(280%)',
-          WebkitBackdropFilter: 'blur(80px) saturate(280%)',
-          borderRight: '1px solid rgba(255,255,255,0.20)',
-          boxShadow: open ? '6px 0 48px rgba(0,0,0,0.08), inset -1px 0 0 rgba(255,255,255,0.50)' : 'none',
-          transform: open ? 'translateX(0)' : 'translateX(-100%)',
-          transition: docked ? 'none' : 'transform 0.30s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-          display: 'flex',
-          flexDirection: 'column',
-          paddingTop: docked ? 0 : 'env(safe-area-inset-top)',
-        }}
-      >
+      <div className={`sb no-print${docked ? ' sb-docked sidebar-docked' : ''}${open ? ' open' : ''}`}>
         {/* Header (overlay only; the docked sidebar sits under the nav bar) */}
         {!docked && (
-        <div style={{
-          height: 60,
-          display: 'flex',
-          alignItems: 'center',
-          padding: '0 16px',
-          borderBottom: '1px solid rgba(0,0,0,0.07)',
-        }}>
-          <span style={{ fontWeight: 700, fontSize: 20, letterSpacing: -0.3, color: 'var(--label)', flex: 1 }}>
-            Menü
-          </span>
-          <button
-            onClick={onClose}
-            className="bar-btn"
-            aria-label="Menü schliessen"
-            style={{ color: 'var(--label2)', width: 44, height: 44, minWidth: 44, minHeight: 44, borderRadius: 12, background: 'rgba(120,120,128,0.10)' }}
-          >
-            <SFXmark />
-          </button>
-        </div>
+          <div className="sb-head">
+            <span className="sb-title">Menü</span>
+            <button onClick={onClose} className="bar-btn" aria-label="Menü schliessen" style={{ color: 'var(--label2)' }}>
+              <SFXmark />
+            </button>
+          </div>
         )}
 
-        {/* Navigation Items */}
-        <nav style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <nav className="sb-nav">
           {SIDEBAR_ITEMS.map((item) => {
             const active = activeTab === item.id;
             return (
               <button
                 key={item.id}
-                className="sidebar-item"
+                className={`sidebar-item sb-item${active ? ' active' : ''}`}
                 aria-current={active ? 'page' : undefined}
                 onClick={() => { onTabChange(item.id); onClose(); }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 13,
-                  padding: '11px 14px',
-                  borderRadius: 12,
-                  border: active ? '1px solid rgb(var(--accent-rgb) / 0.18)' : '1px solid transparent',
-                  cursor: 'pointer',
-                  width: '100%',
-                  textAlign: 'left',
-                  background: active
-                    ? 'rgb(var(--accent-rgb) / 0.10)'
-                    : 'transparent',
-                  color: active ? 'var(--blue)' : 'var(--label)',
-                  fontWeight: active ? 600 : 400,
-                  fontSize: 17,
-                  letterSpacing: -0.4,
-                  transition: 'all 0.15s ease',
-                  boxShadow: active ? 'inset 0 1px 0 rgba(255,255,255,0.70)' : 'none',
-                }}
-                onMouseEnter={(e) => {
-                  if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0,0,0,0.04)';
-                }}
-                onMouseLeave={(e) => {
-                  if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
-                }}
               >
-                <div style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 9,
-                  background: active ? 'rgb(var(--accent-rgb) / 0.14)' : 'rgba(120,120,128,0.10)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: active ? 'var(--blue)' : 'var(--label2)',
-                  flexShrink: 0,
-                  transition: 'all 0.15s ease',
-                }}>
-                  {item.icon}
-                </div>
+                <span className="sb-icon">{item.icon}</span>
                 {item.label}
               </button>
             );
           })}
         </nav>
 
-        {/* Footer */}
-        <div style={{
-          padding: '8px 10px',
-          borderTop: '1px solid rgba(0,0,0,0.07)',
-          paddingBottom: 'calc(16px + env(safe-area-inset-bottom))',
-        }}>
-          <button
-            onClick={onLogout}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 13,
-              padding: '11px 14px',
-              borderRadius: 12,
-              border: '1px solid transparent',
-              cursor: 'pointer',
-              width: '100%',
-              textAlign: 'left',
-              background: 'transparent',
-              color: 'var(--red)',
-              fontWeight: 500,
-              fontSize: 16,
-              letterSpacing: -0.3,
-              transition: 'background 0.15s ease',
-            }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,59,48,0.07)'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
-          >
-            Abmelden
-          </button>
-          {/* Build timestamp */}
-          <div
-            title={__BUILD_TIME__}
-            style={{
-              margin: '6px 14px 0',
-              fontSize: 10.5,
-              color: 'var(--label3)',
-              letterSpacing: '0.02em',
-              fontVariantNumeric: 'tabular-nums',
-              userSelect: 'none',
-            }}
-          >
-            {BUILD_LABEL}
-          </div>
+        <div className="sb-foot">
+          <button onClick={onLogout} className="sb-item sb-logout">Abmelden</button>
+          <div className="sb-build" title={__BUILD_TIME__}>{BUILD_LABEL}</div>
         </div>
       </div>
     </>
