@@ -1,15 +1,19 @@
 import { fahrzeugProfil, markeAusVin, normMotorcode } from './wartung';
+import { SUPA_KEY, SUPA_URL, getFreshToken } from './supabase';
 import type { Antrieb, FahrzeugFelder, Getriebe, Steuertrieb } from '../types';
 
 /* ── VIN → vehicle data ──
    A VIN is WMI (1–3, manufacturer) · VDS (4–9) · VIS (10–17, 10 = model year).
-   The VDS is manufacturer-coded; for European cars it rarely holds more than
-   the model line. Two sources, merged:
+   Resolved server-side by the Edge Function vin-decode (supabase/functions):
+   ISO 3779 parse, NHTSA vPIC and configured commercial decoders, then an AI
+   lookup with web search; cached per VIN pattern in vin_cache. Where the VIN
+   doesn't encode the engine (most European / Asian VINs), it returns the
+   factory engine variants of that model and year (`varianten`) to pick from.
+   When the function isn't reachable, a local fallback runs in the browser:
    - local rules: WMI → Marke, VAG model code (7–8), Mercedes Baureihe (4–6);
    - NHTSA vPIC (public, CORS-enabled): complete for US-market VINs, often only
      Marke / Modell for European ones.
-   The Motorkennbuchstabe is not part of a European VIN; it comes from the
-   Fahrzeugausweis / Datenträger. What couldn't be resolved is reported. */
+   What couldn't be resolved is reported. */
 
 export const vinGueltig = (vin?: string): string | undefined =>
   (vin ?? '').replace(/\s/g, '').toUpperCase().match(/^[A-HJ-NPR-Z0-9]{17}$/)?.[0];
@@ -105,14 +109,46 @@ async function vpic(vin: string, signal?: AbortSignal): Promise<Vpic | null> {
   return j.Results?.[0] ?? null;
 }
 
+/** One factory engine configuration of the decoded model / year, offered as a chip. */
+export interface VinVariante {
+  motor: string;
+  motorcode: string;
+  antrieb: Antrieb | '';
+  getriebe: Getriebe | '';
+  steuertrieb: Steuertrieb | '';
+  hinweis: string;
+}
+
+/** Result of the Edge Function vin-decode (mirrors Ergebnis there). */
+interface VinServerErgebnis {
+  felder: Partial<FahrzeugFelder>;
+  modelljahr?: number;
+  generation?: string;
+  motorEindeutig: boolean;
+  varianten: VinVariante[];
+  sicherheit?: 'hoch' | 'mittel' | 'niedrig';
+  hinweis?: string;
+  quellen: string[];
+}
+
 export interface VinErgebnis {
   /** Resolved fields (only non-empty ones). */
   felder: Partial<FahrzeugFelder>;
-  /** Model year as decoded by vPIC (not the 1. Inverkehrsetzung). */
+  /** Model year (not the 1. Inverkehrsetzung). */
   modelljahr?: number;
+  /** Generation / platform, e.g. "5G, 2012–2020". */
+  generation?: string;
+  /** Engine variants to pick from when the VIN doesn't settle the engine. */
+  varianten: VinVariante[];
   /** Fields the VIN didn't resolve, e.g. "Motorkennbuchstabe". */
   offen: string[];
-  /** The online lookup failed (offline, blocked): only local rules were used. */
+  /** Where the data comes from, e.g. ["ISO 3779", "NHTSA vPIC", "KI-Recherche (Web)"]. */
+  quellen: string[];
+  /** Served from vin_cache. */
+  cache?: boolean;
+  hinweis?: string;
+  sicherheit?: 'hoch' | 'mittel' | 'niedrig';
+  /** The server lookup failed (offline, blocked): only the local fallback was used. */
   offline?: boolean;
 }
 
@@ -120,17 +156,40 @@ const FELD_LABEL: Partial<Record<keyof FahrzeugFelder, string>> = {
   marke: 'Marke', modell: 'Modell', antrieb: 'Antrieb', getriebe: 'Getriebe', motor: 'Motor', motorcode: 'Motorkennbuchstabe', steuertrieb: 'Steuertrieb',
 };
 
-/** Decodes a VIN: local rules first, NHTSA vPIC for the rest. Throws only for an invalid VIN. */
-export async function vinAbrufen(eingabe: string, signal?: AbortSignal): Promise<VinErgebnis> {
-  const vin = vinGueltig(eingabe);
-  if (!vin) throw new Error('Ungültige VIN (17 Zeichen, ohne I, O, Q)');
-  const felder: Partial<FahrzeugFelder> = lokal(vin);
-  let offline = false;
-  let modelljahr: number | undefined;
+/** Steuertrieb from a documented engine family, Motorkennbuchstabe normalised; returns the open fields. */
+function abschliessen(vin: string, felder: Partial<FahrzeugFelder>, varianten: VinVariante[]): string[] {
+  const p = fahrzeugProfil({ ...felder, chassisnummer: vin });
+  if (!felder.steuertrieb && p.steuertriebQuelle === 'motor' && p.steuertrieb) felder.steuertrieb = p.steuertrieb as Steuertrieb;
+  if (felder.motorcode) felder.motorcode = normMotorcode(felder.motorcode);
+  // An EV has neither Motorkennbuchstabe-based intervals nor a Steuertrieb; picking a variant fills the engine fields.
+  const irrelevant: (keyof FahrzeugFelder)[] = p.antrieb === 'elektro' ? ['motorcode', 'steuertrieb'] : [];
+  if (varianten.length) irrelevant.push('antrieb', 'getriebe', 'motor', 'motorcode', 'steuertrieb');
+  return (Object.keys(FELD_LABEL) as (keyof FahrzeugFelder)[])
+    .filter((k) => !felder[k] && !irrelevant.includes(k)).map((k) => FELD_LABEL[k]!);
+}
 
+async function server(vin: string, signal?: AbortSignal): Promise<{ ergebnis: VinServerErgebnis; cache: boolean }> {
+  const token = await getFreshToken();
+  if (!token) throw new Error('Nicht angemeldet');
+  const r = await fetch(`${SUPA_URL}/functions/v1/vin-decode`, {
+    method: 'POST', signal,
+    headers: { 'Content-Type': 'application/json', apikey: SUPA_KEY, Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ vin }),
+  });
+  const j = await r.json().catch(() => ({})) as { ok?: boolean; error?: string; quelle?: string; ergebnis?: VinServerErgebnis };
+  if (!r.ok || !j.ok || !j.ergebnis) throw new Error(j.error || `HTTP ${r.status}`);
+  return { ergebnis: j.ergebnis, cache: j.quelle === 'cache' };
+}
+
+/** Local fallback: WMI / VDS rules and NHTSA vPIC from the browser. */
+async function lokalAbrufen(vin: string, signal?: AbortSignal): Promise<VinErgebnis> {
+  const felder: Partial<FahrzeugFelder> = lokal(vin);
+  const quellen = ['ISO 3779'];
+  let modelljahr: number | undefined;
   try {
     const r = await vpic(vin, signal);
     if (r) {
+      quellen.push('NHTSA vPIC');
       // Only what vPIC confirms: many European makers don't encode the year in char 10.
       modelljahr = parseInt(r.ModelYear ?? '', 10) || undefined;
       if (!felder.marke && r.Make) felder.marke = titel(r.Make);
@@ -144,17 +203,27 @@ export async function vinAbrufen(eingabe: string, signal?: AbortSignal): Promise
     }
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e;
-    offline = true;
   }
+  return { felder, modelljahr, varianten: [], offen: abschliessen(vin, felder, []), quellen, offline: true };
+}
 
-  // Steuertrieb only when an engine family settles it, not assumed from the Marke.
-  const p = fahrzeugProfil({ ...felder, chassisnummer: vin });
-  if (p.steuertriebQuelle === 'motor' && p.steuertrieb) felder.steuertrieb = p.steuertrieb as Steuertrieb;
-  if (felder.motorcode) felder.motorcode = normMotorcode(felder.motorcode);
-
-  // An EV has neither Motorkennbuchstabe-based intervals nor a Steuertrieb.
-  const irrelevant = p.antrieb === 'elektro' ? ['motorcode', 'steuertrieb'] : [];
-  const offen = (Object.keys(FELD_LABEL) as (keyof FahrzeugFelder)[])
-    .filter((k) => !felder[k] && !irrelevant.includes(k)).map((k) => FELD_LABEL[k]!);
-  return { felder, modelljahr, offen, offline };
+/** Decodes any valid VIN via the Edge Function, else locally. Throws only for an invalid VIN. */
+export async function vinAbrufen(eingabe: string, signal?: AbortSignal): Promise<VinErgebnis> {
+  const vin = vinGueltig(eingabe);
+  if (!vin) throw new Error('Ungültige VIN (17 Zeichen, ohne I, O, Q)');
+  let antwort: Awaited<ReturnType<typeof server>>;
+  try {
+    antwort = await server(vin, signal);
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') throw e;
+    return lokalAbrufen(vin, signal);
+  }
+  const { ergebnis: e, cache } = antwort;
+  const felder: Partial<FahrzeugFelder> = {};
+  for (const [k, v] of Object.entries(e.felder) as [keyof FahrzeugFelder, string][]) if (v) (felder as Record<string, string>)[k] = v;
+  const varianten = e.motorEindeutig ? [] : e.varianten ?? [];
+  return {
+    felder, modelljahr: e.modelljahr, generation: e.generation, varianten, offen: abschliessen(vin, felder, varianten),
+    quellen: e.quellen ?? [], cache, hinweis: e.hinweis, sicherheit: e.sicherheit,
+  };
 }

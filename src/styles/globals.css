@@ -975,6 +975,14 @@ select.mf-add-pos.df-pauschale-select{-webkit-appearance:none;appearance:none;co
 .vin-status-warn{border-left-color:var(--orange)}
 .vin-abweichend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;color:var(--label)}
 .vin-abweichend .sp-text-btn{height:28px;padding:0 8px}
+.vin-varianten{display:flex;flex-direction:column;gap:6px;margin-top:4px;color:var(--label)}
+.vin-chips{display:flex;flex-wrap:wrap;gap:6px}
+.vin-chip{display:inline-flex;align-items:center;min-height:32px;padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--label);font-family:inherit;font-size:12.5px;line-height:1.35;text-align:left;cursor:pointer;font-variant-numeric:tabular-nums;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:background 0.12s,border-color 0.12s}
+.vin-chip:hover{background:var(--surface-hover)}
+.vin-chip:active{transform:scale(0.98)}
+.vin-chip:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
+.vin-chip-aktiv{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-text)}
+@media (pointer:coarse){.vin-chip{min-height:40px}}
 @media (pointer:coarse){.vin-row .cf-input{font-size:16px}}
 .sp-tile-actions{display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:10px;border-top:1px solid var(--border)}
 .sp-switch{display:flex;flex:1;min-width:0;max-width:280px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:2px;gap:2px}

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Spinner from '../ui/Spinner';
 import { ANTRIEBE, GETRIEBE, STEUERTRIEBE, fahrzeugProfil, labelVon } from '../../lib/wartung';
-import { vinAbrufen, vinGueltig } from '../../lib/vin';
+import { vinAbrufen, vinGueltig, type VinVariante } from '../../lib/vin';
 import type { FahrzeugFelder } from '../../types';
 
 /** "Automatisch – erkannt: Diesel" / "Automatisch – unbekannt": the empty option of a technical select. */
@@ -22,7 +22,14 @@ interface VinStatus {
   warnung?: boolean;
   /** VIN values differing from what was entered by hand: taken over only on request. */
   abweichend?: Partial<FahrzeugFelder>;
+  /** Factory engine variants when the VIN doesn't settle the engine: one tap fills the engine fields. */
+  varianten?: VinVariante[];
+  /** Index of the picked variant. */
+  gewaehlt?: number;
 }
+
+/** "1.5 TSI · 110 kW (150 PS) · DPCA" */
+const variantenText = (v: VinVariante) => [v.motor, v.motorcode, v.hinweis].filter(Boolean).join(' · ');
 
 /** The vehicle inputs, shared by the vehicle sheet and the new-customer form.
     A complete VIN (top of the form) is looked up (lib/vin) when entered, on blur
@@ -50,7 +57,7 @@ export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k
     abbruch.current?.abort();
     const ac = new AbortController();
     abbruch.current = ac;
-    setVin({ laden: true, text: 'VIN wird abgerufen…' });
+    setVin({ laden: true, text: 'VIN wird analysiert – Herstellerdaten und Web-Recherche, beim ersten Mal bis zu einer Minute…' });
     try {
       const r = await vinAbrufen(nr, ac.signal);
       const jetzt = aktuell.current;
@@ -64,15 +71,30 @@ export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k
       }
       const teile = [
         gefuellt.length ? `Aus VIN übernommen: ${gefuellt.join(', ')}.` : 'Keine leeren Felder zu ergänzen.',
-        r.modelljahr ? `Modelljahr ${r.modelljahr}.` : '',
+        [r.modelljahr ? `Modelljahr ${r.modelljahr}` : '', r.generation ? `Generation ${r.generation}` : ''].filter(Boolean).join(' · ') + (r.modelljahr || r.generation ? '.' : ''),
+        r.hinweis ?? '',
         r.offen.length ? `Nicht aus der VIN ermittelbar: ${r.offen.join(', ')} – bitte Fahrzeugausweis / Datenträger prüfen.` : '',
-        r.offline ? 'Online-Abfrage nicht erreichbar, nur Marke/Modell aus der VIN-Struktur.' : '',
+        r.offline ? 'VIN-Server nicht erreichbar, nur lokale Auswertung und NHTSA.' : '',
+        r.quellen.length ? `Quellen: ${r.quellen.join(', ')}${r.cache ? ' (gespeichert)' : ''}.` : '',
       ].filter(Boolean);
-      setVin({ text: teile.join(' '), warnung: r.offen.length > 0 || r.offline, abweichend: Object.keys(abweichend).length ? abweichend : undefined });
+      setVin({
+        text: teile.join(' '), warnung: r.offen.length > 0 || !!r.offline || r.sicherheit === 'niedrig',
+        abweichend: Object.keys(abweichend).length ? abweichend : undefined,
+        varianten: r.varianten.length ? r.varianten : undefined,
+      });
     } catch (e) {
       if ((e as Error).name === 'AbortError') return;
       setVin({ text: (e as Error).message || 'VIN-Abfrage fehlgeschlagen.', warnung: true });
     }
+  }
+
+  /** A picked engine variant overwrites the engine fields; empty values leave the field as it is. */
+  function varianteWaehlen(i: number) {
+    const v = vin?.varianten?.[i];
+    if (!v) return;
+    const werte: Partial<FahrzeugFelder> = { motor: v.motor, motorcode: v.motorcode.includes('/') ? '' : v.motorcode, antrieb: v.antrieb || undefined, getriebe: v.getriebe || undefined, steuertrieb: v.steuertrieb || undefined };
+    for (const [k, w] of Object.entries(werte) as [keyof FahrzeugFelder, string | undefined][]) if (w) onChange(k, w);
+    setVin({ ...vin!, gewaehlt: i });
   }
 
   function uebernehmen() {
@@ -109,9 +131,24 @@ export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k
                 <button type="button" className="sp-text-btn" onClick={uebernehmen}>Übernehmen</button>
               </span>
             )}
+            {vin.varianten && (
+              <div className="vin-varianten">
+                <span>Motor nicht in der VIN codiert – Motorisierung wählen:</span>
+                <div className="vin-chips">
+                  {vin.varianten.map((v, i) => (
+                    <button
+                      key={i} type="button" className={`vin-chip${vin.gewaehlt === i ? ' vin-chip-aktiv' : ''}`} aria-pressed={vin.gewaehlt === i}
+                      onClick={() => varianteWaehlen(i)} title="Antrieb, Getriebe, Motor, Motorkennbuchstabe und Steuertrieb übernehmen"
+                    >
+                      {variantenText(v)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
-          <p className="vin-hint">17 Zeichen – füllt Marke, Modell, Antrieb, Getriebe, Motor und Steuertrieb automatisch aus.</p>
+          <p className="vin-hint">17 Zeichen, alle Marken – füllt Marke, Modell, Antrieb, Getriebe, Motor, Motorkennbuchstabe und Steuertrieb automatisch aus.</p>
         )}
       </div>
 
