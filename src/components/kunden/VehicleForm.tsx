@@ -25,8 +25,8 @@ interface VinStatus {
 }
 
 /** The vehicle inputs, shared by the vehicle sheet and the new-customer form.
-    A complete VIN is looked up (lib/vin) when entered, on blur or via "VIN
-    abrufen": empty fields (and selects on "Automatisch") are filled in, values
+    A complete VIN (top of the form) is looked up (lib/vin) when entered, on blur
+    or via "Daten abrufen": empty fields (and selects on "Automatisch") are filled in, values
     entered by hand are only replaced on request. */
 export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k: keyof FahrzeugFelder, v: string) => void }) {
   const s = (k: keyof FahrzeugFelder) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => onChange(k, e.target.value);
@@ -83,6 +83,39 @@ export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k
 
   return (
     <div className="cf-group">
+      {/* VIN first: a complete VIN fills the vehicle data below. */}
+      <div className="vin-bar">
+        <label className="cf-label" htmlFor="vf-vin">Chassisnummer (VIN)</label>
+        <div className="vin-row">
+          <input
+            id="vf-vin" className="cf-input vin-input" value={f.chassisnummer ?? ''} placeholder="z.B. WAUZZZ8TX9A020101" maxLength={20}
+            autoCapitalize="characters" autoComplete="off" spellCheck={false}
+            onChange={(e) => { onChange('chassisnummer', e.target.value); if (vinGueltig(e.target.value)) void vinLaden(e.target.value, false); }}
+            onBlur={(e) => void vinLaden(e.target.value, false)}
+          />
+          <button
+            type="button" className="btn-system btn-secondary vin-btn" disabled={vin?.laden || !vinGueltig(f.chassisnummer)}
+            onClick={() => void vinLaden(f.chassisnummer, true)} title="Fahrzeugdaten aus der VIN ermitteln"
+          >
+            {vin?.laden ? <Spinner size={13} color="var(--accent)" /> : 'Daten abrufen'}
+          </button>
+        </div>
+        {vin ? (
+          <div className={`vin-status${vin.warnung ? ' vin-status-warn' : ''}`} role="status" aria-live="polite">
+            <span>{vin.text}</span>
+            {vin.abweichend && (
+              <span className="vin-abweichend">
+                VIN abweichend: {Object.entries(vin.abweichend).map(([k, v]) => `${FELD_LABEL[k as keyof FahrzeugFelder]} ${anzeige(k as keyof FahrzeugFelder, v)}`).join(' · ')}
+                <button type="button" className="sp-text-btn" onClick={uebernehmen}>Übernehmen</button>
+              </span>
+            )}
+          </div>
+        ) : (
+          <p className="vin-hint">17 Zeichen – füllt Marke, Modell, Antrieb, Getriebe, Motor und Steuertrieb automatisch aus.</p>
+        )}
+      </div>
+
+      {/* Vehicle data (from the VIN). Technical data decides which Wartungsplan items apply and their intervals. */}
       <div className="cf-grid-2">
         <div className="cf-field">
           <label className="cf-label">Marke</label>
@@ -93,52 +126,6 @@ export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k
           <input className="cf-input" value={f.modell ?? ''} onChange={s('modell')} placeholder="z.B. 320d" />
         </div>
       </div>
-      <div className="cf-grid-2" style={{ marginTop: 10 }}>
-        <div className="cf-field">
-          <label className="cf-label">Kontrollschild</label>
-          <input className="cf-input" value={f.kennzeichen ?? ''} onChange={s('kennzeichen')} placeholder="ZH 123456" />
-        </div>
-        <div className="cf-field">
-          <label className="cf-label">KM-Stand</label>
-          <input className="cf-input" type="number" inputMode="numeric" value={f.km ?? ''} onChange={s('km')} placeholder="85000" />
-        </div>
-      </div>
-      <div className="cf-grid-2" style={{ marginTop: 10 }}>
-        <div className="cf-field">
-          <label className="cf-label" htmlFor="vf-vin">Chassisnummer (VIN)</label>
-          <div className="vin-row">
-            <input
-              id="vf-vin" className="cf-input" value={f.chassisnummer ?? ''} placeholder="WBA12345678901234" autoCapitalize="characters" spellCheck={false}
-              onChange={(e) => { onChange('chassisnummer', e.target.value); if (vinGueltig(e.target.value)) void vinLaden(e.target.value, false); }}
-              onBlur={(e) => void vinLaden(e.target.value, false)}
-            />
-            <button
-              type="button" className="btn-system btn-secondary vin-btn" disabled={vin?.laden || !vinGueltig(f.chassisnummer)}
-              onClick={() => void vinLaden(f.chassisnummer, true)} title="Fahrzeugdaten aus der VIN ermitteln"
-            >
-              {vin?.laden ? <Spinner size={13} color="var(--accent)" /> : 'VIN abrufen'}
-            </button>
-          </div>
-        </div>
-        <div className="cf-field">
-          <label className="cf-label">1. Inv. Setzung</label>
-          <input className="cf-input" type="date" value={f.erstzulassung ?? ''} onChange={s('erstzulassung')} />
-        </div>
-      </div>
-
-      {vin && (
-        <div className={`vin-status${vin.warnung ? ' vin-status-warn' : ''}`} role="status" aria-live="polite">
-          <span>{vin.text}</span>
-          {vin.abweichend && (
-            <span className="vin-abweichend">
-              VIN abweichend: {Object.entries(vin.abweichend).map(([k, v]) => `${FELD_LABEL[k as keyof FahrzeugFelder]} ${anzeige(k as keyof FahrzeugFelder, v)}`).join(' · ')}
-              <button type="button" className="sp-text-btn" onClick={uebernehmen}>Übernehmen</button>
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Technical data: decides which Wartungsplan items apply and their intervals. */}
       <div className="cf-grid-2" style={{ marginTop: 10 }}>
         <div className="cf-field">
           <label className="cf-label">Antrieb</label>
@@ -173,6 +160,22 @@ export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k
             <option value="">{auto(f.steuertrieb ? undefined : labelVon(STEUERTRIEBE, p.steuertrieb))}</option>
             {STEUERTRIEBE.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
+        </div>
+        <div className="cf-field">
+          <label className="cf-label">1. Inv. Setzung</label>
+          <input className="cf-input" type="date" value={f.erstzulassung ?? ''} onChange={s('erstzulassung')} />
+        </div>
+      </div>
+
+      {/* Registration / workshop data: entered by hand. */}
+      <div className="cf-grid-2 vf-manual">
+        <div className="cf-field">
+          <label className="cf-label">Kontrollschild</label>
+          <input className="cf-input" value={f.kennzeichen ?? ''} onChange={s('kennzeichen')} placeholder="ZH 123456" />
+        </div>
+        <div className="cf-field">
+          <label className="cf-label">KM-Stand</label>
+          <input className="cf-input" type="number" inputMode="numeric" value={f.km ?? ''} onChange={s('km')} placeholder="85000" />
         </div>
       </div>
     </div>
