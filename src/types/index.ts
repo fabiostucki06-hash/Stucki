@@ -27,7 +27,7 @@ export interface Customer {
   vehicleDocuments?: VehicleDocument[];
 }
 
-/** One entry of a vehicle's Service-Wartungsplan (wear part or service job).
+/** One entry of a vehicle's Wartungsplan (wear part or service job).
     'gemacht' = done (at the last visit), 'faellig' = due in the future. The
     item counts as due anyway once faelligDatum or faelligKm is reached. */
 export type ServiceStatus = 'gemacht' | 'faellig';

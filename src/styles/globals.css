@@ -920,59 +920,72 @@ select.mf-add-pos.df-pauschale-select{-webkit-appearance:none;appearance:none;co
 .df .cf-select{padding-right:30px}
 
 
-/* ── SERVICE-WARTUNGSPLAN (Fahrzeugprofil) ──
-   Theme variables (--label*, --sep, --fill4, --card-border) follow applyBgTheme(),
-   so the plan reads on light and dark glass alike. */
-.sp-head{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px}
-.sp-counts{display:flex;gap:6px;flex-wrap:wrap}
+/* ── WARTUNGSPLAN (Fahrzeugprofil) ──
+   Status groups (Fällig / In Zukunft fällig / Erledigt) of compact checklist
+   rows: check circle · name + interval · next due on the right. */
+.sp{margin-bottom:16px}
+.sp-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px}
+.sp-km{display:flex;align-items:center;gap:10px;min-width:0}
+.sp-km>span{font-size:12.5px;color:var(--label2);white-space:nowrap}
+.sp-km .cf-input{width:120px;height:34px;padding:0 10px;font-variant-numeric:tabular-nums}
+.sp-text-btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;height:34px;padding:0 10px;border:none;border-radius:var(--radius-sm);background:transparent;color:var(--accent-text);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;transition:background 0.12s}
+.sp-text-btn:hover{background:var(--surface-hover)}
+.sp-text-btn:active{transform:scale(0.98)}
+.sp-text-btn:disabled{opacity:0.5;cursor:default;transform:none}
+.sp-group-head{display:flex;align-items:center;gap:7px;margin:14px 0 6px;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--label3)}
+.sp-group-count{margin-left:auto;font-weight:500;letter-spacing:0;font-variant-numeric:tabular-nums}
+.sp-list{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.sp-row{display:flex;align-items:center;min-height:48px;padding-left:4px;transition:background 0.12s}
+.sp-row+.sp-row{border-top:1px solid var(--border)}
+.sp-row:hover{background:var(--surface-hover)}
+.sp-check,.sp-flag{flex:none;width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;padding:0;border:none;background:transparent;cursor:pointer;border-radius:var(--radius-md);touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.sp-check:active .sp-circle,.sp-flag:active{transform:scale(0.92)}
+.sp-check:disabled,.sp-flag:disabled{cursor:default;opacity:0.6}
+.sp-circle{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border-strong);display:inline-flex;align-items:center;justify-content:center;color:var(--bg);transition:background 0.12s,border-color 0.12s,transform 0.08s}
+.sp-circle svg{width:12px;height:12px}
+.sp-row-faellig .sp-check:hover .sp-circle{border-color:var(--label3)}
+.sp-check.on .sp-circle{background:var(--green);border-color:var(--green)}
+.sp-row-ueberfaellig .sp-circle{border-color:var(--red)}
+.sp-row-bald .sp-circle{border-color:var(--orange)}
+.sp-flag{width:40px;margin-right:2px;color:var(--label3)}
+.sp-flag:hover{color:var(--accent-text);background:var(--surface-2)}
+.sp-main{flex:1;min-width:0;display:flex;align-items:center;gap:10px;align-self:stretch;padding:7px 10px 7px 2px;border:none;background:transparent;color:inherit;font-family:inherit;text-align:left;cursor:pointer}
+.sp-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.sp-name{font-size:14px;font-weight:500;color:var(--label);line-height:1.3;overflow-wrap:anywhere}
+.sp-row-gemacht .sp-name{color:var(--label2)}
+.sp-sub{font-size:12px;color:var(--label3);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.sp-due{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:1px;text-align:right}
+.sp-due .sp-badge{margin-bottom:2px}
+.sp-due-val{font-size:12.5px;line-height:1.35;color:var(--label);font-variant-numeric:tabular-nums;white-space:nowrap}
+.sp-row-gemacht .sp-due-val{color:var(--label2)}
+.sp-due-label{font-size:11px;color:var(--label3)}
+.sp-chevron{flex:none;display:inline-flex;color:var(--label4)}
 .sp-badge{font-size:11px;font-weight:500;border-radius:980px;padding:2px 8px;white-space:nowrap}
 .sp-badge-red{color:var(--red);background:var(--red-tint)}
 .sp-badge-orange{color:var(--orange);background:var(--orange-tint)}
-.sp-badge-green{color:var(--green);background:var(--green-tint)}
-.sp-badge-blue{color:var(--accent-text);background:var(--accent-soft)}
-.sp-filter{display:flex;gap:2px;padding:2px;border-radius:var(--radius-md);background:var(--surface-2);border:1px solid var(--border);margin-bottom:10px}
-.sp-filter button{flex:1;min-width:0;height:26px;border:none;border-radius:6px;background:transparent;color:var(--label2);font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background 0.12s,color 0.12s}
-.sp-filter button.active{color:var(--label);background:var(--surface-hover);box-shadow:inset 0 0 0 1px var(--border-strong)}
-.sp-list{display:flex;flex-direction:column;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden}
-.sp-item{background:transparent;border-left:2px solid var(--accent);padding:9px 12px}
-.sp-item-ueberfaellig{border-left-color:var(--red)}
-.sp-item-bald{border-left-color:var(--orange)}
-.sp-item-gemacht{border-left-color:var(--green)}
-.sp-item-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.sp-name{font-size:15px;font-weight:600;color:var(--label);min-width:0;overflow-wrap:anywhere}
-.sp-meta{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:12px;color:var(--label3);margin-top:3px}
-.sp-meta .sp-next{color:var(--label2);font-weight:600}
-.sp-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px}
-.sp-check{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px 0 6px;border-radius:6px;font-family:inherit;font-size:12.5px;font-weight:500;cursor:pointer;color:var(--label2);background:transparent;border:1px solid var(--border);transition:background 0.12s,color 0.12s,border-color 0.12s}
-.sp-check:hover{background:var(--surface-2)}
-.sp-check:active{transform:scale(0.98);box-shadow:none}
-.sp-check:disabled{opacity:0.5;transform:none;cursor:default}
-.sp-box{width:14px;height:14px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border-strong);flex-shrink:0}
-.sp-box svg{width:10px;height:10px}
-.sp-check-green.on{color:var(--green);background:var(--green-tint);border-color:rgba(34,197,94,0.35)}
-.sp-check-blue.on{color:var(--accent-text);background:var(--accent-soft);border-color:rgba(59,130,246,0.35)}
-.sp-check.on .sp-box{border-color:currentColor;background:transparent}
-.sp-check-green.on:hover{background:rgba(34,197,94,0.18)}
-.sp-check-blue.on:hover{background:rgba(59,130,246,0.18)}
-.sp-edit{margin-left:auto;background:none;border:none;color:var(--blue);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;padding:4px 2px}
-.sp-editor{display:flex;flex-direction:column;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid var(--sep)}
-.sp-history{font-size:12px;color:var(--label2);display:flex;flex-direction:column;gap:2px}
-.sp-editor-actions{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.sp-del{display:inline-flex;align-items:center;gap:5px;background:none;border:none;color:var(--red);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer}
-.sp-add,.sp-add-vehicle{display:inline-flex;align-items:center;justify-content:center;gap:5px;font-family:inherit;font-weight:700;cursor:pointer;white-space:nowrap}
-.sp-add{width:100%;margin-top:8px;height:32px;background:transparent;border:1px dashed var(--border-strong);border-radius:var(--radius-md);color:var(--label2);font-size:12.5px;font-weight:500}
-.sp-add:hover{background:var(--surface-2);color:var(--label)}
-.sp-add-vehicle{height:28px;padding:0 10px;border-radius:6px;font-size:12.5px;font-weight:500;color:var(--accent-text);background:transparent;border:1px solid var(--border);transition:background 0.12s}
+.sp-check:focus-visible,.sp-flag:focus-visible,.sp-main:focus-visible,.sp-text-btn:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring)}
+.sp-empty{text-align:center;padding:16px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg)}
+.sp-empty p{font-size:13px;color:var(--label2);line-height:1.5;margin:0 0 12px}
+.sp-empty .sp-text-btn{margin-top:6px}
+.sp-editor{display:flex;flex-direction:column;gap:10px}
+.sp-editor-head{font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--label3);margin:6px 0 -2px}
+.sp-history{list-style:none;margin:6px 0 0;padding:0;font-size:13px;color:var(--label2);display:flex;flex-direction:column;gap:4px;font-variant-numeric:tabular-nums}
+.sp-history li{display:flex;align-items:center;gap:8px}
+.sp-history-check{display:inline-flex;color:var(--green)}
+.sp-history-check svg{width:12px;height:12px}
+.sp-editor .text-danger-btn{margin-top:0}
+@media (max-width:400px){
+  .sp-km>span{font-size:12px}
+  .sp-km .cf-input{width:100px}
+  .sp-chevron{display:none}
+}
+.sp-add-vehicle{display:inline-flex;align-items:center;justify-content:center;gap:5px;font-family:inherit;cursor:pointer;white-space:nowrap;height:28px;padding:0 10px;border-radius:6px;font-size:12.5px;font-weight:500;color:var(--accent-text);background:transparent;border:1px solid var(--border);transition:background 0.12s}
 .sp-add-vehicle:hover{background:var(--accent-soft)}
 .sp-add-vehicle:active{transform:scale(0.98)}
 .df-service-hint{font-size:12.5px;font-weight:500;border-radius:var(--radius-md);padding:7px 10px;line-height:1.4}
 .df-service-hint.red{color:var(--red);background:var(--red-tint);border:none}
 .df-service-hint.orange{color:var(--orange);background:var(--orange-tint);border:none}
 
-.sp-item+.sp-item{border-top:1px solid var(--border)}
-.sp-item-ueberfaellig{border-left-color:var(--red)}
-.sp-item-bald{border-left-color:var(--orange)}
-.sp-item-gemacht{border-left-color:var(--green)}
 
 /* ── SIDEBAR ── */
 .sb-backdrop{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.55);opacity:0;pointer-events:none;transition:opacity 0.2s ease}

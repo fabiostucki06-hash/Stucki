@@ -129,7 +129,14 @@ export const SFDownload = ({ size = 16 }: { size?: number }) => (
   </svg>
 );
 
-export const SFTrash = ({ size = 16 }: { size?: number }) => (
+export const SFClock = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+    <circle cx={8} cy={8} r={6.25} stroke="currentColor" strokeWidth={1.5}/>
+    <path d="M8 4.75V8l2.25 1.5" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+export const SFTrash =({ size = 16 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
     <path d="M3 4.5h10M6.5 4.5V3a1 1 0 011-1h1a1 1 0 011 1v1.5m-6.5 0L4.3 13a1 1 0 001 .9h5.4a1 1 0 001-.9l.8-8.5" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/>
   </svg>

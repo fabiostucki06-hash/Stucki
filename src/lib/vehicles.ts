@@ -73,7 +73,7 @@ const kmZahl = (km: string | number | undefined): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
-/* ── Service-Wartungsplan ── */
+/* ── Wartungsplan ── */
 
 /** Usual intervals for a passenger car in Switzerland; adjustable per vehicle. */
 export const STANDARD_SERVICE: { name: string; intervallKm?: number; intervallMonate?: number }[] = [
@@ -96,7 +96,7 @@ export const STANDARD_SERVICE: { name: string; intervallKm?: number; intervallMo
 
 export const neueServiceId = () => `s_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
-export function standardServicePlan(): ServiceItem[] {
+export function standardWartungsplan(): ServiceItem[] {
   return STANDARD_SERVICE.map((s) => ({ id: neueServiceId(), name: s.name, status: 'faellig', intervallKm: s.intervallKm, intervallMonate: s.intervallMonate }));
 }
 

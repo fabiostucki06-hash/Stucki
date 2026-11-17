@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Sheet from '../ui/Sheet';
 import Badge from '../ui/Badge';
 import VehicleForm from './VehicleForm';
-import ServicePlan from './ServicePlan';
+import Wartungsplan from './Wartungsplan';
 import { SFChevron } from '../Icons';
 import { formatDateCH } from '../../lib/utils';
 import { fahrzeugTitel, formatKm } from '../../lib/vehicles';
@@ -16,7 +16,7 @@ interface VehicleDetailProps {
   onOrderClick: (o: Order) => void;
 }
 
-/** Fahrzeugprofil: data, Service-Wartungsplan and the vehicle's Aufträge. */
+/** Fahrzeugprofil: data, Wartungsplan and the vehicle's Aufträge. */
 export default function VehicleDetail({ vehicle, customer, onClose, onOrderClick }: VehicleDetailProps) {
   const { orders, updateVehicle, deleteVehicle, docVehicle } = useApp();
   const [edit, setEdit] = useState(false);
@@ -52,8 +52,8 @@ export default function VehicleDetail({ vehicle, customer, onClose, onOrderClick
         {zeile('1. Inv. Setzung', vehicle.erstzulassung ? formatDateCH(vehicle.erstzulassung) : undefined)}
       </div>
 
-      <p className="section-header" style={{ padding: '0 0 8px' }}>Service-Wartungsplan</p>
-      <ServicePlan key={vehicle.id} vehicle={vehicle} onSave={updateVehicle} />
+      <p className="section-header" style={{ padding: '0 0 8px' }}>Wartungsplan</p>
+      <Wartungsplan key={vehicle.id} vehicle={vehicle} onSave={updateVehicle} />
 
       <p className="section-header" style={{ padding: '0 0 8px' }}>Aufträge ({auftraege.length})</p>
       {!auftraege.length && <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--label3)', fontSize: 15 }}>Noch keine Aufträge für dieses Fahrzeug.</div>}
