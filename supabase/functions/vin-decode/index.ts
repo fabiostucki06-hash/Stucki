@@ -3,12 +3,15 @@
 //   Authorization: Bearer <access token of a signed-in user>
 //
 // Pipeline for any 17-character ISO 3779 VIN (src/lib/vin.ts consumes the result):
-//   1. ISO 3779 parse: WMI (1–3) → Marke / Region / Land, VDS (4–9), check digit (9),
-//      model year (10, 30-year cycle; North-American position-7 rule), plant (11).
-//   2. Lookups in parallel: NHTSA vPIC (always) and the commercial decoders whose
+//   1. ISO 3779 parse: WMI (1–3) → Marke / Region / Land, VDS (4–9) → Modell for
+//      makes with a built-in table (vds.ts), check digit (9), model year (10,
+//      30-year cycle; North-American position-7 rule), plant (11).
+//   2. Lookups in parallel: NHTSA vPIC (free, always) and the commercial decoders whose
 //      keys are set (VINCARIO_API_KEY + VINCARIO_SECRET_KEY, AUTODEV_API_KEY,
 //      CARAPI_TOKEN). Then Claude with web search (ANTHROPIC_API_KEY) resolves
 //      Marke, Modell, Generation, Jahr and, where the VIN settles it, the engine.
+//      Steps 1–2 need no key: without any, the function still resolves the
+//      VIN from the built-in tables and vPIC (complete for North-American VINs).
 //   3. When the VIN doesn't encode the engine (most European / Asian VINs, e.g.
 //      "ZZZ" filler in the VDS), the factory engine variants of that model and
 //      year are returned as `varianten`, which the form offers as one-tap chips.
@@ -16,6 +19,7 @@
 
 import Anthropic from 'npm:@anthropic-ai/sdk@0.135.0';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { vdsModell } from './vds.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -28,7 +32,7 @@ const json = (body: unknown, status = 200) =>
 const env = (k: string) => Deno.env.get(k) || undefined;
 const MODEL = 'claude-opus-5-5';
 /** Bump when the result shape or prompt changes: older cache rows are resolved again. */
-const VERSION = 2;
+const VERSION = 3;
 
 type Antrieb = 'benzin' | 'diesel' | 'hybrid' | 'plugin' | 'elektro' | 'gas';
 type Getriebe = 'manuell' | 'automat' | 'dsg' | 'cvt';
@@ -374,7 +378,8 @@ function zusammenfuehren(vin: string, funde: Fund[], ki: KiAntwort | null): Erge
   const felder: Felder = {};
   // Decoders in order of trust; a later one only fills what is still empty.
   for (const f of funde) for (const [k, v] of Object.entries(f.felder) as [keyof Felder, string][]) if (v && !felder[k]) (felder as Record<string, string>)[k] = v;
-  if (!felder.marke && wmiMarke && !wmiMarke.includes('/')) felder.marke = wmiMarke;
+  // The workshop's spelling ("VW", "Mercedes") rather than the decoder's ("Volkswagen", "Mercedes-Benz").
+  if (wmiMarke && !wmiMarke.includes('/')) felder.marke = wmiMarke;
 
   let varianten: Variante[] = [];
   let motorEindeutig = !!(felder.motorcode || (nordamerika && felder.motor));
@@ -403,8 +408,11 @@ function zusammenfuehren(vin: string, funde: Fund[], ki: KiAntwort | null): Erge
     }
   }
   if (felder.antrieb === 'elektro') { delete felder.motorcode; delete felder.steuertrieb; }
-  const jahrVin = modelljahrAusVin(vin);
-  const modelljahr = (ki?.modelljahr || undefined) ?? funde.find((f) => f.jahr)?.jahr ?? jahrVin;
+  // Char 10 is the model year in North America and for most makers elsewhere, but not on
+  // European Mercedes VINs (serial number). vPIC only echoes the year passed in for non-US VINs.
+  const jahrVin = /^(WD|W1)/.test(vin) && !nordamerika ? undefined : modelljahrAusVin(vin);
+  const jahrDecoder = funde.find((f) => f.jahr && (nordamerika || f.quelle !== 'NHTSA vPIC'))?.jahr;
+  const modelljahr = (ki?.modelljahr || undefined) ?? jahrDecoder ?? jahrVin;
   return {
     version: VERSION, felder, modelljahr, generation: ki?.generation || undefined, region, land,
     pruefziffer: pruefzifferOk(vin) ? 'ok' : 'falsch', motorEindeutig, varianten,
@@ -444,23 +452,25 @@ Deno.serve(async (req) => {
   const analyse = {
     wmi: vin.slice(0, 3), markeLautWmi: WMI3[vin.slice(0, 3)] ?? WMI2[vin.slice(0, 2)] ?? 'unbekannt', region, land,
     vds: vin.slice(3, 9), pruefziffer: pruefzifferOk(vin) ? 'gültig' : 'ungültig (ausserhalb Nordamerikas oft nicht verwendet)',
-    modelljahrZeichen10: vin[9], modelljahrLautVin: jahr ?? 'unbekannt', werkZeichen11: vin[10], seriennummer: vin.slice(11),
+    modelljahrZeichen10: vin[9], modelljahrLautVin: /^(WD|W1)/.test(vin) && !/[1-5]/.test(vin[0]) ? 'nicht codiert (Mercedes Europa)' : jahr ?? 'unbekannt', werkZeichen11: vin[10], seriennummer: vin.slice(11),
   };
 
   const fehler: string[] = [];
-  const quellen = [nhtsa(vin, /[1-5]/.test(vin[0]) ? undefined : jahr), vincario(vin), autodev(vin), carapi(vin)];
+  const quellen = [nhtsa(vin, /^[1-5]|^WD|^W1/.test(vin) ? undefined : jahr), vincario(vin), autodev(vin), carapi(vin)];
   const funde = (await Promise.allSettled(quellen)).flatMap((r) => {
     if (r.status === 'rejected') { fehler.push(String((r.reason as Error)?.message ?? r.reason)); return []; }
     return r.value ? [r.value] : [];
   });
   // vPIC returns a bare Make for most non-US VINs: commercial decoders first when they answered.
   funde.sort((a, b) => (a.quelle === 'NHTSA vPIC' && !/[1-5]/.test(vin[0]) ? 1 : 0) - (b.quelle === 'NHTSA vPIC' && !/[1-5]/.test(vin[0]) ? 1 : 0));
+  // The built-in VDS table names the model line with its generation: ahead of every decoder.
+  const modell = vdsModell(analyse.markeLautWmi, vin);
+  if (modell) funde.unshift({ quelle: 'VDS-Tabelle', felder: { modell }, roh: { modellLautVds: modell } });
 
   let ki: KiAntwort | null = null;
   try { ki = await kiRecherche(vin, analyse, funde); } catch (e) { fehler.push(`KI: ${(e as Error).message}`); }
 
   const ergebnis = zusammenfuehren(vin, funde, ki);
-  if (!kiMoeglich) ergebnis.hinweis = [ergebnis.hinweis, 'KI-Recherche nicht konfiguriert (ANTHROPIC_API_KEY fehlt).'].filter(Boolean).join(' ');
   // Only cache a result that resolved something beyond the WMI.
   if (ergebnis.felder.modell || ki) {
     await supa.from('vin_cache').upsert({ muster, vin, data: ergebnis, quellen: ergebnis.quellen, updated_at: new Date().toISOString() });
