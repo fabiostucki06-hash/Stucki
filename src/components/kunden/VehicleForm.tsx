@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Spinner from '../ui/Spinner';
 import { ANTRIEBE, GETRIEBE, STEUERTRIEBE, fahrzeugProfil, labelVon } from '../../lib/wartung';
 import { vinAbrufen, vinGueltig, type VinVariante } from '../../lib/vin';
+import { motorVarianten } from '../../lib/motorkatalog';
 import type { FahrzeugFelder } from '../../types';
 
 /** "Automatisch – erkannt: Diesel" / "Automatisch – unbekannt": the empty option of a technical select. */
@@ -22,22 +23,23 @@ interface VinStatus {
   warnung?: boolean;
   /** VIN values differing from what was entered by hand: taken over only on request. */
   abweichend?: Partial<FahrzeugFelder>;
-  /** Factory engine variants when the VIN doesn't settle the engine: one tap fills the engine fields. */
+  /** Engine variants of the VIN lookup (AI or Motorkatalog for the decoded model). */
   varianten?: VinVariante[];
-  /** Index of the picked variant. */
-  gewaehlt?: number;
 }
 
 /** "1.5 TSI · 110 kW (150 PS) · DPCA" */
 const variantenText = (v: VinVariante) => [v.motor, v.motorcode, v.hinweis].filter(Boolean).join(' · ');
 
 /** The vehicle inputs, shared by the vehicle sheet and the new-customer form.
+    Where Marke / Modell are known but the engine isn't, the factory engines of
+    the built-in Motorkatalog are offered as chips (also without a VIN).
     A complete VIN (top of the form) is looked up (lib/vin) when entered, on blur
     or via "Daten abrufen": empty fields (and selects on "Automatisch") are filled in, values
     entered by hand are only replaced on request. */
 export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k: keyof FahrzeugFelder, v: string) => void }) {
   const s = (k: keyof FahrzeugFelder) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => onChange(k, e.target.value);
   const p = fahrzeugProfil(f);
+  const katalog = useMemo(() => motorVarianten(f.marke, f.modell, p.baujahr), [f.marke, f.modell, p.baujahr]);
 
   const [vin, setVin] = useState<VinStatus | null>(null);
   const aktuell = useRef(f);
@@ -88,13 +90,20 @@ export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k
     }
   }
 
-  /** A picked engine variant overwrites the engine fields; empty values leave the field as it is. */
-  function varianteWaehlen(i: number) {
-    const v = vin?.varianten?.[i];
-    if (!v) return;
-    const werte: Partial<FahrzeugFelder> = { motor: v.motor, motorcode: v.motorcode.includes('/') ? '' : v.motorcode, antrieb: v.antrieb || undefined, getriebe: v.getriebe || undefined, steuertrieb: v.steuertrieb || undefined };
-    for (const [k, w] of Object.entries(werte) as [keyof FahrzeugFelder, string | undefined][]) if (w) onChange(k, w);
-    setVin({ ...vin!, gewaehlt: i });
+  // Offered while the engine is open, and kept visible once one of them is picked.
+  const varianten = vin?.varianten ?? katalog;
+  const zeigeVarianten = varianten.length > 0 && !(varianten.length === 1 && varianten[0].antrieb === 'elektro')
+    && ((!f.motor && !f.motorcode) || varianten.some((x) => x.motor === f.motor));
+
+  /** A picked engine variant overwrites the engine fields; a field the variant leaves open is cleared
+      only for the Motorkennbuchstabe (it belongs to the previous pick). */
+  function varianteWaehlen(v: VinVariante) {
+    const code = v.motorcode.includes('/') ? '' : v.motorcode;
+    onChange('motor', v.motor);
+    onChange('motorcode', code);
+    if (v.antrieb) onChange('antrieb', v.antrieb);
+    if (v.getriebe) onChange('getriebe', v.getriebe);
+    if (v.steuertrieb) onChange('steuertrieb', v.steuertrieb);
   }
 
   function uebernehmen() {
@@ -130,21 +139,6 @@ export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k
                 VIN abweichend: {Object.entries(vin.abweichend).map(([k, v]) => `${FELD_LABEL[k as keyof FahrzeugFelder]} ${anzeige(k as keyof FahrzeugFelder, v)}`).join(' · ')}
                 <button type="button" className="sp-text-btn" onClick={uebernehmen}>Übernehmen</button>
               </span>
-            )}
-            {vin.varianten && (
-              <div className="vin-varianten">
-                <span>Motor nicht in der VIN codiert – Motorisierung wählen:</span>
-                <div className="vin-chips">
-                  {vin.varianten.map((v, i) => (
-                    <button
-                      key={i} type="button" className={`vin-chip${vin.gewaehlt === i ? ' vin-chip-aktiv' : ''}`} aria-pressed={vin.gewaehlt === i}
-                      onClick={() => varianteWaehlen(i)} title="Antrieb, Getriebe, Motor, Motorkennbuchstabe und Steuertrieb übernehmen"
-                    >
-                      {variantenText(v)}
-                    </button>
-                  ))}
-                </div>
-              </div>
             )}
           </div>
         ) : (
@@ -189,6 +183,27 @@ export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k
           <input className="cf-input" value={f.motorcode ?? ''} onChange={s('motorcode')} placeholder="z.B. CFFB / B47D20 / OM651" autoCapitalize="characters" />
         </div>
       </div>
+      {zeigeVarianten && (
+        <div className="vin-varianten">
+          <span className="vin-varianten-titel">
+            Motorisierung wählen{f.modell ? ` – ${[f.marke, f.modell].filter(Boolean).join(' ')}` : ''}
+            {varianten.some((x) => x.motorcode.includes('/') || !x.motorcode) ? ' · genauen Motorkennbuchstaben vom Fahrzeugausweis ergänzen' : ''}
+          </span>
+          <div className="vin-chips">
+            {varianten.map((v, i) => {
+              const aktiv = v.motor === f.motor;
+              return (
+                <button
+                  key={i} type="button" className={`vin-chip${aktiv ? ' vin-chip-aktiv' : ''}`} aria-pressed={aktiv}
+                  onClick={() => varianteWaehlen(v)} title="Antrieb, Getriebe, Motor, Motorkennbuchstabe und Steuertrieb übernehmen"
+                >
+                  {variantenText(v)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
       {p.motor && <p className="cf-hint" style={{ margin: '6px 2px 0', fontSize: 12, color: 'var(--label3)' }}>Erkannt: {p.motor.name}</p>}
       <div className="cf-grid-2" style={{ marginTop: 10 }}>
         <div className="cf-field">

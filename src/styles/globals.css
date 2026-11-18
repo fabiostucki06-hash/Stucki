@@ -975,7 +975,8 @@ select.mf-add-pos.df-pauschale-select{-webkit-appearance:none;appearance:none;co
 .vin-status-warn{border-left-color:var(--orange)}
 .vin-abweichend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;color:var(--label)}
 .vin-abweichend .sp-text-btn{height:28px;padding:0 8px}
-.vin-varianten{display:flex;flex-direction:column;gap:6px;margin-top:4px;color:var(--label)}
+.vin-varianten{display:flex;flex-direction:column;gap:6px;margin-top:10px;color:var(--label)}
+.vin-varianten-titel{font-size:12px;color:var(--label2)}
 .vin-chips{display:flex;flex-wrap:wrap;gap:6px}
 .vin-chip{display:inline-flex;align-items:center;min-height:32px;padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--label);font-family:inherit;font-size:12.5px;line-height:1.35;text-align:left;cursor:pointer;font-variant-numeric:tabular-nums;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:background 0.12s,border-color 0.12s}
 .vin-chip:hover{background:var(--surface-hover)}

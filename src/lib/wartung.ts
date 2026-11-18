@@ -102,45 +102,69 @@ const RE_BENZIN = /\b(\d{3}i|tsi|tfsi|fsi|gti|tce|puretech|ecoboost|vti|thp|t-?j
 interface Motor { name: string; antrieb?: 'benzin' | 'diesel'; steuertrieb: Steuertrieb; nass?: boolean; zahnriemen?: Intervall }
 const MOTOREN: { gruppen: Gruppe[]; code?: RegExp; text?: RegExp; m: Motor }[] = [
   // VAG
-  { gruppen: ['vag'], code: /^(CAV|CAX|CBZ|CTH|BMY|BLG)/, m: { name: 'EA111 TSI', antrieb: 'benzin', steuertrieb: 'kette' } },
-  { gruppen: ['vag'], code: /^(CHZ|DKR|CJZ|CZC|CZD|CZE|CPT|CHP|DAD|DPC|CHY|CWV)/, m: { name: 'EA211', antrieb: 'benzin', steuertrieb: 'zahnriemen' } },
-  { gruppen: ['vag'], code: /^(CCZ|CDA|CJS|CJX|CHH|CZP)/, m: { name: 'EA888', antrieb: 'benzin', steuertrieb: 'kette' } },
-  { gruppen: ['vag'], code: /^(CAY|CFF|CFG|CBA|CBD|CLH|CRB|CRL|CRK|DFG)/, m: { name: 'EA189 / EA288 TDI', antrieb: 'diesel', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['vag'], code: /^(CGP|CHF|BME|BZG)/, m: { name: 'EA111 1.2 3-Zylinder', antrieb: 'benzin', steuertrieb: 'kette' } },
+  { gruppen: ['vag'], code: /^(CAV|CAX|CBZ|CTH|BMY|BLG|BLF|BAG|BKG|BLP)/, m: { name: 'EA111 TSI / FSI', antrieb: 'benzin', steuertrieb: 'kette' } },
+  { gruppen: ['vag'], code: /^(BUD|BCA|BXW|CGG|AXP|BBY|BKY|AUA)/, m: { name: 'EA111 MPI 16V', antrieb: 'benzin', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['vag'], code: /^(BSE|BSF|BSU|BGU|AXX|BWA|BPY)/, m: { name: 'EA113', antrieb: 'benzin', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['vag'], code: /^(CHZ|DKR|DKL|DLA|CHY|CJZ|CZC|CZD|CZE|CPT|CHP|CMB|CXS|CVN|DAC|DAD|DPC|DPB|CWV|CUK|DGE|DFY)/, m: { name: 'EA211', antrieb: 'benzin', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['vag'], code: /^(CCZ|CDA|CJS|CJX|CHH|CZP|CAW|CBF|CDN|CAE|CDH|CAB|CJK|DKZ|DKT|DJH|DNF|BZB|CPM|CNC)/, m: { name: 'EA888', antrieb: 'benzin', steuertrieb: 'kette' } },
+  { gruppen: ['vag'], code: /^(CAY|CFF|CFG|CBA|CBB|CBD|CAG|CAA|CFC|CFH|CFJ|CFW|CJA|CLH|CRB|CRL|CRK|CUN|CXH|CXF|CXE|CXG|CXX|DCX|DFG|DFH|DFC|CUA|DGT|DTT|DTR)/, m: { name: 'EA189 / EA288 TDI', antrieb: 'diesel', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['vag'], code: /^(BKC|BXE|BLS|BKD|AZV|BKP|BMP|BMR|AXB|AXC|BJB|BMM|BRE|ASZ|ATD|AXR|AJM|BST)/, m: { name: 'Pumpe-Düse / SDI', antrieb: 'diesel', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['vag'], code: /^(CCW|CDU|CAP|CAS|CKV|CRT|CVU|CLA|DCP|CDY|CRC)/, m: { name: 'TDI V6 (EA896/EA897)', antrieb: 'diesel', steuertrieb: 'kette' } },
   { gruppen: ['vag'], text: /\b(1\.[2-9]|2\.0) ?tdi\b/, m: { name: 'TDI R3/R4', antrieb: 'diesel', steuertrieb: 'zahnriemen' } },
   { gruppen: ['vag'], text: /\b[34]\.0 ?tdi\b/, m: { name: 'TDI V6/V8', antrieb: 'diesel', steuertrieb: 'kette' } },
   // BMW / Mini (Mini Cooper D up to 2010: PSA 1.6 HDi)
   { gruppen: ['bmw'], code: /^W16D16/, m: { name: 'PSA DV6', antrieb: 'diesel', steuertrieb: 'zahnriemen' } },
-  { gruppen: ['bmw'], code: /^[NBS]\d{2}/, m: { name: 'BMW N/B', steuertrieb: 'kette' } },
+  { gruppen: ['bmw'], code: /^([NBS]\d{2}|M[45]\d)/, m: { name: 'BMW M/N/B', steuertrieb: 'kette' } },
   // Mercedes: OM607 / OM608 are the Renault 1.5 dCi (K9K)
   { gruppen: ['mercedes'], code: /^OM60[78]/, m: { name: 'OM607/608 (K9K)', antrieb: 'diesel', steuertrieb: 'zahnriemen' } },
   { gruppen: ['mercedes'], code: /^OM6\d\d/, m: { name: 'Mercedes OM', antrieb: 'diesel', steuertrieb: 'kette' } },
-  { gruppen: ['mercedes'], code: /^M2\d\d/, m: { name: 'Mercedes M', antrieb: 'benzin', steuertrieb: 'kette' } },
+  { gruppen: ['mercedes'], code: /^M\d{3}/, m: { name: 'Mercedes M', antrieb: 'benzin', steuertrieb: 'kette' } },
   // Stellantis (incl. Opel)
-  { gruppen: ['stellantis'], code: /^EB[02]/, text: /\bpuretech\b/, m: { name: 'PureTech EB (Nassriemen)', antrieb: 'benzin', steuertrieb: 'zahnriemen', nass: true, zahnriemen: [100000, 72] } },
-  { gruppen: ['stellantis'], code: /^EP6/, text: /\b1\.6 ?(thp|vti)\b/, m: { name: 'EP6 (Prince)', antrieb: 'benzin', steuertrieb: 'kette' } },
-  { gruppen: ['stellantis'], code: /^(DV4|DV6|DW10|DW12)/, text: /\b(1\.4|1\.6|2\.0|2\.2) ?(blue)?hdi\b/, m: { name: 'HDi DV/DW', antrieb: 'diesel', steuertrieb: 'zahnriemen' } },
-  { gruppen: ['stellantis'], code: /^[AB]20DT/, m: { name: 'Opel 2.0 CDTI', antrieb: 'diesel', steuertrieb: 'zahnriemen' } },
-  { gruppen: ['stellantis'], code: /^[AB]14N[EF]T/, m: { name: 'Opel 1.4 Turbo', antrieb: 'benzin', steuertrieb: 'kette' } },
+  { gruppen: ['stellantis'], code: /^(EB[02]|F12X[EH])/, text: /\bpuretech\b/, m: { name: 'PureTech EB (Nassriemen)', antrieb: 'benzin', steuertrieb: 'zahnriemen', nass: true, zahnriemen: [100000, 72] } },
+  { gruppen: ['stellantis'], code: /^EP[36]/, text: /\b1\.[46] ?(thp|vti)\b/, m: { name: 'EP (Prince)', antrieb: 'benzin', steuertrieb: 'kette' } },
+  { gruppen: ['stellantis'], code: /^(TU[1-5]|EW(7|10)|ET3)/, m: { name: 'PSA TU / EW', antrieb: 'benzin', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['stellantis'], code: /^(DV4|DV5|DV6|DW8|DW10|DW12|F15DT)/, text: /\b(1\.4|1\.5|1\.6|2\.0|2\.2) ?(blue)?hdi\b/, m: { name: 'HDi DV/DW', antrieb: 'diesel', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['stellantis'], code: /^([AB]20DT|[ZY]19DT)/, m: { name: 'Opel 1.9 / 2.0 CDTI', antrieb: 'diesel', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['stellantis'], code: /^[ZA]13DT/, m: { name: 'Opel 1.3 CDTI (Multijet)', antrieb: 'diesel', steuertrieb: 'kette' } },
+  { gruppen: ['stellantis'], code: /^([AB]14N[EF]T|[ZA]1[0-4]XE[PRL]|B1[24]XE[RL])/, m: { name: 'Opel Family 0 / 1.4 Turbo', antrieb: 'benzin', steuertrieb: 'kette' } },
+  { gruppen: ['stellantis'], code: /^([ZA]1[68]XE[RP]|[ZA]16LE[TR])/, m: { name: 'Opel Family 1', antrieb: 'benzin', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['stellantis'], code: /^A20N[HF]T/, m: { name: 'Opel 2.0 Turbo', antrieb: 'benzin', steuertrieb: 'kette' } },
   { gruppen: ['stellantis'], code: /^B16DT/, m: { name: 'Opel 1.6 CDTI', antrieb: 'diesel', steuertrieb: 'kette' } },
-  // Ford
+  // Ford (engine codes are model-specific: matched on the Motor text)
   { gruppen: ['ford'], text: /\b1\.0 ?ecoboost\b/, m: { name: '1.0 EcoBoost (Nassriemen)', antrieb: 'benzin', steuertrieb: 'zahnriemen', nass: true } },
   { gruppen: ['ford'], text: /\b2\.0 ?ecoblue\b/, m: { name: '2.0 EcoBlue (Nassriemen)', antrieb: 'diesel', steuertrieb: 'zahnriemen', nass: true } },
+  { gruppen: ['ford'], text: /\b(2\.0|2\.3) ?ecoboost\b|\b2\.0 ?duratec\b/, m: { name: 'Duratec HE / EcoBoost 2.0', antrieb: 'benzin', steuertrieb: 'kette' } },
+  { gruppen: ['ford'], text: /\b(1\.25|1\.4|1\.6) ?(duratec|ti-?vct)\b|\b1\.6 ?ecoboost\b/, m: { name: 'Sigma', antrieb: 'benzin', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['ford'], text: /\b(1\.8|2\.2|2\.4|3\.2) ?tdci\b|transit.*\b2\.0 ?tdci\b/, m: { name: 'Duratorq Lynx / Puma', antrieb: 'diesel', steuertrieb: 'kette' } },
+  { gruppen: ['ford'], text: /\b(1\.4|1\.5|1\.6|2\.0) ?tdci\b/, m: { name: 'TDCi (PSA DV/DW)', antrieb: 'diesel', steuertrieb: 'zahnriemen' } },
   // Renault / Dacia / Nissan
   { gruppen: ['renault', 'nissan'], code: /^K9K/, text: /\b1\.5 ?(blue)?dci\b/, m: { name: 'K9K 1.5 dCi', antrieb: 'diesel', steuertrieb: 'zahnriemen' } },
-  { gruppen: ['renault', 'nissan'], code: /^D4F/, m: { name: 'D4F 1.2 16V', antrieb: 'benzin', steuertrieb: 'zahnriemen' } },
-  { gruppen: ['renault', 'nissan'], code: /^(H4B|H4D|H4M|H5F|H5H)/, text: /\b(0\.9|1\.3) ?tce\b/, m: { name: 'Renault-Nissan H', antrieb: 'benzin', steuertrieb: 'kette' } },
-  { gruppen: ['renault', 'nissan'], code: /^(R9M|M9R)/, m: { name: 'Renault R9M / M9R dCi', antrieb: 'diesel', steuertrieb: 'kette' } },
+  { gruppen: ['renault', 'nissan'], code: /^(D4F|D7F|K4J|K4M|K7J|K7M|F4R|F9Q)/, m: { name: 'Renault D/K/F', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['renault', 'nissan'], code: /^(H4B|H4D|H4M|H5F|H5H|HRA2)/, text: /\b(0\.9|1\.0|1\.2|1\.3) ?(tce|dig-t|ig-t)\b/, m: { name: 'Renault-Nissan H', antrieb: 'benzin', steuertrieb: 'kette' } },
+  { gruppen: ['renault', 'nissan'], code: /^(R9M|M9R|V9X)/, m: { name: 'Renault R9M / M9R / V9X dCi', antrieb: 'diesel', steuertrieb: 'kette' } },
+  { gruppen: ['nissan'], code: /^(HR|MR|QR|CR|YD|YS)\d/, m: { name: 'Nissan HR/MR/QR/CR/YD', steuertrieb: 'kette' } },
   // Fiat engines, also in Opel (1.3 CDTI) and Suzuki (1.3 DDiS)
+  { gruppen: ['fiat'], code: /^(F1CE|4HV|312A2)/, m: { name: 'Fiat / Iveco mit Steuerkette', steuertrieb: 'kette' } },
+  { gruppen: ['fiat'], code: /^(F1AE|169A[34]|187A1)/, m: { name: 'Fiat Fire / Iveco F1A', steuertrieb: 'zahnriemen' } },
   { gruppen: ['fiat', 'stellantis', 'suzuki'], text: /\b1\.3 ?(multijet|mjet|jtd|jtdm|cdti|ddis)\b/, m: { name: '1.3 Multijet', antrieb: 'diesel', steuertrieb: 'kette' } },
-  { gruppen: ['fiat'], text: /\b0\.9 ?twinair\b/, m: { name: '0.9 TwinAir', antrieb: 'benzin', steuertrieb: 'kette' } },
-  { gruppen: ['fiat'], text: /\b((1\.6|2\.0) ?(multijet|jtd|jtdm)|1\.4 ?(t-?jet|16v|8v|fire)|1\.2 ?(8v|fire))\b/, m: { name: 'Fiat Fire / Multijet R4', steuertrieb: 'zahnriemen' } },
-  // Asian makers
-  { gruppen: ['toyota'], code: /^(\d?(KR|NR|ZR|NZ|ZZ|AR|GR|AD|ND|WW)|M15A|M20A|A25A)/, text: /\b1\.4 ?d-?4d\b/, m: { name: 'Toyota KR/NR/ZR/Dynamic Force', steuertrieb: 'kette' } },
+  { gruppen: ['fiat'], text: /\b0\.9 ?twinair\b|\b(2\.2|3\.0) ?multijet\b|\b1750 ?tbi\b/, m: { name: 'TwinAir / Multijet mit Kette', steuertrieb: 'kette' } },
+  { gruppen: ['fiat'], text: /\b((1\.6|1\.9|2\.0|2\.3) ?(multijet|jtd|jtdm)|1\.4 ?(t-?jet|multiair|tb|16v|8v|fire)|1\.[12] ?(8v|fire))\b/, m: { name: 'Fiat Fire / Multijet R4', steuertrieb: 'zahnriemen' } },
+  // Toyota: the old D-4D 2.5 / 3.0 (KD) and 2.0 (CD) run a belt
+  { gruppen: ['toyota'], code: /^(\dKD|1CD)/, m: { name: 'Toyota D-4D KD / CD', antrieb: 'diesel', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['toyota'], code: /^(\d?(KR|NR|ZR|NZ|ZZ|AZ|AR|GR|AD|ND|GD|WW)|M15A|M20A|A25A)/, text: /\b1\.4 ?d-?4d\b/, m: { name: 'Toyota KR/NR/ZR/AR/AD/GD/Dynamic Force', steuertrieb: 'kette' } },
+  // Honda
   { gruppen: ['honda'], code: /^J\d{2}/, m: { name: 'Honda J (V6)', steuertrieb: 'zahnriemen' } },
-  { gruppen: ['honda'], code: /^[KLRN]\d{2}/, m: { name: 'Honda K/L/R/N', steuertrieb: 'kette' } },
-  { gruppen: ['hyundai'], code: /^(D[34]F|D4H)/, m: { name: 'Hyundai U / R CRDi', antrieb: 'diesel', steuertrieb: 'kette' } },
-  // Volvo
-  { gruppen: ['volvo'], code: /^([BD]42\d\dT|D52\d\dT)/, m: { name: 'Volvo VEA / D5', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['honda'], code: /^([KLRN]\d{2}|L[DEF][ABC])/, m: { name: 'Honda K/L/R/N', steuertrieb: 'kette' } },
+  // Mazda: the 1.4 / 1.6 MZ-CD is the PSA DV diesel
+  { gruppen: ['mazda'], code: /^(Y4|Y6)/, m: { name: 'Mazda MZ-CD (PSA DV)', antrieb: 'diesel', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['mazda'], code: /^(P5|PE|PY|HF|SH|S5|S8|Z6|LF|L8|L5|L3|ZJ|ZY|RF7J|R2AA)/, text: /\bskyactiv\b/, m: { name: 'Mazda SKYACTIV / MZR', steuertrieb: 'kette' } },
+  // Hyundai / Kia: Beta / Alpha petrol and the old 2.0 CRDi run a belt
+  { gruppen: ['hyundai'], code: /^(G4GC|G4GB|G4ED|G4EE|D4EA)/, m: { name: 'Hyundai Beta / Alpha / D 2.0 CRDi', steuertrieb: 'zahnriemen' } },
+  { gruppen: ['hyundai'], code: /^(D[34]F|D4H|G3L|G4L|G4F|G4K|G4N)/, m: { name: 'Hyundai Kappa / Gamma / Nu / Theta / U / R', steuertrieb: 'kette' } },
+  // Volvo: Ford 2.0 EcoBoost (B4204T6/T7) with chain, VEA and 5-cylinder with belt
+  { gruppen: ['volvo'], code: /^B4204T[67]$/, m: { name: 'Ford 2.0 EcoBoost', antrieb: 'benzin', steuertrieb: 'kette' } },
+  { gruppen: ['volvo'], code: /^([BD]42\d\dT|B3154T|D52\d\dT|B5\d{3}|B4164T|D4162T)/, m: { name: 'Volvo VEA / 5-Zylinder / 1.6', steuertrieb: 'zahnriemen' } },
 ];
 
 /** "cff b" / "CFF-B" → "CFFB". */
@@ -268,6 +292,7 @@ type Intervall = [km: number | undefined, monate: number | undefined];
 const OEL: Partial<Record<Gruppe, Intervall>> = {
   vag: [30000, 24], bmw: [30000, 24], mercedes: [25000, 12], porsche: [20000, 24], volvo: [30000, 12],
   ford: [20000, 12], stellantis: [25000, 12], renault: [20000, 12], honda: [20000, 12], mazda: [20000, 12], nissan: [20000, 12],
+  toyota: [15000, 12], hyundai: [15000, 12], fiat: [15000, 12], suzuki: [15000, 12], subaru: [15000, 12],
 };
 const ZUENDKERZEN: Partial<Record<Gruppe, Intervall>> = {
   vag: [60000, 72], mercedes: [60000, 72], toyota: [90000, 72], honda: [100000, 96], mazda: [75000, 72], subaru: [100000, 96],

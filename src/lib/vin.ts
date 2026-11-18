@@ -1,16 +1,19 @@
 import { fahrzeugProfil, markeAusVin, normMotorcode } from './wartung';
 import { SUPA_KEY, SUPA_URL, getFreshToken } from './supabase';
+import { motorVarianten, type VinVariante } from './motorkatalog';
+import { vdsModell } from '../../supabase/functions/vin-decode/vds';
 import type { Antrieb, FahrzeugFelder, Getriebe, Steuertrieb } from '../types';
 
 /* ── VIN → vehicle data ──
    A VIN is WMI (1–3, manufacturer) · VDS (4–9) · VIS (10–17, 10 = model year).
    Resolved server-side by the Edge Function vin-decode (supabase/functions):
-   ISO 3779 parse, NHTSA vPIC and configured commercial decoders, then an AI
-   lookup with web search; cached per VIN pattern in vin_cache. Where the VIN
-   doesn't encode the engine (most European / Asian VINs), it returns the
-   factory engine variants of that model and year (`varianten`) to pick from.
+   ISO 3779 parse with built-in VDS model tables (vds.ts) and the free NHTSA
+   vPIC; optional commercial decoders and an AI lookup only when their keys are
+   configured. Cached per VIN pattern in vin_cache. Where the VIN doesn't encode
+   the engine (most European / Asian VINs), the factory engine variants of the
+   model come from the built-in Motorkatalog (or the AI lookup) to pick from.
    When the function isn't reachable, a local fallback runs in the browser:
-   - local rules: WMI → Marke, VAG model code (7–8), Mercedes Baureihe (4–6);
+   - local rules: WMI → Marke, VDS → Modell (same tables, vds.ts);
    - NHTSA vPIC (public, CORS-enabled): complete for US-market VINs, often only
      Marke / Modell for European ones.
    What couldn't be resolved is reported. */
@@ -18,48 +21,10 @@ import type { Antrieb, FahrzeugFelder, Getriebe, Steuertrieb } from '../types';
 export const vinGueltig = (vin?: string): string | undefined =>
   (vin ?? '').replace(/\s/g, '').toUpperCase().match(/^[A-HJ-NPR-Z0-9]{17}$/)?.[0];
 
-/** VAG model codes (VIN chars 7–8) → Modell (Typ). */
-const VAG_MODELL: Record<string, Record<string, string>> = {
-  audi: {
-    '8P': 'A3 (8P)', '8V': 'A3 (8V)', '8Y': 'A3 (8Y)', '8K': 'A4 (B8)', '8W': 'A4 (B9)', '8T': 'A5 (8T)', '8F': 'A5 Cabriolet (8F)',
-    'F5': 'A5 (F5)', '4F': 'A6 (C6)', '4G': 'A6 (C7)', '4A': 'A6 (C8)', '4H': 'A8 (D4)', '8U': 'Q3 (8U)', 'F3': 'Q3 (F3)',
-    '8R': 'Q5 (8R)', 'FY': 'Q5 (FY)', '4L': 'Q7 (4L)', '4M': 'Q7 (4M)', '8J': 'TT (8J)', 'FV': 'TT (FV)', 'GE': 'e-tron (GE)',
-  },
-  vw: {
-    '1J': 'Golf IV', '1K': 'Golf V', '5K': 'Golf VI', 'AU': 'Golf VII', '5G': 'Golf VII', 'CD': 'Golf VIII', '9N': 'Polo (9N)',
-    '6R': 'Polo (6R)', 'AW': 'Polo (AW)', '3C': 'Passat (B6/B7)', '3G': 'Passat (B8)', '5N': 'Tiguan (5N)', 'AD': 'Tiguan (AD)',
-    '1T': 'Touran (1T)', '5T': 'Touran (5T)', '7L': 'Touareg (7L)', '7P': 'Touareg (7P)', 'CR': 'Touareg (CR)', '7H': 'Transporter T5',
-    '7J': 'Transporter T5', '2K': 'Caddy (2K)', 'AA': 'up!', '13': 'Scirocco', 'E1': 'ID.3', 'E2': 'ID.4',
-  },
-  skoda: {
-    '1Z': 'Octavia II', '5E': 'Octavia III', 'NX': 'Octavia IV', '3T': 'Superb II', '3V': 'Superb III', '5J': 'Fabia II',
-    'NJ': 'Fabia III', '5L': 'Yeti', 'NS': 'Kodiaq', 'NU': 'Karoq', 'NW': 'Scala', 'NH': 'Rapid', 'NY': 'Enyaq',
-  },
-  seat: { '1P': 'Leon (1P)', '5F': 'Leon (5F)', 'KL': 'Leon (KL)', '6J': 'Ibiza (6J)', 'KJ': 'Ibiza (KJ)', '5P': 'Altea', 'KH': 'Ateca' },
-};
-
-/** Mercedes Baureihe (VIN chars 4–6) → Modell. */
-const MB_BAUREIHE: Record<string, string> = {
-  '169': 'A-Klasse (W169)', '176': 'A-Klasse (W176)', '177': 'A-Klasse (W177)', '245': 'B-Klasse (W245)', '246': 'B-Klasse (W246)',
-  '247': 'B-Klasse (W247)', '117': 'CLA (C117)', '118': 'CLA (C118)', '156': 'GLA (X156)', '203': 'C-Klasse (W203)',
-  '204': 'C-Klasse (W204)', '205': 'C-Klasse (W205)', '206': 'C-Klasse (W206)', '211': 'E-Klasse (W211)', '212': 'E-Klasse (W212)',
-  '213': 'E-Klasse (W213)', '214': 'E-Klasse (W214)', '221': 'S-Klasse (W221)', '222': 'S-Klasse (W222)', '223': 'S-Klasse (W223)',
-  '253': 'GLC (X253)', '254': 'GLC (X254)', '166': 'GLE/ML (W166)', '167': 'GLE (V167)', '447': 'V-Klasse / Vito (447)',
-  '639': 'Viano / Vito (639)', '906': 'Sprinter (906)', '907': 'Sprinter (907)', '910': 'Sprinter (910)',
-};
-
 function lokal(vin: string): Partial<FahrzeugFelder> {
   const marke = markeAusVin(vin);
-  const out: Partial<FahrzeugFelder> = marke ? { marke } : {};
-  const m = (marke ?? '').toLowerCase();
-  if (m === 'mercedes') {
-    const r = MB_BAUREIHE[vin.slice(3, 6)];
-    if (r) out.modell = r;
-  } else {
-    const r = VAG_MODELL[m]?.[vin.slice(6, 8)];
-    if (r) out.modell = r;
-  }
-  return out;
+  const modell = vdsModell(marke, vin);
+  return { ...(marke ? { marke } : {}), ...(modell ? { modell } : {}) };
 }
 
 /** vPIC "DecodeVinValues" fields used here (all strings, '' when unknown). */
@@ -109,15 +74,7 @@ async function vpic(vin: string, signal?: AbortSignal): Promise<Vpic | null> {
   return j.Results?.[0] ?? null;
 }
 
-/** One factory engine configuration of the decoded model / year, offered as a chip. */
-export interface VinVariante {
-  motor: string;
-  motorcode: string;
-  antrieb: Antrieb | '';
-  getriebe: Getriebe | '';
-  steuertrieb: Steuertrieb | '';
-  hinweis: string;
-}
+export type { VinVariante };
 
 /** Result of the Edge Function vin-decode (mirrors Ergebnis there). */
 interface VinServerErgebnis {
@@ -168,6 +125,14 @@ function abschliessen(vin: string, felder: Partial<FahrzeugFelder>, varianten: V
     .filter((k) => !felder[k] && !irrelevant.includes(k)).map((k) => FELD_LABEL[k]!);
 }
 
+/** Built-in engine variants when the engine is still open; an electric model is settled by its single entry. */
+function katalog(felder: Partial<FahrzeugFelder>, modelljahr?: number): VinVariante[] {
+  if (felder.motor || felder.motorcode) return [];
+  const liste = motorVarianten(felder.marke, felder.modell, modelljahr);
+  if (liste.length === 1 && liste[0].antrieb === 'elektro') { felder.antrieb = 'elektro'; return []; }
+  return liste;
+}
+
 async function server(vin: string, signal?: AbortSignal): Promise<{ ergebnis: VinServerErgebnis; cache: boolean }> {
   const token = await getFreshToken();
   if (!token) throw new Error('Nicht angemeldet');
@@ -204,7 +169,8 @@ async function lokalAbrufen(vin: string, signal?: AbortSignal): Promise<VinErgeb
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e;
   }
-  return { felder, modelljahr, varianten: [], offen: abschliessen(vin, felder, []), quellen, offline: true };
+  const varianten = katalog(felder, modelljahr);
+  return { felder, modelljahr, varianten, offen: abschliessen(vin, felder, varianten), quellen, offline: true };
 }
 
 /** Decodes any valid VIN via the Edge Function, else locally. Throws only for an invalid VIN. */
@@ -221,7 +187,7 @@ export async function vinAbrufen(eingabe: string, signal?: AbortSignal): Promise
   const { ergebnis: e, cache } = antwort;
   const felder: Partial<FahrzeugFelder> = {};
   for (const [k, v] of Object.entries(e.felder) as [keyof FahrzeugFelder, string][]) if (v) (felder as Record<string, string>)[k] = v;
-  const varianten = e.motorEindeutig ? [] : e.varianten ?? [];
+  const varianten = e.motorEindeutig ? [] : e.varianten?.length ? e.varianten : katalog(felder, e.modelljahr);
   return {
     felder, modelljahr: e.modelljahr, generation: e.generation, varianten, offen: abschliessen(vin, felder, varianten),
     quellen: e.quellen ?? [], cache, hinweis: e.hinweis, sicherheit: e.sicherheit,

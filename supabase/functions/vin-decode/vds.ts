@@ -1,5 +1,9 @@
-// Built-in VDS model tables (no external key needed). European makers code the
-// model line in the VDS; the engine usually not. Marke as returned by WMI3.
+// Built-in VDS model tables (no external key needed). Shared by the Edge Function
+// vin-decode and the browser fallback (src/lib/vin.ts), so it has no imports.
+// European and Japanese makers code the model line / chassis in the VDS, rarely
+// the engine; the engine variants come from src/lib/motorkatalog.ts.
+// Marke as returned by the WMI tables ("VW", "Mercedes", "Citroen", "Alfa Romeo").
+// Model names match the patterns of the Motorkatalog.
 
 /** VAG model codes (VIN chars 7–8) → Modell (Typ). */
 const VAG_MODELL: Record<string, Record<string, string>> = {
@@ -49,6 +53,74 @@ const PORSCHE_MODELL: Record<string, string> = {
   '92': 'Cayenne (92A)', '9Y': 'Cayenne (9YA)', '95': 'Macan (95B)', 'Y1': 'Taycan (Y1)',
 };
 
+/** Fiat / Alfa Romeo / Lancia type number (VIN chars 4–6) → Modell. */
+const FIAT_TYP: Record<string, string> = {
+  '312': '500 (312)', '169': 'Panda (169)', '319': 'Panda (319)', '188': 'Punto (188)', '199': 'Punto (199)', '192': 'Stilo (192)',
+  '198': 'Bravo (198)', '223': 'Doblò (223)', '263': 'Doblò (263)', '225': 'Fiorino / Qubo (225)', '244': 'Ducato (244)', '250': 'Ducato (250)',
+  '356': 'Tipo (356)', '334': '500X (334)',
+  '940': 'Giulietta (940)', '955': 'MiTo (955)', '939': '159 / Brera (939)', '937': '147 / GT (937)', '952': 'Giulia (952)', '949': 'Stelvio (949)',
+};
+
+/** Mazda chassis code (VIN chars 4–5, European VINs) → Modell. */
+const MAZDA_MODELL: Record<string, string> = {
+  'BK': 'Mazda3 (BK)', 'BL': 'Mazda3 (BL)', 'BM': 'Mazda3 (BM)', 'BN': 'Mazda3 (BM)', 'BP': 'Mazda3 (BP)',
+  'GG': 'Mazda6 (GG)', 'GY': 'Mazda6 (GG)', 'GH': 'Mazda6 (GH)', 'GJ': 'Mazda6 (GJ)', 'GL': 'Mazda6 (GJ)',
+  'DY': 'Mazda2 (DY)', 'DE': 'Mazda2 (DE)', 'DJ': 'Mazda2 (DJ)', 'DK': 'CX-3 (DK)', 'DM': 'CX-30 (DM)',
+  'KE': 'CX-5 (KE)', 'KF': 'CX-5 (KF)', 'NC': 'MX-5 (NC)', 'ND': 'MX-5 (ND)', 'CR': 'Mazda5 (CR)', 'CW': 'Mazda5 (CW)',
+};
+
+/** Honda chassis code (VIN chars 4–5) → Modell. Civic shares FK/FN over generations: the year decides. */
+const HONDA_MODELL: Record<string, string> = {
+  'FK': 'Civic', 'FN': 'Civic', 'FD': 'Civic', 'FB': 'Civic', 'FC': 'Civic', 'FL': 'Civic (FL)',
+  'GD': 'Jazz (GD)', 'GE': 'Jazz (GE)', 'GK': 'Jazz (GK)', 'GR': 'Jazz (GR)',
+  'RD': 'CR-V (RD)', 'RE': 'CR-V (RE)', 'RM': 'CR-V (RM)', 'RW': 'CR-V (RW)', 'GH': 'HR-V (GH)', 'RU': 'HR-V (RU)',
+  'CL': 'Accord (CL)', 'CM': 'Accord (CL)', 'CU': 'Accord (CU)', 'CW': 'Accord (CU)', 'ZE': 'Insight (ZE)', 'BE': 'FR-V (BE)',
+};
+
+/** Nissan chassis code (VIN chars 7–9, European VINs) → Modell. */
+const NISSAN_MODELL: Record<string, string> = {
+  'J10': 'Qashqai (J10)', 'J11': 'Qashqai (J11)', 'J12': 'Qashqai (J12)', 'F15': 'Juke (F15)', 'F16': 'Juke (F16)',
+  'K12': 'Micra (K12)', 'K13': 'Micra (K13)', 'K14': 'Micra (K14)', 'E11': 'Note (E11)', 'E12': 'Note (E12)',
+  'T30': 'X-Trail (T30)', 'T31': 'X-Trail (T31)', 'T32': 'X-Trail (T32)', 'ZE0': 'Leaf (ZE0)', 'ZE1': 'Leaf (ZE1)',
+  'D40': 'Navara (D40)', 'D23': 'Navara (D23)', 'C13': 'Pulsar (C13)',
+};
+
+/** Volvo model code (VIN chars 4–5) → Modell. */
+const VOLVO_MODELL: Record<string, string> = {
+  'MS': 'S40 (II)', 'MW': 'V50', 'MK': 'C30', 'RS': 'S80 (I)', 'AS': 'S80 (II)', 'SW': 'V70 (II)', 'SZ': 'XC70 (II)',
+  'BW': 'V70 (III)', 'BZ': 'XC70 (III)', 'CZ': 'XC90 (I)', 'DZ': 'XC60 (I)', 'FS': 'S60 (II)', 'FW': 'V60 (I)',
+  'MV': 'V40 (II)', 'MZ': 'V40 Cross Country', 'UZ': 'XC60 (II)', 'XZ': 'XC40', 'PS': 'S90', 'PW': 'V90', 'ZW': 'V60 (II)',
+};
+
+/** Renault / Dacia vehicle type (VIN chars 4–6, else 4–5) → Modell. */
+const RENAULT_MODELL: Record<string, string> = {
+  'BR': 'Clio III', 'CR': 'Clio III', 'KR': 'Clio III Grandtour', '5R': 'Clio IV', 'RJA': 'Clio V', '2R': 'Captur I', 'RJB': 'Captur II',
+  'BM': 'Megane II', 'KM': 'Megane II Grandtour', 'JM': 'Scenic II', 'BZ': 'Megane III', 'DZ': 'Megane III Coupé', 'KZ': 'Megane III Grandtour',
+  'JZ': 'Scenic III', 'RFB': 'Megane IV', 'RFE': 'Kadjar', 'CN': 'Twingo II', 'AH': 'Twingo III', 'FW': 'Kangoo II', 'KW': 'Kangoo II',
+  'FC': 'Kangoo I', 'KC': 'Kangoo I', 'FL': 'Trafic', 'MA': 'Master III', 'BT': 'Laguna III', 'KT': 'Laguna III Grandtour', 'AG': 'Zoe',
+};
+const DACIA_MODELL: Record<string, string> = {
+  'BS': 'Sandero I', '5S': 'Sandero II', 'LS': 'Logan I', '4S': 'Logan II', 'HS': 'Duster I', 'JS': 'Lodgy', '8S': 'Dokker',
+};
+
+/** Peugeot / Citroën family (VIN char 4, or 4–5) → Modell. */
+const PEUGEOT_MODELL: Record<string, string> = {
+  'CU': '2008 (I)', 'CA': '208 (I)', 'CC': '208 (I)', '0U': '3008 (I)', '0E': '5008 (I)',
+  '2': '206', '3': '307', 'W': '207', '4': '308 (I)', 'L': '308 (II)', '6': '407', '8': '508 (I)', '7': 'Partner (II)', 'M': '3008 / 5008 (II)',
+};
+const CITROEN_MODELL: Record<string, string> = {
+  'SC': 'C3 (II)', 'SA': 'DS3', 'SH': 'C3 Picasso', 'FC': 'C3 (I)', 'LC': 'C4 (I)', 'LA': 'C4 (I)', 'NC': 'C4 (II)',
+  'UA': 'C4 Picasso (I)', 'UD': 'C4 Picasso (I)', 'RD': 'C5 (III)', 'RW': 'C5 (III)', '7': 'Berlingo (II)',
+};
+
+/** Opel platform code: older VINs W0L0 + chars 5–6, newer W0L + char 4. */
+const OPEL_MODELL: Record<string, string> = {
+  '0TG': 'Astra G / Zafira A', '0AH': 'Astra H / Zafira B', '0XC': 'Corsa C / Meriva A / Combo C', '0SD': 'Corsa D', '0XE': 'Corsa E',
+  '0ZC': 'Vectra C / Signum', 'P': 'Astra J / Zafira C', 'G': 'Insignia A',
+};
+
+const zuerst = (t: Record<string, string>, ...keys: string[]) => keys.map((k) => t[k]).find(Boolean);
+
 /** Modell from the manufacturer-coded VDS, where a built-in table covers the make. */
 export function vdsModell(marke: string | undefined, vin: string): string | undefined {
   switch (marke) {
@@ -58,6 +130,26 @@ export function vdsModell(marke: string | undefined, vin: string): string | unde
       return MB_BAUREIHE[vin.slice(3, 6)];
     case 'Porsche':
       return PORSCHE_MODELL[vin.slice(6, 8)];
+    case 'Fiat': case 'Alfa Romeo': case 'Lancia':
+      return FIAT_TYP[vin.slice(3, 6)];
+    case 'Mazda':
+      return MAZDA_MODELL[vin.slice(3, 5)];
+    case 'Honda':
+      return HONDA_MODELL[vin.slice(3, 5)];
+    case 'Nissan':
+      return NISSAN_MODELL[vin.slice(6, 9)];
+    case 'Volvo':
+      return VOLVO_MODELL[vin.slice(3, 5)];
+    case 'Renault':
+      return zuerst(RENAULT_MODELL, vin.slice(3, 6), vin.slice(3, 5));
+    case 'Dacia':
+      return DACIA_MODELL[vin.slice(3, 5)];
+    case 'Peugeot':
+      return zuerst(PEUGEOT_MODELL, vin.slice(3, 5), vin[3]);
+    case 'Citroen': case 'DS':
+      return zuerst(CITROEN_MODELL, vin.slice(3, 5), vin[3]);
+    case 'Opel':
+      return zuerst(OPEL_MODELL, vin.slice(3, 6), vin[3]);
     default:
       return undefined;
   }
