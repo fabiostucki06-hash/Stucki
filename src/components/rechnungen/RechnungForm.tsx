@@ -146,6 +146,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
     setMaterial(materialRows.length ? materialRows : [newMaterial()]);
     // Beanstandungen go into the Notizen (printed on the Rechnung). Those already
     // listed as an Arbeitsposition (Auftrag from an Offerte) aren't repeated.
+    // auftrag.notizen are internal and must never be copied onto a Rechnung.
     const arbeitTexte = new Set(arbeitRows.map((p) => p.beschreibung.trim()));
     const bs = echteBeanstandungen(auftrag.beanstandungen).filter((b) => !arbeitTexte.has(b.trim()));
     if (bs.length) {
