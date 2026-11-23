@@ -372,7 +372,7 @@ export async function exportRechnungPDF(rechnung: Rechnung, customer: Customer |
 
     const filename = buildDocumentFilename(customer, rechnungDocName(rechnung), rechnung.rechnungNumber ?? '');
     doc.save(`${filename}.pdf`);
-    void archiveToDrive(doc, rechnung.art === 'anzahlung' ? 'Anzahlungsrechnungen' : 'Rechnungen', filename);
+    void archiveToDrive(doc, rechnung.art === 'anzahlung' ? 'Anzahlungsrechnungen' : 'Rechnungen', filename, customer);
   } catch (err) {
     alert(`PDF-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);
   }

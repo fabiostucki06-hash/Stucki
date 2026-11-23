@@ -341,7 +341,7 @@ function exportDoc(offerte: Offerte, customer: Customer | undefined, mode: DocMo
     addPageNumbers(doc, TR);
     const filename = buildDocumentFilename(customer, docType, offerteNr(offerte));
     doc.save(`${filename}.pdf`);
-    void archiveToDrive(doc, mode === 'ab' ? 'Auftragsbestätigungen' : offerte.art === 'material' ? 'Materialofferten' : 'Offerten', filename);
+    void archiveToDrive(doc, mode === 'ab' ? 'Auftragsbestätigungen' : offerte.art === 'material' ? 'Materialofferten' : 'Offerten', filename, customer);
   } catch (err) {
     alert(`PDF-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);
   }

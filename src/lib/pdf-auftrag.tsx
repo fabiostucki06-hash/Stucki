@@ -200,7 +200,7 @@ export async function exportOrderPDF(order: Order, customer: Customer | undefine
     addPageNumbers(doc, TR);
     const filename = buildDocumentFilename(customer, 'Auftrag', order.orderNumber ?? '');
     doc.save(`${filename}.pdf`);
-    void archiveToDrive(doc, 'Aufträge', filename);
+    void archiveToDrive(doc, 'Aufträge', filename, customer);
   } catch (err) {
     alert(`PDF-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);
   }

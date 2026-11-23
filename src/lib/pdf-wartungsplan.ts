@@ -79,7 +79,7 @@ export async function exportWartungsplanPDF(vehicle: Vehicle, customer: Customer
     addPageNumbers(doc, TR);
     const filename = buildDocumentFilename(customer, 'Wartungsplan', vehicle.kennzeichen || fahrzeugLabel(vehicle));
     doc.save(`${filename}.pdf`);
-    void archiveToDrive(doc, 'Wartungsplaene', filename);
+    void archiveToDrive(doc, 'Wartungsplaene', filename, customer);
   } catch (err) {
     alert(`PDF-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);
   }

@@ -332,7 +332,7 @@ export default function SettingsView({ syncStatus, userEmail }: SettingsViewProp
           </div>
 
           <Hint>
-            Jedes heruntergeladene PDF wird zusätzlich in deinem Google Drive gespeichert. Die App sieht dort nur die Dateien, die sie selbst angelegt hat. Einen von Hand erstellten Ordner „GarageOS“ erkennt sie deshalb nicht und legt daneben einen eigenen an.
+            Jedes heruntergeladene PDF wird zusätzlich in deinem Google Drive unter „GarageOS/Dokumentart/Kunde“ gespeichert, zum Beispiel „GarageOS/Rechnungen/Max Muster“. Die App sieht dort nur die Dateien, die sie selbst angelegt hat. Einen von Hand erstellten Ordner „GarageOS“ erkennt sie deshalb nicht und legt daneben einen eigenen an.
           </Hint>
 
           {drive && !drive.configured && (

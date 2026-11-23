@@ -1,8 +1,9 @@
 import type { jsPDF } from 'jspdf';
 import { getFreshToken } from './supabase';
 import { showSavedToast, showToast } from '../components/ui/Toast';
+import type { Customer } from '../types';
 
-/** Document type of an export; the server maps it to GarageOS/<Ordner>/<Dateiname>.pdf */
+/** Document type of an export; the server maps it to GarageOS/<Ordner>/<Kunde>/<Dateiname>.pdf */
 export type DriveDocType =
   | 'Rechnungen' | 'Anzahlungsrechnungen' | 'Offerten' | 'Materialofferten'
   | 'Auftragsbestätigungen' | 'Aufträge' | 'Wartungsplaene';
@@ -127,13 +128,17 @@ class UploadError extends Error {
 }
 
 /** The server finds or creates the folder and opens a Drive upload session for this file. */
-async function openUploadSession(docType: DriveDocType, filename: string, size: number): Promise<{ uploadUrl: string; folder?: string }> {
+async function openUploadSession(docType: DriveDocType, filename: string, size: number, customer: Customer | undefined): Promise<{ uploadUrl: string; folder?: string }> {
   const token = await getFreshToken();
   if (!token) throw new UploadError('Sitzung abgelaufen, bitte neu anmelden', { stage: 'session' });
   const r = await fetchWithTimeout('/api/drive-upload', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ docType, filename: `${filename}.pdf`, size }),
+    body: JSON.stringify({
+      docType, filename: `${filename}.pdf`, size,
+      customerId: customer?.id,
+      customerName: customer ? `${customer.vorname ?? ''} ${customer.nachname ?? ''}` : undefined,
+    }),
   }, SESSION_TIMEOUT_MS);
   const j = (await r.json().catch(() => ({}))) as { ok?: boolean; uploadUrl?: string; error?: string; connected?: boolean; reconnect?: boolean; folder?: string };
   if (r.ok && j.ok && j.uploadUrl) return { uploadUrl: j.uploadUrl, folder: j.folder };
@@ -194,12 +199,12 @@ let uploadQueue: Promise<void> = Promise.resolve();
 
 /** Uploads a generated PDF to the connected Google Drive in the background.
     Never throws: the local download already happened, Drive is the backup copy. */
-export function archiveToDrive(doc: jsPDF, docType: DriveDocType, filename: string): Promise<void> {
-  uploadQueue = uploadQueue.then(() => uploadToDrive(doc, docType, filename));
+export function archiveToDrive(doc: jsPDF, docType: DriveDocType, filename: string, customer: Customer | undefined): Promise<void> {
+  uploadQueue = uploadQueue.then(() => uploadToDrive(doc, docType, filename, customer));
   return uploadQueue;
 }
 
-async function uploadToDrive(doc: jsPDF, docType: DriveDocType, filename: string): Promise<void> {
+async function uploadToDrive(doc: jsPDF, docType: DriveDocType, filename: string, customer: Customer | undefined): Promise<void> {
   try {
     const blocked = await blockedReason();
     if (blocked) return reportFailure(docType, blocked, { stage: 'status' });
@@ -208,7 +213,7 @@ async function uploadToDrive(doc: jsPDF, docType: DriveDocType, filename: string
     showToast('Wird in Google Drive gespeichert, Tab bitte offen lassen', 'info');
     // Every attempt gets a new session; the server then replaces a file that already arrived.
     for (let attempt = 1; attempt <= MAX_UPLOAD_ATTEMPTS; attempt++) {
-      const { uploadUrl, folder } = await openUploadSession(docType, filename, pdf.byteLength);
+      const { uploadUrl, folder } = await openUploadSession(docType, filename, pdf.byteLength, customer);
       if (await sendPdf(uploadUrl, pdf)) {
         showSavedToast(folder ? `In Google Drive gespeichert (${folder})` : 'In Google Drive gespeichert');
         return;
