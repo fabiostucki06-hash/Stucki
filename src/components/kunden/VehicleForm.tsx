@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Spinner from '../ui/Spinner';
 import DokumentScan from './DokumentScan';
-import { ANTRIEBE, GETRIEBE, STEUERTRIEBE, fahrzeugProfil, labelVon, motorfamilieAusCode } from '../../lib/wartung';
+import { ALLRADEN, ANTRIEBE, GETRIEBE, STEUERTRIEBE, fahrzeugProfil, labelVon, motorfamilieAusCode } from '../../lib/wartung';
 import { vinAbrufen, vinGueltig, type VinVariante } from '../../lib/vin';
 import { motorVarianten } from '../../lib/motorkatalog';
 import type { FahrzeugFelder } from '../../types';
@@ -10,10 +10,10 @@ import type { FahrzeugFelder } from '../../types';
 const AUTO = 'Automatisch – unbekannt';
 
 const FELD_LABEL: Partial<Record<keyof FahrzeugFelder, string>> = {
-  marke: 'Marke', modell: 'Modell', antrieb: 'Antrieb', getriebe: 'Getriebe', motor: 'Motor', motorcode: 'Motorkennbuchstabe', steuertrieb: 'Steuertrieb', erstzulassung: '1. Inv. Setzung',
+  marke: 'Marke', modell: 'Modell', antrieb: 'Antrieb', getriebe: 'Getriebe', allrad: 'Allrad', motor: 'Motor', motorcode: 'Motorkennbuchstabe', steuertrieb: 'Steuertrieb', erstzulassung: '1. Inv. Setzung',
 };
 const WERT_LABEL: Partial<Record<keyof FahrzeugFelder, (v: string) => string | undefined>> = {
-  antrieb: (v) => labelVon(ANTRIEBE, v as never), getriebe: (v) => labelVon(GETRIEBE, v as never), steuertrieb: (v) => labelVon(STEUERTRIEBE, v as never),
+  antrieb: (v) => labelVon(ANTRIEBE, v as never), getriebe: (v) => labelVon(GETRIEBE, v as never), steuertrieb: (v) => labelVon(STEUERTRIEBE, v as never), allrad: (v) => labelVon(ALLRADEN, v as never),
 };
 const anzeige = (k: keyof FahrzeugFelder, v: string) => WERT_LABEL[k]?.(v) ?? v;
 
@@ -97,7 +97,8 @@ export function VehicleFields({ f, onChange, vinReset }: {
         erkannt.push(`${FELD_LABEL[k] ?? k}: ${anzeige(k, v)}`);
       }
       const offen = r.offen.filter((k) => !String(werte[k] ?? '').trim()).map((k) => FELD_LABEL[k] ?? k);
-      const nurDatum = offen.length === 1 && offen[0] === FELD_LABEL.erstzulassung;
+      // Neither is in a European VIN as a rule: no reason for a warning on their own.
+      const nurDatum = offen.every((x) => x === FELD_LABEL.erstzulassung || x === FELD_LABEL.allrad);
       setVin({
         text: [
           r.offline ? 'VIN-Server nicht erreichbar: nur die lokale Auswertung wurde verwendet.' : '',
@@ -272,8 +273,11 @@ export function VehicleFields({ f, onChange, vinReset }: {
           </select>
         </div>
         <div className="cf-field">
-          <label className="cf-label">1. Inv. Setzung</label>
-          <input className="cf-input" type="date" value={f.erstzulassung ?? ''} onChange={s('erstzulassung')} />
+          <label className="cf-label" htmlFor="vf-allrad">Allrad (4x4)</label>
+          <select id="vf-allrad" className="cf-select" value={f.allrad ?? ''} onChange={s('allrad')}>
+            <option value="">{AUTO}</option>
+            {ALLRADEN.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
         </div>
       </div>
 
@@ -282,6 +286,10 @@ export function VehicleFields({ f, onChange, vinReset }: {
         <div className="cf-field">
           <label className="cf-label">Kontrollschild</label>
           <input className="cf-input" value={f.kennzeichen ?? ''} onChange={s('kennzeichen')} placeholder="ZH 123456" />
+        </div>
+        <div className="cf-field">
+          <label className="cf-label">1. Inv. Setzung</label>
+          <input className="cf-input" type="date" value={f.erstzulassung ?? ''} onChange={s('erstzulassung')} />
         </div>
         <div className="cf-field">
           <label className="cf-label">KM-Stand</label>
@@ -309,6 +317,7 @@ export default function VehicleForm({ initial, onSave, onCancel }: VehicleFormPr
     antrieb:       initial?.antrieb,
     getriebe:      initial?.getriebe,
     steuertrieb:   initial?.steuertrieb,
+    allrad:        initial?.allrad,
     motor:         initial?.motor         ?? '',
     motorcode:     initial?.motorcode     ?? '',
   });

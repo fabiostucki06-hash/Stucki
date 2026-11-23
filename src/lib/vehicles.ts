@@ -3,7 +3,7 @@ import { STD_SATZ } from './company';
 import type { ArbeitPosition, Customer, FahrzeugFeld, FahrzeugFelder, ServiceItem, Vehicle } from '../types';
 
 /** The vehicle fields that used to live on the Customer (see FahrzeugFeld). */
-export const FAHRZEUG_FELDER: FahrzeugFeld[] = ['marke', 'modell', 'kennzeichen', 'km', 'chassisnummer', 'erstzulassung', 'antrieb', 'getriebe', 'steuertrieb', 'motor', 'motorcode'];
+export const FAHRZEUG_FELDER: FahrzeugFeld[] = ['marke', 'modell', 'kennzeichen', 'km', 'chassisnummer', 'erstzulassung', 'antrieb', 'getriebe', 'steuertrieb', 'allrad', 'motor', 'motorcode'];
 
 export const hatFahrzeugDaten = (f: Partial<FahrzeugFelder>): boolean =>
   FAHRZEUG_FELDER.some((k) => String(f[k] ?? '').trim() !== '');

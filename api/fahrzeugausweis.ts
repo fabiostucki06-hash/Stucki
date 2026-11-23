@@ -25,7 +25,7 @@ const FELD = {
     deliberately absent: vehicle papers do not state them. */
 const FELDER = [
   'vorname', 'nachname', 'firma', 'strasse', 'plzOrt', 'kennzeichen', 'chassisnummer', 'marke', 'modell',
-  'erstzulassung', 'antrieb', 'getriebe', 'hubraumCcm', 'leistungKw', 'motorcode',
+  'erstzulassung', 'antrieb', 'getriebe', 'allrad', 'hubraumCcm', 'leistungKw', 'motorcode',
 ] as const;
 
 const SCHEMA = {
@@ -61,6 +61,7 @@ Felder:
 - erstzulassung: Datum der 1. Inverkehrsetzung als YYYY-MM-DD. Nicht das Datum der letzten Prüfung und nicht das Ausstellungsdatum.
 - antrieb: nur wenn der Treibstoff gedruckt ist: benzin, diesel, hybrid, plugin, elektro oder gas.
 - getriebe: nur wenn ausdrücklich gedruckt: manuell, automat, dsg oder cvt.
+- allrad: nur der wörtlich gedruckte Hinweis auf die Antriebsart, z. B. "4x4", "AWD", "quattro", "xDrive", "4MATIC", "4MOTION", "4x2". Nie aus Modell, Marke oder Fachwissen ableiten; steht nichts Ausdrückliches da, leer.
 - hubraumCcm: Hubraum in cm³, nur Ziffern. leistungKw: Leistung in kW, nur die Zahl; nicht aus PS umrechnen.
 - motorcode: nur wenn ausdrücklich als Motorcode/Motorkennbuchstabe bezeichnet, nie die Typengenehmigung oder Motornummer.`;
 

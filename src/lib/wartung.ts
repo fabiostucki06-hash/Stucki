@@ -1,6 +1,6 @@
 import { neueServiceId, plusMonate } from './vehicles';
 import { modelljahrAusVin } from '../../supabase/functions/vin-decode/vds';
-import type { Antrieb, Getriebe, IntervallQuelle, ServiceItem, Steuertrieb, Vehicle, WartungSpec } from '../types';
+import type { Allrad, Antrieb, Getriebe, IntervallQuelle, ServiceItem, Steuertrieb, Vehicle, WartungSpec } from '../types';
 
 /* ── Fahrzeugprofil: what the Wartungsplan is generated from ──
    Antrieb / Getriebe / Steuertrieb are stored on the vehicle when known; else
@@ -34,6 +34,10 @@ export const GETRIEBE: { value: Getriebe; label: string }[] = [
 export const STEUERTRIEBE: { value: Steuertrieb; label: string }[] = [
   { value: 'zahnriemen', label: 'Zahnriemen' },
   { value: 'kette',      label: 'Steuerkette' },
+];
+export const ALLRADEN: { value: Allrad; label: string }[] = [
+  { value: 'ja',   label: 'Ja (Allrad / 4x4)' },
+  { value: 'nein', label: 'Nein (kein Allrad)' },
 ];
 export const labelVon = <T extends string>(liste: { value: T; label: string }[], v?: T) => liste.find((x) => x.value === v)?.label;
 
@@ -195,7 +199,7 @@ export interface FahrzeugProfil {
   fehlt: string[];
 }
 
-type ProfilQuelle = Partial<Pick<Vehicle, 'marke' | 'modell' | 'motor' | 'motorcode' | 'chassisnummer' | 'erstzulassung' | 'antrieb' | 'getriebe' | 'steuertrieb'>>;
+type ProfilQuelle = Partial<Pick<Vehicle, 'marke' | 'modell' | 'motor' | 'motorcode' | 'chassisnummer' | 'erstzulassung' | 'antrieb' | 'getriebe' | 'steuertrieb' | 'allrad'>>;
 
 /** Profile a vehicle's maintenance schedule is derived from. */
 export function fahrzeugProfil(v: ProfilQuelle): FahrzeugProfil {
@@ -366,6 +370,15 @@ export function wartungsVorlagen(v: ProfilQuelle, specs: WartungSpec[] = []): Vo
     else if (alt) add('getriebeoel', 'Getriebeöl', undefined, [60000, undefined]);
   }
 
+  // Only for a vehicle explicitly set to Allrad. Which of these exist depends on the system, and
+  // electric all-wheel drive (one motor per axle) has none of them.
+  if (v.allrad === 'ja' && verbrenner) {
+    const hinweis = 'Standardwert – nur falls bei diesem Allradsystem verbaut; Öl und Intervall laut Herstellervorgabe prüfen, sonst Position löschen';
+    add('allradkupplung', 'Allrad: Kupplung / Haldex-Öl', undefined, [60000, 36], hinweis);
+    add('verteilergetriebe', 'Allrad: Verteilergetriebe-Öl', undefined, [100000, undefined], hinweis);
+    add('hinterachsgetriebe', 'Allrad: Hinterachsdifferenzial-Öl', undefined, [100000, undefined], hinweis);
+  }
+
   // Intervals checked against the OEM schedule for this engine.
   if (p.motorcode) {
     const geprueft = new Map(specs.filter((s) => s.hersteller === p.hersteller && s.motorcode === p.motorcode).map((s) => [s.vorlage, s]));
@@ -392,6 +405,9 @@ const LEGACY: Record<VorlageKey, { name: string; iv: Intervall }> = {
   bremsfluessigkeit: { name: 'Bremsflüssigkeit',               iv: [undefined, 24] },
   zahnriemen:        { name: 'Zahnriemen / Wasserpumpe',       iv: [120000, 72] },
   getriebeoel:       { name: 'Getriebeöl',                     iv: [60000, undefined] },
+  allradkupplung:    { name: 'Allrad: Kupplung / Haldex-Öl',   iv: [60000, 36] },
+  verteilergetriebe: { name: 'Allrad: Verteilergetriebe-Öl',   iv: [100000, undefined] },
+  hinterachsgetriebe: { name: 'Allrad: Hinterachsdifferenzial-Öl', iv: [100000, undefined] },
 };
 
 /** The Vorlage an item was made from (older items: by their name). */

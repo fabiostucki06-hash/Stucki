@@ -1,7 +1,7 @@
 import { markeAusVin, motorfamilieAusCode, normMotorcode } from './wartung';
 import { SUPA_KEY, SUPA_URL, getFreshToken } from './supabase';
 import { motorVarianten, type VinVariante } from './motorkatalog';
-import { modelljahrAusVin, vdsModell, vdsModellVorschlag } from '../../supabase/functions/vin-decode/vds';
+import { allradAusText, modelljahrAusVin, vdsModell, vdsModellVorschlag } from '../../supabase/functions/vin-decode/vds';
 import type { Antrieb, FahrzeugFelder, Getriebe } from '../types';
 
 /* ── VIN → vehicle data ──
@@ -13,6 +13,7 @@ import type { Antrieb, FahrzeugFelder, Getriebe } from '../types';
    vehicle. Everything else stays empty and is reported in `offen`:
    - Marke from the WMI, Modell from a VDS layout that is fixed for the make;
    - Antrieb, Getriebe, Motor, Motorkennbuchstabe from a decoder's clean answer;
+   - Allrad only from a decoder's explicit drive type or marker (4x4, quattro, xDrive …);
    - Steuertrieb only from a delivered Motorkennbuchstabe of a documented family;
    - 1. Inverkehrsetzung never: a VIN holds at most the model year.
    AI research and the Motorkatalog only produce suggestions (`varianten`,
@@ -30,7 +31,7 @@ function lokal(vin: string): Partial<FahrzeugFelder> {
 /** vPIC "DecodeVinValues" fields used here (all strings, '' when unknown). */
 interface Vpic {
   ErrorCode?: string; Make?: string; Model?: string; Series?: string; FuelTypePrimary?: string; FuelTypeSecondary?: string; ElectrificationLevel?: string;
-  TransmissionStyle?: string; DisplacementL?: string; EngineKW?: string; EngineHP?: string; EngineModel?: string; ModelYear?: string;
+  TransmissionStyle?: string; DriveType?: string; Trim?: string; DisplacementL?: string; EngineKW?: string; EngineHP?: string; EngineModel?: string; ModelYear?: string;
 }
 
 const titel = (s: string) => s.toLowerCase().replace(/(^|[\s-])\p{L}/gu, (c) => c.toUpperCase());
@@ -110,7 +111,7 @@ export interface VinErgebnis {
   offline?: boolean;
 }
 
-const VIN_FELDER: (keyof FahrzeugFelder)[] = ['marke', 'modell', 'antrieb', 'getriebe', 'motor', 'motorcode', 'steuertrieb', 'erstzulassung'];
+const VIN_FELDER: (keyof FahrzeugFelder)[] = ['marke', 'modell', 'antrieb', 'getriebe', 'allrad', 'motor', 'motorcode', 'steuertrieb', 'erstzulassung'];
 
 /** Motorkennbuchstabe normalised, Steuertrieb from its documented family; returns the open fields. */
 function abschliessen(felder: Partial<FahrzeugFelder>): (keyof FahrzeugFelder)[] {
@@ -164,6 +165,8 @@ async function lokalAbrufen(vin: string, signal?: AbortSignal): Promise<VinErgeb
         if (r.Model) felder.modell = felder.modell ?? [r.Model, r.Series].filter(Boolean).join(' ');
         const a = antriebVon(r); if (a) felder.antrieb = a;
         const g = getriebeVon(r); if (g) felder.getriebe = g;
+        const allrad = allradAusText(r.DriveType) ?? allradAusText([r.Model, r.Series, r.Trim].filter(Boolean).join(' '));
+        if (allrad) felder.allrad = allrad;
         const m = motorVon(r); if (m) felder.motor = m;
         // Only a code-like EngineModel ("CDNC", "K24Z7"), not a description ("EA888 Gen3").
         const code = (r.EngineModel ?? '').trim();

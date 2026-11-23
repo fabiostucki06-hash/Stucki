@@ -1,6 +1,7 @@
 import { ANTRIEBE, GETRIEBE, normMotorcode } from './wartung';
 import { getFreshToken } from './supabase';
 import { vinGueltig } from './vin';
+import { allradAusText } from '../../supabase/functions/vin-decode/vds';
 import type { FahrzeugFelder } from '../types';
 
 /* ── Photo of the vehicle papers → form values ──
@@ -12,7 +13,7 @@ import type { FahrzeugFelder } from '../types';
 
 export const AUSWEIS_FELDER = [
   'vorname', 'nachname', 'firma', 'strasse', 'plzOrt', 'kennzeichen', 'chassisnummer', 'marke', 'modell',
-  'erstzulassung', 'antrieb', 'getriebe', 'hubraumCcm', 'leistungKw', 'motorcode',
+  'erstzulassung', 'antrieb', 'getriebe', 'allrad', 'hubraumCcm', 'leistungKw', 'motorcode',
 ] as const;
 type AusweisFeld = typeof AUSWEIS_FELDER[number];
 
@@ -36,7 +37,7 @@ export interface AusweisAuswertung {
 const LABEL: Record<AusweisFeld, string> = {
   vorname: 'Vorname', nachname: 'Nachname', firma: 'Firma', strasse: 'Strasse', plzOrt: 'PLZ / Ort', kennzeichen: 'Kontrollschild',
   chassisnummer: 'Chassisnummer (VIN)', marke: 'Marke', modell: 'Modell', erstzulassung: '1. Inv. Setzung', antrieb: 'Antrieb',
-  getriebe: 'Getriebe', hubraumCcm: 'Hubraum', leistungKw: 'Leistung', motorcode: 'Motorkennbuchstabe',
+  getriebe: 'Getriebe', allrad: 'Allrad', hubraumCcm: 'Hubraum', leistungKw: 'Leistung', motorcode: 'Motorkennbuchstabe',
 };
 
 /** Real calendar date, not in the future; accepts YYYY-MM-DD and DD.MM.YYYY. */
@@ -74,6 +75,7 @@ const PRUEFUNG: Record<AusweisFeld, (s: string) => string | undefined> = {
   erstzulassung: (s) => datumGueltig(s),
   antrieb: (s) => ANTRIEBE.find((o) => o.value === s.trim().toLowerCase())?.value,
   getriebe: (s) => GETRIEBE.find((o) => o.value === s.trim().toLowerCase())?.value,
+  allrad: (s) => allradAusText(s),
   hubraumCcm: (s) => zahl(s, 50, 12000), leistungKw: (s) => zahl(s, 1, 2000),
   motorcode: (s) => { const c = normMotorcode(s); return /^[A-Z0-9]{3,10}$/.test(c) ? c : undefined; },
 };
@@ -97,6 +99,9 @@ export function ausweisAuswerten(roh: AusweisRoh): AusweisAuswertung {
   // A company without a contact person goes into Nachname, as in the PDF import.
   const nachname = ok.nachname ?? (ok.vorname ? undefined : ok.firma);
   if (nachname) werte.nachname = nachname;
+  // The printed drive marker, or one in the reliably read type ("A4 2.0 TDI quattro"); both must agree.
+  const allrad = new Set([ok.allrad, allradAusText(ok.modell)].filter(Boolean));
+  if (allrad.size === 1) werte.allrad = [...allrad][0] as 'ja' | 'nein';
   const motor = [ok.hubraumCcm && `${ok.hubraumCcm} cm³`, ok.leistungKw && `${ok.leistungKw} kW`].filter(Boolean).join(' · ');
   if (motor) werte.motor = motor;
 

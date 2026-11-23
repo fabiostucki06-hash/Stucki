@@ -6,7 +6,7 @@ import Wartungsplan from './Wartungsplan';
 import { SFChevron } from '../Icons';
 import { formatDateCH } from '../../lib/utils';
 import { FAHRZEUG_FELDER, fahrzeugTitel, formatKm } from '../../lib/vehicles';
-import { ANTRIEBE, GETRIEBE, STEUERTRIEBE, fahrzeugProfil, labelVon } from '../../lib/wartung';
+import { ALLRADEN, ANTRIEBE, GETRIEBE, STEUERTRIEBE, fahrzeugProfil, labelVon } from '../../lib/wartung';
 import { useApp } from '../../context/AppContext';
 import type { Customer, Order, ServiceItem, Vehicle } from '../../types';
 
@@ -58,6 +58,7 @@ export default function VehicleDetail({ vehicle, customer, onClose, onOrderClick
         {zeile('KM-Stand', vehicle.km ? `${formatKm(vehicle.km)} km` : undefined)}
         {zeile('1. Inv. Setzung', vehicle.erstzulassung ? formatDateCH(vehicle.erstzulassung) : undefined)}
         {zeile('Antrieb', technik(labelVon(ANTRIEBE, profil.antrieb), profil.erkannt.antrieb))}
+        {zeile('Allrad', labelVon(ALLRADEN, vehicle.allrad) ?? 'Unbekannt')}
         {zeile('Getriebe', technik(labelVon(GETRIEBE, profil.getriebe), profil.erkannt.getriebe))}
         {zeile('Motor', vehicle.motor)}
         {zeile('Motorkennbuchstabe', [vehicle.motorcode, profil.motor && `(${profil.motor.name})`].filter(Boolean).join(' ') || undefined)}

@@ -128,6 +128,21 @@ const AUDI_BAUZEIT: Record<string, [number, number]> = {
   '8T': [2007, 2017], '4F': [2004, 2011], '4G': [2011, 2018], '8U': [2011, 2018], '8R': [2008, 2017], '4L': [2005, 2015], '8J': [2006, 2014],
 };
 
+const ALLRAD_VERNEINT = /\b(?:kein(?:e[nr]?)?|ohne|nicht|non|no)[\s-]+(?:allrad\w*|awd|4wd|4\s?x\s?4)(?!\w)/gi;
+const ALLRAD_JA = /\b(?:4\s?x\s?4|4wd|awd|(?:all|four|4)[- ]?wheel[- ]drive|allrad\w*|quattro|4matic\+?|4motion|syncro|xdrive\w*|all4)(?!\w)/i;
+const ALLRAD_NEIN = /\b(?:4\s?x\s?2|2wd|fwd|rwd|(?:front|rear)[- ]?wheel[- ]drive|frontantrieb|heckantrieb|sdrive\w*)(?!\w)/i;
+
+/** All-wheel drive only from an explicit marker in decoder or document text. "Quattroporte",
+    a model line or a contradictory text say nothing, and the result stays undefined. */
+export function allradAusText(text?: string): 'ja' | 'nein' | undefined {
+  const t = text ?? '';
+  const verneint = new RegExp(ALLRAD_VERNEINT.source, 'i').test(t);
+  const rest = t.replace(ALLRAD_VERNEINT, ' ');
+  const ja = ALLRAD_JA.test(rest);
+  const nein = verneint || ALLRAD_NEIN.test(rest);
+  return ja === nein ? undefined : ja ? 'ja' : 'nein';
+}
+
 const JAHR_CODES = 'ABCDEFGHJKLMNPRSTVWXY123456789';
 
 /** Model year from VIN char 10, only where it is unambiguous. North America: the position-7

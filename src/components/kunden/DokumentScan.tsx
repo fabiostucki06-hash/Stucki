@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import Spinner from '../ui/Spinner';
 import { ausweisAuswerten, ausweisLesen, type ScanFeld, type ScanWerte } from '../../lib/fahrzeugausweis';
-import { ANTRIEBE, GETRIEBE, labelVon } from '../../lib/wartung';
+import { ALLRADEN, ANTRIEBE, GETRIEBE, labelVon } from '../../lib/wartung';
 import { vinGueltig } from '../../lib/vin';
 
 const LABEL: Record<ScanFeld, string> = {
   vorname: 'Vorname', nachname: 'Nachname', chassisnummer: 'VIN', kennzeichen: 'Kontrollschild', marke: 'Marke', modell: 'Modell',
-  erstzulassung: '1. Inv. Setzung', antrieb: 'Antrieb', getriebe: 'Getriebe', motor: 'Motor', motorcode: 'Motorkennbuchstabe', steuertrieb: 'Steuertrieb', km: 'KM-Stand',
+  erstzulassung: '1. Inv. Setzung', antrieb: 'Antrieb', getriebe: 'Getriebe', allrad: 'Allrad', motor: 'Motor', motorcode: 'Motorkennbuchstabe', steuertrieb: 'Steuertrieb', km: 'KM-Stand',
 };
-const FAHRZEUG_OFFEN: ScanFeld[] = ['chassisnummer', 'kennzeichen', 'marke', 'modell', 'erstzulassung', 'antrieb', 'getriebe', 'motor', 'motorcode', 'steuertrieb', 'km'];
+const FAHRZEUG_OFFEN: ScanFeld[] = ['chassisnummer', 'kennzeichen', 'marke', 'modell', 'erstzulassung', 'antrieb', 'getriebe', 'allrad', 'motor', 'motorcode', 'steuertrieb', 'km'];
 
 function anzeige(k: ScanFeld, v: string) {
   if (k === 'antrieb') return labelVon(ANTRIEBE, v as never) ?? v;
   if (k === 'getriebe') return labelVon(GETRIEBE, v as never) ?? v;
+  if (k === 'allrad') return labelVon(ALLRADEN, v as never) ?? v;
   if (k === 'erstzulassung') return v.split('-').reverse().join('.');
   return v;
 }

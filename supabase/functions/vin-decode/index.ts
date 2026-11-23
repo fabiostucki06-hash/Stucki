@@ -19,7 +19,7 @@
 
 import Anthropic from 'npm:@anthropic-ai/sdk@0.135.0';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { modelljahrAusVin, vdsModell, vdsModellVorschlag } from './vds.ts';
+import { allradAusText, modelljahrAusVin, vdsModell, vdsModellVorschlag } from './vds.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -32,7 +32,7 @@ const json = (body: unknown, status = 200) =>
 const env = (k: string) => Deno.env.get(k) || undefined;
 const MODEL = 'claude-opus-5-5';
 /** Bump when the result shape or prompt changes: older cache rows are resolved again. */
-const VERSION = 5;
+const VERSION = 6;
 
 type Antrieb = 'benzin' | 'diesel' | 'hybrid' | 'plugin' | 'elektro' | 'gas';
 type Getriebe = 'manuell' | 'automat' | 'dsg' | 'cvt';
@@ -40,7 +40,7 @@ type Steuertrieb = 'zahnriemen' | 'kette';
 
 interface Felder {
   marke?: string; modell?: string; antrieb?: Antrieb; getriebe?: Getriebe;
-  motor?: string; motorcode?: string; steuertrieb?: Steuertrieb;
+  motor?: string; motorcode?: string; steuertrieb?: Steuertrieb; allrad?: 'ja' | 'nein';
 }
 interface Variante {
   motor: string; motorcode: string; antrieb: Antrieb | ''; getriebe: Getriebe | ''; steuertrieb: Steuertrieb | ''; hinweis: string;
@@ -165,6 +165,8 @@ function getriebeVon(text: string): Getriebe | undefined {
   if (/automat/.test(t)) return 'automat';
   return undefined;
 }
+/** A decoder's drive type, else an explicit marker in its model / trim text. Never from the AI research. */
+const allradVon = (drive?: string, modell?: string) => allradAusText(drive) ?? allradAusText(modell);
 function motorText(l?: number, kw?: number, zusatz?: string): string | undefined {
   const teile = [
     l && l > 0 ? `${l.toFixed(1)} l` : '',
@@ -203,6 +205,7 @@ async function nhtsa(vin: string): Promise<Fund | null> {
   const a = unklar ? undefined : antriebVon(`${leer(r.ElectrificationLevel) ? '' : r.ElectrificationLevel} ${r.FuelTypePrimary ?? ''}`);
   if (a) felder.antrieb = a;
   const g = getriebeVon(r.TransmissionStyle ?? ''); if (g) felder.getriebe = g;
+  const allrad = allradVon(r.DriveType, felder.modell); if (allrad) felder.allrad = allrad;
   const kw = parseFloat(r.EngineKW) || (parseFloat(r.EngineHP) ? parseFloat(r.EngineHP) * 0.7457 : undefined);
   const m = motorText(parseFloat(r.DisplacementL), kw); if (m) felder.motor = m;
   if (codeArtig(r.EngineModel)) felder.motorcode = r.EngineModel.trim();
@@ -228,6 +231,7 @@ async function vincario(vin: string): Promise<Fund | null> {
   if (roh.Model) felder.modell = roh.Model;
   const a = antriebVon(roh['Fuel Type - Primary'] ?? ''); if (a) felder.antrieb = a;
   const g = getriebeVon(roh.Transmission ?? ''); if (g) felder.getriebe = g;
+  const allrad = allradVon(roh.Drive ?? roh['Drive Type'], felder.modell); if (allrad) felder.allrad = allrad;
   const m = motorText(parseFloat(roh['Engine Displacement (ccm)']) / 1000, parseFloat(roh['Engine Power (kW)'])); if (m) felder.motor = m;
   if (codeArtig(roh['Engine Code'])) felder.motorcode = roh['Engine Code'];
   return { quelle: 'Vincario', felder, jahr: parseInt(roh['Model Year'], 10) || undefined, roh };
@@ -250,6 +254,7 @@ async function autodev(vin: string): Promise<Fund | null> {
   const md = roh.model ?? roh['model.name'] ?? roh['vehicle.model']; if (md) felder.modell = [md, roh.trim].filter(Boolean).join(' ');
   const a = antriebVon(`${roh['engine.fuelType'] ?? ''} ${roh['engine.type'] ?? ''} ${roh.engine ?? ''}`); if (a) felder.antrieb = a;
   const g = getriebeVon(`${roh['transmission.transmissionType'] ?? ''} ${roh.transmission ?? ''}`); if (g) felder.getriebe = g;
+  const allrad = allradVon(roh.drivenWheels, felder.modell); if (allrad) felder.allrad = allrad;
   if (codeArtig(roh['engine.code'])) felder.motorcode = roh['engine.code'];
   return { quelle: 'Auto.dev', felder, jahr: parseInt(roh.year ?? roh['vehicle.year'], 10) || undefined, roh };
 }
@@ -267,6 +272,7 @@ async function carapi(vin: string): Promise<Fund | null> {
   if (roh.model) felder.modell = [roh.model, roh.trim].filter(Boolean).join(' ');
   const a = antriebVon(`${roh['specs.fuel_type_primary'] ?? ''} ${roh['specs.electrification_level'] ?? ''}`); if (a) felder.antrieb = a;
   const g = getriebeVon(roh['specs.transmission_style'] ?? ''); if (g) felder.getriebe = g;
+  const allrad = allradVon(roh['specs.drive_type'], felder.modell); if (allrad) felder.allrad = allrad;
   return { quelle: 'CarAPI', felder, jahr: parseInt(roh.year, 10) || undefined, roh };
 }
 
@@ -384,7 +390,7 @@ function zusammenfuehren(vin: string, funde: Fund[], ki: KiAntwort | null): Erge
 
   // Decoders disagreeing on a technical value: none of them is entered.
   const widerspruch: string[] = [];
-  for (const [k, label] of [['antrieb', 'Antrieb'], ['getriebe', 'Getriebe'], ['motorcode', 'Motorkennbuchstabe']] as const) {
+  for (const [k, label] of [['antrieb', 'Antrieb'], ['getriebe', 'Getriebe'], ['allrad', 'Allrad'], ['motorcode', 'Motorkennbuchstabe']] as const) {
     if (new Set(funde.map((f) => f.felder[k]?.toUpperCase()).filter(Boolean)).size > 1) {
       delete felder[k];
       if (k === 'motorcode') delete felder.motor;
