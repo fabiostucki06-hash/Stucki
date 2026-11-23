@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Spinner from '../ui/Spinner';
-import { ANTRIEBE, GETRIEBE, STEUERTRIEBE, fahrzeugProfil, labelVon } from '../../lib/wartung';
+import { ANTRIEBE, GETRIEBE, STEUERTRIEBE, fahrzeugProfil, labelVon, motorfamilieAusCode } from '../../lib/wartung';
 import { vinAbrufen, vinGueltig, type VinVariante } from '../../lib/vin';
 import { motorVarianten } from '../../lib/motorkatalog';
 import type { FahrzeugFelder } from '../../types';
 
-/** "Automatisch – erkannt: Diesel" / "Automatisch – unbekannt": the empty option of a technical select. */
-const auto = (erkannt?: string) => `Automatisch – ${erkannt ? `erkannt: ${erkannt}` : 'unbekannt'}`;
+/** The empty option of a technical select: nothing is presumed for an open field. */
+const AUTO = 'Automatisch – unbekannt';
 
 const FELD_LABEL: Partial<Record<keyof FahrzeugFelder, string>> = {
-  marke: 'Marke', modell: 'Modell', antrieb: 'Antrieb', getriebe: 'Getriebe', motor: 'Motor', motorcode: 'Motorkennbuchstabe', steuertrieb: 'Steuertrieb',
+  marke: 'Marke', modell: 'Modell', antrieb: 'Antrieb', getriebe: 'Getriebe', motor: 'Motor', motorcode: 'Motorkennbuchstabe', steuertrieb: 'Steuertrieb', erstzulassung: '1. Inv. Setzung',
 };
 const WERT_LABEL: Partial<Record<keyof FahrzeugFelder, (v: string) => string | undefined>> = {
   antrieb: (v) => labelVon(ANTRIEBE, v as never), getriebe: (v) => labelVon(GETRIEBE, v as never), steuertrieb: (v) => labelVon(STEUERTRIEBE, v as never),
@@ -18,12 +18,20 @@ const anzeige = (k: keyof FahrzeugFelder, v: string) => WERT_LABEL[k]?.(v) ?? v;
 
 interface VinStatus {
   laden?: boolean;
-  /** What was filled in / what the VIN doesn't hold. */
-  text: string;
+  /** Lookup failed, nothing found, or a general note. */
+  text?: string;
   warnung?: boolean;
+  /** Reliably recognized: "Marke: VW". */
+  erkannt?: string[];
+  /** Fields still empty, to be checked or entered by hand. */
+  offen?: string[];
+  /** Model year and sources. */
+  info?: string;
   /** VIN values differing from what was entered by hand: taken over only on request. */
   abweichend?: Partial<FahrzeugFelder>;
-  /** Engine variants of the VIN lookup (AI or Motorkatalog for the decoded model). */
+  /** Unconfirmed model name, entered only on request. */
+  modellVorschlag?: string;
+  /** Unconfirmed engine variants (AI or Motorkatalog for the decoded model). */
   varianten?: VinVariante[];
 }
 
@@ -33,9 +41,9 @@ const variantenText = (v: VinVariante) => [v.motor, v.motorcode, v.hinweis].filt
 /** The vehicle inputs, shared by the vehicle sheet and the new-customer form.
     Where Marke / Modell are known but the engine isn't, the factory engines of
     the built-in Motorkatalog are offered as chips (also without a VIN).
-    A complete VIN (top of the form) is looked up (lib/vin) when entered, on blur
-    or via "Daten abrufen": empty fields (and selects on "Automatisch") are filled in, values
-    entered by hand are only replaced on request. */
+    "Daten abrufen" looks up a complete VIN (lib/vin): only reliably resolved values
+    fill empty fields, values entered by hand are only replaced on request, and the
+    status names what was recognized and what is still to be checked. */
 export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k: keyof FahrzeugFelder, v: string) => void }) {
   const s = (k: keyof FahrzeugFelder) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => onChange(k, e.target.value);
   const p = fahrzeugProfil(f);
@@ -44,50 +52,67 @@ export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k
   const [vin, setVin] = useState<VinStatus | null>(null);
   const aktuell = useRef(f);
   aktuell.current = f;
-  const abgefragt = useRef<string | undefined>(vinGueltig(f.chassisnummer));
   const abbruch = useRef<AbortController | null>(null);
+  /** Values the last lookup entered: a lookup for another VIN must not leave them behind. */
+  const eingetragen = useRef(new Map<keyof FahrzeugFelder, string>());
   useEffect(() => () => abbruch.current?.abort(), []);
 
-  async function vinLaden(eingabe: string | undefined, erzwingen: boolean) {
-    const nr = vinGueltig(eingabe);
+  async function vinLaden() {
+    const nr = vinGueltig(aktuell.current.chassisnummer);
     if (!nr) {
-      if (erzwingen) setVin({ text: 'Ungültige VIN: 17 Zeichen, ohne I, O und Q.', warnung: true });
+      setVin({ text: 'Ungültige VIN: 17 Zeichen, ohne I, O und Q.', warnung: true });
       return;
     }
-    if (!erzwingen && abgefragt.current === nr) return;
-    abgefragt.current = nr;
     abbruch.current?.abort();
     const ac = new AbortController();
     abbruch.current = ac;
-    setVin({ laden: true, text: 'VIN wird analysiert – Herstellerdaten und Web-Recherche, beim ersten Mal bis zu einer Minute…' });
+    setVin({ laden: true, text: 'VIN wird geprüft, beim ersten Mal kann das bis zu einer Minute dauern…' });
     try {
       const r = await vinAbrufen(nr, ac.signal);
-      const jetzt = aktuell.current;
-      if (vinGueltig(jetzt.chassisnummer) !== nr) return; // VIN changed meanwhile
-      const gefuellt: string[] = [];
+      if (vinGueltig(aktuell.current.chassisnummer) !== nr) return; // VIN changed meanwhile
+      const werte: Record<string, unknown> = { ...aktuell.current };
+      for (const [k, v] of eingetragen.current) {
+        if (String(werte[k] ?? '') === v) { onChange(k, ''); werte[k] = ''; }
+      }
+      eingetragen.current = new Map();
+
+      const erkannt: string[] = [];
       const abweichend: Partial<FahrzeugFelder> = {};
       for (const [k, v] of Object.entries(r.felder) as [keyof FahrzeugFelder, string][]) {
-        const alt = String(jetzt[k] ?? '').trim();
-        if (!alt) { onChange(k, v); gefuellt.push(FELD_LABEL[k] ?? k); }
-        else if (alt.toLowerCase() !== v.toLowerCase()) (abweichend as Record<string, string>)[k] = v;
+        const alt = String(werte[k] ?? '').trim();
+        if (!alt) { onChange(k, v); werte[k] = v; eingetragen.current.set(k, v); }
+        else if (alt.toLowerCase() !== v.toLowerCase()) { (abweichend as Record<string, string>)[k] = v; continue; }
+        erkannt.push(`${FELD_LABEL[k] ?? k}: ${anzeige(k, v)}`);
       }
-      const teile = [
-        gefuellt.length ? `Aus VIN übernommen: ${gefuellt.join(', ')}.` : 'Keine leeren Felder zu ergänzen.',
-        [r.modelljahr ? `Modelljahr ${r.modelljahr}` : '', r.generation ? `Generation ${r.generation}` : ''].filter(Boolean).join(' · ') + (r.modelljahr || r.generation ? '.' : ''),
-        r.hinweis ?? '',
-        r.offen.length ? `Nicht aus der VIN ermittelbar: ${r.offen.join(', ')} – bitte Fahrzeugausweis / Datenträger prüfen.` : '',
-        r.offline ? 'VIN-Server nicht erreichbar, nur lokale Auswertung und NHTSA.' : '',
-        r.quellen.length ? `Quellen: ${r.quellen.join(', ')}${r.cache ? ' (gespeichert)' : ''}.` : '',
-      ].filter(Boolean);
+      const offen = r.offen.filter((k) => !String(werte[k] ?? '').trim()).map((k) => FELD_LABEL[k] ?? k);
+      const nurDatum = offen.length === 1 && offen[0] === FELD_LABEL.erstzulassung;
       setVin({
-        text: teile.join(' '), warnung: r.offen.length > 0 || !!r.offline || r.sicherheit === 'niedrig',
+        text: [
+          r.offline ? 'VIN-Server nicht erreichbar: nur die lokale Auswertung wurde verwendet.' : '',
+          erkannt.length ? '' : 'Zu dieser VIN wurden keine verlässlichen Fahrzeugdaten gefunden. Es wurde nichts eingetragen.',
+          r.hinweis ?? '',
+        ].filter(Boolean).join(' ') || undefined,
+        warnung: !erkannt.length || !!r.offline || !!r.hinweis || (offen.length > 0 && !nurDatum),
+        erkannt, offen,
+        info: [
+          r.modelljahr ? `Modelljahr ${r.modelljahr} (entspricht nicht zwingend der 1. Inv. Setzung)` : '',
+          r.quellen.length ? `Quelle: ${r.quellen.join(', ')}${r.cache ? ' (gespeichert)' : ''}` : '',
+        ].filter(Boolean).join(' · ') || undefined,
         abweichend: Object.keys(abweichend).length ? abweichend : undefined,
+        modellVorschlag: r.modellVorschlag,
         varianten: r.varianten.length ? r.varianten : undefined,
       });
     } catch (e) {
       if ((e as Error).name === 'AbortError') return;
-      setVin({ text: (e as Error).message || 'VIN-Abfrage fehlgeschlagen.', warnung: true });
+      setVin({ text: 'VIN-Abfrage fehlgeschlagen. Es wurde nichts eingetragen, bitte später erneut versuchen oder die Daten manuell erfassen.', warnung: true });
     }
+  }
+
+  /** A changed VIN invalidates the shown result and a lookup still running. */
+  function vinGeaendert(wert: string) {
+    abbruch.current?.abort();
+    setVin(null);
+    onChange('chassisnummer', wert);
   }
 
   // Offered while the engine is open, and kept visible once one of them is picked.
@@ -108,9 +133,19 @@ export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k
 
   function uebernehmen() {
     if (!vin?.abweichend) return;
-    for (const [k, v] of Object.entries(vin.abweichend) as [keyof FahrzeugFelder, string][]) onChange(k, v);
-    setVin({ ...vin, text: `VIN-Werte übernommen: ${Object.keys(vin.abweichend).map((k) => FELD_LABEL[k as keyof FahrzeugFelder]).join(', ')}.`, abweichend: undefined });
+    const neu = Object.entries(vin.abweichend) as [keyof FahrzeugFelder, string][];
+    for (const [k, v] of neu) onChange(k, v);
+    setVin({ ...vin, erkannt: [...(vin.erkannt ?? []), ...neu.map(([k, v]) => `${FELD_LABEL[k] ?? k}: ${anzeige(k, v)}`)], abweichend: undefined });
   }
+
+  function modellUebernehmen() {
+    if (!vin?.modellVorschlag) return;
+    onChange('modell', vin.modellVorschlag);
+    setVin({ ...vin, modellVorschlag: undefined, offen: vin.offen?.filter((x) => x !== FELD_LABEL.modell) });
+  }
+
+  // Shown only for a Motorkennbuchstabe of a documented family, never from free text.
+  const familie = motorfamilieAusCode(f.marke, f.motorcode);
 
   return (
     <div className="cf-group">
@@ -121,28 +156,40 @@ export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k
           <input
             id="vf-vin" className="cf-input vin-input" value={f.chassisnummer ?? ''} placeholder="z.B. WAUZZZ8TX9A020101" maxLength={20}
             autoCapitalize="characters" autoComplete="off" spellCheck={false}
-            onChange={(e) => { onChange('chassisnummer', e.target.value); if (vinGueltig(e.target.value)) void vinLaden(e.target.value, false); }}
-            onBlur={(e) => void vinLaden(e.target.value, false)}
+            onChange={(e) => vinGeaendert(e.target.value)}
           />
           <button
             type="button" className="btn-system btn-secondary vin-btn" disabled={vin?.laden || !vinGueltig(f.chassisnummer)}
-            onClick={() => void vinLaden(f.chassisnummer, true)} title="Fahrzeugdaten aus der VIN ermitteln"
+            onClick={() => void vinLaden()} title="Fahrzeugdaten aus der VIN ermitteln"
           >
             {vin?.laden ? <Spinner size={13} color="var(--accent)" /> : 'Daten abrufen'}
           </button>
         </div>
         {vin ? (
           <div className={`vin-status${vin.warnung ? ' vin-status-warn' : ''}`} role="status" aria-live="polite">
-            <span>{vin.text}</span>
+            {vin.text && <span>{vin.text}</span>}
+            {!!vin.erkannt?.length && (
+              <span className="vin-zeile"><span className="vin-zeile-titel">Erkannt</span><span className="vin-zeile-wert">{vin.erkannt.join(' · ')}</span></span>
+            )}
+            {!!vin.offen?.length && (
+              <span className="vin-zeile"><span className="vin-zeile-titel">Bitte prüfen / ergänzen</span><span className="vin-zeile-wert">{vin.offen.join(', ')}</span></span>
+            )}
             {vin.abweichend && (
               <span className="vin-abweichend">
                 VIN abweichend: {Object.entries(vin.abweichend).map(([k, v]) => `${FELD_LABEL[k as keyof FahrzeugFelder]} ${anzeige(k as keyof FahrzeugFelder, v)}`).join(' · ')}
                 <button type="button" className="sp-text-btn" onClick={uebernehmen}>Übernehmen</button>
               </span>
             )}
+            {vin.modellVorschlag && !f.modell && (
+              <span className="vin-abweichend">
+                Modell-Vorschlag (nicht bestätigt): {vin.modellVorschlag}
+                <button type="button" className="sp-text-btn" onClick={modellUebernehmen}>Übernehmen</button>
+              </span>
+            )}
+            {vin.info && <span className="vin-info">{vin.info}</span>}
           </div>
         ) : (
-          <p className="vin-hint">17 Zeichen, alle Marken – füllt Marke, Modell, Antrieb, Getriebe, Motor, Motorkennbuchstabe und Steuertrieb automatisch aus.</p>
+          <p className="vin-hint">17 Zeichen. Übernimmt nur verlässlich erkannte Daten, offene Felder werden danach angezeigt.</p>
         )}
       </div>
 
@@ -161,14 +208,14 @@ export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k
         <div className="cf-field">
           <label className="cf-label">Antrieb</label>
           <select className="cf-select" value={f.antrieb ?? ''} onChange={s('antrieb')}>
-            <option value="">{auto(f.antrieb ? undefined : labelVon(ANTRIEBE, p.antrieb))}</option>
+            <option value="">{AUTO}</option>
             {ANTRIEBE.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
         <div className="cf-field">
           <label className="cf-label">Getriebe</label>
           <select className="cf-select" value={f.getriebe ?? ''} onChange={s('getriebe')}>
-            <option value="">{auto(f.getriebe ? undefined : labelVon(GETRIEBE, p.getriebe))}</option>
+            <option value="">{AUTO}</option>
             {GETRIEBE.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
@@ -186,8 +233,7 @@ export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k
       {zeigeVarianten && (
         <div className="vin-varianten">
           <span className="vin-varianten-titel">
-            Motorisierung wählen{f.modell ? ` – ${[f.marke, f.modell].filter(Boolean).join(' ')}` : ''}
-            {varianten.some((x) => x.motorcode.includes('/') || !x.motorcode) ? ' · genauen Motorkennbuchstaben vom Fahrzeugausweis ergänzen' : ''}
+            Mögliche Motorisierungen{f.modell ? ` – ${[f.marke, f.modell].filter(Boolean).join(' ')}` : ''}: nicht bestätigt, nur nach Prüfung am Fahrzeug oder Fahrzeugausweis wählen
           </span>
           <div className="vin-chips">
             {varianten.map((v, i) => {
@@ -204,12 +250,12 @@ export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k
           </div>
         </div>
       )}
-      {p.motor && <p className="cf-hint" style={{ margin: '6px 2px 0', fontSize: 12, color: 'var(--label3)' }}>Erkannt: {p.motor.name}</p>}
+      {familie && <p className="cf-hint" style={{ margin: '6px 2px 0', fontSize: 12, color: 'var(--label3)' }}>Motorfamilie: {familie.name}</p>}
       <div className="cf-grid-2" style={{ marginTop: 10 }}>
         <div className="cf-field">
           <label className="cf-label">Steuertrieb</label>
           <select className="cf-select" value={f.steuertrieb ?? ''} onChange={s('steuertrieb')}>
-            <option value="">{auto(f.steuertrieb ? undefined : labelVon(STEUERTRIEBE, p.steuertrieb))}</option>
+            <option value="">{AUTO}</option>
             {STEUERTRIEBE.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>

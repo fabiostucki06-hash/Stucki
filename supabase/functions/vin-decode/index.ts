@@ -19,7 +19,7 @@
 
 import Anthropic from 'npm:@anthropic-ai/sdk@0.135.0';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { vdsModell } from './vds.ts';
+import { vdsModell, vdsModellVorschlag } from './vds.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -32,7 +32,7 @@ const json = (body: unknown, status = 200) =>
 const env = (k: string) => Deno.env.get(k) || undefined;
 const MODEL = 'claude-opus-5-5';
 /** Bump when the result shape or prompt changes: older cache rows are resolved again. */
-const VERSION = 3;
+const VERSION = 4;
 
 type Antrieb = 'benzin' | 'diesel' | 'hybrid' | 'plugin' | 'elektro' | 'gas';
 type Getriebe = 'manuell' | 'automat' | 'dsg' | 'cvt';
@@ -56,7 +56,9 @@ interface Ergebnis {
   pruefziffer: 'ok' | 'falsch';
   /** The VIN settles the engine; otherwise pick one of `varianten`. */
   motorEindeutig: boolean;
+  /** Unconfirmed: never entered automatically, the form offers them to pick. */
   varianten: Variante[];
+  modellVorschlag?: string;
   sicherheit?: 'hoch' | 'mittel' | 'niedrig';
   hinweis?: string;
   quellen: string[];
@@ -161,13 +163,15 @@ function antriebVon(text: string): Antrieb | undefined {
   if (/\bbev\b|battery electric|^electric$|\belektro\b/.test(t.trim())) return 'elektro';
   if (/hybrid|hev/.test(t)) return 'hybrid';
   if (/diesel/.test(t)) return 'diesel';
-  if (/natural gas|cng|lpg|erdgas/.test(t)) return 'gas';
-  if (/gasoline|petrol|benzin|flexible/.test(t)) return 'benzin';
+  if (/natural gas|cng|erdgas/.test(t)) return 'gas';
+  if (/gasoline|petrol|benzin/.test(t)) return 'benzin';
   if (/electric/.test(t)) return 'elektro';
   return undefined;
 }
 function getriebeVon(text: string): Getriebe | undefined {
   const t = text.toLowerCase();
+  // An automated manual is neither of the form's options.
+  if (/automated.?manual|\bamt\b/.test(t)) return undefined;
   if (/dual.?clutch|dct|dsg|s.?tronic|pdk/.test(t)) return 'dsg';
   if (/continuously|cvt/.test(t)) return 'cvt';
   if (/manual|schalt/.test(t)) return 'manuell';
@@ -182,7 +186,9 @@ function motorText(l?: number, kw?: number, zusatz?: string): string | undefined
   ].filter(Boolean);
   return teile.length ? teile.join(' · ') : undefined;
 }
-const codeArtig = (s?: string) => !!s && /^[A-Z0-9-]{3,10}$/.test(s.trim()) && /[A-Z]/.test(s) && /\d|^[A-Z]{4}$/.test(s);
+/** Technology names that look like an engine code but aren't one. */
+const KEIN_CODE = /^(VTEC|TFSI|HEMI|TDCI|CRDI|MIVE|GDIT|TGDI|MPFI|DOHC|SOHC|VVTI|TURBO|FLEX|BOXER)$/;
+const codeArtig = (s?: string) => !!s && /^[A-Z0-9-]{3,10}$/.test(s.trim()) && /[A-Z]/.test(s) && /\d|^[A-Z]{4}$/.test(s) && !KEIN_CODE.test(s.trim());
 
 async function holen(url: string, init?: RequestInit, ms = 12000): Promise<unknown> {
   const r = await fetch(url, { ...init, signal: AbortSignal.timeout(ms) });
@@ -190,17 +196,25 @@ async function holen(url: string, init?: RequestInit, ms = 12000): Promise<unkno
   return r.json();
 }
 
-async function nhtsa(vin: string, jahr?: number): Promise<Fund | null> {
-  const j = await holen(`https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValuesExtended/${vin}?format=json${jahr ? `&modelyear=${jahr}` : ''}`) as { Results?: Record<string, string>[] };
+async function nhtsa(vin: string): Promise<Fund | null> {
+  const j = await holen(`https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValuesExtended/${vin}?format=json`) as { Results?: Record<string, string>[] };
   const r = j.Results?.[0];
   if (!r) return null;
   const roh = sauber(Object.fromEntries(Object.entries(r).filter(([k]) => !/^(ErrorCode|ErrorText|AdditionalErrorText|SuggestedVIN|PossibleValues|VIN)$/.test(k))));
   roh.Fehler = r.ErrorText ?? '';
   const felder: Felder = {};
   if (r.Make) felder.marke = titel(r.Make);
+  // ErrorCode 0 alone = decoded cleanly. Anything else (typical for European VINs): only the Make counts.
+  const sauberDekodiert = (r.ErrorCode ?? '').split(',').every((c) => c.trim() === '0');
+  if (!sauberDekodiert) {
+    if (Object.keys(roh).length <= 1 && !felder.marke) return null;
+    return { quelle: 'NHTSA vPIC', felder, roh };
+  }
   if (r.Model) felder.modell = [r.Model, r.Series, r.Trim].filter((x) => !leer(x)).join(' ');
-  const el = `${r.ElectrificationLevel ?? ''} ${r.FuelTypePrimary ?? ''} ${r.FuelTypeSecondary ?? ''}`;
-  const a = antriebVon(el); if (a) felder.antrieb = a;
+  // Gasoline + secondary Electric without an electrification level doesn't say which hybrid it is.
+  const unklar = /electric/i.test(r.FuelTypeSecondary ?? '') && leer(r.ElectrificationLevel);
+  const a = unklar ? undefined : antriebVon(`${leer(r.ElectrificationLevel) ? '' : r.ElectrificationLevel} ${r.FuelTypePrimary ?? ''}`);
+  if (a) felder.antrieb = a;
   const g = getriebeVon(r.TransmissionStyle ?? ''); if (g) felder.getriebe = g;
   const kw = parseFloat(r.EngineKW) || (parseFloat(r.EngineHP) ? parseFloat(r.EngineHP) * 0.7457 : undefined);
   const m = motorText(parseFloat(r.DisplacementL), kw); if (m) felder.motor = m;
@@ -381,42 +395,39 @@ function zusammenfuehren(vin: string, funde: Fund[], ki: KiAntwort | null): Erge
   // The workshop's spelling ("VW", "Mercedes") rather than the decoder's ("Volkswagen", "Mercedes-Benz").
   if (wmiMarke && !wmiMarke.includes('/')) felder.marke = wmiMarke;
 
-  let varianten: Variante[] = [];
-  let motorEindeutig = !!(felder.motorcode || (nordamerika && felder.motor));
-  if (ki) {
-    if (ki.marke) felder.marke = ki.marke;
-    if (ki.modell) felder.modell = ki.modell;
-    if (ki.antrieb) felder.antrieb = ki.antrieb;
-    if (ki.getriebe) felder.getriebe = ki.getriebe;
-    if (ki.motorEindeutig) {
-      motorEindeutig = true;
-      if (ki.motor) felder.motor = ki.motor;
-      if (ki.motorcode && !felder.motorcode) felder.motorcode = ki.motorcode;
-      if (ki.steuertrieb) felder.steuertrieb = ki.steuertrieb;
-    } else if (!motorEindeutig) {
-      varianten = (ki.varianten ?? []).filter((v) => v.motor).slice(0, 14);
-      if (varianten.length === 1) {
-        const [v] = varianten;
-        motorEindeutig = true;
-        varianten = [];
-        felder.motor = v.motor;
-        if (v.motorcode && !v.motorcode.includes('/')) felder.motorcode = v.motorcode;
-        if (v.antrieb) felder.antrieb = v.antrieb;
-        if (v.getriebe) felder.getriebe = v.getriebe;
-        if (v.steuertrieb) felder.steuertrieb = v.steuertrieb;
-      }
+  // Decoders disagreeing on a technical value: none of them is entered.
+  const widerspruch: string[] = [];
+  for (const [k, label] of [['antrieb', 'Antrieb'], ['getriebe', 'Getriebe'], ['motorcode', 'Motorkennbuchstabe']] as const) {
+    if (new Set(funde.map((f) => f.felder[k]?.toUpperCase()).filter(Boolean)).size > 1) {
+      delete felder[k];
+      if (k === 'motorcode') delete felder.motor;
+      widerspruch.push(label);
     }
   }
+
+  const motorEindeutig = !!(felder.motorcode || (nordamerika && felder.motor));
+  // The AI lookup is a web research, not a record of this vehicle: it only produces suggestions.
+  let varianten: Variante[] = [];
+  if (ki && !motorEindeutig) {
+    varianten = ki.motorEindeutig && ki.motor
+      ? [{ motor: ki.motor, motorcode: ki.motorcode, antrieb: ki.antrieb, getriebe: ki.getriebe, steuertrieb: ki.steuertrieb, hinweis: '' }]
+      : (ki.varianten ?? []).filter((v) => v.motor).slice(0, 14);
+  }
+  const modellVorschlag = felder.modell ? undefined : vdsModellVorschlag(felder.marke, vin) ?? (ki?.modell || undefined);
   if (felder.antrieb === 'elektro') { delete felder.motorcode; delete felder.steuertrieb; }
   // Char 10 is the model year in North America and for most makers elsewhere, but not on
-  // European Mercedes VINs (serial number). vPIC only echoes the year passed in for non-US VINs.
+  // European Mercedes VINs (serial number).
   const jahrVin = /^(WD|W1)/.test(vin) && !nordamerika ? undefined : modelljahrAusVin(vin);
-  const jahrDecoder = funde.find((f) => f.jahr && (nordamerika || f.quelle !== 'NHTSA vPIC'))?.jahr;
-  const modelljahr = (ki?.modelljahr || undefined) ?? jahrDecoder ?? jahrVin;
+  const modelljahr = funde.find((f) => f.jahr)?.jahr ?? jahrVin;
+  const pruefziffer = pruefzifferOk(vin) ? 'ok' as const : 'falsch' as const;
+  const hinweise = [
+    widerspruch.length ? `Die Datenquellen widersprechen sich bei ${widerspruch.join(', ')}: nicht übernommen.` : '',
+    nordamerika && pruefziffer === 'falsch' ? 'Die Prüfziffer dieser VIN stimmt nicht: bitte die Eingabe kontrollieren.' : '',
+  ].filter(Boolean);
   return {
-    version: VERSION, felder, modelljahr, generation: ki?.generation || undefined, region, land,
-    pruefziffer: pruefzifferOk(vin) ? 'ok' : 'falsch', motorEindeutig, varianten,
-    sicherheit: ki?.sicherheit, hinweis: ki?.hinweis || undefined,
+    version: VERSION, felder, modelljahr, region, land,
+    pruefziffer, motorEindeutig, varianten, modellVorschlag,
+    hinweis: hinweise.join(' ') || undefined,
     quellen: ['ISO 3779', ...funde.map((f) => f.quelle), ...(ki ? ['KI-Recherche (Web)'] : [])],
   };
 }
@@ -437,8 +448,10 @@ Deno.serve(async (req) => {
   const vin = (body.vin ?? '').replace(/\s/g, '').toUpperCase();
   if (!VIN_RE.test(vin)) return json({ ok: false, error: 'Ungültige VIN (17 Zeichen, ohne I, O, Q)' }, 400);
 
-  // Pattern: WMI + VDS without check digit + model year.
-  const muster = vin.slice(0, 8) + vin[9];
+  // Pattern: WMI + VDS without check digit + model year. A commercial decoder answers for the
+  // single vehicle on non-US VINs (the VDS doesn't hold the engine there), so those are cached per VIN.
+  const einzeln = !/^[1-5]/.test(vin) && !!(env('VINCARIO_API_KEY') || env('AUTODEV_API_KEY') || env('CARAPI_TOKEN'));
+  const muster = einzeln ? vin : vin.slice(0, 8) + vin[9];
   const kiMoeglich = !!env('ANTHROPIC_API_KEY');
   const { data: cache } = await supa.from('vin_cache').select('data').eq('muster', muster).maybeSingle();
   const alt = cache?.data as Ergebnis | undefined;
@@ -456,7 +469,7 @@ Deno.serve(async (req) => {
   };
 
   const fehler: string[] = [];
-  const quellen = [nhtsa(vin, /^[1-5]|^WD|^W1/.test(vin) ? undefined : jahr), vincario(vin), autodev(vin), carapi(vin)];
+  const quellen = [nhtsa(vin), vincario(vin), autodev(vin), carapi(vin)];
   const funde = (await Promise.allSettled(quellen)).flatMap((r) => {
     if (r.status === 'rejected') { fehler.push(String((r.reason as Error)?.message ?? r.reason)); return []; }
     return r.value ? [r.value] : [];
@@ -471,8 +484,8 @@ Deno.serve(async (req) => {
   try { ki = await kiRecherche(vin, analyse, funde); } catch (e) { fehler.push(`KI: ${(e as Error).message}`); }
 
   const ergebnis = zusammenfuehren(vin, funde, ki);
-  // Only cache a result that resolved something beyond the WMI.
-  if (ergebnis.felder.modell || ki) {
+  // Only cache a complete run that resolved something beyond the WMI: a failed source is retried next time.
+  if (!fehler.length && (ergebnis.felder.modell || ki)) {
     await supa.from('vin_cache').upsert({ muster, vin, data: ergebnis, quellen: ergebnis.quellen, updated_at: new Date().toISOString() });
   }
   if (fehler.length) console.warn('vin-decode', vin, fehler);

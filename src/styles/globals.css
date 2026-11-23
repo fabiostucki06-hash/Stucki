@@ -1008,6 +1008,10 @@ select.mf-add-pos.df-pauschale-select{-webkit-appearance:none;appearance:none;co
 .vin-btn:disabled{opacity:0.5;cursor:default}
 .vin-status{display:flex;flex-direction:column;gap:4px;margin-top:8px;padding:8px 12px;font-size:12.5px;line-height:1.45;color:var(--label2);background:var(--surface-2);border:1px solid var(--border);border-left:3px solid var(--green);border-radius:var(--radius-md)}
 .vin-status-warn{border-left-color:var(--orange)}
+.vin-zeile{display:flex;flex-direction:column;gap:1px}
+.vin-zeile-titel{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--label3)}
+.vin-zeile-wert{color:var(--label);font-variant-numeric:tabular-nums}
+.vin-info{font-size:12px;color:var(--label3)}
 .vin-abweichend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;color:var(--label)}
 .vin-abweichend .sp-text-btn{height:28px;padding:0 8px}
 .vin-varianten{display:flex;flex-direction:column;gap:6px;margin-top:10px;color:var(--label)}

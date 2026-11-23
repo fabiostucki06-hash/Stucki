@@ -174,6 +174,13 @@ function motorVon(g: Gruppe, code: string, text: string): Motor | undefined {
   return MOTOREN.find((x) => x.gruppen.includes(g) && ((!!code && !!x.code?.test(code)) || !!x.text?.test(text)))?.m;
 }
 
+/** Engine family documented for exactly this Motorkennbuchstabe (never from free text or the Marke). */
+export function motorfamilieAusCode(marke?: string, motorcode?: string): { name: string; steuertrieb: Steuertrieb } | undefined {
+  const m = norm(marke);
+  const code = normMotorcode(motorcode);
+  return code ? motorVon(GRUPPE_VON[m] ?? GRUPPE_VON[m.split(/\s+/)[0]] ?? 'andere', code, '') : undefined;
+}
+
 export interface FahrzeugProfil {
   gruppe: Gruppe;
   /** Manufacturer key of maintenance_specs: the group, else the Marke. */

@@ -121,8 +121,29 @@ const OPEL_MODELL: Record<string, string> = {
 
 const zuerst = (t: Record<string, string>, ...keys: string[]) => keys.map((k) => t[k]).find(Boolean);
 
-/** Modell from the manufacturer-coded VDS, where a built-in table covers the make. */
+/** The VDS layout is fixed and documented only for these cases: European VAG / Porsche
+    VINs ("ZZZ" filler, type in chars 7–8), European Mercedes (Baureihe in 4–6) and the
+    Fiat group's type number. A name covering several models doesn't settle the model. */
+function vdsSicher(marke: string | undefined, vin: string, modell: string): boolean {
+  if (modell.includes(' / ')) return false;
+  if (marke === 'Audi' || marke === 'VW' || marke === 'Skoda' || marke === 'Seat' || marke === 'Porsche') return vin.slice(3, 6) === 'ZZZ';
+  if (marke === 'Mercedes') return vin[0] === 'W';
+  return marke === 'Fiat' || marke === 'Alfa Romeo' || marke === 'Lancia';
+}
+
+/** Modell only where the VIN settles it; safe to enter into the form. */
 export function vdsModell(marke: string | undefined, vin: string): string | undefined {
+  const m = vdsTabelle(marke, vin);
+  return m && vdsSicher(marke, vin, m) ? m : undefined;
+}
+
+/** A table hit that doesn't settle the model: shown as an unconfirmed suggestion only. */
+export function vdsModellVorschlag(marke: string | undefined, vin: string): string | undefined {
+  const m = vdsTabelle(marke, vin);
+  return m && !vdsSicher(marke, vin, m) ? m : undefined;
+}
+
+function vdsTabelle(marke: string | undefined, vin: string): string | undefined {
   switch (marke) {
     case 'Audi': case 'VW': case 'Skoda': case 'Seat':
       return VAG_MODELL[marke][vin.slice(6, 8)];

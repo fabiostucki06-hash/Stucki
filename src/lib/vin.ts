@@ -1,22 +1,22 @@
-import { fahrzeugProfil, markeAusVin, normMotorcode } from './wartung';
+import { markeAusVin, motorfamilieAusCode, normMotorcode } from './wartung';
 import { SUPA_KEY, SUPA_URL, getFreshToken } from './supabase';
 import { motorVarianten, type VinVariante } from './motorkatalog';
-import { vdsModell } from '../../supabase/functions/vin-decode/vds';
-import type { Antrieb, FahrzeugFelder, Getriebe, Steuertrieb } from '../types';
+import { vdsModell, vdsModellVorschlag } from '../../supabase/functions/vin-decode/vds';
+import type { Antrieb, FahrzeugFelder, Getriebe } from '../types';
 
 /* ── VIN → vehicle data ──
    A VIN is WMI (1–3, manufacturer) · VDS (4–9) · VIS (10–17, 10 = model year).
-   Resolved server-side by the Edge Function vin-decode (supabase/functions):
-   ISO 3779 parse with built-in VDS model tables (vds.ts) and the free NHTSA
-   vPIC; optional commercial decoders and an AI lookup only when their keys are
-   configured. Cached per VIN pattern in vin_cache. Where the VIN doesn't encode
-   the engine (most European / Asian VINs), the factory engine variants of the
-   model come from the built-in Motorkatalog (or the AI lookup) to pick from.
-   When the function isn't reachable, a local fallback runs in the browser:
-   - local rules: WMI → Marke, VDS → Modell (same tables, vds.ts);
-   - NHTSA vPIC (public, CORS-enabled): complete for US-market VINs, often only
-     Marke / Modell for European ones.
-   What couldn't be resolved is reported. */
+   Resolved server-side by the Edge Function vin-decode (supabase/functions),
+   with a browser fallback (WMI / VDS tables, NHTSA vPIC) when it isn't reachable.
+
+   Strict rule: `felder` holds only what the VIN or a decoder states for this
+   vehicle. Everything else stays empty and is reported in `offen`:
+   - Marke from the WMI, Modell from a VDS layout that is fixed for the make;
+   - Antrieb, Getriebe, Motor, Motorkennbuchstabe from a decoder's clean answer;
+   - Steuertrieb only from a delivered Motorkennbuchstabe of a documented family;
+   - 1. Inverkehrsetzung never: a VIN holds at most the model year.
+   AI research and the Motorkatalog only produce suggestions (`varianten`,
+   `modellVorschlag`), which the user has to pick. */
 
 export const vinGueltig = (vin?: string): string | undefined =>
   (vin ?? '').replace(/\s/g, '').toUpperCase().match(/^[A-HJ-NPR-Z0-9]{17}$/)?.[0];
@@ -29,7 +29,7 @@ function lokal(vin: string): Partial<FahrzeugFelder> {
 
 /** vPIC "DecodeVinValues" fields used here (all strings, '' when unknown). */
 interface Vpic {
-  Make?: string; Model?: string; Series?: string; FuelTypePrimary?: string; FuelTypeSecondary?: string; ElectrificationLevel?: string;
+  ErrorCode?: string; Make?: string; Model?: string; Series?: string; FuelTypePrimary?: string; FuelTypeSecondary?: string; ElectrificationLevel?: string;
   TransmissionStyle?: string; DisplacementL?: string; EngineKW?: string; EngineHP?: string; EngineModel?: string; ModelYear?: string;
 }
 
@@ -37,10 +37,12 @@ const titel = (s: string) => s.toLowerCase().replace(/(^|[\s-])\p{L}/gu, (c) => 
 
 function antriebVon(r: Vpic): Antrieb | undefined {
   const el = (r.ElectrificationLevel ?? '').toLowerCase();
-  const fuel = `${r.FuelTypePrimary ?? ''} ${r.FuelTypeSecondary ?? ''}`.toLowerCase();
+  const fuel = (r.FuelTypePrimary ?? '').toLowerCase().trim();
   if (el.includes('phev') || el.includes('plug-in')) return 'plugin';
-  if (el.includes('bev') || fuel.trim() === 'electric') return 'elektro';
+  if (el.includes('bev') || fuel === 'electric') return 'elektro';
   if (el.includes('hev')) return 'hybrid';
+  // A secondary electric fuel without an electrification level doesn't say which hybrid it is.
+  if ((r.FuelTypeSecondary ?? '').toLowerCase().includes('electric')) return undefined;
   if (fuel.includes('diesel')) return 'diesel';
   if (fuel.includes('natural gas') || fuel.includes('cng')) return 'gas';
   if (fuel.includes('gasoline') || fuel.includes('petrol')) return 'benzin';
@@ -49,6 +51,7 @@ function antriebVon(r: Vpic): Antrieb | undefined {
 
 function getriebeVon(r: Vpic): Getriebe | undefined {
   const t = (r.TransmissionStyle ?? '').toLowerCase();
+  if (t.includes('automated manual') || /\bamt\b/.test(t)) return undefined;
   if (t.includes('dual-clutch') || t.includes('dct')) return 'dsg';
   if (t.includes('continuously') || t.includes('cvt')) return 'cvt';
   if (t.includes('manual')) return 'manuell';
@@ -80,49 +83,45 @@ export type { VinVariante };
 interface VinServerErgebnis {
   felder: Partial<FahrzeugFelder>;
   modelljahr?: number;
-  generation?: string;
   motorEindeutig: boolean;
   varianten: VinVariante[];
-  sicherheit?: 'hoch' | 'mittel' | 'niedrig';
+  modellVorschlag?: string;
   hinweis?: string;
   quellen: string[];
 }
 
 export interface VinErgebnis {
-  /** Resolved fields (only non-empty ones). */
+  /** Reliably resolved fields (only non-empty ones). */
   felder: Partial<FahrzeugFelder>;
   /** Model year (not the 1. Inverkehrsetzung). */
   modelljahr?: number;
-  /** Generation / platform, e.g. "5G, 2012–2020". */
-  generation?: string;
-  /** Engine variants to pick from when the VIN doesn't settle the engine. */
+  /** Unconfirmed engine variants to pick from. */
   varianten: VinVariante[];
-  /** Fields the VIN didn't resolve, e.g. "Motorkennbuchstabe". */
-  offen: string[];
-  /** Where the data comes from, e.g. ["ISO 3779", "NHTSA vPIC", "KI-Recherche (Web)"]. */
+  /** Unconfirmed model name to take over on request. */
+  modellVorschlag?: string;
+  /** Fields that could not be resolved reliably. */
+  offen: (keyof FahrzeugFelder)[];
+  /** Sources that contributed to `felder`. */
   quellen: string[];
   /** Served from vin_cache. */
   cache?: boolean;
   hinweis?: string;
-  sicherheit?: 'hoch' | 'mittel' | 'niedrig';
   /** The server lookup failed (offline, blocked): only the local fallback was used. */
   offline?: boolean;
 }
 
-const FELD_LABEL: Partial<Record<keyof FahrzeugFelder, string>> = {
-  marke: 'Marke', modell: 'Modell', antrieb: 'Antrieb', getriebe: 'Getriebe', motor: 'Motor', motorcode: 'Motorkennbuchstabe', steuertrieb: 'Steuertrieb',
-};
+const VIN_FELDER: (keyof FahrzeugFelder)[] = ['marke', 'modell', 'antrieb', 'getriebe', 'motor', 'motorcode', 'steuertrieb', 'erstzulassung'];
 
-/** Steuertrieb from a documented engine family, Motorkennbuchstabe normalised; returns the open fields. */
-function abschliessen(vin: string, felder: Partial<FahrzeugFelder>, varianten: VinVariante[]): string[] {
-  const p = fahrzeugProfil({ ...felder, chassisnummer: vin });
-  if (!felder.steuertrieb && p.steuertriebQuelle === 'motor' && p.steuertrieb) felder.steuertrieb = p.steuertrieb as Steuertrieb;
+/** Motorkennbuchstabe normalised, Steuertrieb from its documented family; returns the open fields. */
+function abschliessen(felder: Partial<FahrzeugFelder>): (keyof FahrzeugFelder)[] {
   if (felder.motorcode) felder.motorcode = normMotorcode(felder.motorcode);
-  // An EV has neither Motorkennbuchstabe-based intervals nor a Steuertrieb; picking a variant fills the engine fields.
-  const irrelevant: (keyof FahrzeugFelder)[] = p.antrieb === 'elektro' ? ['motorcode', 'steuertrieb'] : [];
-  if (varianten.length) irrelevant.push('antrieb', 'getriebe', 'motor', 'motorcode', 'steuertrieb');
-  return (Object.keys(FELD_LABEL) as (keyof FahrzeugFelder)[])
-    .filter((k) => !felder[k] && !irrelevant.includes(k)).map((k) => FELD_LABEL[k]!);
+  if (!felder.steuertrieb && felder.antrieb !== 'elektro') {
+    const familie = motorfamilieAusCode(felder.marke, felder.motorcode);
+    if (familie) felder.steuertrieb = familie.steuertrieb;
+  }
+  // An EV has neither a Motorkennbuchstabe-based schedule nor a Steuertrieb.
+  const irrelevant: (keyof FahrzeugFelder)[] = felder.antrieb === 'elektro' ? ['motorcode', 'steuertrieb'] : [];
+  return VIN_FELDER.filter((k) => !felder[k] && !irrelevant.includes(k));
 }
 
 /** Built-in engine variants when the engine is still open; an electric model is settled by its single entry. */
@@ -149,28 +148,31 @@ async function server(vin: string, signal?: AbortSignal): Promise<{ ergebnis: Vi
 /** Local fallback: WMI / VDS rules and NHTSA vPIC from the browser. */
 async function lokalAbrufen(vin: string, signal?: AbortSignal): Promise<VinErgebnis> {
   const felder: Partial<FahrzeugFelder> = lokal(vin);
-  const quellen = ['ISO 3779'];
+  const quellen: string[] = [];
   let modelljahr: number | undefined;
   try {
     const r = await vpic(vin, signal);
     if (r) {
-      quellen.push('NHTSA vPIC');
-      // Only what vPIC confirms: many European makers don't encode the year in char 10.
-      modelljahr = parseInt(r.ModelYear ?? '', 10) || undefined;
       if (!felder.marke && r.Make) felder.marke = titel(r.Make);
-      if (r.Model) felder.modell = felder.modell ?? [r.Model, r.Series].filter(Boolean).join(' ');
-      const a = antriebVon(r); if (a) felder.antrieb = a;
-      const g = getriebeVon(r); if (g) felder.getriebe = g;
-      const m = motorVon(r); if (m) felder.motor = m;
-      // Only a code-like EngineModel ("CDNC", "K24Z7"), not a description ("EA888 Gen3").
-      const code = (r.EngineModel ?? '').trim();
-      if (/^[A-Z0-9]{3,8}$/.test(code) && /[A-Z]/.test(code)) felder.motorcode = code;
+      // ErrorCode 0 alone = decoded cleanly. Anything else (typical for European VINs): only the Make counts.
+      if ((r.ErrorCode ?? '').split(',').every((c) => c.trim() === '0')) {
+        quellen.push('NHTSA vPIC');
+        modelljahr = parseInt(r.ModelYear ?? '', 10) || undefined;
+        if (r.Model) felder.modell = felder.modell ?? [r.Model, r.Series].filter(Boolean).join(' ');
+        const a = antriebVon(r); if (a) felder.antrieb = a;
+        const g = getriebeVon(r); if (g) felder.getriebe = g;
+        const m = motorVon(r); if (m) felder.motor = m;
+        // Only a code-like EngineModel ("CDNC", "K24Z7"), not a description ("EA888 Gen3").
+        const code = (r.EngineModel ?? '').trim();
+        if (/^[A-Z0-9]{3,8}$/.test(code) && /\d/.test(code)) felder.motorcode = code;
+      }
     }
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e;
   }
   const varianten = katalog(felder, modelljahr);
-  return { felder, modelljahr, varianten, offen: abschliessen(vin, felder, varianten), quellen, offline: true };
+  const modellVorschlag = felder.modell ? undefined : vdsModellVorschlag(felder.marke, vin);
+  return { felder, modelljahr, varianten, modellVorschlag, offen: abschliessen(felder), quellen, offline: true };
 }
 
 /** Decodes any valid VIN via the Edge Function, else locally. Throws only for an invalid VIN. */
@@ -189,7 +191,8 @@ export async function vinAbrufen(eingabe: string, signal?: AbortSignal): Promise
   for (const [k, v] of Object.entries(e.felder) as [keyof FahrzeugFelder, string][]) if (v) (felder as Record<string, string>)[k] = v;
   const varianten = e.motorEindeutig ? [] : e.varianten?.length ? e.varianten : katalog(felder, e.modelljahr);
   return {
-    felder, modelljahr: e.modelljahr, generation: e.generation, varianten, offen: abschliessen(vin, felder, varianten),
-    quellen: e.quellen ?? [], cache, hinweis: e.hinweis, sicherheit: e.sicherheit,
+    felder, modelljahr: e.modelljahr, varianten, modellVorschlag: e.modellVorschlag, offen: abschliessen(felder),
+    // The AI research only yields suggestions, so it isn't a source of the entered data.
+    quellen: (e.quellen ?? []).filter((q) => q !== 'KI-Recherche (Web)'), cache, hinweis: e.hinweis,
   };
 }
