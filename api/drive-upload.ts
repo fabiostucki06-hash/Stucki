@@ -1,16 +1,19 @@
 // Vercel Node serverless function (not part of the Vite app bundle / tsc -b build).
-// Stores a generated PDF in the signed-in user's Google Drive:
-//   POST /api/drive-upload  { docType, filename, data: <base64 PDF> }
+// Opens a Google Drive resumable upload session for the signed-in user:
+//   POST /api/drive-upload  { docType, filename, size }  → { uploadUrl, folder, path }
 //   Authorization: Bearer <Supabase access token of the signed-in user>
+// The browser then PUTs the PDF straight to uploadUrl, so the file never passes
+// through this function's request body (Vercel caps those at 4.5 MB).
 // Files land in "GarageOS/<Aufträge|Rechnungen|Offerten|Wartungspläne|Sonstiges>/<filename>";
 // all missing folders are created and a file with the same name is replaced (new
 // revision), so a re-exported document doesn't pile up duplicates. With the
 // drive.file scope these lookups only ever see what this app created.
+// uploadUrl works without a further token: it is never logged.
 
 import type { VercelLikeRequest, VercelLikeResponse } from './import-part.js';
 import {
   ReconnectError, TransientDriveError, accessTokenFrom, bearer, decryptToken, deleteConnection, driveError, getConnection,
-  googleFetch, missingEnv, supabaseUserId,
+  googleFetch, header, missingEnv, supabaseUserId,
 } from './_drive.js';
 
 const DRIVE = 'https://www.googleapis.com/drive/v3/files';
@@ -18,7 +21,7 @@ const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
 const ROOT_NAME = 'GarageOS';
 const FALLBACK_FOLDER = 'Sonstiges';
-const MAX_BYTES = 3 * 1024 * 1024; // Vercel caps request bodies at 4.5 MB (base64 adds a third)
+const MAX_BYTES = 25 * 1024 * 1024; // safety limit, same as src/lib/drive.ts
 const MAX_ATTEMPTS = 3;
 const RETRY_WINDOW_MS = 25_000; // stays inside the function's maxDuration (vercel.json)
 const MAX_SEARCH_PAGES = 5;
@@ -97,29 +100,40 @@ async function ensureFolder(gToken: string, name: string, parent: string): Promi
   return (await findOne(gToken, query).catch(() => null)) ?? created.id;
 }
 
-async function uploadPdf(gToken: string, parent: string, filename: string, pdf: Uint8Array<ArrayBuffer>): Promise<{ id: string; webViewLink?: string }> {
-  const existing = await findOne(gToken, `name=${q(filename)} and ${q(parent)} in parents and mimeType='application/pdf'`);
-  const boundary = `garageos${crypto.randomUUID().replace(/-/g, '')}`;
-  // On update the parents can't be set through the metadata part.
-  const meta = existing ? { name: filename } : { name: filename, parents: [parent], mimeType: 'application/pdf' };
-  const body = new Blob([
-    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`,
-    pdf,
-    `\r\n--${boundary}--`,
-  ]);
-  const url = existing
-    ? `${UPLOAD}/${existing}?uploadType=multipart&fields=id,webViewLink,size`
-    : `${UPLOAD}?uploadType=multipart&fields=id,webViewLink,size`;
-  const file = await driveJson<{ id: string; webViewLink?: string; size?: string }>(url, gToken, {
-    method: existing ? 'PATCH' : 'POST',
-    headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
-    body,
-  });
-  // Success is only reported once Drive holds the complete file.
-  if (file.size !== undefined && Number(file.size) !== pdf.length) {
-    throw new TransientDriveError('Upload unvollständig – später erneut exportieren');
+/** The app's own origin. Google only answers the browser's PUT (CORS) for the origin named here. */
+function appOrigin(req: VercelLikeRequest): string | null {
+  const origin = header(req, 'origin');
+  const host = (header(req, 'x-forwarded-host') ?? header(req, 'host') ?? '').split(',')[0].trim();
+  if (!origin || !host) return null;
+  try {
+    return new URL(origin).host === host ? origin : null;
+  } catch {
+    return null;
   }
-  return file;
+}
+
+async function startUpload(gToken: string, parent: string, filename: string, size: number, origin: string): Promise<string> {
+  const existing = await findOne(gToken, `name=${q(filename)} and ${q(parent)} in parents and mimeType='application/pdf'`);
+  // On update the parents can't be set through the metadata.
+  const meta = existing ? { name: filename } : { name: filename, parents: [parent], mimeType: 'application/pdf' };
+  const url = existing
+    ? `${UPLOAD}/${existing}?uploadType=resumable&fields=id,webViewLink,size`
+    : `${UPLOAD}?uploadType=resumable&fields=id,webViewLink,size`;
+  const r = await googleFetch(url, {
+    method: existing ? 'PATCH' : 'POST',
+    headers: {
+      Authorization: `Bearer ${gToken}`,
+      'Content-Type': 'application/json; charset=UTF-8',
+      'X-Upload-Content-Type': 'application/pdf',
+      'X-Upload-Content-Length': String(size),
+      Origin: origin,
+    },
+    body: JSON.stringify(meta),
+  });
+  if (!r.ok) throw await driveError(r);
+  const uploadUrl = r.headers.get('location');
+  if (!uploadUrl) throw new TransientDriveError('Google Drive hat keine Upload-Adresse geliefert');
+  return uploadUrl;
 }
 
 export default async function handler(req: VercelLikeRequest, res: VercelLikeResponse) {
@@ -132,7 +146,7 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
   const missing = missingEnv();
   if (missing.length) return res.status(501).json({ ok: false, configured: false, missing, error: `In Vercel fehlen: ${missing.join(', ')}` });
 
-  let body: { docType?: unknown; filename?: unknown; data?: unknown };
+  let body: { docType?: unknown; filename?: unknown; size?: unknown; data?: unknown };
   try {
     body = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body ?? {}) as typeof body;
   } catch {
@@ -142,17 +156,15 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
   const folder = folderFor(body.docType);
   const rawName = typeof body.filename === 'string' ? cleanName(body.filename) : '';
   const filename = rawName && !/\.pdf$/i.test(rawName) ? `${rawName}.pdf` : rawName;
-  const data = typeof body.data === 'string' ? body.data : '';
-  if (!filename || !data) return res.status(400).json({ ok: false, error: 'filename und data erforderlich' });
-
-  let pdf: Uint8Array<ArrayBuffer>;
-  try {
-    pdf = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
-  } catch {
-    return res.status(400).json({ ok: false, error: 'Ungültige Base64-Daten' });
+  // A tab still running the previous app version sends the PDF itself.
+  if (body.data !== undefined) return res.status(400).json({ ok: false, error: 'App wurde aktualisiert, bitte Seite neu laden und erneut exportieren' });
+  const size = body.size;
+  if (!filename || typeof size !== 'number' || !Number.isSafeInteger(size) || size <= 0) {
+    return res.status(400).json({ ok: false, error: 'filename und size erforderlich' });
   }
-  if (pdf.length > MAX_BYTES) return res.status(413).json({ ok: false, error: 'PDF ist grösser als 3 MB' });
-  if (String.fromCharCode(...pdf.subarray(0, 5)) !== '%PDF-') return res.status(400).json({ ok: false, error: 'Keine PDF-Datei' });
+  if (size > MAX_BYTES) return res.status(413).json({ ok: false, error: 'PDF ist grösser als 25 MB' });
+  const origin = appOrigin(req);
+  if (!origin) return res.status(403).json({ ok: false, error: 'Unbekannte Herkunft der Anfrage' });
 
   try {
     const row = await getConnection(token, userId);
@@ -164,14 +176,14 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
       // GOOGLE_CLIENT_SECRET changed: kept, because restoring a mistyped secret makes it readable again.
       throw new ReconnectError('Google-Verbindung nicht lesbar – in den Einstellungen trennen und neu verbinden', true);
     }
-    const file = await withRetry(async () => {
+    const uploadUrl = await withRetry(async () => {
       const gToken = await accessTokenFrom(refresh);
       const root = await ensureFolder(gToken, ROOT_NAME, 'root');
       const ids = await Promise.all(SUBFOLDERS.map((name) => ensureFolder(gToken, name, root)));
-      return uploadPdf(gToken, ids[SUBFOLDERS.indexOf(folder)], filename, pdf);
+      return startUpload(gToken, ids[SUBFOLDERS.indexOf(folder)], filename, size, origin);
     });
     const folderPath = `${ROOT_NAME}/${folder}`;
-    return res.status(200).json({ ok: true, id: file.id, webViewLink: file.webViewLink, folder: folderPath, path: `${folderPath}/${filename}` });
+    return res.status(200).json({ ok: true, uploadUrl, folder: folderPath, path: `${folderPath}/${filename}` });
   } catch (err) {
     console.error('[drive-upload] failed', { folder, reconnect: err instanceof ReconnectError, message: err instanceof Error ? err.message : String(err) });
     if (err instanceof ReconnectError) {

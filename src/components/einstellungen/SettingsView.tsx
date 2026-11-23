@@ -326,7 +326,7 @@ export default function SettingsView({ syncStatus, userEmail }: SettingsViewProp
           <div role="note" style={{ marginTop: 12, padding: '10px 12px', background: 'var(--orange-tint)', borderRadius: 'var(--radius-sm)', fontSize: 13, lineHeight: 1.45, color: 'var(--label)' }}>
             <strong style={{ color: 'var(--orange)' }}>Wann ein PDF nur lokal bleibt</strong>
             <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
-              <li>PDFs über 3 MB werden nicht nach Google Drive hochgeladen.</li>
+              <li>PDFs über 25 MB werden nicht nach Google Drive hochgeladen.</li>
               <li>Schlägt ein Upload endgültig fehl oder wird der Tab vorher geschlossen, gibt es keinen automatischen Nachversuch. Exportiere das PDF dann erneut.</li>
             </ul>
           </div>
