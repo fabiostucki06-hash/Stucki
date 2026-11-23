@@ -11,8 +11,9 @@ import {
   HINWEIS_STANDARD, fahrzeugProfil, mitWartungsplan, profilSignatur, quelleVon, specId, vorlageVon, wartungsVorlagen,
   type FahrzeugProfil, type Vorlage,
 } from '../../lib/wartung';
+import { exportWartungsplanPDF } from '../../lib/pdf-wartungsplan';
 import { useApp } from '../../context/AppContext';
-import type { IntervallQuelle, ServiceItem, Vehicle, WartungSpec } from '../../types';
+import type { Customer, IntervallQuelle, ServiceItem, Vehicle, WartungSpec } from '../../types';
 
 /** Status groups, in display order. "Jetzt fällig" = overdue or due soon. */
 type Gruppe = 'faellig' | 'geplant' | 'erledigt';
@@ -68,6 +69,8 @@ const datumKm = (datum?: string, km?: string) =>
 
 interface WartungsplanProps {
   vehicle: Vehicle;
+  /** Owner of the vehicle, named on the PDF. */
+  customer: Customer;
   /** Stores the vehicle with the changed plan / mileage. */
   onSave: (v: Vehicle) => Promise<void>;
   /** Creates a draft Offerte from the due items and opens it. */
@@ -80,7 +83,7 @@ interface WartungsplanProps {
     today at the current mileage) or "In Zukunft" in one tap. Details, history
     and undo live in the editor behind the pencil. Due dates / mileages follow
     from the last service plus the interval. */
-export default function Wartungsplan({ vehicle, onSave, onOfferte }: WartungsplanProps) {
+export default function Wartungsplan({ vehicle, customer, onSave, onOfferte }: WartungsplanProps) {
   const { wartungSpecs, saveWartungSpec } = useApp();
   const items = ohneEntfernteService(vehicle.service ?? []);
   const profil = fahrzeugProfil(vehicle);
@@ -195,6 +198,7 @@ export default function Wartungsplan({ vehicle, onSave, onOfferte }: Wartungspla
           </button>
         )}
         <button className="sp-text-btn" disabled={busy} onClick={neuePosition}><SFPlus size={12} /> Position</button>
+        <button className="sp-text-btn" onClick={() => void exportWartungsplanPDF(vehicle, customer)} title="Wartungsplan als PDF herunterladen">PDF</button>
         <button
           className="btn-tinted sp-offerte" disabled={busy || !faellige.length} onClick={offerteErstellen}
           title={faellige.length ? `Offerte mit ${faellige.length} fälligen Positionen erstellen` : 'Keine fälligen Positionen'}

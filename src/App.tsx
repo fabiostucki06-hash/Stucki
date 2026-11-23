@@ -9,6 +9,7 @@ import { useVersionCheck } from './hooks/useVersionCheck';
 import { useIsDesktop } from './hooks/useIsDesktop';
 import { offerteNr, nextVersion, sumPositions, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_BEDINGUNG, ANZAHLUNG_PROZENT, mitMaterialHinweis, ohneMaterialHinweis, ersetzeNummer, OFFERTE_REF, ANZAHLUNG_REF } from './lib/offerte-docs';
 import { hardReload } from './lib/reload';
+import { finishDriveCallback, isDriveCallback } from './lib/drive';
 import { naechsteNr } from './lib/nummern';
 import { computeRechnungTotals, withOffertePositionen, migrateAnzahlungEntwurf, findQuellOfferte, hoechsteRechnungNr, rechnungArt } from './lib/rechnung-totals';
 import { ohneMaterialZe } from './lib/ze';
@@ -63,9 +64,12 @@ export default function App() {
   // A Shortcut may open /offerten?import_url=… instead of the root; land on that tab.
   // /schlussrechnungen opens the Schlussrechnungen list directly.
   const [tab, setTab] = useState<TabId>(() => {
+    if (isDriveCallback()) return 'einstellungen';
     const path = window.location.pathname.replace(/\/+$/, '');
     return path === '/offerten' ? 'offerten' : path === '/schlussrechnungen' ? 'schlussrechnungen' : 'dashboard';
   });
+  // Back from Google's consent page: finish the Drive connection once signed in.
+  useEffect(() => { if (token) void finishDriveCallback(); }, [token]);
   const [fabOpen, setFabOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // Laptop / desktop: docked sidebar, centered dialogs, table lists (see globals.css).

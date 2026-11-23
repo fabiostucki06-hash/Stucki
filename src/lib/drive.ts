@@ -1,13 +1,92 @@
 import type { jsPDF } from 'jspdf';
 import { getFreshToken } from './supabase';
-import { getSettings } from './settings';
 import { showToast } from '../components/ui/Toast';
 
-/** Drive folder per document type: GarageOS/<Typ>/<Jahr>/<Dateiname>.pdf */
-export type DriveDocType = 'Offerten' | 'Materialofferten' | 'Auftragsbestätigungen' | 'Anzahlungsrechnungen' | 'Rechnungen';
+/** Drive folder per document type: Stucki Repair/<Typ>/<Dateiname>.pdf */
+export type DriveDocType =
+  | 'Rechnungen' | 'Anzahlungsrechnungen' | 'Offerten' | 'Materialofferten'
+  | 'Auftragsbestätigungen' | 'Aufträge' | 'Wartungsplaene';
 
-// Once the server says Drive isn't set up, stop trying for this page load.
-let unconfigured = false;
+export interface DriveStatus {
+  configured: boolean;
+  connected: boolean;
+  account: string;
+  /** Required Vercel env vars that are not set. */
+  missing: string[];
+  /** Redirect URI to register at the Google OAuth client. */
+  redirectUri: string;
+}
+
+const CALLBACK_PATH = '/drive-callback';
+/** A "not connected" answer is reused this long, so exports don't each ask the server. */
+const STATUS_TTL_MS = 60_000;
+
+let known: { connected: boolean; at: number } | null = null;
+const remember = (connected: boolean) => { known = { connected, at: Date.now() }; };
+
+async function authCall<T>(body: Record<string, unknown>): Promise<T & { ok?: boolean; error?: string }> {
+  const token = await getFreshToken();
+  if (!token) throw new Error('Nicht angemeldet');
+  const r = await fetch('/api/drive-auth', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  if (r.status === 404) throw new Error('Server-Funktion nicht verfügbar (lokale Entwicklung)');
+  const j = (await r.json().catch(() => ({}))) as T & { ok?: boolean; error?: string };
+  if (!r.ok || !j.ok) throw new Error(j.error ?? `Fehler ${r.status}`);
+  return j;
+}
+
+export async function getDriveStatus(): Promise<DriveStatus> {
+  const s = await authCall<DriveStatus>({ action: 'status' });
+  remember(s.connected);
+  return s;
+}
+
+/** Leaves the app for Google's consent page; it comes back on /drive-callback. */
+export async function connectDrive(): Promise<void> {
+  const { url } = await authCall<{ url: string }>({ action: 'start' });
+  window.location.assign(url);
+}
+
+export async function disconnectDrive(): Promise<void> {
+  await authCall({ action: 'disconnect' });
+  remember(false);
+}
+
+/** True while the app is on Google's redirect back; the tab should show Einstellungen. */
+export const isDriveCallback = (): boolean => window.location.pathname.replace(/\/+$/, '') === CALLBACK_PATH;
+
+/** Completes the OAuth redirect. The code leaves the address bar first, so a
+    reload or a second effect run can't submit it twice. */
+export async function finishDriveCallback(): Promise<void> {
+  if (!isDriveCallback()) return;
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const state = params.get('state');
+  const denied = params.get('error');
+  window.history.replaceState({}, '', '/');
+  if (denied) {
+    showToast(denied === 'access_denied' ? 'Google Drive nicht verbunden' : `Google Drive: ${denied}`, 'error');
+    return;
+  }
+  if (!code || !state) return;
+  try {
+    await authCall({ action: 'finish', code, state });
+    remember(true);
+    showToast('Google Drive verbunden', 'success');
+    window.dispatchEvent(new Event('garage-drive-changed'));
+  } catch (err) {
+    showToast(`Google Drive: ${err instanceof Error ? err.message : 'Verbindung fehlgeschlagen'}`, 'error');
+  }
+}
+
+async function isConnected(): Promise<boolean> {
+  if (known?.connected) return true;
+  if (known && Date.now() - known.at < STATUS_TTL_MS) return false;
+  return (await getDriveStatus()).connected;
+}
 
 function toBase64(buf: ArrayBuffer): string {
   const bytes = new Uint8Array(buf);
@@ -16,65 +95,27 @@ function toBase64(buf: ArrayBuffer): string {
   return btoa(bin);
 }
 
-/** Uploads a generated PDF to Google Drive (api/drive-upload.ts) in the background.
-    Never throws: the local download already happened, Drive is the archive copy. */
+/** Uploads a generated PDF to the connected Google Drive in the background.
+    Never throws: the local download already happened, Drive is the backup copy. */
 export async function archiveToDrive(doc: jsPDF, docType: DriveDocType, filename: string): Promise<void> {
-  if (unconfigured) return;
   try {
+    if (!(await isConnected())) return;
     const token = await getFreshToken();
     if (!token) return;
     const r = await fetch('/api/drive-upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        rootFolderId: getSettings().driveFolderId || undefined,
-        folder: [docType, String(new Date().getFullYear())],
-        filename: `${filename}.pdf`,
-        data: toBase64(doc.output('arraybuffer')),
-      }),
+      body: JSON.stringify({ docType, filename: `${filename}.pdf`, data: toBase64(doc.output('arraybuffer')) }),
     });
-    // 501: Drive not set up on the server; 404: no /api (local vite dev).
-    if (r.status === 501 || r.status === 404) { unconfigured = true; return; }
-    const j = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-    if (r.ok && j.ok) showToast(`Auf Google Drive gespeichert (${docType})`, 'success');
-    else showToast(`Google Drive: ${j.error ?? `Fehler ${r.status}`}`, 'error');
+    const j = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string; connected?: boolean; reconnect?: boolean };
+    if (r.ok && j.ok) { showToast('In Google Drive gespeichert', 'success'); return; }
+    if (j.connected === false) {
+      remember(false);
+      window.dispatchEvent(new Event('garage-drive-changed'));
+      if (!j.reconnect) return;
+    }
+    showToast(`Google Drive: ${j.error ?? (r.status === 413 ? 'PDF zu gross' : `Fehler ${r.status}`)}`, 'error');
   } catch (err) {
     showToast(`Google Drive: ${err instanceof Error ? err.message : 'Upload fehlgeschlagen'}`, 'error');
-  }
-}
-
-/** Accepts a bare folder ID or a pasted Drive URL
-    (…/drive/folders/<id>, …/open?id=<id>) and returns the ID; '' when none. */
-export function parseDriveFolderId(input: string): string {
-  const s = input.trim();
-  const m = s.match(/\/folders\/([A-Za-z0-9_-]+)/) ?? s.match(/[?&]id=([A-Za-z0-9_-]+)/);
-  return m ? m[1] : s;
-}
-
-/** Plausible Drive file/folder ID (what the server accepts). */
-export const isDriveFolderId = (id: string): boolean => /^[A-Za-z0-9_-]{10,100}$/.test(id);
-
-export type DriveTestResult =
-  | { ok: true; name: string; account: string }
-  | { ok: false; error: string; /** Required Vercel env vars that are not set. */ missing?: string[] };
-
-/** Asks the server whether the folder ('' = default target) exists and is
-    writable for the Drive account the uploads use. */
-export async function testDriveFolder(folderId: string): Promise<DriveTestResult> {
-  try {
-    const token = await getFreshToken();
-    if (!token) return { ok: false, error: 'Nicht angemeldet' };
-    const r = await fetch('/api/drive-upload', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ test: true, rootFolderId: folderId || undefined }),
-    });
-    if (r.status === 404) return { ok: false, error: 'Server-Funktion nicht verfügbar (lokale Entwicklung)' };
-    const j = (await r.json().catch(() => ({}))) as { ok?: boolean; name?: string; account?: string; error?: string; missing?: string[] };
-    return r.ok && j.ok
-      ? { ok: true, name: j.name ?? '', account: j.account ?? '' }
-      : { ok: false, error: j.error ?? `Fehler ${r.status}`, missing: j.missing };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'Verbindung fehlgeschlagen' };
   }
 }

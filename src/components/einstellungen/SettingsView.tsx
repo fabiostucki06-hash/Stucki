@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { setIban, setMargin, setSignature, setDriveFolderId } from '../../lib/settings';
-import { parseDriveFolderId, isDriveFolderId, testDriveFolder } from '../../lib/drive';
+import { setIban, setMargin, setSignature } from '../../lib/settings';
+import { connectDrive, disconnectDrive, getDriveStatus, type DriveStatus } from '../../lib/drive';
 import { signatureFromFile } from '../../lib/signature';
 import { useSettings } from '../../hooks/useSettings';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
@@ -71,64 +71,60 @@ const SYNC_TEXT: Record<SyncStatus, { color: string; text: string }> = {
   error:  { color: '#f87171', text: 'Fehler beim Speichern' },
 };
 
-type DriveState = 'checking' | 'on' | 'off' | 'unavailable';
-
 interface SettingsViewProps {
   syncStatus: SyncStatus;
   userEmail: string | null;
 }
 
 export default function SettingsView({ syncStatus, userEmail }: SettingsViewProps) {
-  const { iban, margin, signature, driveFolderId } = useSettings();
+  const { iban, margin, signature } = useSettings();
   const isDesktop = useIsDesktop();
   const [section, setSection] = useState<SectionId>(readSection);
   const [sigLoading, setSigLoading] = useState(false);
-  const [drive, setDrive] = useState<DriveState>('checking');
-  // Raw text of the folder field (may be a pasted URL); only a valid ID is stored.
-  const [folderDraft, setFolderDraft] = useState(driveFolderId);
-  const [driveTest, setDriveTest] = useState<{ state: 'idle' | 'running' | 'ok' | 'error'; message?: string }>({ state: 'idle' });
-  /** Required Vercel env vars the server reports as unset. */
-  const [driveMissing, setDriveMissing] = useState<string[]>([]);
-  /** Google account the uploads run as (from the last successful test). */
-  const [driveAccount, setDriveAccount] = useState('');
-  const [linkFixed, setLinkFixed] = useState(false);
-  const folderValid = isDriveFolderId(parseDriveFolderId(folderDraft));
+  /** null while loading. */
+  const [drive, setDrive] = useState<DriveStatus | null>(null);
+  const [driveError, setDriveError] = useState('');
+  const [driveBusy, setDriveBusy] = useState(false);
   const bookmarklet = buildImportBookmarklet(window.location.origin);
   function selectSection(id: SectionId) {
     setSection(id);
     try { localStorage.setItem(SECTION_KEY, id); } catch { /* storage blocked */ }
   }
 
-  // Adopt a folder ID changed on another device (keep a pasted URL that resolves to it).
   useEffect(() => {
-    setFolderDraft((d) => (parseDriveFolderId(d) === driveFolderId ? d : driveFolderId));
-  }, [driveFolderId]);
+    if (section !== 'integrationen') return;
+    let cancelled = false;
+    const load = () => getDriveStatus()
+      .then((s) => { if (!cancelled) { setDrive(s); setDriveError(''); } })
+      .catch((err) => { if (!cancelled) setDriveError(err instanceof Error ? err.message : 'Status nicht verfügbar'); });
+    void load();
+    window.addEventListener('garage-drive-changed', load);
+    return () => { cancelled = true; window.removeEventListener('garage-drive-changed', load); };
+  }, [section]);
 
-  function handleFolderInput(v: string) {
-    setDriveTest({ state: 'idle' });
-    const id = parseDriveFolderId(v);
-    // A pasted Drive link is reduced to its ID right away, so the field shows what is stored.
-    const fixed = id !== v.trim() && isDriveFolderId(id);
-    setLinkFixed(fixed);
-    setFolderDraft(fixed ? id : v);
-    if (!id) setDriveFolderId('');
-    else if (isDriveFolderId(id)) setDriveFolderId(id);
+  async function handleDriveConnect() {
+    setDriveBusy(true);
+    setDriveError('');
+    try {
+      await connectDrive(); // leaves the page on success
+    } catch (err) {
+      setDriveError(err instanceof Error ? err.message : 'Verbindung fehlgeschlagen');
+      setDriveBusy(false);
+    }
   }
 
-  async function handleDriveTest() {
-    setDriveTest({ state: 'running' });
-    const r = await testDriveFolder(folderValid ? parseDriveFolderId(folderDraft) : '');
-    if (r.ok) {
-      setDrive('on');
-      setDriveMissing([]);
-      setDriveAccount(r.account);
-    } else if (r.missing?.length) {
-      setDrive('off');
-      setDriveMissing(r.missing);
+  async function handleDriveDisconnect() {
+    if (!window.confirm('Google Drive trennen? Bereits gespeicherte PDFs bleiben in Drive.')) return;
+    setDriveBusy(true);
+    try {
+      await disconnectDrive();
+      setDrive(await getDriveStatus());
+      showToast('Google Drive getrennt', 'info');
+    } catch (err) {
+      setDriveError(err instanceof Error ? err.message : 'Trennen fehlgeschlagen');
+    } finally {
+      setDriveBusy(false);
     }
-    setDriveTest(r.ok
-      ? { state: 'ok', message: `Verbindung OK – Zielordner: „${r.name}“` }
-      : { state: 'error', message: r.error });
   }
 
   function handleIbanChange(v: string) {
@@ -155,26 +151,6 @@ export default function SettingsView({ syncStatus, userEmail }: SettingsViewProp
     const pct = Number.isFinite(n) ? n : 0;
     setMargin(pct);
   }
-
-  // Google Drive status: the upload endpoint answers GET with { configured, missing }.
-  // 404 = no /api (local vite dev). Once configured, the connection is tested
-  // right away so the status can say "Eingerichtet & Verbunden".
-  useEffect(() => {
-    if (section !== 'integrationen' || drive !== 'checking') return;
-    let cancelled = false;
-    fetch('/api/drive-upload', { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j: { configured?: boolean; missing?: string[] } | null) => {
-        if (cancelled) return;
-        setDrive(!j ? 'unavailable' : j.configured ? 'on' : 'off');
-        setDriveMissing(j?.missing ?? []);
-        if (j?.configured) void handleDriveTest();
-      })
-      .catch(() => { if (!cancelled) setDrive('unavailable'); });
-    return () => { cancelled = true; };
-    // handleDriveTest reads the current field; it must not re-trigger this probe.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [section, drive]);
 
   const active = SECTIONS.find((s) => s.id === section)!;
   const sync = SYNC_TEXT[syncStatus];
@@ -321,119 +297,47 @@ export default function SettingsView({ syncStatus, userEmail }: SettingsViewProp
           <InfoRow
             label="Status"
             value={
-              drive === 'checking' ? 'Wird geprüft…'
-              : drive === 'on' && driveTest.state === 'ok' ? <><StatusDot color="#4ade80" />Eingerichtet &amp; Verbunden</>
-              : drive === 'on' && driveTest.state === 'error' ? <><StatusDot color="#f87171" />Eingerichtet – Verbindung fehlgeschlagen</>
-              : drive === 'on' ? <><StatusDot color="#4ade80" />Eingerichtet</>
-              : drive === 'off' ? <><StatusDot color="#fbbf24" />Nicht eingerichtet</>
-              : <><StatusDot color="#64748b" />Nicht verfügbar</>
+              !drive ? (driveError ? <><StatusDot color="var(--red)" />Nicht verfügbar</> : 'Wird geprüft…')
+              : drive.connected ? <><StatusDot color="var(--green)" />Verbunden</>
+              : drive.configured ? <><StatusDot color="var(--label3)" />Nicht verbunden</>
+              : <><StatusDot color="var(--orange)" />Nicht eingerichtet</>
             }
           />
-          {driveAccount && <InfoRow label="Google-Konto" value={driveAccount} />}
-          <InfoRow label="Ablage" value={`${driveFolderId ? 'Eigener Ordner' : 'GarageOS'} / Typ / Jahr`} />
+          {drive?.connected && drive.account && <InfoRow label="Google-Konto" value={drive.account} />}
+          <InfoRow label="Ablage" value="Stucki Repair / Dokumenttyp" />
 
-          {drive === 'off' && driveMissing.length > 0 && (
-            <div role="alert" style={{
-              marginTop: 14, padding: '10px 12px', borderRadius: 10, fontSize: 13, lineHeight: 1.5, color: 'var(--label)',
-              background: 'var(--orange-tint)', border: 'none',
-            }}>
-              In Vercel fehlen: {driveMissing.map((k, i) => (
-                <span key={k}>{i > 0 && ', '}<code style={{ fontSize: 12, fontWeight: 600 }}>{k}</code></span>
-              ))}. Anleitung unten unter „Einrichtung auf Vercel“.
-            </div>
-          )}
+          {driveError && <p role="alert" style={{ fontSize: 13, marginTop: 10, color: 'var(--red)', lineHeight: 1.45 }}>{driveError}</p>}
 
-          <div className="cf-field" style={{ marginTop: 16 }}>
-            <label className="cf-label" htmlFor="drive-folder">Google Drive Ordner-ID</label>
-            <input
-              id="drive-folder"
-              className="cf-input"
-              value={folderDraft}
-              onChange={(e) => handleFolderInput(e.target.value)}
-              placeholder="ID oder Ordner-Link einfügen"
-              autoCapitalize="off"
-              autoCorrect="off"
-              spellCheck={false}
-              inputMode="url"
-              style={{ fontFamily: 'monospace', fontSize: 14 }}
-            />
-          </div>
-          {folderDraft.trim() && !folderValid ? (
-            <p style={{ fontSize: 12, color: '#f87171', marginTop: 8 }}>Keine gültige Ordner-ID – bitte ID oder Ordner-Link einfügen.</p>
-          ) : linkFixed ? (
-            <p style={{ fontSize: 12, color: '#4ade80', marginTop: 8 }}>✓ Link erkannt – nur die Ordner-ID wurde übernommen und gespeichert.</p>
-          ) : (
-            <Hint>
-              Ordner in Google Drive öffnen und die ID aus der Adresse kopieren:{' '}
-              <span style={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>drive.google.com/drive/folders/<strong>&lt;ID&gt;</strong></span>.
-              Der ganze Link darf auch eingefügt werden. Leer lassen = Standardordner „GarageOS“.
-            </Hint>
-          )}
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, flexWrap: 'wrap' }}>
-            <button
-              className="mf-btn-save"
-              style={{ height: 40, padding: '0 20px', fontSize: 14 }}
-              onClick={handleDriveTest}
-              disabled={driveTest.state === 'running' || (!!folderDraft.trim() && !folderValid)}
-            >
-              {driveTest.state === 'running' ? 'Wird getestet…' : 'Verbindung testen'}
+          {drive?.connected ? (
+            <button className="text-danger-btn" onClick={handleDriveDisconnect} disabled={driveBusy}>
+              {driveBusy ? 'Wird getrennt…' : 'Verbindung trennen'}
             </button>
-            {driveFolderId && (
-              <a
-                href={`https://drive.google.com/drive/folders/${driveFolderId}`}
-                target="_blank"
-                rel="noreferrer"
-                style={{ fontSize: 13, color: 'var(--blue)', fontWeight: 600 }}
-              >
-                Ordner öffnen ↗
-              </a>
-            )}
-          </div>
-          {(driveTest.state === 'ok' || driveTest.state === 'error') && (
-            <p role="status" style={{ fontSize: 13, marginTop: 10, color: 'var(--label)', lineHeight: 1.45 }}>
-              <StatusDot color={driveTest.state === 'ok' ? '#4ade80' : '#f87171'} />
-              {driveTest.message}
-            </p>
+          ) : (
+            <button
+              className="btn-system btn-primary"
+              style={{ marginTop: 14, height: 44, fontSize: 15, width: '100%' }}
+              onClick={handleDriveConnect}
+              disabled={driveBusy || !drive?.configured}
+            >
+              {driveBusy ? 'Weiterleitung…' : 'Google Drive verbinden'}
+            </button>
           )}
 
           <Hint>
-            Jedes exportierte PDF (Offerten, Auftragsbestätigungen, Rechnungen …) wird automatisch als Archivkopie auf Google Drive gespeichert.
-            Die Google-Zugangsdaten liegen aus Sicherheitsgründen nur auf dem Server (Vercel) – der Ordner muss für dieses Google-Konto beschreibbar sein.
+            Jedes heruntergeladene PDF wird zusätzlich in deinem Google Drive gespeichert. Die App sieht dort nur die Dateien, die sie selbst angelegt hat.
           </Hint>
 
-          <details open={drive === 'off'} className="settings-details">
-            <summary>Einrichtung auf Vercel</summary>
-            <p>Vercel → Projekt → <strong>Settings → Environment Variables</strong> (Production), danach <strong>Redeploy</strong>:</p>
-            <ul className="settings-envlist">
-              {[
-                { k: 'GOOGLE_CLIENT_ID', d: 'OAuth-Client-ID (Typ „Webanwendung“)' },
-                { k: 'GOOGLE_CLIENT_SECRET', d: 'Clientschlüssel zum selben OAuth-Client' },
-                { k: 'GOOGLE_REFRESH_TOKEN', d: 'Refresh-Token des Google-Kontos, in dessen Drive gespeichert wird' },
-                { k: 'GOOGLE_DRIVE_FOLDER_ID', d: 'optional – Standardordner, wenn oben keiner eingetragen ist' },
-              ].map(({ k, d }) => {
-                const isMissing = driveMissing.includes(k);
-                return (
-                  <li key={k}>
-                    <code style={{ color: isMissing ? '#fbbf24' : undefined }}>{k}</code>
-                    {isMissing && <span style={{ color: '#fbbf24', fontWeight: 600 }}> · fehlt</span>}
-                    <br /><span>{d}</span>
-                  </li>
-                );
-              })}
-            </ul>
-            <ol>
-              <li><strong>console.cloud.google.com</strong> → Projekt wählen → „APIs &amp; Dienste“ → <strong>Google Drive API</strong> aktivieren.</li>
-              <li>„Anmeldedaten“ → OAuth-Client-ID erstellen (Webanwendung), Weiterleitungs-URI <code>https://developers.google.com/oauthplayground</code> eintragen → ID + Schlüssel kopieren.</li>
-              <li><strong>developers.google.com/oauthplayground</strong> → Zahnrad → „Use your own OAuth credentials“ → ID + Schlüssel eintragen → Scope <code>https://www.googleapis.com/auth/drive</code> autorisieren → „Exchange authorization code for tokens“ → <strong>Refresh token</strong> kopieren.</li>
-              <li>Ist der OAuth-Zustimmungsbildschirm im Modus „Testing“, läuft der Token nach 7 Tagen ab – auf „In Produktion“ stellen.</li>
-              <li>Ordner von einem anderen Konto? Dort in Drive „Freigeben“ → das oben angezeigte Google-Konto als <strong>Bearbeiter</strong> hinzufügen.</li>
-            </ol>
-            <p style={{ color: 'var(--label3)' }}>
-              Ein Service-Account (GOOGLE_CLIENT_EMAIL / GOOGLE_PRIVATE_KEY) funktioniert hier nicht: Er hat keinen eigenen Speicherplatz und kann
-              in „Meine Ablage“ keine Dateien anlegen – deshalb nutzt die App den Refresh-Token eines normalen Google-Kontos.
-            </p>
-          </details>
+          {drive && !drive.configured && (
+            <details open className="settings-details">
+              <summary>Einrichtung</summary>
+              <ol>
+                <li><strong>console.cloud.google.com</strong> → „APIs &amp; Dienste“ → <strong>Google Drive API</strong> aktivieren.</li>
+                <li>OAuth-Zustimmungsbildschirm einrichten, Scope <code>drive.file</code> hinzufügen und auf <strong>In Produktion</strong> stellen (im Modus „Testing“ läuft die Verbindung nach 7 Tagen ab).</li>
+                <li>„Anmeldedaten“ → OAuth-Client-ID (Webanwendung) mit dieser Weiterleitungs-URI erstellen: <code>{drive.redirectUri}</code></li>
+                <li>Vercel → Settings → Environment Variables (Production): {drive.missing.map((k, i) => <span key={k}>{i > 0 && ', '}<code>{k}</code></span>)} eintragen, danach <strong>Redeploy</strong>.</li>
+              </ol>
+            </details>
+          )}
         </Card>
 
         <Card title="Teile-Import">

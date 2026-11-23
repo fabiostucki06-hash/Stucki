@@ -67,7 +67,7 @@ export default function VehicleDetail({ vehicle, customer, onClose, onOrderClick
       </div>
 
       <p className="section-header" style={{ padding: '0 0 8px' }}>Wartungsplan</p>
-      <Wartungsplan key={vehicle.id} vehicle={vehicle} onSave={updateVehicle} onOfferte={onOfferte} />
+      <Wartungsplan key={vehicle.id} vehicle={vehicle} customer={customer} onSave={updateVehicle} onOfferte={onOfferte} />
 
       <p className="section-header" style={{ padding: '0 0 8px' }}>Aufträge ({auftraege.length})</p>
       {!auftraege.length && <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--label3)', fontSize: 15 }}>Noch keine Aufträge für dieses Fahrzeug.</div>}

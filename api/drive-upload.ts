@@ -1,108 +1,32 @@
 // Vercel Node serverless function (not part of the Vite app bundle / tsc -b build).
-// Stores a generated PDF in Google Drive:
-//   POST /api/drive-upload  { rootFolderId?, folder: string[], filename, data: <base64 PDF> }
-//   POST /api/drive-upload  { test: true, rootFolderId? } → { name, account } or the exact failure reason
-//   GET  /api/drive-upload  → { configured, missing: env var names } (status shown in Einstellungen)
+// Stores a generated PDF in the signed-in user's Google Drive:
+//   POST /api/drive-upload  { docType, filename, data: <base64 PDF> }
 //   Authorization: Bearer <Supabase access token of the signed-in user>
-// Files land in <root>/<folder…>/<filename>; missing folders are created and a
-// file with the same name in the target folder is replaced (new revision), so a
-// re-exported document doesn't pile up duplicates.
-//
-// Google access uses an OAuth refresh token of the Drive owner (service accounts
-// have no storage quota in a personal "Meine Ablage"). Environment variables:
-//   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN  (required)
-//   GOOGLE_DRIVE_FOLDER_ID  (optional root folder; default: "GarageOS" in My Drive)
-// Without them the endpoint answers 501 { configured: false, missing } and the app skips the upload.
+// Files land in "Stucki Repair/<docType>/<filename>"; missing folders are created
+// and a file with the same name is replaced (new revision), so a re-exported
+// document doesn't pile up duplicates. With the drive.file scope these lookups
+// only ever see what this app created.
 
 import type { VercelLikeRequest, VercelLikeResponse } from './import-part.js';
-
-declare const process: { env: Record<string, string | undefined> };
-
-const SUPA_URL = 'https://xpggpkmqwescbcrnnpod.supabase.co';
-// Public anon key (same as in src/lib/supabase.ts).
-const SUPA_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhwZ2dwa21xd2VzY2Jjcm5ucG9kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NjIxMjIsImV4cCI6MjA5NjEzODEyMn0.egPJ4OYOegRKIBV6PHUz_VfRib8g7sVIcNNy_7bFxjg';
+import {
+  ReconnectError, accessTokenFrom, bearer, decryptToken, deleteConnection, driveError, getConnection, missingEnv, supabaseUserId,
+} from './_drive.js';
 
 const DRIVE = 'https://www.googleapis.com/drive/v3/files';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
-const ROOT_NAME = 'GarageOS';
-const MAX_BYTES = 4 * 1024 * 1024; // Vercel caps request bodies at 4.5 MB
+const ROOT_NAME = 'Stucki Repair';
+const MAX_BYTES = 3 * 1024 * 1024; // Vercel caps request bodies at 4.5 MB (base64 adds a third)
 
-interface UploadBody {
-  /** Target folder chosen in Einstellungen; overrides GOOGLE_DRIVE_FOLDER_ID. */
-  rootFolderId?: unknown;
-  /** true: only check that the target folder is reachable, upload nothing. */
-  test?: unknown;
-  folder?: unknown;
-  filename?: unknown;
-  data?: unknown;
-}
-
-const header = (req: VercelLikeRequest, name: string): string | undefined => {
-  const v = req.headers?.[name];
-  return (Array.isArray(v) ? v[0] : v) || undefined;
-};
+const DOC_FOLDERS = new Set([
+  'Rechnungen', 'Anzahlungsrechnungen', 'Offerten', 'Materialofferten', 'Auftragsbestätigungen', 'Aufträge', 'Wartungsplaene',
+]);
 
 /** Drive query literal: backslash and single quote escaped. */
 const q = (s: string) => `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 
-/** Folder / file names: no path separators, no control characters, bounded length. */
+/** File names: no path separators, no control characters, bounded length. */
 const cleanName = (s: string) => s.replace(/[\\/\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
-
-export async function supabaseUserOk(token: string): Promise<boolean> {
-  try {
-    const r = await fetch(`${SUPA_URL}/auth/v1/user`, { headers: { apikey: SUPA_KEY, Authorization: `Bearer ${token}` } });
-    if (!r.ok) return false;
-    const u = (await r.json()) as { id?: string };
-    return !!u.id;
-  } catch {
-    return false;
-  }
-}
-
-async function googleAccessToken(): Promise<string> {
-  const r = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID ?? '',
-      client_secret: process.env.GOOGLE_CLIENT_SECRET ?? '',
-      refresh_token: process.env.GOOGLE_REFRESH_TOKEN ?? '',
-      grant_type: 'refresh_token',
-    }).toString(),
-  });
-  const j = (await r.json().catch(() => ({}))) as { access_token?: string; error?: string; error_description?: string };
-  if (r.ok && j.access_token) return j.access_token;
-  const reason =
-    j.error === 'invalid_grant' ? 'GOOGLE_REFRESH_TOKEN ist ungültig, widerrufen oder abgelaufen – neuen Refresh-Token erzeugen und in Vercel ersetzen'
-    : j.error === 'invalid_client' ? 'GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET stimmen nicht (invalid_client)'
-    : j.error === 'unauthorized_client' ? 'Refresh-Token gehört zu einem anderen OAuth-Client als GOOGLE_CLIENT_ID (unauthorized_client)'
-    : `${j.error ?? `HTTP ${r.status}`}${j.error_description ? `: ${j.error_description}` : ''}`;
-  throw new Error(`Google-Anmeldung fehlgeschlagen – ${reason}`);
-}
-
-/** Readable reason for a failed Drive API call (403 / 404 / quota …). */
-async function driveError(r: Response): Promise<Error> {
-  const j = (await r.json().catch(() => ({}))) as { error?: { message?: string; errors?: { reason?: string }[] } };
-  const reason = j.error?.errors?.[0]?.reason ?? '';
-  const msg = j.error?.message ?? '';
-  if (reason === 'accessNotConfigured' || /has not been used|is disabled/i.test(msg))
-    return new Error('Google Drive API ist im Google-Cloud-Projekt nicht aktiviert (403) – unter „APIs & Dienste“ aktivieren');
-  if (reason === 'insufficientPermissions' || /insufficient.*scope/i.test(msg))
-    return new Error('Zugriff verweigert (403): Refresh-Token hat keinen Drive-Zugriff – mit Scope https://www.googleapis.com/auth/drive neu erzeugen');
-  if (reason === 'storageQuotaExceeded') return new Error('Google-Drive-Speicher voll (403)');
-  if (r.status === 403) return new Error(`Zugriff verweigert (403)${msg ? `: ${msg}` : ''}`);
-  if (r.status === 404) return new Error('Ordner nicht gefunden (404) – ID prüfen oder den Ordner für das Google-Konto der App freigeben (Bearbeiter)');
-  return new Error(`Google Drive ${r.status}${msg ? `: ${msg}` : ''}`);
-}
-
-/** Email of the Google account the uploads run as (to know whom to share a folder with). */
-async function driveAccount(gToken: string): Promise<string> {
-  const r = await fetch('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)', { headers: { Authorization: `Bearer ${gToken}` } });
-  if (!r.ok) throw await driveError(r);
-  return ((await r.json()) as { user?: { emailAddress?: string } }).user?.emailAddress ?? '';
-}
 
 async function driveJson<T>(url: string, gToken: string, init: RequestInit = {}): Promise<T> {
   const r = await fetch(url, { ...init, headers: { Authorization: `Bearer ${gToken}`, ...(init.headers ?? {}) } });
@@ -111,7 +35,7 @@ async function driveJson<T>(url: string, gToken: string, init: RequestInit = {})
 }
 
 async function findOne(gToken: string, query: string): Promise<string | null> {
-  const url = `${DRIVE}?q=${encodeURIComponent(`${query} and trashed=false`)}&fields=files(id)&pageSize=1&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+  const url = `${DRIVE}?q=${encodeURIComponent(`${query} and trashed=false`)}&fields=files(id)&pageSize=1`;
   const j = await driveJson<{ files?: { id: string }[] }>(url, gToken);
   return j.files?.[0]?.id ?? null;
 }
@@ -119,7 +43,7 @@ async function findOne(gToken: string, query: string): Promise<string | null> {
 async function ensureFolder(gToken: string, name: string, parent: string): Promise<string> {
   const found = await findOne(gToken, `name=${q(name)} and mimeType=${q(FOLDER_MIME)} and ${q(parent)} in parents`);
   if (found) return found;
-  const created = await driveJson<{ id: string }>(`${DRIVE}?supportsAllDrives=true&fields=id`, gToken, {
+  const created = await driveJson<{ id: string }>(`${DRIVE}?fields=id`, gToken, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, mimeType: FOLDER_MIME, parents: [parent] }),
@@ -127,26 +51,9 @@ async function ensureFolder(gToken: string, name: string, parent: string): Promi
   return created.id;
 }
 
-const REQUIRED_ENV = ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REFRESH_TOKEN'] as const;
-
-const FOLDER_ID_RE =/^[A-Za-z0-9_-]{10,100}$/;
-
-/** The folder exists, is not trashed and the Drive account may add files to it; returns its name. */
-async function checkFolder(gToken: string, id: string): Promise<string> {
-  const r = await fetch(`${DRIVE}/${encodeURIComponent(id)}?fields=name,mimeType,trashed,capabilities(canAddChildren)&supportsAllDrives=true`, {
-    headers: { Authorization: `Bearer ${gToken}` },
-  });
-  if (!r.ok) throw await driveError(r);
-  const f = (await r.json()) as { name?: string; mimeType?: string; trashed?: boolean; capabilities?: { canAddChildren?: boolean } };
-  if (f.mimeType !== FOLDER_MIME) throw new Error('Die ID gehört nicht zu einem Ordner');
-  if (f.trashed) throw new Error('Der Ordner liegt im Papierkorb');
-  if (f.capabilities?.canAddChildren === false) throw new Error('Keine Schreibrechte – Ordner für das Google-Konto der App als „Bearbeiter“ freigeben');
-  return f.name ?? id;
-}
-
 async function uploadPdf(gToken: string, parent: string, filename: string, pdf: Uint8Array<ArrayBuffer>): Promise<{ id: string; webViewLink?: string }> {
   const existing = await findOne(gToken, `name=${q(filename)} and ${q(parent)} in parents and mimeType='application/pdf'`);
-  const boundary = `garageos${Date.now().toString(36)}`;
+  const boundary = `garageos${crypto.randomUUID().replace(/-/g, '')}`;
   // On update the parents can't be set through the metadata part.
   const meta = existing ? { name: filename } : { name: filename, parents: [parent], mimeType: 'application/pdf' };
   const body = new Blob([
@@ -155,8 +62,8 @@ async function uploadPdf(gToken: string, parent: string, filename: string, pdf: 
     `\r\n--${boundary}--`,
   ]);
   const url = existing
-    ? `${UPLOAD}/${existing}?uploadType=multipart&supportsAllDrives=true&fields=id,webViewLink`
-    : `${UPLOAD}?uploadType=multipart&supportsAllDrives=true&fields=id,webViewLink`;
+    ? `${UPLOAD}/${existing}?uploadType=multipart&fields=id,webViewLink`
+    : `${UPLOAD}?uploadType=multipart&fields=id,webViewLink`;
   return driveJson(url, gToken, {
     method: existing ? 'PATCH' : 'POST',
     headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
@@ -165,50 +72,26 @@ async function uploadPdf(gToken: string, parent: string, filename: string, pdf: 
 }
 
 export default async function handler(req: VercelLikeRequest, res: VercelLikeResponse) {
-  // Names (never values) of the required variables that are not set.
-  const missing = REQUIRED_ENV.filter((k) => !process.env[k]?.trim());
-  const configured = missing.length === 0;
-  // GET: status probe for Einstellungen → Integrationen.
-  if (req.method === 'GET') return res.status(200).json({ ok: true, configured, missing });
-  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Nur GET/POST' });
+  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Nur POST' });
 
-  const token = header(req, 'authorization')?.replace(/^Bearer\s+/i, '');
-  if (!token || !(await supabaseUserOk(token))) return res.status(401).json({ ok: false, error: 'Nicht angemeldet' });
+  const token = bearer(req);
+  const userId = token ? await supabaseUserId(token) : null;
+  if (!token || !userId) return res.status(401).json({ ok: false, error: 'Nicht angemeldet' });
 
-  if (!configured) {
-    return res.status(501).json({
-      ok: false, configured: false, missing,
-      error: `Google Drive ist nicht eingerichtet – in Vercel fehlen die Umgebungsvariablen: ${missing.join(', ')}`,
-    });
-  }
+  const missing = missingEnv();
+  if (missing.length) return res.status(501).json({ ok: false, configured: false, missing, error: `In Vercel fehlen: ${missing.join(', ')}` });
 
-  let body: UploadBody;
+  let body: { docType?: unknown; filename?: unknown; data?: unknown };
   try {
-    body = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body ?? {}) as UploadBody;
+    body = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body ?? {}) as typeof body;
   } catch {
     return res.status(400).json({ ok: false, error: 'Ungültiges JSON' });
   }
-  const rootFolderId = typeof body.rootFolderId === 'string' ? body.rootFolderId.trim() : '';
-  if (rootFolderId && !FOLDER_ID_RE.test(rootFolderId)) return res.status(400).json({ ok: false, error: 'Ungültige Ordner-ID' });
 
-  if (body.test === true) {
-    try {
-      const gToken = await googleAccessToken();
-      const account = await driveAccount(gToken);
-      const id = rootFolderId || process.env.GOOGLE_DRIVE_FOLDER_ID;
-      if (id) return res.status(200).json({ ok: true, account, name: await checkFolder(gToken, id) });
-      // Default target: "GarageOS" in My Drive, created on the first upload.
-      const found = await findOne(gToken, `name=${q(ROOT_NAME)} and mimeType=${q(FOLDER_MIME)} and 'root' in parents`);
-      return res.status(200).json({ ok: true, account, name: found ? ROOT_NAME : `${ROOT_NAME} (wird beim ersten Upload angelegt)` });
-    } catch (err) {
-      return res.status(422).json({ ok: false, error: err instanceof Error ? err.message : String(err) });
-    }
-  }
-
-  const folder = Array.isArray(body.folder) ? body.folder.filter((s): s is string => typeof s === 'string').map(cleanName).filter(Boolean).slice(0, 4) : [];
+  if (typeof body.docType !== 'string' || !DOC_FOLDERS.has(body.docType)) return res.status(400).json({ ok: false, error: 'Unbekannter Dokumenttyp' });
   const rawName = typeof body.filename === 'string' ? cleanName(body.filename) : '';
   const filename = rawName && !/\.pdf$/i.test(rawName) ? `${rawName}.pdf` : rawName;
-  const data = typeof body.data === 'string' ? body.data.replace(/^data:application\/pdf;[^,]*,/, '') : '';
+  const data = typeof body.data === 'string' ? body.data : '';
   if (!filename || !data) return res.status(400).json({ ok: false, error: 'filename und data erforderlich' });
 
   let pdf: Uint8Array<ArrayBuffer>;
@@ -217,17 +100,29 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
   } catch {
     return res.status(400).json({ ok: false, error: 'Ungültige Base64-Daten' });
   }
-  if (pdf.length > MAX_BYTES) return res.status(413).json({ ok: false, error: 'PDF zu gross' });
+  if (pdf.length > MAX_BYTES) return res.status(413).json({ ok: false, error: 'PDF zu gross für den Upload' });
   if (String.fromCharCode(...pdf.subarray(0, 5)) !== '%PDF-') return res.status(400).json({ ok: false, error: 'Keine PDF-Datei' });
 
   try {
-    const gToken = await googleAccessToken();
-    if (rootFolderId) await checkFolder(gToken, rootFolderId);
-    let parent = rootFolderId || process.env.GOOGLE_DRIVE_FOLDER_ID || (await ensureFolder(gToken, ROOT_NAME, 'root'));
-    for (const name of folder) parent = await ensureFolder(gToken, name, parent);
+    const row = await getConnection(token, userId);
+    if (!row) return res.status(409).json({ ok: false, connected: false, error: 'Google Drive nicht verbunden' });
+    let refresh: string;
+    try {
+      refresh = await decryptToken(row.refresh_token_enc, userId);
+    } catch {
+      // GOOGLE_CLIENT_SECRET was rotated: the stored token can't be read anymore.
+      throw new ReconnectError('Google-Verbindung ungültig – bitte neu verbinden');
+    }
+    const gToken = await accessTokenFrom(refresh);
+    const root = await ensureFolder(gToken, ROOT_NAME, 'root');
+    const parent = await ensureFolder(gToken, body.docType, root);
     const file = await uploadPdf(gToken, parent, filename, pdf);
-    return res.status(200).json({ ok: true, id: file.id, webViewLink: file.webViewLink, path: [...folder, filename].join('/') });
+    return res.status(200).json({ ok: true, id: file.id, webViewLink: file.webViewLink, path: `${ROOT_NAME}/${body.docType}/${filename}` });
   } catch (err) {
+    if (err instanceof ReconnectError) {
+      await deleteConnection(token, userId).catch(() => undefined);
+      return res.status(409).json({ ok: false, connected: false, reconnect: true, error: err.message });
+    }
     return res.status(502).json({ ok: false, error: err instanceof Error ? err.message : String(err) });
   }
 }
