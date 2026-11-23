@@ -19,7 +19,7 @@
 
 import Anthropic from 'npm:@anthropic-ai/sdk@0.135.0';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { vdsModell, vdsModellVorschlag } from './vds.ts';
+import { modelljahrAusVin, vdsModell, vdsModellVorschlag } from './vds.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -32,7 +32,7 @@ const json = (body: unknown, status = 200) =>
 const env = (k: string) => Deno.env.get(k) || undefined;
 const MODEL = 'claude-opus-5-5';
 /** Bump when the result shape or prompt changes: older cache rows are resolved again. */
-const VERSION = 4;
+const VERSION = 5;
 
 type Antrieb = 'benzin' | 'diesel' | 'hybrid' | 'plugin' | 'elektro' | 'gas';
 type Getriebe = 'manuell' | 'automat' | 'dsg' | 'cvt';
@@ -132,19 +132,6 @@ function pruefzifferOk(vin: string): boolean {
   const sum = [...vin].reduce((s, ch, i) => s + (/\d/.test(ch) ? +ch : TRANSLIT[ch] ?? 0) * GEWICHT[i], 0);
   const r = sum % 11;
   return vin[8] === (r === 10 ? 'X' : String(r));
-}
-
-const JAHR_CODES = 'ABCDEFGHJKLMNPRSTVWXY123456789';
-/** Model year (position 10). North American VINs: position 7 a letter → 2010–2039, a digit → 1980–2009.
-    Elsewhere: the latest year of the 30-year cycle not after next year. */
-function modelljahrAusVin(vin: string, jetzt = new Date().getFullYear()): number | undefined {
-  const i = JAHR_CODES.indexOf(vin[9]);
-  if (i < 0) return undefined;
-  const basis = 1980 + i;
-  if (/[1-5]/.test(vin[0])) return /[A-Z]/.test(vin[6]) ? basis + 30 : basis;
-  let y = basis;
-  while (y + 30 <= jetzt + 1) y += 30;
-  return y;
 }
 
 /* ── 2. Lookups ── */
@@ -415,10 +402,7 @@ function zusammenfuehren(vin: string, funde: Fund[], ki: KiAntwort | null): Erge
   }
   const modellVorschlag = felder.modell ? undefined : vdsModellVorschlag(felder.marke, vin) ?? (ki?.modell || undefined);
   if (felder.antrieb === 'elektro') { delete felder.motorcode; delete felder.steuertrieb; }
-  // Char 10 is the model year in North America and for most makers elsewhere, but not on
-  // European Mercedes VINs (serial number).
-  const jahrVin = /^(WD|W1)/.test(vin) && !nordamerika ? undefined : modelljahrAusVin(vin);
-  const modelljahr = funde.find((f) => f.jahr)?.jahr ?? jahrVin;
+  const modelljahr = funde.find((f) => f.jahr)?.jahr ?? modelljahrAusVin(wmiMarke, vin);
   const pruefziffer = pruefzifferOk(vin) ? 'ok' as const : 'falsch' as const;
   const hinweise = [
     widerspruch.length ? `Die Datenquellen widersprechen sich bei ${widerspruch.join(', ')}: nicht übernommen.` : '',
@@ -428,7 +412,12 @@ function zusammenfuehren(vin: string, funde: Fund[], ki: KiAntwort | null): Erge
     version: VERSION, felder, modelljahr, region, land,
     pruefziffer, motorEindeutig, varianten, modellVorschlag,
     hinweis: hinweise.join(' ') || undefined,
-    quellen: ['ISO 3779', ...funde.map((f) => f.quelle), ...(ki ? ['KI-Recherche (Web)'] : [])],
+    // Only sources that contributed: vPIC rejecting a European VIN adds nothing.
+    quellen: [
+      ...(wmiMarke ? ['VIN-Herstellercode'] : []),
+      ...funde.filter((f) => f.quelle !== 'NHTSA vPIC' || f.felder.modell || f.jahr).map((f) => f.quelle === 'VDS-Tabelle' ? 'VIN-Typschlüssel' : f.quelle),
+      ...(ki ? ['KI-Recherche (Web)'] : []),
+    ],
   };
 }
 
@@ -460,12 +449,12 @@ Deno.serve(async (req) => {
     return json({ ok: true, quelle: 'cache', ergebnis: { ...alt, pruefziffer: pruefzifferOk(vin) ? 'ok' : 'falsch' } });
   }
 
-  const jahr = modelljahrAusVin(vin);
+  const jahr = modelljahrAusVin(WMI3[vin.slice(0, 3)] ?? WMI2[vin.slice(0, 2)], vin);
   const { region, land } = herkunft(vin);
   const analyse = {
     wmi: vin.slice(0, 3), markeLautWmi: WMI3[vin.slice(0, 3)] ?? WMI2[vin.slice(0, 2)] ?? 'unbekannt', region, land,
     vds: vin.slice(3, 9), pruefziffer: pruefzifferOk(vin) ? 'gültig' : 'ungültig (ausserhalb Nordamerikas oft nicht verwendet)',
-    modelljahrZeichen10: vin[9], modelljahrLautVin: /^(WD|W1)/.test(vin) && !/[1-5]/.test(vin[0]) ? 'nicht codiert (Mercedes Europa)' : jahr ?? 'unbekannt', werkZeichen11: vin[10], seriennummer: vin.slice(11),
+    modelljahrZeichen10: vin[9], modelljahrLautVin: jahr ?? 'nicht eindeutig', werkZeichen11: vin[10], seriennummer: vin.slice(11),
   };
 
   const fehler: string[] = [];

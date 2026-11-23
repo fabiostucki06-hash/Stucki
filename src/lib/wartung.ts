@@ -1,4 +1,5 @@
 import { neueServiceId, plusMonate } from './vehicles';
+import { modelljahrAusVin } from '../../supabase/functions/vin-decode/vds';
 import type { Antrieb, Getriebe, IntervallQuelle, ServiceItem, Steuertrieb, Vehicle, WartungSpec } from '../types';
 
 /* ── Fahrzeugprofil: what the Wartungsplan is generated from ──
@@ -75,16 +76,10 @@ export function markeAusVin(vin?: string): string | undefined {
   return v ? WMI[v.slice(0, 3)] ?? WMI2[v.slice(0, 2)] : undefined;
 }
 
-/** Model year from VIN char 10 (latest year of its 30-year cycle not in the
-    future). Not every European maker encodes it; only a fallback. */
+/** Model year from the VIN, only where it is unambiguous (vds.ts). */
 export function baujahrAusVin(vin?: string, jetzt = new Date().getFullYear()): number | undefined {
   const v = vinOk(vin);
-  if (!v) return undefined;
-  const i = 'ABCDEFGHJKLMNPRSTVWXY123456789'.indexOf(v[9]);
-  if (i < 0) return undefined;
-  let y = 1980 + i;
-  while (y + 30 <= jetzt + 1) y += 30;
-  return y;
+  return v ? modelljahrAusVin(markeAusVin(v), v, jetzt) : undefined;
 }
 
 const norm = (s?: string) => (s ?? '').trim().toLowerCase();

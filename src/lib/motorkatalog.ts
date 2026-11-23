@@ -674,8 +674,11 @@ export function motorVarianten(marke?: string, modell?: string, baujahr?: number
   const mk = MARKE_ALIAS[m] ?? m;
   const text = (modell ?? '').trim().toLowerCase();
   if (!mk || !text) return [];
-  const e = KATALOG.find((x) => x.marken.includes(mk) && x.modell.test(text)
+  const treffer = KATALOG.filter((x) => x.marken.includes(mk) && x.modell.test(text)
     && (!x.jahre || baujahr == null || (baujahr >= x.jahre[0] && baujahr <= x.jahre[1])));
+  // Without a year, entries for different periods can't be told apart: offer none of them.
+  if (baujahr == null && treffer.length > 1 && treffer.some((x) => x.jahre)) return [];
+  const e = treffer[0];
   if (!e) return [];
   // Electric models need no pick: their single entry is applied as such by the caller.
   return e.varianten;

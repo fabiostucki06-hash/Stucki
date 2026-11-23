@@ -1,7 +1,7 @@
 import { markeAusVin, motorfamilieAusCode, normMotorcode } from './wartung';
 import { SUPA_KEY, SUPA_URL, getFreshToken } from './supabase';
 import { motorVarianten, type VinVariante } from './motorkatalog';
-import { vdsModell, vdsModellVorschlag } from '../../supabase/functions/vin-decode/vds';
+import { modelljahrAusVin, vdsModell, vdsModellVorschlag } from '../../supabase/functions/vin-decode/vds';
 import type { Antrieb, FahrzeugFelder, Getriebe } from '../types';
 
 /* ── VIN → vehicle data ──
@@ -148,8 +148,11 @@ async function server(vin: string, signal?: AbortSignal): Promise<{ ergebnis: Vi
 /** Local fallback: WMI / VDS rules and NHTSA vPIC from the browser. */
 async function lokalAbrufen(vin: string, signal?: AbortSignal): Promise<VinErgebnis> {
   const felder: Partial<FahrzeugFelder> = lokal(vin);
-  const quellen: string[] = [];
-  let modelljahr: number | undefined;
+  const quellen: string[] = [
+    ...(felder.marke ? ['VIN-Herstellercode'] : []),
+    ...(felder.modell ? ['VIN-Typschlüssel'] : []),
+  ];
+  let modelljahr = modelljahrAusVin(felder.marke, vin);
   try {
     const r = await vpic(vin, signal);
     if (r) {
@@ -157,7 +160,7 @@ async function lokalAbrufen(vin: string, signal?: AbortSignal): Promise<VinErgeb
       // ErrorCode 0 alone = decoded cleanly. Anything else (typical for European VINs): only the Make counts.
       if ((r.ErrorCode ?? '').split(',').every((c) => c.trim() === '0')) {
         quellen.push('NHTSA vPIC');
-        modelljahr = parseInt(r.ModelYear ?? '', 10) || undefined;
+        modelljahr = parseInt(r.ModelYear ?? '', 10) || modelljahr;
         if (r.Model) felder.modell = felder.modell ?? [r.Model, r.Series].filter(Boolean).join(' ');
         const a = antriebVon(r); if (a) felder.antrieb = a;
         const g = getriebeVon(r); if (g) felder.getriebe = g;

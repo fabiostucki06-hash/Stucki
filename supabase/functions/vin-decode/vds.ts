@@ -8,7 +8,7 @@
 /** VAG model codes (VIN chars 7–8) → Modell (Typ). */
 const VAG_MODELL: Record<string, Record<string, string>> = {
   Audi: {
-    '8L': 'A3 (8L)', '8P': 'A3 (8P)', '8V': 'A3 (8V)', '8Y': 'A3 (8Y)', 'GB': 'A1 (GB)', '8X': 'A1 (8X)', '8E': 'A4 (B6/B7)', '8K': 'A4 (B8)',
+    '8D': 'A4 (B5)', '8L': 'A3 (8L)', '8P': 'A3 (8P)', '8V': 'A3 (8V)', '8Y': 'A3 (8Y)', 'GB': 'A1 (GB)', '8X': 'A1 (8X)', '8E': 'A4 (B6/B7)', '8K': 'A4 (B8)',
     '8W': 'A4 (B9)', '8T': 'A5 (8T)', '8F': 'A5 Cabriolet (8F)', 'F5': 'A5 (F5)', '4F': 'A6 (C6)', '4G': 'A6 (C7)', '4A': 'A6 (C8)',
     '4K': 'A7 (4K)', '4H': 'A8 (D4)', '4N': 'A8 (D5)', '8U': 'Q3 (8U)', 'F3': 'Q3 (F3)', '8R': 'Q5 (8R)', 'FY': 'Q5 (FY)', '4L': 'Q7 (4L)',
     '4M': 'Q7 / Q8 (4M)', 'GA': 'Q2 (GA)', '8J': 'TT (8J)', 'FV': 'TT (FV)', '42': 'R8 (42)', '4S': 'R8 (4S)', 'GE': 'e-tron (GE)', 'FZ': 'Q4 e-tron (FZ)',
@@ -120,6 +120,32 @@ const OPEL_MODELL: Record<string, string> = {
 };
 
 const zuerst = (t: Record<string, string>, ...keys: string[]) => keys.map((k) => t[k]).find(Boolean);
+
+/** Production years of Audi types (VIN chars 7–8). The year code repeats every 30 years,
+    so these periods decide which of the two possible years is the real one. */
+const AUDI_BAUZEIT: Record<string, [number, number]> = {
+  '8D': [1994, 2001], '8L': [1996, 2003], '8P': [2003, 2013], '8V': [2012, 2020], '8E': [2000, 2008], '8K': [2007, 2016],
+  '8T': [2007, 2017], '4F': [2004, 2011], '4G': [2011, 2018], '8U': [2011, 2018], '8R': [2008, 2017], '4L': [2005, 2015], '8J': [2006, 2014],
+};
+
+const JAHR_CODES = 'ABCDEFGHJKLMNPRSTVWXY123456789';
+
+/** Model year from VIN char 10, only where it is unambiguous. North America: the position-7
+    rule. Elsewhere char 10 isn't standardised, so only the VAG "ZZZ" layout counts, and of its
+    two possible years (30-year cycle) one must be ruled out by the calendar or the type's period. */
+export function modelljahrAusVin(marke: string | undefined, vin: string, jetzt = new Date().getFullYear()): number | undefined {
+  const i = JAHR_CODES.indexOf(vin[9]);
+  if (i < 0) return undefined;
+  const basis = 1980 + i;
+  if (/^[1-5]/.test(vin)) {
+    const jahr = /[A-Z]/.test(vin[6]) ? basis + 30 : basis;
+    return jahr <= jetzt + 1 ? jahr : undefined;
+  }
+  if (!['Audi', 'VW', 'Skoda', 'Seat', 'Porsche'].includes(marke ?? '') || vin.slice(3, 6) !== 'ZZZ') return undefined;
+  const bauzeit = marke === 'Audi' ? AUDI_BAUZEIT[vin.slice(6, 8)] : undefined;
+  const moeglich = [basis, basis + 30].filter((y) => y <= jetzt + 1 && (!bauzeit || (y >= bauzeit[0] - 1 && y <= bauzeit[1] + 1)));
+  return moeglich.length === 1 ? moeglich[0] : undefined;
+}
 
 /** The VDS layout is fixed and documented only for these cases: European VAG / Porsche
     VINs ("ZZZ" filler, type in chars 7–8), European Mercedes (Baureihe in 4–6) and the
