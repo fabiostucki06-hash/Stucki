@@ -1024,6 +1024,17 @@ select.mf-add-pos.df-pauschale-select{-webkit-appearance:none;appearance:none;co
 .vin-chip-aktiv{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-text)}
 @media (pointer:coarse){.vin-chip{min-height:40px}}
 @media (pointer:coarse){.vin-row .cf-input{font-size:16px}}
+.scan-bar{display:flex;flex-direction:column;padding:12px 14px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg)}
+.scan-kopf{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px}
+.scan-titel{display:flex;flex-direction:column;gap:1px;min-width:0}
+.scan-name{font-size:14px;font-weight:600;color:var(--label)}
+.scan-hint{font-size:12px;color:var(--label3)}
+.scan-aktionen{display:flex;gap:8px}
+.scan-btn{flex:none;width:auto;display:inline-flex;align-items:center;justify-content:center;min-width:96px;height:36px;padding:0 12px;font-size:13px;white-space:nowrap}
+.scan-btn:disabled{opacity:0.5;cursor:default}
+.scan-kamera{display:none}
+.scan-entfernen{margin-left:-8px;color:var(--label2)}
+@media (pointer:coarse){.scan-kamera{display:inline-flex}.scan-btn{height:44px}}
 .sp-tile-actions{display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:10px;border-top:1px solid var(--border)}
 .sp-switch{display:flex;flex:1;min-width:0;max-width:280px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:2px;gap:2px}
 .sp-switch-btn{flex:1;min-width:0;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:30px;padding:0 8px;border:none;border-radius:var(--radius-sm);background:transparent;color:var(--label2);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:background 0.12s,color 0.12s}

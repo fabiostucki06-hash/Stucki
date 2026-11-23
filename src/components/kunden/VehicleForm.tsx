@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Spinner from '../ui/Spinner';
+import DokumentScan from './DokumentScan';
 import { ANTRIEBE, GETRIEBE, STEUERTRIEBE, fahrzeugProfil, labelVon, motorfamilieAusCode } from '../../lib/wartung';
 import { vinAbrufen, vinGueltig, type VinVariante } from '../../lib/vin';
 import { motorVarianten } from '../../lib/motorkatalog';
@@ -44,7 +45,12 @@ const variantenText = (v: VinVariante) => [v.motor, v.motorcode, v.hinweis].filt
     "Daten abrufen" looks up a complete VIN (lib/vin): only reliably resolved values
     fill empty fields, values entered by hand are only replaced on request, and the
     status names what was recognized and what is still to be checked. */
-export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k: keyof FahrzeugFelder, v: string) => void }) {
+export function VehicleFields({ f, onChange, vinReset }: {
+  f: FahrzeugFelder;
+  onChange: (k: keyof FahrzeugFelder, v: string) => void;
+  /** Set here, called by DokumentScan: a new document drops the last lookup and what it entered. */
+  vinReset?: React.MutableRefObject<(() => void) | null>;
+}) {
   const s = (k: keyof FahrzeugFelder) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => onChange(k, e.target.value);
   const p = fahrzeugProfil(f);
   const katalog = useMemo(() => motorVarianten(f.marke, f.modell, p.baujahr), [f.marke, f.modell, p.baujahr]);
@@ -56,6 +62,12 @@ export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k
   /** Values the last lookup entered: a lookup for another VIN must not leave them behind. */
   const eingetragen = useRef(new Map<keyof FahrzeugFelder, string>());
   useEffect(() => () => abbruch.current?.abort(), []);
+  if (vinReset) vinReset.current = () => {
+    abbruch.current?.abort();
+    for (const [k, v] of eingetragen.current) if (String(aktuell.current[k] ?? '') === v) onChange(k, '');
+    eingetragen.current = new Map();
+    setVin(null);
+  };
 
   async function vinLaden() {
     const nr = vinGueltig(aktuell.current.chassisnummer);
@@ -301,6 +313,7 @@ export default function VehicleForm({ initial, onSave, onCancel }: VehicleFormPr
     motorcode:     initial?.motorcode     ?? '',
   });
   const [busy, setBusy] = useState(false);
+  const vinReset = useRef<(() => void) | null>(null);
 
   async function submit() {
     if (busy) return;
@@ -319,8 +332,9 @@ export default function VehicleForm({ initial, onSave, onCancel }: VehicleFormPr
 
   return (
     <div>
+      <DokumentScan werte={f} onChange={(k, v) => setF((p) => ({ ...p, [k]: v }))} vinReset={vinReset} />
       <div className="cf-section-title" style={{ marginTop: 0 }}>Fahrzeug</div>
-      <VehicleFields f={f} onChange={(k, v) => setF((p) => ({ ...p, [k]: v }))} />
+      <VehicleFields f={f} onChange={(k, v) => setF((p) => ({ ...p, [k]: v }))} vinReset={vinReset} />
       <div className="cf-actions">
         <button className="cf-btn-save" onClick={submit} disabled={busy}>
           {busy ? 'Wird gespeichert…' : 'Sichern'}
