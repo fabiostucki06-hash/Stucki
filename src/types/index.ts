@@ -8,7 +8,7 @@ export interface VehicleDocument {
 /** The vehicle fields of a Customer: since the vehicles table they belong to a
     Vehicle; on a Customer they mirror the vehicle a view or document refers to
     (see lib/vehicles), and they are never stored on the customer row. */
-export type FahrzeugFeld = 'marke' | 'modell' | 'kennzeichen' | 'km' | 'chassisnummer' | 'erstzulassung' | 'antrieb' | 'getriebe' | 'steuertrieb' | 'allrad' | 'motor' | 'motorcode';
+export type FahrzeugFeld = 'marke' | 'modell' | 'kennzeichen' | 'km' | 'chassisnummer' | 'erstzulassung' | 'antrieb' | 'getriebe' | 'steuertrieb' | 'achsantrieb' | 'motor' | 'motorcode';
 export type FahrzeugFelder = Pick<Vehicle, FahrzeugFeld>;
 
 /** Technical data the Wartungsplan is derived from (lib/wartung); inferred from
@@ -16,8 +16,8 @@ export type FahrzeugFelder = Pick<Vehicle, FahrzeugFeld>;
 export type Antrieb = 'benzin' | 'diesel' | 'hybrid' | 'plugin' | 'elektro' | 'gas';
 export type Getriebe = 'manuell' | 'automat' | 'dsg' | 'cvt';
 export type Steuertrieb = 'zahnriemen' | 'kette';
-/** Set only when known; unset = unknown. Independent of Antrieb (the fuel / energy type). */
-export type Allrad = 'ja' | 'nein';
+/** Driven axles. Set only when known; unset = unknown. Independent of Antrieb (the fuel / energy type). */
+export type Achsantrieb = 'front' | 'heck' | 'allrad';
 
 export interface Customer {
   id: string;
@@ -34,7 +34,7 @@ export interface Customer {
   antrieb?: Antrieb;
   getriebe?: Getriebe;
   steuertrieb?: Steuertrieb;
-  allrad?: Allrad;
+  achsantrieb?: Achsantrieb;
   motor?: string;
   motorcode?: string;
   createdAt: string;
@@ -114,7 +114,7 @@ export interface Vehicle {
   antrieb?: Antrieb;
   getriebe?: Getriebe;
   steuertrieb?: Steuertrieb;
-  allrad?: Allrad;
+  achsantrieb?: Achsantrieb;
   /** Free text, e.g. "2.0 TDI 150 PS". */
   motor?: string;
   /** Motorkennbuchstabe / engine code, e.g. "CFFB", "B47D20", "OM651". */

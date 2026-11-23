@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Spinner from '../ui/Spinner';
-import { ALLRADEN, ANTRIEBE, GETRIEBE, STEUERTRIEBE, fahrzeugProfil, labelVon, motorfamilieAusCode } from '../../lib/wartung';
+import { ACHSANTRIEBE, ANTRIEBE, GETRIEBE, STEUERTRIEBE, fahrzeugProfil, labelVon, motorfamilieAusCode } from '../../lib/wartung';
 import { vinAbrufen, vinGueltig, type VinVariante } from '../../lib/vin';
 import { motorVarianten } from '../../lib/motorkatalog';
 import type { FahrzeugFelder } from '../../types';
@@ -9,10 +9,10 @@ import type { FahrzeugFelder } from '../../types';
 const AUTO = 'Automatisch – unbekannt';
 
 const FELD_LABEL: Partial<Record<keyof FahrzeugFelder, string>> = {
-  marke: 'Marke', modell: 'Modell', antrieb: 'Antrieb', getriebe: 'Getriebe', allrad: 'Allrad', motor: 'Motor', motorcode: 'Motorkennbuchstabe', steuertrieb: 'Steuertrieb', erstzulassung: '1. Inv. Setzung',
+  marke: 'Marke', modell: 'Modell', antrieb: 'Antrieb', getriebe: 'Getriebe', achsantrieb: 'Antriebsart', motor: 'Motor', motorcode: 'Motorkennbuchstabe', steuertrieb: 'Steuertrieb', erstzulassung: '1. Inv. Setzung',
 };
 const WERT_LABEL: Partial<Record<keyof FahrzeugFelder, (v: string) => string | undefined>> = {
-  antrieb: (v) => labelVon(ANTRIEBE, v as never), getriebe: (v) => labelVon(GETRIEBE, v as never), steuertrieb: (v) => labelVon(STEUERTRIEBE, v as never), allrad: (v) => labelVon(ALLRADEN, v as never),
+  antrieb: (v) => labelVon(ANTRIEBE, v as never), getriebe: (v) => labelVon(GETRIEBE, v as never), steuertrieb: (v) => labelVon(STEUERTRIEBE, v as never), achsantrieb: (v) => labelVon(ACHSANTRIEBE, v as never),
 };
 const anzeige = (k: keyof FahrzeugFelder, v: string) => WERT_LABEL[k]?.(v) ?? v;
 
@@ -86,7 +86,7 @@ export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k
       }
       const offen = r.offen.filter((k) => !String(werte[k] ?? '').trim()).map((k) => FELD_LABEL[k] ?? k);
       // Neither is in a European VIN as a rule: no reason for a warning on their own.
-      const nurDatum = offen.every((x) => x === FELD_LABEL.erstzulassung || x === FELD_LABEL.allrad);
+      const nurDatum = offen.every((x) => x === FELD_LABEL.erstzulassung || x === FELD_LABEL.achsantrieb);
       setVin({
         text: [
           r.offline ? 'VIN-Server nicht erreichbar: nur die lokale Auswertung wurde verwendet.' : '',
@@ -261,10 +261,10 @@ export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k
           </select>
         </div>
         <div className="cf-field">
-          <label className="cf-label" htmlFor="vf-allrad">Allrad (4x4)</label>
-          <select id="vf-allrad" className="cf-select" value={f.allrad ?? ''} onChange={s('allrad')}>
+          <label className="cf-label" htmlFor="vf-achsantrieb">Antriebsart</label>
+          <select id="vf-achsantrieb" className="cf-select" value={f.achsantrieb ?? ''} onChange={s('achsantrieb')}>
             <option value="">{AUTO}</option>
-            {ALLRADEN.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            {ACHSANTRIEBE.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
       </div>
@@ -305,7 +305,7 @@ export default function VehicleForm({ initial, onSave, onCancel }: VehicleFormPr
     antrieb:       initial?.antrieb,
     getriebe:      initial?.getriebe,
     steuertrieb:   initial?.steuertrieb,
-    allrad:        initial?.allrad,
+    achsantrieb:   initial?.achsantrieb,
     motor:         initial?.motor         ?? '',
     motorcode:     initial?.motorcode     ?? '',
   });
