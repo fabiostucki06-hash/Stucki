@@ -144,11 +144,30 @@ export async function deleteConnection(token: string, userId: string): Promise<v
 
 /* ── Google ── */
 
-/** The stored grant no longer works (revoked, expired): the user has to connect again. */
-export class ReconnectError extends Error {}
+/** The stored grant no longer works (revoked, expired): the user has to connect again.
+    keepConnection: the row may still be valid (e.g. a mistyped secret), so it isn't deleted. */
+export class ReconnectError extends Error {
+  constructor(message: string, readonly keepConnection = false) {
+    super(message);
+  }
+}
+
+/** A temporary Google or network problem: the whole upload can safely run again. */
+export class TransientDriveError extends Error {}
+
+const GOOGLE_TIMEOUT_MS = 15_000;
+
+/** fetch with a timeout; network failures become retryable errors. */
+export async function googleFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  try {
+    return await fetch(url, { ...init, signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS) });
+  } catch {
+    throw new TransientDriveError('Google Drive nicht erreichbar');
+  }
+}
 
 export async function accessTokenFrom(refreshToken: string): Promise<string> {
-  const r = await fetch(TOKEN_URL, {
+  const r = await googleFetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -162,7 +181,8 @@ export async function accessTokenFrom(refreshToken: string): Promise<string> {
   if (r.ok && j.access_token) return j.access_token;
   if (j.error === 'invalid_grant') throw new ReconnectError('Google-Zugriff abgelaufen oder widerrufen – bitte neu verbinden');
   if (j.error === 'invalid_client') throw new Error('GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET stimmen nicht');
-  throw new Error(`Google-Anmeldung fehlgeschlagen (${j.error ?? r.status})`);
+  const message = `Google-Anmeldung fehlgeschlagen (${j.error ?? r.status})`;
+  throw r.status === 429 || r.status >= 500 ? new TransientDriveError(message) : new Error(message);
 }
 
 /** Readable reason for a failed Drive API call. */
@@ -170,13 +190,15 @@ export async function driveError(r: Response): Promise<Error> {
   const j = (await r.json().catch(() => ({}))) as { error?: { message?: string; errors?: { reason?: string }[] } };
   const reason = j.error?.errors?.[0]?.reason ?? '';
   const msg = j.error?.message ?? '';
-  if (r.status === 401) return new ReconnectError('Google-Zugriff abgelaufen – bitte neu verbinden');
+  // A just-issued access token was refused: retry with a new one, the grant itself is fine.
+  if (r.status === 401) return new TransientDriveError('Google-Zugriff vorübergehend abgelehnt – später erneut exportieren');
   if (reason === 'accessNotConfigured' || /has not been used|is disabled/i.test(msg))
     return new Error('Google Drive API ist im Google-Cloud-Projekt nicht aktiviert');
   if (reason === 'insufficientPermissions' || /insufficient.*scope/i.test(msg))
     return new ReconnectError('Drive-Berechtigung fehlt – bitte neu verbinden und Zugriff erlauben');
   if (reason === 'storageQuotaExceeded') return new Error('Google-Drive-Speicher voll');
   if (reason === 'rateLimitExceeded' || reason === 'userRateLimitExceeded' || r.status === 429)
-    return new Error('Google Drive ist gerade ausgelastet – später erneut exportieren');
-  return new Error(`Google Drive ${r.status}${msg ? `: ${msg}` : ''}`);
+    return new TransientDriveError('Google Drive ist gerade ausgelastet – später erneut exportieren');
+  const message = `Google Drive ${r.status}${msg ? `: ${msg}` : ''}`;
+  return r.status >= 500 ? new TransientDriveError(message) : new Error(message);
 }

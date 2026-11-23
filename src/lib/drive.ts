@@ -23,14 +23,33 @@ const CALLBACK_PATH = '/drive-callback';
 let knownConnected = false;
 const remember = (connected: boolean) => { knownConnected = connected; };
 
+const AUTH_TIMEOUT_MS = 20_000;
+const UPLOAD_TIMEOUT_MS = 70_000; // a little above the server's maxDuration
+const MAX_UPLOAD_BYTES = 3 * 1024 * 1024; // same limit as api/drive-upload.ts
+const FAILURE_TOAST_MS = 10_000; // long enough to read that the PDF is only local
+
+/** A request that never answers must not block the upload queue forever. */
+async function fetchWithTimeout(url: string, init: RequestInit, ms: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (controller.signal.aborted) throw new Error('Zeitüberschreitung');
+    throw err;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 async function authCall<T>(body: Record<string, unknown>): Promise<T & { ok?: boolean; error?: string }> {
   const token = await getFreshToken();
   if (!token) throw new Error('Nicht angemeldet');
-  const r = await fetch('/api/drive-auth', {
+  const r = await fetchWithTimeout('/api/drive-auth', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
-  });
+  }, AUTH_TIMEOUT_MS);
   if (r.status === 404) throw new Error('Server-Funktion nicht verfügbar (lokale Entwicklung)');
   const j = (await r.json().catch(() => ({}))) as T & { ok?: boolean; error?: string };
   if (!r.ok || !j.ok) throw new Error(j.error ?? `Fehler ${r.status}`);
@@ -87,13 +106,13 @@ async function blockedReason(): Promise<string | null> {
   const s = await getDriveStatus();
   if (s.connected) return null;
   return s.configured
-    ? 'Nicht verbunden, PDF nur lokal gespeichert. Einstellungen → Integrationen'
+    ? 'Nicht verbunden (Einstellungen → Integrationen)'
     : `Nicht eingerichtet, in Vercel fehlen: ${s.missing.join(', ')}`;
 }
 
 function reportFailure(docType: DriveDocType, message: string, detail: Record<string, unknown> = {}): void {
   console.error('[Drive-Upload] fehlgeschlagen', { docType, message, ...detail });
-  showToast(`Google Drive: ${message}`, 'error');
+  showToast(`Google Drive: ${message}. Das PDF bleibt nur lokal, es gibt keinen automatischen Nachversuch.`, 'error', FAILURE_TOAST_MS);
 }
 
 function toBase64(buf: ArrayBuffer): string {
@@ -119,11 +138,14 @@ async function uploadToDrive(doc: jsPDF, docType: DriveDocType, filename: string
     if (blocked) return reportFailure(docType, blocked, { stage: 'status' });
     const token = await getFreshToken();
     if (!token) return reportFailure(docType, 'Sitzung abgelaufen, bitte neu anmelden', { stage: 'session' });
-    const r = await fetch('/api/drive-upload', {
+    const pdf = doc.output('arraybuffer');
+    if (pdf.byteLength > MAX_UPLOAD_BYTES) return reportFailure(docType, 'PDF ist grösser als 3 MB', { stage: 'size', bytes: pdf.byteLength });
+    showToast('Wird in Google Drive gespeichert, Tab bitte offen lassen', 'info');
+    const r = await fetchWithTimeout('/api/drive-upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ docType, filename: `${filename}.pdf`, data: toBase64(doc.output('arraybuffer')) }),
-    });
+      body: JSON.stringify({ docType, filename: `${filename}.pdf`, data: toBase64(pdf) }),
+    }, UPLOAD_TIMEOUT_MS);
     const j = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string; connected?: boolean; reconnect?: boolean; folder?: string };
     if (r.ok && j.ok) {
       showToast(j.folder ? `In Google Drive gespeichert (${j.folder})` : 'In Google Drive gespeichert', 'success');
@@ -133,7 +155,7 @@ async function uploadToDrive(doc: jsPDF, docType: DriveDocType, filename: string
       remember(false);
       window.dispatchEvent(new Event('garage-drive-changed'));
     }
-    reportFailure(docType, j.error ?? (r.status === 413 ? 'PDF zu gross' : `Fehler ${r.status}`), {
+    reportFailure(docType, j.error ?? (r.status === 413 ? 'PDF ist grösser als 3 MB' : `Fehler ${r.status}`), {
       stage: 'upload', status: r.status, connected: j.connected, reconnect: j.reconnect,
     });
   } catch (err) {

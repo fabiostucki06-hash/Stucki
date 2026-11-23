@@ -11,7 +11,7 @@ interface ToastItem {
 let _toastId = 0;
 let _setter: React.Dispatch<React.SetStateAction<ToastItem[]>> | null = null;
 
-export function showToast(msg: string, type: 'success' | 'error' | 'info' = 'info') {
+export function showToast(msg: string, type: 'success' | 'error' | 'info' = 'info', durationMs = 3600) {
   if (!_setter) return;
   const id = ++_toastId;
   const icons = { success: '✓', error: '✕', info: 'ℹ' };
@@ -20,7 +20,7 @@ export function showToast(msg: string, type: 'success' | 'error' | 'info' = 'inf
     setTimeout(() => {
       _setter!((ts) => ts.map((t) => (t.id === id ? { ...t, out: true } : t)));
       setTimeout(() => _setter!((ts) => ts.filter((t) => t.id !== id)), 260);
-    }, 3600);
+    }, durationMs);
   }, 0);
 }
 
