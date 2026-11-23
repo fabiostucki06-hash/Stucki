@@ -18,11 +18,10 @@ export interface DriveStatus {
 }
 
 const CALLBACK_PATH = '/drive-callback';
-/** A "not connected" answer is reused this long, so exports don't each ask the server. */
-const STATUS_TTL_MS = 60_000;
 
-let known: { connected: boolean; at: number } | null = null;
-const remember = (connected: boolean) => { known = { connected, at: Date.now() }; };
+/** Only a positive answer is cached, so a fresh connection or setup fix applies to the next export. */
+let knownConnected = false;
+const remember = (connected: boolean) => { knownConnected = connected; };
 
 async function authCall<T>(body: Record<string, unknown>): Promise<T & { ok?: boolean; error?: string }> {
   const token = await getFreshToken();
@@ -82,10 +81,19 @@ export async function finishDriveCallback(): Promise<void> {
   }
 }
 
-async function isConnected(): Promise<boolean> {
-  if (known?.connected) return true;
-  if (known && Date.now() - known.at < STATUS_TTL_MS) return false;
-  return (await getDriveStatus()).connected;
+/** Why an upload can't start, or null when Drive is ready. */
+async function blockedReason(): Promise<string | null> {
+  if (knownConnected) return null;
+  const s = await getDriveStatus();
+  if (s.connected) return null;
+  return s.configured
+    ? 'Nicht verbunden, PDF nur lokal gespeichert. Einstellungen → Integrationen'
+    : `Nicht eingerichtet, in Vercel fehlen: ${s.missing.join(', ')}`;
+}
+
+function reportFailure(docType: DriveDocType, message: string, detail: Record<string, unknown> = {}): void {
+  console.error('[Drive-Upload] fehlgeschlagen', { docType, message, ...detail });
+  showToast(`Google Drive: ${message}`, 'error');
 }
 
 function toBase64(buf: ArrayBuffer): string {
@@ -107,9 +115,10 @@ export function archiveToDrive(doc: jsPDF, docType: DriveDocType, filename: stri
 
 async function uploadToDrive(doc: jsPDF, docType: DriveDocType, filename: string): Promise<void> {
   try {
-    if (!(await isConnected())) return;
+    const blocked = await blockedReason();
+    if (blocked) return reportFailure(docType, blocked, { stage: 'status' });
     const token = await getFreshToken();
-    if (!token) return;
+    if (!token) return reportFailure(docType, 'Sitzung abgelaufen, bitte neu anmelden', { stage: 'session' });
     const r = await fetch('/api/drive-upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -123,10 +132,11 @@ async function uploadToDrive(doc: jsPDF, docType: DriveDocType, filename: string
     if (j.connected === false) {
       remember(false);
       window.dispatchEvent(new Event('garage-drive-changed'));
-      if (!j.reconnect) return;
     }
-    showToast(`Google Drive: ${j.error ?? (r.status === 413 ? 'PDF zu gross' : `Fehler ${r.status}`)}`, 'error');
+    reportFailure(docType, j.error ?? (r.status === 413 ? 'PDF zu gross' : `Fehler ${r.status}`), {
+      stage: 'upload', status: r.status, connected: j.connected, reconnect: j.reconnect,
+    });
   } catch (err) {
-    showToast(`Google Drive: ${err instanceof Error ? err.message : 'Upload fehlgeschlagen'}`, 'error');
+    reportFailure(docType, err instanceof Error ? err.message : 'Upload fehlgeschlagen', { stage: 'request' });
   }
 }

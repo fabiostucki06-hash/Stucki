@@ -121,8 +121,8 @@ const rowUrl = (userId: string) => `${SUPA_URL}/rest/v1/drive_connections?user_i
 
 export async function getConnection(token: string, userId: string): Promise<DriveConnection | null> {
   const r = await fetch(`${rowUrl(userId)}&select=refresh_token_enc,account_email`, { headers: rest(token) });
-  // 404: migration not applied yet. Nobody can be connected, exports must keep working.
-  if (r.status === 404) return null;
+  // Reported instead of read as "not connected", which would hide a broken setup.
+  if (r.status === 404) throw new Error('Datenbank-Tabelle drive_connections fehlt – Migration ausführen');
   if (!r.ok) throw new Error(`Verbindung konnte nicht gelesen werden (${r.status})`);
   return ((await r.json()) as DriveConnection[])[0] ?? null;
 }

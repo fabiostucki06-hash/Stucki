@@ -80,7 +80,8 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
   const missing = missingEnv();
   try {
     if (body.action === 'status') {
-      const row = await getConnection(token, userId);
+      // Without credentials nobody can be connected; the answer still carries the setup guide.
+      const row = missing.length ? null : await getConnection(token, userId);
       return res.status(200).json({
         ok: true, configured: missing.length === 0, missing,
         connected: !!row && missing.length === 0, account: row?.account_email ?? '',

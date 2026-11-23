@@ -134,6 +134,7 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
     const folderPath = `${ROOT_NAME}/${folder}`;
     return res.status(200).json({ ok: true, id: file.id, webViewLink: file.webViewLink, folder: folderPath, path: `${folderPath}/${filename}` });
   } catch (err) {
+    console.error('[drive-upload] failed', { folder, reconnect: err instanceof ReconnectError, message: err instanceof Error ? err.message : String(err) });
     if (err instanceof ReconnectError) {
       await deleteConnection(token, userId).catch(() => undefined);
       return res.status(409).json({ ok: false, connected: false, reconnect: true, error: err.message });
