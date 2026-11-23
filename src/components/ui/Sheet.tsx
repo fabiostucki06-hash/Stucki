@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useRef } from 'react';
-import { SFChevron } from '../Icons';
+import { SFChevron, SFXmark } from '../Icons';
 
 interface SheetProps {
   title: string;
@@ -12,6 +12,17 @@ interface SheetProps {
       the default "Fertig", and full sheets cover the whole phone screen (no
       backdrop to tap), so without it there is no way back to the list. */
   back?: boolean;
+}
+
+/** Plain × for `barRight`, for forms that carry their own "Fertig" action. */
+export function SheetClose({ onClick }: { onClick: () => void }) {
+  return (
+    <div className="sheet-close">
+      <button type="button" className="bar-btn" onClick={onClick} aria-label="Schliessen" title="Schliessen">
+        <SFXmark />
+      </button>
+    </div>
+  );
 }
 
 /* Touch: bottom sheet sliding up from the edge. Desktop (≥1024px, see

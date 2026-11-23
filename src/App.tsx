@@ -13,7 +13,7 @@ import { computeRechnungTotals, withOffertePositionen, migrateAnzahlungEntwurf, 
 import { ohneMaterialZe } from './lib/ze';
 
 import Spinner from './components/ui/Spinner';
-import Sheet from './components/ui/Sheet';
+import Sheet, { SheetClose } from './components/ui/Sheet';
 import ReauthModal from './components/ui/ReauthModal';
 import UpdateBanner from './components/ui/UpdateBanner';
 import LoginPage from './components/LoginPage';
@@ -713,7 +713,7 @@ export default function App() {
       )}
 
       {showNR && (
-        <Sheet title="Neue Rechnung" onClose={() => setShowNR(false)} full>
+        <Sheet title="Neue Rechnung" onClose={() => setShowNR(false)} barRight={<SheetClose onClick={() => setShowNR(false)} />} full>
           <RechnungForm customers={customers} orders={orders} offerten={offerten} onSave={handleSaveRechnung} onDone={(saved) => { setShowNR(false); if (saved) setTab('rechnungen'); }} nummerVorschlag={naechsteRechnungNr} nummerVergeben={rechnungNrVergeben()} />
         </Sheet>
       )}
@@ -767,7 +767,7 @@ export default function App() {
       )}
 
       {editR && (
-        <Sheet title={`Rechnung #${editR.rechnungNumber} bearbeiten`} onClose={() => setEditR(null)} full>
+        <Sheet title={`Rechnung #${editR.rechnungNumber} bearbeiten`} onClose={() => setEditR(null)} barRight={<SheetClose onClick={() => setEditR(null)} />} full>
           <RechnungForm customers={customers} orders={orders} offerten={offerten} initial={editR} onSave={handleSaveRechnung} onDone={(saved) => { setEditR(null); if (saved) setSelR(saved); }} nummerVorschlag={editR.rechnungNumber} nummerVergeben={rechnungNrVergeben(editR)} />
         </Sheet>
       )}

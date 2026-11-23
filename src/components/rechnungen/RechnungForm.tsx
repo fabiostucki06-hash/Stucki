@@ -8,6 +8,7 @@ import { setMaterialFeld } from '../../lib/marge';
 import { festpreisSummen } from '../../lib/sonderpositionen';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { useApp } from '../../context/AppContext';
+import { SFChevron } from '../Icons';
 import { fahrzeugText } from '../../lib/vehicles';
 import { echteBeanstandungen, materialZuerst } from '../../lib/utils';
 import type { Customer, Order, Offerte, ArbeitPosition, MaterialPosition, Rechnung, RechnungKategorie } from '../../types';
@@ -115,6 +116,8 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
   const [faelligAm,    setFaelligAm]    = useState(
     () => initial?.faelligAm ?? calcFaelligAm(initial?.zahlungsFrist ?? '10')
   );
+
+  const [detailsOffen, setDetailsOffen] = useState(false);
 
   const selectedVehicle = vehiclesOf(cid).find((v) => v.id === vid);
 
@@ -240,13 +243,14 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
   /** Why the current input isn't saved (null: it is). A new Rechnung is only
       created once there is a customer and something to bill. */
   const hinweis =
-    !cid ? (saved ? 'Kunde fehlt – nicht gespeichert' : 'Speichert automatisch, sobald ein Kunde gewählt ist')
+    !cid && (saved || hatInhalt) ? 'Kunde fehlt – nicht gespeichert'
     : nr == null ? 'Ungültige Rechnungs-Nr. – nicht gespeichert'
     : nrVergeben && dupOk !== nr ? `Nr. ${nr} existiert bereits – nicht gespeichert`
-    : !saved && !hatInhalt ? 'Speichert automatisch, sobald Betreff oder Position erfasst ist'
     : null;
+  // An untouched form simply has nothing to save yet, which needs no message.
+  const speicherbar = !!cid && (!!saved || hatInhalt);
 
-  const data: RechnungData | null = hinweis || nr == null ? null : {
+  const data: RechnungData | null = !speicherbar || hinweis || nr == null ? null : {
     rechnungNumber: nr, customerId: cid, vehicleId: vid || undefined, titel,
     positionen: materialZuerst([...mp, ...ap.map(toArbeitPosition)]), notizen,
     zahlungsFrist, faelligAm,
@@ -281,12 +285,21 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
     ? (importACount + importMCount > 0
         ? `${importACount} Arbeits- + ${importMCount} Materialpos. übernommen`
         : 'Kunde übernommen, keine Positionen')
-    : 'Optional: aus Auftrag oder Offerte übernehmen';
+    : undefined;
 
   const rundung = rechnungstotal - (totM + totA + kleinteil);
 
+  /* What the collapsed "Details & Zahlungsfrist" row shows */
+  const kategorieLabel = KATEGORIE_OPTS.find(([k]) => k === kategorie)?.[1];
+  const faelligText = faelligAm ? faelligAm.split('-').reverse().join('.') : '';
+  const detailsText = [
+    kategorieLabel,
+    zahlungsFrist ? `${zahlungsFrist} Tage` : '',
+    faelligText,
+  ].filter(Boolean).join(' · ');
+
   return (
-    <div className="df">
+    <div className="df df-rechnung">
 
       {/* ── 1: Kunde & Details ── */}
       <FormCard title="Kunde & Details" hint={importHint}>
@@ -299,7 +312,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
               onChange={(e) => onAuftragSelect(e.target.value)}
               style={{ color: selectedAuftragId ? 'var(--input-text)' : 'var(--input-placeholder)' }}
             >
-              <option value="">Auftrag wählen…</option>
+              <option value="">Auftrag…</option>
               {sortedAuftraege.map((o) => {
                 const c = customers.find((cu) => cu.id === o.customerId);
                 const hasPos = (o.positionen ?? []).length > 0;
@@ -319,7 +332,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
               onChange={(e) => onOfferteSelect(e.target.value)}
               style={{ color: selectedOfferteId ? 'var(--input-text)' : 'var(--input-placeholder)' }}
             >
-              <option value="">Offerte wählen…</option>
+              <option value="">Offerte…</option>
               {sortedOfferten.map((off) => {
                 const c = customers.find((cu) => cu.id === off.customerId);
                 return (
@@ -345,39 +358,58 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
             </select>
           </div>
           <VehicleSelect customerId={cid} vehicleId={vid} onChange={setVid} />
-          <NummerField
-            label="Rechnungs-Nr." value={nummer} onChange={setNummer} vorschlag={vorschlag}
-            vergeben={nrVergeben}
-          />
-          <div className="cf-field">
-            <label className="cf-label">Betreff</label>
-            <input className="cf-input" value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="z.B. Inspektion, Reparatur…" />
-          </div>
-          <div className="cf-field">
-            <label className="cf-label">Auftragsart</label>
-            <select
-              className="cf-select"
-              value={kategorie}
-              onChange={(e) => setKategorie(e.target.value as RechnungKategorie | '')}
-              style={{ color: kategorie ? 'var(--input-text)' : 'var(--input-placeholder)' }}
-            >
-              <option value="">Keine Angabe</option>
-              {KATEGORIE_OPTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-            </select>
-          </div>
-          <div className="cf-field">
-            <label className="cf-label">Zahlungsfrist (Tage)</label>
-            <input className="cf-input" type="number" inputMode="numeric" min={1} value={zahlungsFrist} onChange={(e) => handleZahlungsFristChange(e.target.value)} placeholder="30" />
-          </div>
-          <div className="cf-field">
-            <label className="cf-label">Fällig am</label>
-            <input className="cf-input" type="date" value={faelligAm} onChange={(e) => setFaelligAm(e.target.value)} />
+          <div className="df-span2 df-nr-row">
+            <NummerField
+              label="Rechnungs-Nr." value={nummer} onChange={setNummer} vorschlag={vorschlag}
+              vergeben={nrVergeben}
+            />
+            <div className="cf-field">
+              <label className="cf-label">Betreff</label>
+              <input className="cf-input" value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="z.B. Service / Reparatur" />
+            </div>
           </div>
         </div>
+
+        <button
+          type="button"
+          className="df-more"
+          aria-expanded={detailsOffen}
+          aria-controls="rechnung-details"
+          onClick={() => setDetailsOffen((o) => !o)}
+        >
+          <span className="df-more-chevron"><SFChevron size={14} /></span>
+          <span className="df-more-label">Details & Zahlungsfrist</span>
+          {!detailsOffen && <span className="df-more-value">{detailsText}</span>}
+        </button>
+
+        {detailsOffen && (
+          <div id="rechnung-details" className="df-details">
+            <div className="cf-field df-details-art">
+              <label className="cf-label">Auftragsart</label>
+              <select
+                className="cf-select"
+                value={kategorie}
+                onChange={(e) => setKategorie(e.target.value as RechnungKategorie | '')}
+                style={{ color: kategorie ? 'var(--input-text)' : 'var(--input-placeholder)' }}
+              >
+                <option value="">Keine Angabe</option>
+                {KATEGORIE_OPTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              </select>
+            </div>
+            <div className="cf-field">
+              <label className="cf-label">Frist (Tage)</label>
+              <input className="cf-input" type="number" inputMode="numeric" min={1} value={zahlungsFrist} onChange={(e) => handleZahlungsFristChange(e.target.value)} placeholder="30" />
+            </div>
+            <div className="cf-field">
+              <label className="cf-label">Fällig am</label>
+              <input className="cf-input" type="date" value={faelligAm} onChange={(e) => setFaelligAm(e.target.value)} />
+            </div>
+          </div>
+        )}
       </FormCard>
 
       {/* ── 2: Positionen ── */}
-      <FormCard title="Positionen" hint="Enter fügt die nächste Zeile hinzu">
+      <FormCard title="Positionen">
         <PositionenEditor
           arbeit={arbeit} material={material}
           onArbeitChange={updA} onArbeitAdd={addA} onArbeitRemove={remA} onKiZE={kiZE}
@@ -442,12 +474,12 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
 
       <FormBar
         label="Total" value={fCHF(rechnungstotal)}
-        status={
+        status={(autoSave.status !== 'idle' || hinweis) ? (
           <SaveStatus
             status={autoSave.status} onRetry={autoSave.retry} hinweis={hinweis}
             action={nr != null && nrVergeben && dupOk !== nr && cid ? { label: 'Trotzdem verwenden', onClick: () => setDupOk(nr) } : undefined}
           />
-        }
+        ) : undefined}
       >
         <button className="mf-btn-save" onClick={fertig}>Fertig</button>
       </FormBar>
