@@ -304,7 +304,7 @@ export default function SettingsView({ syncStatus, userEmail }: SettingsViewProp
             }
           />
           {drive?.connected && drive.account && <InfoRow label="Google-Konto" value={drive.account} />}
-          <InfoRow label="Ablage" value="Stucki Repair / Dokumenttyp" />
+          <InfoRow label="Ablage" value="GarageOS / Rechnungen, Offerten, Wartungsplaene, Sonstiges" />
 
           {driveError && <p role="alert" style={{ fontSize: 13, marginTop: 10, color: 'var(--red)', lineHeight: 1.45 }}>{driveError}</p>}
 

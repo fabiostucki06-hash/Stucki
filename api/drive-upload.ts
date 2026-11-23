@@ -2,10 +2,10 @@
 // Stores a generated PDF in the signed-in user's Google Drive:
 //   POST /api/drive-upload  { docType, filename, data: <base64 PDF> }
 //   Authorization: Bearer <Supabase access token of the signed-in user>
-// Files land in "Stucki Repair/<docType>/<filename>"; missing folders are created
-// and a file with the same name is replaced (new revision), so a re-exported
-// document doesn't pile up duplicates. With the drive.file scope these lookups
-// only ever see what this app created.
+// Files land in "GarageOS/<Rechnungen|Offerten|Wartungsplaene|Sonstiges>/<filename>";
+// missing folders are created and a file with the same name is replaced (new
+// revision), so a re-exported document doesn't pile up duplicates. With the
+// drive.file scope these lookups only ever see what this app created.
 
 import type { VercelLikeRequest, VercelLikeResponse } from './import-part.js';
 import {
@@ -15,12 +15,20 @@ import {
 const DRIVE = 'https://www.googleapis.com/drive/v3/files';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
-const ROOT_NAME = 'Stucki Repair';
+const ROOT_NAME = 'GarageOS';
+const FALLBACK_FOLDER = 'Sonstiges';
 const MAX_BYTES = 3 * 1024 * 1024; // Vercel caps request bodies at 4.5 MB (base64 adds a third)
 
-const DOC_FOLDERS = new Set([
-  'Rechnungen', 'Anzahlungsrechnungen', 'Offerten', 'Materialofferten', 'Auftragsbestätigungen', 'Aufträge', 'Wartungsplaene',
-]);
+const DOC_FOLDERS: Record<string, string> = {
+  Rechnungen: 'Rechnungen',
+  Anzahlungsrechnungen: 'Rechnungen',
+  Offerten: 'Offerten',
+  Materialofferten: 'Offerten',
+  Wartungsplaene: 'Wartungsplaene',
+};
+
+const folderFor = (docType: unknown): string =>
+  typeof docType === 'string' && Object.hasOwn(DOC_FOLDERS, docType) ? DOC_FOLDERS[docType] : FALLBACK_FOLDER;
 
 /** Drive query literal: backslash and single quote escaped. */
 const q = (s: string) => `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
@@ -35,20 +43,26 @@ async function driveJson<T>(url: string, gToken: string, init: RequestInit = {})
 }
 
 async function findOne(gToken: string, query: string): Promise<string | null> {
-  const url = `${DRIVE}?q=${encodeURIComponent(`${query} and trashed=false`)}&fields=files(id)&pageSize=1`;
-  const j = await driveJson<{ files?: { id: string }[] }>(url, gToken);
-  return j.files?.[0]?.id ?? null;
+  const url = `${DRIVE}?q=${encodeURIComponent(`${query} and trashed=false`)}&orderBy=createdTime&fields=files(id,createdTime)&pageSize=20`;
+  const j = await driveJson<{ files?: { id: string; createdTime?: string }[] }>(url, gToken);
+  // Oldest, then lowest id: every request settles on the same item if duplicates exist.
+  const key = (f: { id: string; createdTime?: string }) => `${f.createdTime ?? ''}|${f.id}`;
+  const [first] = [...(j.files ?? [])].sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
+  return first?.id ?? null;
 }
 
 async function ensureFolder(gToken: string, name: string, parent: string): Promise<string> {
-  const found = await findOne(gToken, `name=${q(name)} and mimeType=${q(FOLDER_MIME)} and ${q(parent)} in parents`);
+  const query = `name=${q(name)} and mimeType=${q(FOLDER_MIME)} and ${q(parent)} in parents`;
+  const found = await findOne(gToken, query);
   if (found) return found;
   const created = await driveJson<{ id: string }>(`${DRIVE}?fields=id`, gToken, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, mimeType: FOLDER_MIME, parents: [parent] }),
   });
-  return created.id;
+  // Drive allows equal names: if another device created it too, use the oldest.
+  // The spare stays untouched, because a parallel upload may already be using it.
+  return (await findOne(gToken, query).catch(() => null)) ?? created.id;
 }
 
 async function uploadPdf(gToken: string, parent: string, filename: string, pdf: Uint8Array<ArrayBuffer>): Promise<{ id: string; webViewLink?: string }> {
@@ -88,7 +102,7 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
     return res.status(400).json({ ok: false, error: 'Ungültiges JSON' });
   }
 
-  if (typeof body.docType !== 'string' || !DOC_FOLDERS.has(body.docType)) return res.status(400).json({ ok: false, error: 'Unbekannter Dokumenttyp' });
+  const folder = folderFor(body.docType);
   const rawName = typeof body.filename === 'string' ? cleanName(body.filename) : '';
   const filename = rawName && !/\.pdf$/i.test(rawName) ? `${rawName}.pdf` : rawName;
   const data = typeof body.data === 'string' ? body.data : '';
@@ -115,9 +129,10 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
     }
     const gToken = await accessTokenFrom(refresh);
     const root = await ensureFolder(gToken, ROOT_NAME, 'root');
-    const parent = await ensureFolder(gToken, body.docType, root);
+    const parent = await ensureFolder(gToken, folder, root);
     const file = await uploadPdf(gToken, parent, filename, pdf);
-    return res.status(200).json({ ok: true, id: file.id, webViewLink: file.webViewLink, path: `${ROOT_NAME}/${body.docType}/${filename}` });
+    const folderPath = `${ROOT_NAME}/${folder}`;
+    return res.status(200).json({ ok: true, id: file.id, webViewLink: file.webViewLink, folder: folderPath, path: `${folderPath}/${filename}` });
   } catch (err) {
     if (err instanceof ReconnectError) {
       await deleteConnection(token, userId).catch(() => undefined);

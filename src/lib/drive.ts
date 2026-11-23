@@ -2,7 +2,7 @@ import type { jsPDF } from 'jspdf';
 import { getFreshToken } from './supabase';
 import { showToast } from '../components/ui/Toast';
 
-/** Drive folder per document type: Stucki Repair/<Typ>/<Dateiname>.pdf */
+/** Document type of an export; the server maps it to GarageOS/<Ordner>/<Dateiname>.pdf */
 export type DriveDocType =
   | 'Rechnungen' | 'Anzahlungsrechnungen' | 'Offerten' | 'Materialofferten'
   | 'Auftragsbestätigungen' | 'Aufträge' | 'Wartungsplaene';
@@ -95,9 +95,17 @@ function toBase64(buf: ArrayBuffer): string {
   return btoa(bin);
 }
 
+/** One upload at a time, so quick successive exports can't create the same folder twice. */
+let uploadQueue: Promise<void> = Promise.resolve();
+
 /** Uploads a generated PDF to the connected Google Drive in the background.
     Never throws: the local download already happened, Drive is the backup copy. */
-export async function archiveToDrive(doc: jsPDF, docType: DriveDocType, filename: string): Promise<void> {
+export function archiveToDrive(doc: jsPDF, docType: DriveDocType, filename: string): Promise<void> {
+  uploadQueue = uploadQueue.then(() => uploadToDrive(doc, docType, filename));
+  return uploadQueue;
+}
+
+async function uploadToDrive(doc: jsPDF, docType: DriveDocType, filename: string): Promise<void> {
   try {
     if (!(await isConnected())) return;
     const token = await getFreshToken();
@@ -107,8 +115,11 @@ export async function archiveToDrive(doc: jsPDF, docType: DriveDocType, filename
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ docType, filename: `${filename}.pdf`, data: toBase64(doc.output('arraybuffer')) }),
     });
-    const j = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string; connected?: boolean; reconnect?: boolean };
-    if (r.ok && j.ok) { showToast('In Google Drive gespeichert', 'success'); return; }
+    const j = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string; connected?: boolean; reconnect?: boolean; folder?: string };
+    if (r.ok && j.ok) {
+      showToast(j.folder ? `In Google Drive gespeichert (${j.folder})` : 'In Google Drive gespeichert', 'success');
+      return;
+    }
     if (j.connected === false) {
       remember(false);
       window.dispatchEvent(new Event('garage-drive-changed'));

@@ -4,10 +4,19 @@ import type { Order, Customer, Position } from '../types';
 export const formatDateCH = (d: string | Date): string =>
   new Date(d).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-/** Builds the standard export filename "Vorname Nachname DocType_Nummer", stripped of characters invalid in filenames. */
+/** Builds the standard export filename "DocType_Nummer_Vorname-Nachname", stripped of characters invalid in filenames. */
 export function buildDocumentFilename(customer: Customer | undefined, docType: string, number: number | string): string {
-  const name = customer ? `${customer.vorname} ${customer.nachname}`.trim() : 'Kunde';
-  return `${name} ${docType}_${number}`.replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim();
+  const name = customer ? fileSegment(`${customer.vorname} ${customer.nachname}`).replace(/_+/g, '-') : '';
+  return [fileSegment(docType), fileSegment(number), name || 'Kunde'].filter(Boolean).join('_');
+}
+
+/** One part of a file name. Underscores survive here: version numbers like "12_2" use them. */
+function fileSegment(value: number | string): string {
+  return String(value)
+    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/^[-.]+|[-.]+$/g, '');
 }
 
 /** Prints with document.title temporarily set so the browser's print/"Save as PDF" dialog suggests the right filename. */

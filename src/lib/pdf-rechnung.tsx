@@ -352,7 +352,7 @@ async function renderQrBillImage(rechnung: Rechnung, amount: number): Promise<{ 
   }
 }
 
-/** Renders the invoice + Swiss QR-Bill as a jsPDF document and saves it as "Vorname Nachname Rechnung_[X].pdf". */
+/** Renders the invoice + Swiss QR-Bill as a jsPDF document and saves it as "Rechnung_[X]_Vorname-Nachname.pdf". */
 export async function exportRechnungPDF(rechnung: Rechnung, customer: Customer | undefined): Promise<void> {
   try {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
