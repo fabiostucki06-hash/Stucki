@@ -1,7 +1,6 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { showToast } from '../ui/Toast';
 import { VehicleFields } from './VehicleForm';
-import DokumentScan from './DokumentScan';
 import { FAHRZEUG_FELDER } from '../../lib/vehicles';
 import type { Customer } from '../../types';
 
@@ -29,7 +28,6 @@ export default function CustomerForm({ initial, onSave, onCancel, saving }: Cust
   });
 
   const [busy, setBusy] = useState(false);
-  const vinReset = useRef<(() => void) | null>(null);
 
   const s = (k: 'vorname' | 'nachname' | 'telefon' | 'email') => (e: React.ChangeEvent<HTMLInputElement>) =>
     setF((p) => ({ ...p, [k]: e.target.value }));
@@ -58,7 +56,6 @@ export default function CustomerForm({ initial, onSave, onCancel, saving }: Cust
 
   return (
     <div>
-      {!initial && <DokumentScan mitKontakt werte={f} onChange={(k, v) => setF((p) => ({ ...p, [k]: v }))} vinReset={vinReset} />}
       <div className="cf-section-title" style={{ marginTop: 0 }}>Kontakt</div>
       <div className="cf-group">
         <div className="cf-grid-2">
@@ -88,7 +85,7 @@ export default function CustomerForm({ initial, onSave, onCancel, saving }: Cust
       {!initial && (
         <>
           <div className="cf-section-title">Fahrzeug</div>
-          <VehicleFields f={f} onChange={(k, v) => setF((p) => ({ ...p, [k]: v }))} vinReset={vinReset} />
+          <VehicleFields f={f} onChange={(k, v) => setF((p) => ({ ...p, [k]: v }))} />
         </>
       )}
 
