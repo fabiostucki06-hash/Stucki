@@ -9,6 +9,7 @@ import { festpreisSummen } from '../../lib/sonderpositionen';
 import { materialZuerst } from '../../lib/utils';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { useApp } from '../../context/AppContext';
+import { useDokNummer } from '../../hooks/useDokNummer';
 import { fahrzeugText } from '../../lib/vehicles';
 
 type OfferteData = Omit<Offerte, 'id' | 'offertNumber' | 'createdAt'> & { offertNumber: number };
@@ -24,7 +25,7 @@ interface OfferteFormProps {
   customers: Customer[];
   /** Auto-save: `existing` is the stored Offerte (none yet for a new one, which
       creates it); resolves with the row as stored and rejects when the write failed. */
-  onSave: (data: OfferteData, existing?: Offerte) => Promise<Offerte>;
+  onSave: (data: OfferteData, existing?: Offerte, autoNummer?: boolean) => Promise<Offerte>;
   /** "Fertig": everything is saved; `saved` is the stored Offerte, if any. */
   onDone: (saved?: Offerte) => void;
   initial?: Offerte;
@@ -77,9 +78,6 @@ const toArbeitPosition = (p: ArbeitRow): ArbeitPosition => ({
 const newMaterial = (): MaterialRow => ({ typ: 'material', beschreibung: '', menge: '1', stueckpreis: '', preis: '' });
 
 export default function OfferteForm({ customers, onSave, onDone, initial, prefillMaterial, prefillCustomerId, nummerVorschlag, nummerVergeben }: OfferteFormProps) {
-  // Kept from the start: once a new Offerte is stored, the next free number moves on.
-  const [vorschlag] = useState(nummerVorschlag);
-  const [nummer, setNummer] = useState(String(initial?.offertNumber ?? vorschlag));
   /* The Offerte as last stored. The ref feeds the save chain (a quick second save
      must update the Offerte the first one created), the state the render. */
   const savedRef = useRef<Offerte | undefined>(initial);
@@ -89,8 +87,10 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
   // Only a Materialofferte offers the 50% Anzahlung; a new Offerte from this form is a normal one.
   const istMaterial = !!initial && anzahlungMoeglich(initial);
   const [mitAnzahlung, setMitAnzahlung] = useState(() => (initial ? anzahlungErforderlich(initial) : false));
-  const { vehiclesOf, docVehicle } = useApp();
-  const [cid,        setCid]        = useState(initial?.customerId ?? prefillCustomerId ?? '');
+  const { vehiclesOf, docVehicle, naechsteNummer } = useApp();
+  const nummerung = useDokNummer(initial?.offertNumber, nummerVorschlag, () => naechsteNummer('offerten'));
+  const { nummer, setNummer, vorschlag } = nummerung;
+  const [cid,        setCid]       = useState(initial?.customerId ?? prefillCustomerId ?? '');
   const [vid,        setVid]        = useState(() => (initial ? docVehicle(initial)?.id ?? '' : ''));
   const [titel,      setTitel]      = useState(initial?.titel ?? '');
   const [arbeit,     setArbeit]     = useState<ArbeitRow[]>(() => {
@@ -187,9 +187,12 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
   };
 
   const autoSave = useAutoSave(data, async (d) => {
-    const s = await onSave(d, savedRef.current);
+    const neu = !savedRef.current;
+    const auto = neu && nummerung.istAuto();
+    const s = await onSave(neu ? d : { ...d, offertNumber: nummerung.aktuell(d.offertNumber) }, savedRef.current, auto);
     savedRef.current = s;
     setSaved(s);
+    if (neu) nummerung.uebernehmen(s.offertNumber, auto);
   }, { unsaved: !initial });
 
   /** Saves what's still pending, then closes. A failed save keeps the form open. */

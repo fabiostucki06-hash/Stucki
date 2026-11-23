@@ -9,6 +9,7 @@ import { useVersionCheck } from './hooks/useVersionCheck';
 import { useIsDesktop } from './hooks/useIsDesktop';
 import { offerteNr, nextVersion, sumPositions, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_BEDINGUNG, ANZAHLUNG_PROZENT, mitMaterialHinweis, ohneMaterialHinweis, ersetzeNummer, OFFERTE_REF, ANZAHLUNG_REF } from './lib/offerte-docs';
 import { hardReload } from './lib/reload';
+import { naechsteNr } from './lib/nummern';
 import { computeRechnungTotals, withOffertePositionen, migrateAnzahlungEntwurf, findQuellOfferte, hoechsteRechnungNr, rechnungArt } from './lib/rechnung-totals';
 import { ohneMaterialZe } from './lib/ze';
 
@@ -55,7 +56,6 @@ export default function App() {
     addOrder, updateOrder, deleteOrder,
     addOfferte, updateOfferte, deleteOfferte,
     addRechnung, updateRechnung, deleteRechnung,
-    offertNum, rechnungNum,
     addMaterial, docKunde,
   } = useApp();
 
@@ -299,10 +299,10 @@ export default function App() {
   /** Auto-save of the Offerte form: the first save of a new Offerte creates it,
       every later one updates the stored row. A throw keeps the form's input and
       shows the error there. */
-  async function handleSaveOfferte(data: Omit<Offerte, 'id' | 'createdAt'>, existing?: Offerte): Promise<Offerte> {
+  async function handleSaveOfferte(data: Omit<Offerte, 'id' | 'createdAt'>, existing?: Offerte, autoNummer = false): Promise<Offerte> {
     if (!existing) {
       const { offertNumber, ...rest } = data;
-      return addOfferte(rest, { offertNumber });
+      return addOfferte(rest, autoNummer ? undefined : { offertNumber });
     }
     const saved = await updateOfferte({ ...existing, ...data });
     setEditOff((p) => (p?.id === saved.id ? saved : p));
@@ -320,10 +320,11 @@ export default function App() {
     }
     return saved;
   }
-  /* Next automatic numbers (the counters can lag behind the loaded rows) and duplicate checks. */
-  const naechsteOffertNr = Math.max(offertNum, ...offerten.map((o) => o.offertNumber ?? 0)) + 1;
+  /* Next automatic numbers (highest existing + 1) and duplicate checks. */
+  const naechsteOrderNr = naechsteNr(orders.map((o) => o.orderNumber));
+  const naechsteOffertNr = naechsteNr(offerten.map((o) => o.offertNumber));
   /** Each Rechnung type has its own sequence; the new-Rechnung form creates normal Rechnungen. */
-  const naechsteRechnungNr = Math.max(rechnungNum.standard, hoechsteRechnungNr(rechnungen, 'standard')) + 1;
+  const naechsteRechnungNr = hoechsteRechnungNr(rechnungen, 'standard') + 1;
   /** Versions share their number ("12", "12_2"), so only the same version counts as taken. */
   const offertNrVergeben = (self?: Offerte) => (n: number) =>
     offerten.some((o) => o.id !== self?.id && o.offertNumber === n && (o.version ?? 1) === (self?.version ?? 1));
@@ -528,10 +529,10 @@ export default function App() {
     setSelR((p) => (p?.id === upd.id ? upd : p));
   }
   /** Auto-save of the Rechnung form, like handleSaveOfferte. */
-  async function handleSaveRechnung(data: Omit<Rechnung, 'id' | 'status' | 'createdAt'>, existing?: Rechnung): Promise<Rechnung> {
+  async function handleSaveRechnung(data: Omit<Rechnung, 'id' | 'status' | 'createdAt'>, existing?: Rechnung, autoNummer = false): Promise<Rechnung> {
     if (!existing) {
       const { rechnungNumber, ...rest } = data;
-      const created = await addRechnung(rest, { rechnungNumber });
+      const created = await addRechnung(rest, autoNummer ? undefined : { rechnungNumber });
       if (!created) throw new Error('Rechnung konnte nicht gespeichert werden');
       return created;
     }
@@ -668,7 +669,7 @@ export default function App() {
       {showNO && (
         <Sheet title="Neuer Auftrag" onClose={() => { setShowNO(false); setNewOCid(null); }}
           barRight={<button onClick={() => { setShowNO(false); setNewOCid(null); }} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
-          <OrderForm customers={customers} customerId={newOCid ?? undefined} onSave={handleAddOrder} onCancel={() => { setShowNO(false); setNewOCid(null); }} />
+          <OrderForm customers={customers} customerId={newOCid ?? undefined} nummerVorschlag={naechsteOrderNr} onSave={handleAddOrder} onCancel={() => { setShowNO(false); setNewOCid(null); }} />
         </Sheet>
       )}
 

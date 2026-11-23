@@ -222,15 +222,28 @@ export const db = {
       throw new Error(e.message || e.hint || `HTTP ${r.status}`);
     }
   },
-  async getCounter(token: string): Promise<number> {
-    const r = await authedFetch(`${SUPA_URL}/rest/v1/counters?id=eq.orderNum&select=value`, {}, token);
-    const d = await r.json();
-    return d[0]?.value ?? 0;
+  /** Next free number (MAX + 1) of a sequence, read from the database. */
+  async nextNumber(table: DocTable, art: string, token: string): Promise<number> {
+    const n = await rpc('next_document_number', { p_table: table, p_art: art }, token);
+    if (typeof n !== 'number') throw new Error('Ungültige Nummer vom Server');
+    return n;
   },
-  async setCounter(val: number, token: string) {
-    await authedFetch(`${SUPA_URL}/rest/v1/counters?id=eq.orderNum`, {
-      method: 'PATCH',
-      body: JSON.stringify({ value: val }),
-    }, token);
+  /** Inserts a document. With `auto` the database assigns the next number under a
+      lock, so simultaneous saves can't collide; returns the document as stored. */
+  async createDocument<T>(table: DocTable, id: string, data: T, auto: boolean, token: string): Promise<T> {
+    return await rpc('create_document', { p_table: table, p_id: id, p_data: data, p_auto: auto }, token) as T;
   },
 };
+
+export type DocTable = 'orders' | 'offerten' | 'rechnungen';
+
+async function rpc(fn: string, args: Record<string, unknown>, token: string): Promise<unknown> {
+  const r = await authedFetch(`${SUPA_URL}/rest/v1/rpc/${fn}`, { method: 'POST', body: JSON.stringify(args) }, token);
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({} as Record<string, string>));
+    console.error(`[Supabase] rpc("${fn}") HTTP ${r.status}:`, e);
+    if (e.code === '42501') throw new Error('Keine Berechtigung (RLS). Bitte neu anmelden oder Admin kontaktieren.');
+    throw new Error(e.message || e.hint || `HTTP ${r.status}`);
+  }
+  return r.json();
+}

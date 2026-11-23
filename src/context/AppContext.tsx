@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useMemo, useRef, ReactNode } from 'react';
-import { auth, db, setAuthHandlers, tokenUserId } from '../lib/supabase';
+import { auth, db, setAuthHandlers, tokenUserId, type DocTable } from '../lib/supabase';
+import { naechsteNr, neueDokId } from '../lib/nummern';
 import { startSettingsSync, whenSettingsLoaded } from '../lib/settingsSync';
 import { showToast } from '../components/ui/Toast';
 import { offerteNr } from '../lib/offerte-docs';
@@ -31,10 +32,8 @@ interface AppContextValue {
   orders: Order[];
   offerten: Offerte[];
   rechnungen: Rechnung[];
-  orderNum: number;
-  offertNum: number;
-  /** Highest number handed out per Rechnung type; each type has its own sequence. */
-  rechnungNum: Record<RechnungArt, number>;
+  /** Next free number (MAX + 1) from the database; Rechnung types count separately. */
+  naechsteNummer: (table: DocTable, art?: RechnungArt) => Promise<number>;
   loading: boolean;
   syncStatus: SyncStatus;
   token: string | null;
@@ -93,9 +92,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [offerten, setOfferten] = useState<Offerte[]>([]);
   const [rechnungen, setRechnungen] = useState<Rechnung[]>([]);
-  const [orderNum, setOrderNum] = useState(0);
-  const [offertNum, setOffertNum] = useState(0);
-  const [rechnungNum, setRechnungNum] = useState<Record<RechnungArt, number>>({ standard: 0, anzahlung: 0, schluss: 0 });
   const [loading, setLoading] = useState(true);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [sessionExpired, setSessionExpired] = useState(false);
@@ -148,11 +144,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const sync = async () => {
       lastSyncAt.current = Date.now();
       const seq = writeSeq.current;
-      const [cr, vr, or, cnt, offr, rechr, specr] = await Promise.all([
+      const [cr, vr, or, offr, rechr, specr] = await Promise.all([
         db.get('customers', token),
         db.get('vehicles', token).catch((e) => { console.error('[Supabase] get(vehicles):', e); return null; }),
         db.get('orders', token),
-        db.getCounter(token),
         db.get('offerten', token).catch((e) => { console.error('[Supabase] get(offerten):', e); return null; }),
         db.get('rechnungen', token).catch((e) => { console.error('[Supabase] get(rechnungen):', e); return null; }),
         db.get('maintenance_specs', token).catch((e) => { console.error('[Supabase] get(maintenance_specs):', e); return null; }),
@@ -164,21 +159,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (Array.isArray(vr)) setVehicles(parseRows(vr) as Vehicle[]);
       if (Array.isArray(specr)) setWartungSpecs(parseRows(specr) as unknown as WartungSpec[]);
       if (Array.isArray(or)) setOrders((parseRows(or) as Order[]).map(mitGetrenntenTotals));
-      setOrderNum((p) => Math.max(p, cnt));
       if (Array.isArray(offr)) {
-        const offs = (parseRows(offr) as Offerte[]).map((o) => (o.art === 'material' ? alsReineMaterialofferte(o) : mitGetrenntenTotals(o)));
-        setOfferten(offs);
-        setOffertNum((p) => Math.max(p, ...offs.map((o) => o.offertNumber ?? 0)));
+        setOfferten((parseRows(offr) as Offerte[]).map((o) => (o.art === 'material' ? alsReineMaterialofferte(o) : mitGetrenntenTotals(o))));
       }
-      if (Array.isArray(rechr)) {
-        const rechns = (parseRows(rechr) as Rechnung[]).map(mitGetrenntenTotals);
-        setRechnungen(rechns);
-        setRechnungNum((p) => ({
-          standard: Math.max(p.standard, hoechsteRechnungNr(rechns, 'standard')),
-          anzahlung: Math.max(p.anzahlung, hoechsteRechnungNr(rechns, 'anzahlung')),
-          schluss: Math.max(p.schluss, hoechsteRechnungNr(rechns, 'schluss')),
-        }));
-      }
+      if (Array.isArray(rechr)) setRechnungen((parseRows(rechr) as Rechnung[]).map(mitGetrenntenTotals));
     };
 
     const onWake = () => {
@@ -345,11 +329,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   async function addOrder(data: Pick<Order, 'customerId' | 'vehicleId' | 'beanstandungen' | 'notizen' | 'positionen' | 'offertId'>) {
-    const num = orderNum + 1;
-    const newO: Order = { id: `o_${Date.now()}`, orderNumber: num, status: 'aufnahme', statusChangedAt: new Date().toISOString(), createdAt: new Date().toISOString(), ...data };
-    await syncOk(async () => { await db.upsert('orders', { id: newO.id, data: newO }, token!); await db.setCounter(num, token!); });
-    setOrders((p) => [...p, newO]); setOrderNum(num);
+    const newO: Order = { id: neueDokId('o'), orderNumber: naechsteNr(orders.map((o) => o.orderNumber)), status: 'aufnahme', statusChangedAt: new Date().toISOString(), createdAt: new Date().toISOString(), ...data };
+    let saved = newO;
+    await syncOk(async () => { saved = await db.createDocument('orders', newO.id, newO, true, token!); });
+    setOrders((p) => [...p, saved]);
   }
+
+  const naechsteNummer = (table: DocTable, art: RechnungArt = 'standard') => db.nextNumber(table, art, token!);
 
   async function updateOrder(upd: Order, cp: Partial<Customer> | null) {
     await syncOk(() => db.upsert('orders', { id: upd.id, data: upd }, token!));
@@ -369,18 +355,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setOrders((p) => p.filter((o) => o.id !== id));
   }
 
-  // opts.offertNumber reuses an existing number for a new version (e.g. "12_2").
+  // opts.offertNumber keeps that number (manual entry, or a new version like "12_2");
+  // without it the database assigns the next one.
   async function addOfferte(data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>, opts?: { offertNumber?: number }): Promise<Offerte> {
-    // offertNum can lag behind the loaded rows (e.g. the offerten fetch failed on
-    // startup), which would hand out a number that already exists — take both maxima.
-    const num = opts?.offertNumber ?? Math.max(offertNum, ...offerten.map((o) => o.offertNumber ?? 0)) + 1;
-    const newOff: Offerte = { id: `off_${Date.now()}`, offertNumber: num, status: 'entwurf', createdAt: new Date().toISOString(), ...data };
+    const num = opts?.offertNumber ?? naechsteNr(offerten.map((o) => o.offertNumber));
+    const newOff: Offerte = { id: neueDokId('off'), offertNumber: num, status: 'entwurf', createdAt: new Date().toISOString(), ...data };
     let saved = newOff;
     await syncOk(async () => {
-      const rows = await db.upsert('offerten', { id: newOff.id, data: newOff }, token!);
-      saved = pickRow<Offerte>(rows) ?? newOff;
+      saved = await db.createDocument('offerten', newOff.id, newOff, opts?.offertNumber == null, token!);
     });
-    setOfferten((p) => [...p, saved]); setOffertNum((p) => Math.max(p, saved.offertNumber ?? num));
+    setOfferten((p) => [...p, saved]);
     showToast(`Offerte #${offerteNr(saved)} gespeichert`, 'success');
     return saved;
   }
@@ -394,8 +378,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       saved = pickRow<Offerte>(rows) ?? upd;
     });
     setOfferten((p) => p.map((o) => (o.id === saved.id ? saved : o)));
-    // A manually raised number moves the sequence on, so the next one stays unique.
-    setOffertNum((p) => Math.max(p, saved.offertNumber ?? 0));
     return saved;
   }
 
@@ -405,24 +387,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   async function addRechnung(data: Omit<Rechnung, 'id' | 'rechnungNumber' | 'status' | 'createdAt'>, opts?: { rechnungNumber?: number }): Promise<Rechnung | undefined> {
-    // Each type (Rechnung / Anzahlungs- / Schlussrechnung) counts on its own. Like
-    // addOfferte: take both maxima in case the counter lags behind the loaded rows.
-    const art = rechnungArt(data);
-    const num = opts?.rechnungNumber ?? Math.max(rechnungNum[art], hoechsteRechnungNr(rechnungen, art)) + 1;
-    const newR: Rechnung = { id: `r_${Date.now()}`, rechnungNumber: num, status: 'entwurf', createdAt: new Date().toISOString(), ...data };
+    // Each type (Rechnung / Anzahlungs- / Schlussrechnung) counts on its own.
+    const num = opts?.rechnungNumber ?? hoechsteRechnungNr(rechnungen, rechnungArt(data)) + 1;
+    const newR: Rechnung = { id: neueDokId('r'), rechnungNumber: num, status: 'entwurf', createdAt: new Date().toISOString(), ...data };
+    let saved = newR;
     try {
-      await syncOk(() => db.upsert('rechnungen', { id: newR.id, data: newR }, token!));
+      await syncOk(async () => {
+        saved = await db.createDocument('rechnungen', newR.id, newR, opts?.rechnungNumber == null, token!);
+      });
     } catch { return; }
-    setRechnungen((p) => [...p, newR]); setRechnungNum((p) => ({ ...p, [art]: Math.max(p[art], num) }));
-    showToast(`${rechnungDocName(newR)} #${num} gespeichert`, 'success');
-    return newR;
+    setRechnungen((p) => [...p, saved]);
+    showToast(`${rechnungDocName(saved)} #${saved.rechnungNumber} gespeichert`, 'success');
+    return saved;
   }
 
   async function updateRechnung(upd: Rechnung) {
     await syncOk(() => db.upsert('rechnungen', { id: upd.id, data: upd }, token!));
     setRechnungen((p) => p.map((r) => (r.id === upd.id ? upd : r)));
-    const art = rechnungArt(upd);
-    setRechnungNum((p) => ({ ...p, [art]: Math.max(p[art], upd.rechnungNumber ?? 0) }));
   }
 
   async function deleteRechnung(id: string) {
@@ -448,7 +429,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AppContext.Provider value={{ customers, vehicles, vehiclesOf, docVehicle, docKunde, addVehicle, updateVehicle, deleteVehicle, wartungSpecs, saveWartungSpec, orders, offerten, rechnungen, orderNum, offertNum, rechnungNum, loading, syncStatus, token, userEmail, authChecked, sessionExpired, updateToken, addCustomer, updateCustomer, deleteCustomer, addOrder, updateOrder, deleteOrder, addOfferte, updateOfferte, deleteOfferte, addRechnung, updateRechnung, deleteRechnung, addMaterial, handleLogin, handleLogout }}>
+    <AppContext.Provider value={{ customers, vehicles, vehiclesOf, docVehicle, docKunde, addVehicle, updateVehicle, deleteVehicle, wartungSpecs, saveWartungSpec, orders, offerten, rechnungen, naechsteNummer, loading, syncStatus, token, userEmail, authChecked, sessionExpired, updateToken, addCustomer, updateCustomer, deleteCustomer, addOrder, updateOrder, deleteOrder, addOfferte, updateOfferte, deleteOfferte, addRechnung, updateRechnung, deleteRechnung, addMaterial, handleLogin, handleLogout }}>
       {children}
     </AppContext.Provider>
   );

@@ -3,6 +3,7 @@ import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
 import { FormCard, FormBar, VehicleSelect, onEnterNextRow } from '../ui/DocForm';
 import { useApp } from '../../context/AppContext';
+import { useDokNummer } from '../../hooks/useDokNummer';
 import { SFPlus, SFXmark } from '../Icons';
 import type { Customer, Order } from '../../types';
 
@@ -14,10 +15,13 @@ interface OrderFormProps {
   onSave: (data: OrderData) => Promise<void> | void;
   onCancel: () => void;
   saving?: boolean;
+  /** Next free Auftrags-Nr.; the database confirms it on save. */
+  nummerVorschlag: number;
 }
 
-export default function OrderForm({ customers, customerId: preCid, onSave, onCancel, saving }: OrderFormProps) {
-  const { vehiclesOf } = useApp();
+export default function OrderForm({ customers, customerId: preCid, onSave, onCancel, saving, nummerVorschlag }: OrderFormProps) {
+  const { vehiclesOf, naechsteNummer } = useApp();
+  const { nummer } = useDokNummer(undefined, nummerVorschlag, () => naechsteNummer('orders'));
   const [cid,     setCid]     = useState(preCid ?? '');
   const [vid,     setVid]     = useState('');
   const [bs,      setBs]      = useState(['']);
@@ -61,7 +65,7 @@ export default function OrderForm({ customers, customerId: preCid, onSave, onCan
     <div className="df">
 
       {/* ── 1: Kunde & Fahrzeug ── */}
-      <FormCard title="Kunde & Fahrzeug">
+      <FormCard title="Kunde & Fahrzeug" hint={`Auftrag #${nummer}`}>
         <div className="df-grid">
           <div className="cf-field df-span2">
             <label className="cf-label">Kunde *</label>

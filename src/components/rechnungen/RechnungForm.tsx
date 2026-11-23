@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { FormCard, FormBar, SaveStatus, SummaryRow, VehicleSelect, PositionenEditor, fCHF, type ArbeitRow, type MaterialRow } from '../ui/DocForm';
-import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL } from '../../lib/rechnung-totals';
+import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL, rechnungArt } from '../../lib/rechnung-totals';
+import { useDokNummer } from '../../hooks/useDokNummer';
 import { offerteNr } from '../../lib/offerte-docs';
 import NummerField, { parseNummer } from '../ui/NummerField';
 import { materialPreis, materialZeSumme, zeBetrag, zeMinuten } from '../../lib/ze';
@@ -21,7 +22,7 @@ interface RechnungFormProps {
   offerten: Offerte[];
   /** Auto-save: `existing` is the stored Rechnung (none yet for a new one, which
       creates it); resolves with the row as stored and rejects when the write failed. */
-  onSave: (data: RechnungData, existing?: Rechnung) => Promise<Rechnung>;
+  onSave: (data: RechnungData, existing?: Rechnung, autoNummer?: boolean) => Promise<Rechnung>;
   /** "Fertig": everything is saved; `saved` is the stored Rechnung, if any. */
   onDone: (saved?: Rechnung) => void;
   initial?: Rechnung;
@@ -86,9 +87,6 @@ function calcFaelligAm(days: string): string {
 }
 
 export default function RechnungForm({ customers, orders, offerten, onSave, onDone, initial, nummerVorschlag, nummerVergeben }: RechnungFormProps) {
-  // Kept from the start: once a new Rechnung is stored, the next free number moves on.
-  const [vorschlag] = useState(nummerVorschlag);
-  const [nummer, setNummer] = useState(String(initial?.rechnungNumber ?? vorschlag));
   /* The Rechnung as last stored. The ref feeds the save chain (a quick second save
      must update the Rechnung the first one created), the state the render. */
   const savedRef = useRef<Rechnung | undefined>(initial);
@@ -97,7 +95,9 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
   const [dupOk, setDupOk] = useState<number | null>(null);
   const [selectedAuftragId, setSelectedAuftragId] = useState(initial?.auftragId ?? '');
   const [selectedOfferteId, setSelectedOfferteId] = useState('');
-  const { vehiclesOf, docVehicle } = useApp();
+  const { vehiclesOf, docVehicle, naechsteNummer } = useApp();
+  const nummerung = useDokNummer(initial?.rechnungNumber, nummerVorschlag, () => naechsteNummer('rechnungen', initial ? rechnungArt(initial) : 'standard'));
+  const { nummer, setNummer, vorschlag } = nummerung;
   const [cid,          setCid]          = useState(initial?.customerId ?? '');
   const [vid,          setVid]          = useState(() => (initial ? docVehicle(initial)?.id ?? '' : ''));
   const [titel,        setTitel]        = useState(initial?.titel ?? '');
@@ -261,9 +261,12 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
   };
 
   const autoSave = useAutoSave(data, async (d) => {
-    const r = await onSave(d, savedRef.current);
+    const neu = !savedRef.current;
+    const auto = neu && nummerung.istAuto();
+    const r = await onSave(neu ? d : { ...d, rechnungNumber: nummerung.aktuell(d.rechnungNumber) }, savedRef.current, auto);
     savedRef.current = r;
     setSaved(r);
+    if (neu) nummerung.uebernehmen(r.rechnungNumber, auto);
   }, { unsaved: !initial });
 
   /** Saves what's still pending, then closes. A failed save keeps the form open. */
