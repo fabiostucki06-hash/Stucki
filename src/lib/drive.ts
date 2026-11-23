@@ -1,6 +1,6 @@
 import type { jsPDF } from 'jspdf';
 import { getFreshToken } from './supabase';
-import { showToast } from '../components/ui/Toast';
+import { showSavedToast, showToast } from '../components/ui/Toast';
 
 /** Document type of an export; the server maps it to GarageOS/<Ordner>/<Dateiname>.pdf */
 export type DriveDocType =
@@ -210,7 +210,7 @@ async function uploadToDrive(doc: jsPDF, docType: DriveDocType, filename: string
     for (let attempt = 1; attempt <= MAX_UPLOAD_ATTEMPTS; attempt++) {
       const { uploadUrl, folder } = await openUploadSession(docType, filename, pdf.byteLength);
       if (await sendPdf(uploadUrl, pdf)) {
-        showToast(folder ? `In Google Drive gespeichert (${folder})` : 'In Google Drive gespeichert', 'success');
+        showSavedToast(folder ? `In Google Drive gespeichert (${folder})` : 'In Google Drive gespeichert');
         return;
       }
       if (attempt < MAX_UPLOAD_ATTEMPTS) await new Promise((resolve) => window.setTimeout(resolve, 1000 * 3 ** (attempt - 1)));
