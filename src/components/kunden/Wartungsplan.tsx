@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Sheet from '../ui/Sheet';
 import { SFCheckmark, SFClock, SFPencil, SFPlus } from '../Icons';
 import { formatDateCH } from '../../lib/utils';
@@ -13,22 +13,27 @@ import {
 } from '../../lib/wartung';
 import { exportWartungsplanPDF } from '../../lib/pdf-wartungsplan';
 import { useApp } from '../../context/AppContext';
-import type { Customer, IntervallQuelle, ServiceItem, Vehicle, WartungSpec } from '../../types';
+import type { Customer, FahrzeugFeld, IntervallQuelle, ServiceItem, Vehicle, WartungSpec } from '../../types';
 
-/** Status groups, in display order. "Jetzt fällig" = overdue or due soon. */
-type Gruppe = 'faellig' | 'geplant' | 'erledigt';
-const GRUPPE_VON: Record<ServiceZustand, Gruppe> = { ueberfaellig: 'faellig', bald: 'faellig', faellig: 'geplant', gemacht: 'erledigt' };
+/** Status groups, in display order. "Jetzt fällig" = overdue or due soon;
+    "Fälligkeit unbekannt" = no last service / due value entered (nothing assumed). */
+type Gruppe = 'faellig' | 'unbekannt' | 'geplant' | 'erledigt';
+const GRUPPE_VON: Record<ServiceZustand, Gruppe> = {
+  ueberfaellig: 'faellig', bald: 'faellig', unbekannt: 'unbekannt', faellig: 'geplant', gemacht: 'erledigt',
+};
 const GRUPPEN: { key: Gruppe; label: string; dot: string }[] = [
-  { key: 'faellig',  label: 'Jetzt fällig',      dot: 'var(--orange)' },
-  { key: 'geplant',  label: 'In Zukunft fällig', dot: 'var(--accent)' },
-  { key: 'erledigt', label: 'Erledigt',          dot: 'var(--green)' },
+  { key: 'faellig',   label: 'Jetzt fällig',         dot: 'var(--orange)' },
+  { key: 'unbekannt', label: 'Fälligkeit unbekannt', dot: 'var(--label3)' },
+  { key: 'geplant',   label: 'In Zukunft fällig',    dot: 'var(--accent)' },
+  { key: 'erledigt',  label: 'Erledigt',             dot: 'var(--green)' },
 ];
-const RANG: Record<ServiceZustand, number> = { ueberfaellig: 0, bald: 1, faellig: 2, gemacht: 3 };
+const RANG: Record<ServiceZustand, number> = { ueberfaellig: 0, bald: 1, unbekannt: 2, faellig: 3, gemacht: 4 };
 
 /** Status badge of a tile: tinted background + coloured text. */
 const BADGE: Record<ServiceZustand, { label: string; cls: string }> = {
   ueberfaellig: { label: 'Überfällig',  cls: 'sp-badge-red' },
   bald:         { label: 'Bald fällig', cls: 'sp-badge-orange' },
+  unbekannt:    { label: 'Daten fehlen', cls: 'sp-badge-orange' },
   faellig:      { label: 'In Zukunft',  cls: 'sp-badge-accent' },
   gemacht:      { label: 'Erledigt',    cls: 'sp-badge-green' },
 };
@@ -40,18 +45,60 @@ const QUELLE: Record<IntervallQuelle, { label: string; dot: string }> = {
   standard:  { label: 'Standardwert – prüfen',     dot: 'var(--orange)' },
 };
 
-/** What is missing / only assumed to match the plan to the OEM schedule. */
-function profilHinweis(p: FahrzeugProfil): string | null {
-  const annahmen = [
-    p.steuertriebQuelle === 'marke' && 'Steuerkette (nach Marke)',
-    p.erkannt.antrieb && 'Antrieb (aus Modell/Motor)',
-    p.erkannt.getriebe && 'Getriebe (aus Modell/Motor)',
-  ].filter(Boolean);
-  const teile = [
-    p.fehlt.length > 0 && `Für exakte Herstellervorgaben fehlt: ${p.fehlt.join(', ')}.`,
-    annahmen.length > 0 && `Angenommen: ${annahmen.join(', ')}.`,
-  ].filter(Boolean);
-  return teile.length ? `${teile.join(' ')} Unter «Bearbeiten» ergänzen.` : null;
+/** Which part of the editor to jump to. */
+type EditorFokus = 'intervall' | 'naechste';
+
+interface PruefhinweisProps {
+  profil: FahrzeugProfil;
+  /** Items whose interval is only a Richtwert / Standardwert. */
+  ungeprueft: ServiceItem[];
+  /** Open items without a last service or due value. */
+  unbekannt: ServiceItem[];
+  onFahrzeug?: (feld: FahrzeugFeld) => void;
+  onPosition: (it: ServiceItem, fokus: EditorFokus) => void;
+}
+
+/** What is missing, assumed or unverified, each with a shortcut to the field
+    that settles it. Stays visible until the data is entered / checked. */
+function Pruefhinweis({ profil, ungeprueft, unbekannt, onFahrzeug, onPosition }: PruefhinweisProps) {
+  // Vehicle data only assumed, not entered: the field to confirm it in
+  // (fields already listed as missing are not repeated).
+  const annahmen = ([
+    profil.steuertriebQuelle === 'marke' && { label: 'Steuerkette (nach Marke)', feld: 'motorcode' },
+    profil.erkannt.antrieb && { label: 'Antrieb (aus Modell/Motor)', feld: 'antrieb' },
+    profil.erkannt.getriebe && { label: 'Getriebe (aus Modell/Motor)', feld: 'getriebe' },
+  ].filter(Boolean) as { label: string; feld: FahrzeugFeld }[]).filter((a) => !profil.fehltFelder.includes(a.feld));
+  if (!profil.fehlt.length && !annahmen.length && !ungeprueft.length && !unbekannt.length) return null;
+  return (
+    <div className="sp-hinweis sp-pruefen" role="note">
+      {profil.fehlt.length > 0 && (
+        <div className="sp-pruefen-zeile">
+          <span>Für exakte Herstellervorgaben fehlt: <strong>{profil.fehlt.join(', ')}</strong>.</span>
+          {onFahrzeug && profil.fehltFelder.map((feld, i) => (
+            <button key={feld} type="button" className="sp-text-btn" onClick={() => onFahrzeug(feld)}>{profil.fehlt[i]} erfassen</button>
+          ))}
+        </div>
+      )}
+      {annahmen.length > 0 && (
+        <div className="sp-pruefen-zeile">
+          <span>Angenommen, nicht erfasst: {annahmen.map((a) => a.label).join(', ')}.</span>
+          {onFahrzeug && <button type="button" className="sp-text-btn" onClick={() => onFahrzeug(annahmen[0].feld)}>Bestätigen</button>}
+        </div>
+      )}
+      {ungeprueft.length > 0 && (
+        <div className="sp-pruefen-zeile">
+          <span>{ungeprueft.length === 1 ? '1 Intervall ist' : `${ungeprueft.length} Intervalle sind`} nur Richt- oder Standardwert, nicht mit der Herstellervorgabe geprüft.</span>
+          <button type="button" className="sp-text-btn" onClick={() => onPosition(ungeprueft[0], 'intervall')}>{ungeprueft[0].name} prüfen</button>
+        </div>
+      )}
+      {unbekannt.length > 0 && (
+        <div className="sp-pruefen-zeile">
+          <span>{unbekannt.length === 1 ? '1 Position hat' : `${unbekannt.length} Positionen haben`} weder letzten Service noch nächste Fälligkeit – es wird nichts angenommen.</span>
+          <button type="button" className="sp-text-btn" onClick={() => onPosition(unbekannt[0], 'naechste')}>{unbekannt[0].name} erfassen</button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** "05/2027" */
@@ -60,8 +107,8 @@ const monatJahr = (iso: string) => { const [y, m] = iso.split('-'); return `${m}
 /** "15'000 km · 12 Mt." / "100'000 km · 11/2027" / "17.11.2026 · 85'000 km" */
 const intervallText = (i: ServiceItem) =>
   [i.intervallKm ? `${formatKm(i.intervallKm)} km` : '', i.intervallMonate ? `${i.intervallMonate} Mt.` : ''].filter(Boolean).join(' · ');
-const naechsteText = (i: ServiceItem, v: Vehicle) => {
-  const n = naechsteFaelligkeit(i, v);
+const naechsteText = (i: ServiceItem) => {
+  const n = naechsteFaelligkeit(i);
   return [n.km != null ? `${formatKm(n.km)} km` : '', n.datum ? monatJahr(n.datum) : ''].filter(Boolean).join(' · ');
 };
 const datumKm = (datum?: string, km?: string) =>
@@ -75,6 +122,8 @@ interface WartungsplanProps {
   onSave: (v: Vehicle) => Promise<void>;
   /** Creates a draft Offerte from the due items and opens it. */
   onOfferte: (items: ServiceItem[]) => Promise<void>;
+  /** Opens the vehicle form at a missing field (e.g. Getriebe). */
+  onFahrzeugBearbeiten?: (feld: FahrzeugFeld) => void;
 }
 
 /** Wartungsplan of a vehicle: one tile per service item (two columns on wide
@@ -83,14 +132,13 @@ interface WartungsplanProps {
     today at the current mileage) or "In Zukunft" in one tap. Details, history
     and undo live in the editor behind the pencil. Due dates / mileages follow
     from the last service plus the interval. */
-export default function Wartungsplan({ vehicle, customer, onSave, onOfferte }: WartungsplanProps) {
+export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onFahrzeugBearbeiten }: WartungsplanProps) {
   const { wartungSpecs, saveWartungSpec } = useApp();
   const items = ohneEntfernteService(vehicle.service ?? []);
   const profil = fahrzeugProfil(vehicle);
   const vorlagen = wartungsVorlagen(vehicle, wartungSpecs);
   const vorlageZu = (it: ServiceItem) => vorlagen.find((x) => x.key === vorlageVon(it));
-  const hinweis = profilHinweis(profil);
-  const [edit, setEdit] = useState<{ item: ServiceItem; neu: boolean } | null>(null);
+  const [edit, setEdit] = useState<{ item: ServiceItem; neu: boolean; fokus?: EditorFokus } | null>(null);
   const [km, setKm] = useState(vehicle.km ?? '');
   const [busy, setBusy] = useState(false);
 
@@ -150,6 +198,17 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte }: W
     .map((item) => ({ item, zustand: serviceZustand(item, vehicle) }))
     .sort((a, b) => RANG[a.zustand] - RANG[b.zustand]);
   const faellige = mitZustand.filter((x) => GRUPPE_VON[x.zustand] === 'faellig').map((x) => x.item);
+  const ungeprueft = mitZustand.map((x) => x.item).filter((it) => {
+    const q = quelleVon(it, vorlageZu(it));
+    return q === 'richtwert' || q === 'standard';
+  });
+  const unbekannt = mitZustand.filter((x) => x.zustand === 'unbekannt').map((x) => x.item);
+  const pruefhinweis = (
+    <Pruefhinweis
+      profil={profil} ungeprueft={ungeprueft} unbekannt={unbekannt} onFahrzeug={onFahrzeugBearbeiten}
+      onPosition={(item, fokus) => setEdit({ item, neu: false, fokus })}
+    />
+  );
 
   // Positions picked for the Offerte. Without a pick it covers the due items.
   // Picking and quoting never touch the plan: only "Gemacht" advances an interval.
@@ -177,7 +236,7 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte }: W
 
   const sheet = edit && (
     <WartungsplanEditor
-      item={edit.item} neu={edit.neu} busy={busy} vorlage={vorlageZu(edit.item)} motorcode={profil.motorcode}
+      item={edit.item} neu={edit.neu} fokus={edit.fokus} busy={busy} vorlage={vorlageZu(edit.item)} motorcode={profil.motorcode}
       onSave={(it, teilen) => void speichern(it, teilen)} onUndo={() => rueckgaengig(edit.item)} onDelete={() => entfernen(edit.item)} onClose={() => setEdit(null)}
     />
   );
@@ -186,7 +245,7 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte }: W
     return (
       <div className="sp sp-empty">
         <p>Noch kein Wartungsplan. Für dieses Fahrzeug passen: {vorlagen.map((x) => x.name).join(', ')} – mit Richtwerten nach Marke, Motor, Antrieb und Getriebe. Jedes Intervall ist als Standardwert, Richtwert oder geprüfte Herstellervorgabe markiert und anpassbar.</p>
-        {hinweis && <p className="sp-hinweis">{hinweis}</p>}
+        {pruefhinweis}
         <button className="btn-system btn-primary" disabled={busy} onClick={anlegen}>Wartungsplan anlegen</button>
         <button className="sp-text-btn" disabled={busy} onClick={neuePosition}><SFPlus size={12} /> Eigene Position</button>
         {sheet}
@@ -231,7 +290,7 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte }: W
           <button className="sp-text-btn" disabled={busy} onClick={() => setAuswahl(new Set())}>Auswahl aufheben</button>
         </div>
       )}
-      {hinweis && <p className="sp-hinweis">{hinweis}</p>}
+      {pruefhinweis}
 
       {GRUPPEN.map(({ key, label, dot }) => {
         const tiles = mitZustand.filter((x) => GRUPPE_VON[x.zustand] === key);
@@ -252,13 +311,13 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte }: W
             <ul className="sp-grid">
               {tiles.map(({ item, zustand }) => (
                 <WartungsplanKachel
-                  key={item.id} item={item} naechste={naechsteText(item, vehicle)} zustand={zustand} busy={busy}
+                  key={item.id} item={item} naechste={naechsteText(item)} zustand={zustand} busy={busy}
                   vorlage={vorlageZu(item)}
                   selected={auswahl.has(item.id)}
                   onSelect={() => umschalten(item.id)}
                   onGemacht={() => gemacht(item)}
                   onVormerken={() => vormerken(item)}
-                  onOpen={() => setEdit({ item, neu: false })}
+                  onOpen={(fokus) => setEdit({ item, neu: false, fokus })}
                 />
               ))}
             </ul>
@@ -283,7 +342,7 @@ interface KachelProps {
   onSelect: () => void;
   onGemacht: () => void;
   onVormerken: () => void;
-  onOpen: () => void;
+  onOpen: (fokus?: EditorFokus) => void;
 }
 
 /** Tile: name + badge · Intervall / Nächste · status switch + pencil.
@@ -312,9 +371,20 @@ function WartungsplanKachel({ item, naechste, zustand, busy, vorlage, selected, 
         <span className={`sp-badge ${badge.cls}`}>{badge.label}</span>
       </div>
 
+      {/* Empty values are never filled in by assumption: "Erfassen" opens the field. */}
       <dl className="sp-facts">
-        <div><dt>Intervall</dt><dd className={intervall ? undefined : 'sp-leer'}>{intervall || '–'}</dd></div>
-        <div><dt>Nächste</dt><dd className={naechste ? undefined : 'sp-leer'}>{naechste || '–'}</dd></div>
+        <div>
+          <dt>Intervall</dt>
+          <dd>{intervall || <button type="button" className="sp-erfassen" onClick={() => onOpen('intervall')}>Erfassen</button>}</dd>
+        </div>
+        <div>
+          <dt>Nächste</dt>
+          <dd>
+            {naechste || (istGemacht
+              ? <span className="sp-leer">–</span>
+              : <button type="button" className="sp-erfassen" onClick={() => onOpen('naechste')} title="Letzten Service oder nächste Fälligkeit eintragen">Erfassen</button>)}
+          </dd>
+        </div>
       </dl>
       {fuss && <p className="sp-foot">{fuss}</p>}
       {quelle && (
@@ -340,7 +410,7 @@ function WartungsplanKachel({ item, naechste, zustand, busy, vorlage, selected, 
             <span aria-hidden="true"><SFClock size={13} /></span> In Zukunft
           </button>
         </div>
-        <button className="sp-icon-btn" onClick={onOpen} aria-label={`${item.name} bearbeiten`} title="Bearbeiten">
+        <button className="sp-icon-btn" onClick={() => onOpen()} aria-label={`${item.name} bearbeiten`} title="Bearbeiten">
           <span aria-hidden="true"><SFPencil size={15} /></span>
         </button>
       </div>
@@ -351,6 +421,8 @@ function WartungsplanKachel({ item, naechste, zustand, busy, vorlage, selected, 
 interface EditorProps {
   item: ServiceItem;
   neu: boolean;
+  /** Section to jump to on open. */
+  fokus?: EditorFokus;
   busy: boolean;
   /** The Vorlage the item was made from: hint on what to check. */
   vorlage?: Vorlage;
@@ -364,7 +436,15 @@ interface EditorProps {
   onClose: () => void;
 }
 
-function WartungsplanEditor({ item, neu, busy, vorlage, motorcode, onSave, onUndo, onDelete, onClose }: EditorProps) {
+function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, onSave, onUndo, onDelete, onClose }: EditorProps) {
+  const fokusRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = fokusRef.current;
+    if (!el) return;
+    el.scrollIntoView({ block: 'center' });
+    el.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true });
+  }, []);
+  const ohneBasis = !neu && !item.letztesDatum && !item.letzteKm && !item.faelligDatum && !item.faelligKm;
   const [f, setF] = useState({
     name: item.name,
     intervallKm: item.intervallKm ? String(item.intervallKm) : '',
@@ -425,7 +505,7 @@ function WartungsplanEditor({ item, neu, busy, vorlage, motorcode, onSave, onUnd
         </div>
 
         <p className="sp-editor-head">Intervall</p>
-        <div className="cf-grid-2">
+        <div className="cf-grid-2" ref={fokus === 'intervall' ? fokusRef : undefined}>
           <div className="cf-field"><label className="cf-label" htmlFor="sp-ikm">Alle … km</label><input id="sp-ikm" className="cf-input" type="number" inputMode="numeric" value={f.intervallKm} onChange={s('intervallKm')} placeholder="15000" /></div>
           <div className="cf-field"><label className="cf-label" htmlFor="sp-imt">Alle … Monate</label><input id="sp-imt" className="cf-input" type="number" inputMode="numeric" value={f.intervallMonate} onChange={s('intervallMonate')} placeholder="12" /></div>
         </div>
@@ -456,6 +536,7 @@ function WartungsplanEditor({ item, neu, busy, vorlage, motorcode, onSave, onUnd
           </label>
         )}
 
+        {ohneBasis && <p className="sp-hinweis">Fälligkeit unbekannt: letzten Service (Serviceheft / Rechnung) oder nächste Fälligkeit eintragen. Ohne Angabe wird nichts angenommen.</p>}
         <p className="sp-editor-head">Zuletzt gemacht</p>
         <div className="cf-grid-2">
           <div className="cf-field"><label className="cf-label" htmlFor="sp-ld">Datum</label><input id="sp-ld" className="cf-input" type="date" value={f.letztesDatum} onChange={s('letztesDatum')} /></div>
@@ -463,7 +544,7 @@ function WartungsplanEditor({ item, neu, busy, vorlage, motorcode, onSave, onUnd
         </div>
 
         <p className="sp-editor-head">Nächste Fälligkeit</p>
-        <div className="cf-grid-2">
+        <div className="cf-grid-2" ref={fokus === 'naechste' ? fokusRef : undefined}>
           <div className="cf-field"><label className="cf-label" htmlFor="sp-fd">Datum</label><input id="sp-fd" className="cf-input" type="date" value={f.faelligDatum} onChange={s('faelligDatum')} /></div>
           <div className="cf-field"><label className="cf-label" htmlFor="sp-fkm">KM-Stand</label><input id="sp-fkm" className="cf-input" type="number" inputMode="numeric" value={f.faelligKm} onChange={s('faelligKm')} /></div>
         </div>

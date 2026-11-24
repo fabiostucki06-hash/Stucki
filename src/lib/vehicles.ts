@@ -130,53 +130,42 @@ export function serviceZuruecksetzen(item: ServiceItem): ServiceItem {
 const BALD_TAGE = 30;
 const BALD_KM = 1000;
 
-export type ServiceZustand = 'ueberfaellig' | 'bald' | 'gemacht' | 'faellig';
+/** 'unbekannt': open item without a known last service or due value. */
+export type ServiceZustand = 'ueberfaellig' | 'bald' | 'gemacht' | 'faellig' | 'unbekannt';
 
 const ISO_DATUM = /^\d{4}-\d{2}-\d{2}/;
 
 /** Next due mileage / date of an item: the stored value (set when ticked off
-    or by hand), else the last service plus the interval. Without a last
-    service it is the next interval step past the vehicle: from 0 km, and from
-    the first registration (else the date the vehicle was entered). Such
-    untracked items therefore show as due soon at most, never as overdue. */
-export function naechsteFaelligkeit(
-  item: ServiceItem, v: Partial<Pick<Vehicle, 'km' | 'erstzulassung' | 'createdAt'>> | undefined, heute = todayISO(),
-): { km?: number; datum?: string } {
+    or by hand), else the last service plus the interval. Nothing is assumed:
+    without a stored due value and without a last service there is no due
+    mileage / date (the item shows as "unbekannt" until it is entered). */
+export function naechsteFaelligkeit(item: ServiceItem): { km?: number; datum?: string } {
   let km = kmZahl(item.faelligKm) ?? undefined;
   if (km == null && item.intervallKm) {
-    const letzte = kmZahl(item.letzteKm), akt = kmZahl(v?.km);
+    const letzte = kmZahl(item.letzteKm);
     if (letzte != null) km = letzte + item.intervallKm;
-    else if (akt != null) km = (Math.floor(akt / item.intervallKm) + 1) * item.intervallKm;
   }
 
   let datum = item.faelligDatum && ISO_DATUM.test(item.faelligDatum) ? item.faelligDatum : undefined;
-  const m = item.intervallMonate;
-  if (!datum && m) {
-    if (item.letztesDatum && ISO_DATUM.test(item.letztesDatum)) datum = plusMonate(item.letztesDatum.slice(0, 10), m);
-    else {
-      const anker = [v?.erstzulassung, v?.createdAt].find((d) => d && ISO_DATUM.test(d))?.slice(0, 10);
-      if (anker) {
-        // Each step from the anchor (not cumulative), so month-end clamping doesn't drift.
-        let n = 1;
-        do datum = plusMonate(anker, n++ * m); while (datum <= heute);
-      }
-    }
-  }
+  if (!datum && item.intervallMonate && item.letztesDatum && ISO_DATUM.test(item.letztesDatum))
+    datum = plusMonate(item.letztesDatum.slice(0, 10), item.intervallMonate);
   return { km, datum };
 }
 
 /** What the item shows now: overdue / due soon (by date or the vehicle's
-    mileage, see naechsteFaelligkeit) wins over the stored status. */
+    mileage, see naechsteFaelligkeit) wins over the stored status. An open item
+    with no due value is 'unbekannt', never assumed to be in the future. */
 export function serviceZustand(
   item: ServiceItem, v: Partial<Pick<Vehicle, 'km' | 'erstzulassung' | 'createdAt'>> | undefined, heute = todayISO(),
 ): ServiceZustand {
   const km = kmZahl(v?.km);
-  const { km: fKm, datum } = naechsteFaelligkeit(item, v, heute);
+  const { km: fKm, datum } = naechsteFaelligkeit(item);
   if (datum && datum <= heute) return 'ueberfaellig';
   if (fKm != null && km != null && km >= fKm) return 'ueberfaellig';
   const bald = plusTage(heute, BALD_TAGE);
   if (datum && datum <= bald) return 'bald';
   if (fKm != null && km != null && km >= fKm - BALD_KM) return 'bald';
+  if (item.status !== 'gemacht' && fKm == null && !datum) return 'unbekannt';
   return item.status;
 }
 
@@ -189,7 +178,7 @@ function plusTage(iso: string, n: number): string {
 /** Items that need attention at the next visit: overdue first, then due soon. */
 export function anstehendeServices(v: Vehicle | undefined): { item: ServiceItem; zustand: ServiceZustand }[] {
   if (!v?.service?.length) return [];
-  const rang: Record<ServiceZustand, number> = { ueberfaellig: 0, bald: 1, faellig: 2, gemacht: 3 };
+  const rang: Record<ServiceZustand, number> = { ueberfaellig: 0, bald: 1, unbekannt: 2, faellig: 3, gemacht: 4 };
   return ohneEntfernteService(v.service)
     .map((item) => ({ item, zustand: serviceZustand(item, v) }))
     .filter((x) => x.zustand === 'ueberfaellig' || x.zustand === 'bald')

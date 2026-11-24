@@ -1,6 +1,6 @@
 import { neueServiceId, plusMonate } from './vehicles';
 import { modelljahrAusVin } from '../../supabase/functions/vin-decode/vds';
-import type { Achsantrieb, Antrieb, Getriebe, IntervallQuelle, ServiceItem, Steuertrieb, Vehicle, WartungSpec } from '../types';
+import type { Achsantrieb, Antrieb, FahrzeugFeld, Getriebe, IntervallQuelle, ServiceItem, Steuertrieb, Vehicle, WartungSpec } from '../types';
 
 /* ── Fahrzeugprofil: what the Wartungsplan is generated from ──
    Antrieb / Getriebe / Steuertrieb are stored on the vehicle when known; else
@@ -198,6 +198,8 @@ export interface FahrzeugProfil {
   erkannt: { marke?: string; antrieb?: boolean; getriebe?: boolean; steuertrieb?: boolean; baujahr?: boolean };
   /** Vehicle data missing to match the OEM schedule exactly. */
   fehlt: string[];
+  /** The vehicle fields behind `fehlt`, same order: to jump straight to them. */
+  fehltFelder: FahrzeugFeld[];
 }
 
 type ProfilQuelle = Partial<Pick<Vehicle, 'marke' | 'modell' | 'motor' | 'motorcode' | 'chassisnummer' | 'erstzulassung' | 'antrieb' | 'getriebe' | 'steuertrieb' | 'achsantrieb'>>;
@@ -254,15 +256,17 @@ export function fahrzeugProfil(v: ProfilQuelle): FahrzeugProfil {
   }
 
   const fehlt: string[] = [];
+  const fehltFelder: FahrzeugFeld[] = [];
+  const fehlend = (feld: FahrzeugFeld, label: string) => { fehltFelder.push(feld); fehlt.push(label); };
   if (antrieb !== 'elektro') {
-    if (!motorcode) fehlt.push('Motorkennbuchstabe');
-    if (!v.getriebe) fehlt.push('Getriebe');
+    if (!motorcode) fehlend('motorcode', 'Motorkennbuchstabe');
+    if (!v.getriebe) fehlend('getriebe', 'Getriebe');
   }
-  if (!v.antrieb) fehlt.push('Antrieb');
-  if (!/^\d{4}/.test(v.erstzulassung ?? '')) fehlt.push('1. Inverkehrsetzung');
+  if (!v.antrieb) fehlend('antrieb', 'Antrieb');
+  if (!/^\d{4}/.test(v.erstzulassung ?? '')) fehlend('erstzulassung', '1. Inverkehrsetzung');
 
   const hersteller = gruppe !== 'andere' ? gruppe : marke;
-  return { gruppe, hersteller, motorcode, motor, antrieb, getriebe, steuertrieb, steuertriebQuelle, baujahr, erkannt, fehlt };
+  return { gruppe, hersteller, motorcode, motor, antrieb, getriebe, steuertrieb, steuertriebQuelle, baujahr, erkannt, fehlt, fehltFelder };
 }
 
 /** Manufacturers whose engines (as a rule) run a maintenance-free timing chain.

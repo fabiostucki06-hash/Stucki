@@ -4,6 +4,7 @@ import { buildDocumentFilename, formatDateCH } from './utils';
 import { CO_NAME, CO_ADDR, CO_CITY, CO_PHONE } from './company';
 import { fahrzeugLabel, formatKm, naechsteFaelligkeit, ohneEntfernteService, serviceZustand, type ServiceZustand } from './vehicles';
 import { archiveToDrive } from './drive';
+import { quelleVon } from './wartung';
 import type { Customer, ServiceItem, Vehicle } from '../types';
 
 const TL = 15, TR = 195;
@@ -11,9 +12,9 @@ const COL = { name: TL, intervall: 84, zuletzt: 118, naechste: 152 };
 const NAME_W = COL.intervall - COL.name - 3;
 
 const ZUSTAND: Record<ServiceZustand, string> = {
-  ueberfaellig: 'Überfällig', bald: 'Bald fällig', faellig: 'In Zukunft', gemacht: 'Erledigt',
+  ueberfaellig: 'Überfällig', bald: 'Bald fällig', unbekannt: 'Fälligkeit unbekannt', faellig: 'In Zukunft', gemacht: 'Erledigt',
 };
-const RANG: Record<ServiceZustand, number> = { ueberfaellig: 0, bald: 1, faellig: 2, gemacht: 3 };
+const RANG: Record<ServiceZustand, number> = { ueberfaellig: 0, bald: 1, unbekannt: 2, faellig: 3, gemacht: 4 };
 
 // de-CH groups with a typographic apostrophe; the standard PDF font wants the plain one.
 const km = (v?: string | number) => (v ? `${formatKm(v).replace(/’/g, "'")} km` : '');
@@ -56,10 +57,14 @@ export async function exportWartungsplanPDF(vehicle: Vehicle, customer: Customer
       .map((item) => ({ item, zustand: serviceZustand(item, vehicle) }))
       .sort((a, b) => RANG[a.zustand] - RANG[b.zustand]);
 
+    // Intervals not checked against the OEM schedule are marked, never passed off as manufacturer values.
+    let unsicher = false;
     for (const { item, zustand } of zeilen) {
-      const n = naechsteFaelligkeit(item, vehicle);
+      const n = naechsteFaelligkeit(item);
       const name = doc.splitTextToSize(item.name, NAME_W) as string[];
       const iv = intervall(item).split('\n');
+      const q = quelleVon(item);
+      if ((q === 'richtwert' || q === 'standard') && iv[0] !== '-') { iv[0] += ' *'; unsicher = true; }
       const zu = mitTrenner(item.letztesDatum ? formatDateCH(item.letztesDatum) : '', km(item.letzteKm)).split('\n');
       const na = mitTrenner(n.datum ? formatDateCH(n.datum) : '', km(n.km ?? undefined)).split('\n');
       const lines = Math.max(name.length + 1, iv.length, zu.length, na.length);
@@ -74,6 +79,13 @@ export async function exportWartungsplanPDF(vehicle: Vehicle, customer: Customer
       y += h - 2.4 + 0.2;
       doc.setDrawColor(210, 210, 210); doc.setLineWidth(0.15); doc.line(TL, y, TR, y); doc.setDrawColor(0, 0, 0);
       y += 4;
+    }
+
+    if (unsicher) {
+      if (y + 6 > PAGE_BOTTOM) { doc.addPage('a4', 'portrait'); y = PAGE_TOP + 4; }
+      doc.setFontSize(7.5); doc.setTextColor(100, 100, 100);
+      doc.text('* Richt- oder Standardwert, nicht mit der Herstellervorgabe geprüft.', TL, y + 1);
+      doc.setTextColor(0, 0, 0);
     }
 
     addPageNumbers(doc, TR);

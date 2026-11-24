@@ -8,7 +8,7 @@ import { formatDateCH } from '../../lib/utils';
 import { FAHRZEUG_FELDER, fahrzeugTitel, formatKm } from '../../lib/vehicles';
 import { ACHSANTRIEBE, ANTRIEBE, GETRIEBE, STEUERTRIEBE, fahrzeugProfil, labelVon } from '../../lib/wartung';
 import { useApp } from '../../context/AppContext';
-import type { Customer, Order, ServiceItem, Vehicle } from '../../types';
+import type { Customer, FahrzeugFeld, Order, ServiceItem, Vehicle } from '../../types';
 
 interface VehicleDetailProps {
   vehicle: Vehicle;
@@ -22,7 +22,8 @@ interface VehicleDetailProps {
 /** Fahrzeugprofil: data, Wartungsplan and the vehicle's Aufträge. */
 export default function VehicleDetail({ vehicle, customer, onClose, onOrderClick, onOfferte }: VehicleDetailProps) {
   const { orders, updateVehicle, deleteVehicle, docVehicle } = useApp();
-  const [edit, setEdit] = useState(false);
+  // Open vehicle form; `fokus` jumps to a field the Wartungsplan flags as missing.
+  const [edit, setEdit] = useState<{ fokus?: FahrzeugFeld } | null>(null);
 
   const auftraege = orders
     .filter((o) => o.customerId === customer.id && docVehicle(o)?.id === vehicle.id)
@@ -45,7 +46,7 @@ export default function VehicleDetail({ vehicle, customer, onClose, onOrderClick
   }
 
   return (
-    <Sheet title={fahrzeugTitel(vehicle)} onClose={onClose} full back barRight={<button onClick={() => setEdit(true)} className="bar-btn">Bearbeiten</button>}>
+    <Sheet title={fahrzeugTitel(vehicle)} onClose={onClose} full back barRight={<button onClick={() => setEdit({})} className="bar-btn">Bearbeiten</button>}>
       <div className="glass-panel" style={{ padding: '12px 14px', marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
           <div style={{ minWidth: 0 }}>
@@ -68,7 +69,10 @@ export default function VehicleDetail({ vehicle, customer, onClose, onOrderClick
       </div>
 
       <p className="section-header" style={{ padding: '0 0 8px' }}>Wartungsplan</p>
-      <Wartungsplan key={vehicle.id} vehicle={vehicle} customer={customer} onSave={updateVehicle} onOfferte={onOfferte} />
+      <Wartungsplan
+        key={vehicle.id} vehicle={vehicle} customer={customer} onSave={updateVehicle} onOfferte={onOfferte}
+        onFahrzeugBearbeiten={(fokus) => setEdit({ fokus })}
+      />
 
       <p className="section-header" style={{ padding: '0 0 8px' }}>Aufträge ({auftraege.length})</p>
       {!auftraege.length && <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--label3)', fontSize: 15 }}>Noch keine Aufträge für dieses Fahrzeug.</div>}
@@ -90,14 +94,14 @@ export default function VehicleDetail({ vehicle, customer, onClose, onOrderClick
       <button onClick={remove} className="text-danger-btn">Fahrzeug löschen</button>
 
       {edit && (
-        <Sheet title="Fahrzeug bearbeiten" onClose={() => setEdit(false)}
-          barRight={<button onClick={() => setEdit(false)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
-          <VehicleForm initial={vehicle} onCancel={() => setEdit(false)} onSave={async (data) => {
+        <Sheet title="Fahrzeug bearbeiten" onClose={() => setEdit(null)}
+          barRight={<button onClick={() => setEdit(null)} className="bar-btn" style={{ color: 'var(--label2)' }}>Abbrechen</button>}>
+          <VehicleForm initial={vehicle} fokus={edit.fokus} onCancel={() => setEdit(null)} onSave={async (data) => {
             // The form holds all vehicle fields: cleared ones are dropped, the rest (plan, profile) kept.
             const upd: Vehicle = { ...vehicle, ...data };
             for (const k of FAHRZEUG_FELDER) if (!(k in data)) delete upd[k];
             await updateVehicle(upd);
-            setEdit(false);
+            setEdit(null);
           }} />
         </Sheet>
       )}

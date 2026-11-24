@@ -3,7 +3,7 @@ import Spinner from '../ui/Spinner';
 import { ACHSANTRIEBE, ANTRIEBE, GETRIEBE, STEUERTRIEBE, fahrzeugProfil, labelVon, motorfamilieAusCode } from '../../lib/wartung';
 import { vinAbrufen, vinGueltig, type VinVariante } from '../../lib/vin';
 import { motorVarianten } from '../../lib/motorkatalog';
-import type { FahrzeugFelder } from '../../types';
+import type { FahrzeugFeld, FahrzeugFelder } from '../../types';
 
 /** The empty option of a technical select: nothing is presumed for an open field. */
 const AUTO = 'Automatisch – unbekannt';
@@ -208,14 +208,14 @@ export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k
       <div className="cf-grid-2" style={{ marginTop: 10 }}>
         <div className="cf-field">
           <label className="cf-label">Antrieb</label>
-          <select className="cf-select" value={f.antrieb ?? ''} onChange={s('antrieb')}>
+          <select className="cf-select" data-feld="antrieb" value={f.antrieb ?? ''} onChange={s('antrieb')}>
             <option value="">{AUTO}</option>
             {ANTRIEBE.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
         <div className="cf-field">
           <label className="cf-label">Getriebe</label>
-          <select className="cf-select" value={f.getriebe ?? ''} onChange={s('getriebe')}>
+          <select className="cf-select" data-feld="getriebe" value={f.getriebe ?? ''} onChange={s('getriebe')}>
             <option value="">{AUTO}</option>
             {GETRIEBE.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
@@ -228,7 +228,7 @@ export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k
         </div>
         <div className="cf-field">
           <label className="cf-label">Motorkennbuchstabe</label>
-          <input className="cf-input" value={f.motorcode ?? ''} onChange={s('motorcode')} placeholder="z.B. CFFB / B47D20 / OM651" autoCapitalize="characters" />
+          <input className="cf-input" data-feld="motorcode" value={f.motorcode ?? ''} onChange={s('motorcode')} placeholder="z.B. CFFB / B47D20 / OM651" autoCapitalize="characters" />
         </div>
       </div>
       {zeigeVarianten && (
@@ -277,7 +277,7 @@ export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k
         </div>
         <div className="cf-field">
           <label className="cf-label">1. Inv. Setzung</label>
-          <input className="cf-input" type="date" value={f.erstzulassung ?? ''} onChange={s('erstzulassung')} />
+          <input className="cf-input" data-feld="erstzulassung" type="date" value={f.erstzulassung ?? ''} onChange={s('erstzulassung')} />
         </div>
         <div className="cf-field">
           <label className="cf-label">KM-Stand</label>
@@ -292,9 +292,19 @@ interface VehicleFormProps {
   initial?: FahrzeugFelder;
   onSave: (data: FahrzeugFelder) => Promise<void> | void;
   onCancel: () => void;
+  /** Field to focus on open, e.g. a missing Getriebe flagged by the Wartungsplan. */
+  fokus?: FahrzeugFeld;
 }
 
-export default function VehicleForm({ initial, onSave, onCancel }: VehicleFormProps) {
+export default function VehicleForm({ initial, onSave, onCancel, fokus }: VehicleFormProps) {
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!fokus) return;
+    const el = root.current?.querySelector<HTMLElement>(`[data-feld="${fokus}"]`);
+    if (!el) return;
+    el.scrollIntoView({ block: 'center' });
+    el.focus({ preventScroll: true });
+  }, [fokus]);
   const [f, setF] = useState<FahrzeugFelder>({
     marke:         initial?.marke         ?? '',
     modell:        initial?.modell        ?? '',
@@ -327,7 +337,7 @@ export default function VehicleForm({ initial, onSave, onCancel }: VehicleFormPr
   }
 
   return (
-    <div>
+    <div ref={root}>
       <div className="cf-section-title" style={{ marginTop: 0 }}>Fahrzeug</div>
       <VehicleFields f={f} onChange={(k, v) => setF((p) => ({ ...p, [k]: v }))} />
       <div className="cf-actions">
