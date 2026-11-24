@@ -1,6 +1,6 @@
 import { todayISO } from './offerte-docs';
 import { STD_SATZ } from './company';
-import type { ArbeitPosition, Customer, FahrzeugFeld, FahrzeugFelder, ServiceItem, Vehicle } from '../types';
+import type { ArbeitPosition, Customer, FahrzeugFeld, FahrzeugFelder, Nachweis, ServiceEintrag, ServiceItem, Vehicle } from '../types';
 
 /** The vehicle fields that used to live on the Customer (see FahrzeugFeld). */
 export const FAHRZEUG_FELDER: FahrzeugFeld[] = ['marke', 'modell', 'kennzeichen', 'km', 'chassisnummer', 'erstzulassung', 'antrieb', 'getriebe', 'steuertrieb', 'achsantrieb', 'motor', 'motorcode'];
@@ -69,7 +69,7 @@ export function formatKm(km: string | number | undefined): string {
   return Number.isFinite(n) ? n.toLocaleString('de-CH') : String(km ?? '');
 }
 
-const kmZahl = (km: string | number | undefined): number | null => {
+export const kmZahl = (km: string | number | undefined): number | null => {
   const n = typeof km === 'number' ? km : parseInt(String(km ?? '').replace(/\D/g, ''), 10);
   return Number.isFinite(n) ? n : null;
 };
@@ -102,28 +102,112 @@ export function plusMonate(iso: string, n: number): string {
   return `${ny}-${String(nm + 1).padStart(2, '0')}-${String(Math.min(d, last)).padStart(2, '0')}`;
 }
 
+/** Due date / mileage that follow from a service on `datum` at `km` plus the
+    item's interval. Nothing without a basis: no date → no due date, etc. */
+export function faelligAus(item: ServiceItem, datum?: string, km?: string): Pick<ServiceItem, 'faelligDatum' | 'faelligKm'> {
+  const kmN = kmZahl(km);
+  return {
+    faelligDatum: item.intervallMonate && datum && ISO_DATUM.test(datum) ? plusMonate(datum.slice(0, 10), item.intervallMonate) : undefined,
+    faelligKm: item.intervallKm && kmN != null ? String(kmN + item.intervallKm) : undefined,
+  };
+}
+
+/** Whether a stored due value differs from last service + interval (= set by hand). */
+export function faelligVonHand(i: ServiceItem): boolean {
+  const soll = faelligAus(i, i.letztesDatum, i.letzteKm);
+  return (!!i.faelligKm && kmZahl(i.faelligKm) !== kmZahl(soll.faelligKm)) || (!!i.faelligDatum && i.faelligDatum !== soll.faelligDatum);
+}
+
+/** What proves a service entry. */
+export type Beleg = { nachweis: Nachweis; auftragId?: string };
+
+/** Proof of a history entry. Entries from before proofs were recorded could
+    only be made by "Gemacht" in this workshop. */
+export const eintragNachweis = (e: Partial<Beleg>): Beleg =>
+  ({ nachweis: e.nachweis ?? 'werkstatt', ...(e.auftragId ? { auftragId: e.auftragId } : {}) });
+
+/** Every Nachweis with its labels; `farbe` = status dot (documented green, not orange). */
+export const NACHWEIS: Record<Nachweis, { label: string; kurz: string; belegt: boolean; farbe: string }> = {
+  werkstatt:   { label: 'In dieser Werkstatt erledigt',     kurz: 'Werkstatt',     belegt: true,  farbe: 'var(--green)' },
+  serviceheft: { label: 'Serviceheft / Servicenachweis',    kurz: 'Serviceheft',   belegt: true,  farbe: 'var(--green)' },
+  rechnung:    { label: 'Rechnung einer anderen Werkstatt', kurz: 'Fremdrechnung', belegt: true,  farbe: 'var(--green)' },
+  kunde:       { label: 'Ohne Beleg (Angabe Kunde)',        kurz: 'ohne Beleg',    belegt: false, farbe: 'var(--orange)' },
+};
+
 /** Ticks an item off as done on `datum` at `km`: logged in the history, next
     due date / mileage moved on by the interval. The only place an interval
-    advances; call it for work actually done ("Gemacht"), never for an Offerte. */
-export function serviceErledigt(item: ServiceItem, datum: string, km?: string): ServiceItem {
+    advances; call it for work actually done ("Gemacht", or a documented
+    earlier service entered in the editor), never for an Offerte.
+    `beleg`: what proves it; unset = done in this workshop ("Gemacht"). */
+export function serviceErledigt(item: ServiceItem, datum: string, km?: string, beleg: Partial<Beleg> = {}): ServiceItem {
   const kmN = kmZahl(km);
+  const kmS = kmN != null ? String(kmN) : undefined;
   return {
     ...item,
     status: 'gemacht',
     letztesDatum: datum,
-    letzteKm: kmN != null ? String(kmN) : undefined,
-    faelligDatum: item.intervallMonate ? plusMonate(datum, item.intervallMonate) : undefined,
-    faelligKm: item.intervallKm && kmN != null ? String(kmN + item.intervallKm) : undefined,
-    historie: [...(item.historie ?? []), { datum, ...(kmN != null ? { km: String(kmN) } : {}) }],
+    letzteKm: kmS,
+    ...faelligAus(item, datum, kmS),
+    historie: [...(item.historie ?? []), { datum, ...(kmS ? { km: kmS } : {}), ...eintragNachweis(beleg) }],
   };
 }
 
-/** Undoes the last tick: back to the previous service (if any) and "fällig". */
+/** Undoes the last entry: back to the previous service (if any) and "fällig". */
 export function serviceZuruecksetzen(item: ServiceItem): ServiceItem {
   const historie = (item.historie ?? []).slice(0, -1);
   const prev = historie[historie.length - 1];
   const base: ServiceItem = { ...item, historie, letztesDatum: undefined, letzteKm: undefined, faelligDatum: undefined, faelligKm: undefined };
-  return { ...(prev ? serviceErledigt({ ...base, historie: historie.slice(0, -1) }, prev.datum, prev.km) : base), status: 'faellig' };
+  return { ...(prev ? serviceErledigt({ ...base, historie: historie.slice(0, -1) }, prev.datum, prev.km, prev) : base), status: 'faellig' };
+}
+
+/** Where the item's last service comes from: the newest history entry when
+    it is the stored last service, else `null` = entered without a record.
+    `undefined` = no last service known. */
+export function letzterService(i: ServiceItem): (ServiceEintrag & Beleg) | null | undefined {
+  if (!i.letztesDatum && !i.letzteKm) return undefined;
+  const e = i.historie?.[i.historie.length - 1];
+  return e && e.datum === i.letztesDatum ? { ...e, ...eintragNachweis(e) } : null;
+}
+
+/** Proof of the last service as shown; entered without a record = no proof. */
+export function letzterBeleg(i: ServiceItem): (typeof NACHWEIS)[Nachweis] | undefined {
+  const l = letzterService(i);
+  return l === undefined ? undefined : NACHWEIS[l?.nachweis ?? 'kunde'];
+}
+
+/** The last service as entered in the editor. */
+export interface LetzterServiceEingabe {
+  datum?: string;
+  km?: string;
+  beleg: Beleg;
+  faelligDatum?: string;
+  faelligKm?: string;
+}
+
+/** Applies an edited last service. Nothing is assumed:
+    - without a date: stored as entered, no history entry (= no proof);
+    - same date / km, other proof: the entry's proof is updated, nothing moves;
+    - new date: logged with its proof via serviceErledigt (due values move on
+      by the interval unless set here by hand). A same or earlier date
+      corrects the entry it replaces. */
+export function letztenServiceSetzen(item: ServiceItem, e: LetzterServiceEingabe): ServiceItem {
+  const faellig = { faelligDatum: e.faelligDatum, faelligKm: e.faelligKm };
+  if (!e.datum) return { ...item, letztesDatum: undefined, letzteKm: e.km, ...faellig };
+
+  const alt = letzterService(item);
+  const hist = item.historie ?? [];
+  if (e.datum === item.letztesDatum && e.km === item.letzteKm) {
+    const b = eintragNachweis(e.beleg);
+    const altBeleg = alt ?? { nachweis: 'kunde' as Nachweis, auftragId: undefined };
+    if (b.nachweis === altBeleg.nachweis && b.auftragId === altBeleg.auftragId) return { ...item, ...faellig };
+    const eintrag: ServiceEintrag = { datum: e.datum, ...(e.km ? { km: e.km } : {}), ...b };
+    return { ...item, ...faellig, historie: alt ? [...hist.slice(0, -1), eintrag] : [...hist, eintrag] };
+  }
+
+  const korrektur = !!alt && e.datum <= (item.letztesDatum ?? '');
+  const n = serviceErledigt({ ...item, historie: korrektur ? hist.slice(0, -1) : hist }, e.datum, e.km, e.beleg);
+  const vonHand = e.faelligDatum !== item.faelligDatum || e.faelligKm !== item.faelligKm;
+  return vonHand ? { ...n, ...faellig } : n;
 }
 
 /** Warning window before the due date / mileage. */

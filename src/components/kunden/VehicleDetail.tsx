@@ -72,6 +72,7 @@ export default function VehicleDetail({ vehicle, customer, onClose, onOrderClick
       <Wartungsplan
         key={vehicle.id} vehicle={vehicle} customer={customer} onSave={updateVehicle} onOfferte={onOfferte}
         onFahrzeugBearbeiten={(fokus) => setEdit({ fokus })}
+        auftraege={auftraege} onAuftrag={onOrderClick}
       />
 
       <p className="section-header" style={{ padding: '0 0 8px' }}>Aufträge ({auftraege.length})</p>

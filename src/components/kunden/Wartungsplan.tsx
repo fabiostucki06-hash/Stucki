@@ -4,16 +4,16 @@ import { SFCheckmark, SFClock, SFPencil, SFPlus } from '../Icons';
 import { formatDateCH } from '../../lib/utils';
 import { todayISO } from '../../lib/offerte-docs';
 import {
-  formatKm, naechsteFaelligkeit, neueServiceId, ohneEntfernteService, serviceErledigt, serviceZuruecksetzen, serviceZustand,
-  type ServiceZustand,
+  NACHWEIS, eintragNachweis, faelligVonHand, formatKm, letzterBeleg, letzterService, letztenServiceSetzen, naechsteFaelligkeit,
+  neueServiceId, ohneEntfernteService, serviceErledigt, serviceZuruecksetzen, serviceZustand, type ServiceZustand,
 } from '../../lib/vehicles';
 import {
   HINWEIS_STANDARD, fahrzeugProfil, mitWartungsplan, profilSignatur, quelleVon, specId, vorlageVon, wartungsVorlagen,
-  type FahrzeugProfil, type Vorlage,
+  type FahrzeugProfil, type QuelleAnzeige, type Vorlage,
 } from '../../lib/wartung';
 import { exportWartungsplanPDF } from '../../lib/pdf-wartungsplan';
 import { useApp } from '../../context/AppContext';
-import type { Customer, FahrzeugFeld, IntervallQuelle, ServiceItem, Vehicle, WartungSpec } from '../../types';
+import type { Customer, FahrzeugFeld, IntervallQuelle, Nachweis, Order, ServiceItem, Vehicle, WartungSpec } from '../../types';
 
 /** Status groups, in display order. "Jetzt fällig" = overdue or due soon;
     "Fälligkeit unbekannt" = no last service / due value entered (nothing assumed). */
@@ -39,14 +39,18 @@ const BADGE: Record<ServiceZustand, { label: string; cls: string }> = {
 };
 
 /** Source of an interval: checked against the OEM schedule, manufacturer Richtwert, generic Standardwert. */
-const QUELLE: Record<IntervallQuelle, { label: string; dot: string }> = {
+const QUELLE: Record<QuelleAnzeige, { label: string; dot: string }> = {
   geprueft:  { label: 'Herstellervorgabe geprüft', dot: 'var(--green)' },
   richtwert: { label: 'Richtwert – prüfen',        dot: 'var(--accent)' },
   standard:  { label: 'Standardwert – prüfen',     dot: 'var(--orange)' },
+  eigen:     { label: 'Eigener Wert – nicht geprüft', dot: 'var(--label3)' },
 };
 
+/** Last service known, but without a record (workshop, service book, invoice). */
+const ohneBeleg = (it: ServiceItem) => letzterBeleg(it)?.belegt === false;
+
 /** Which part of the editor to jump to. */
-type EditorFokus = 'intervall' | 'naechste';
+type EditorFokus = 'intervall' | 'letzte' | 'naechste';
 
 interface PruefhinweisProps {
   profil: FahrzeugProfil;
@@ -54,13 +58,15 @@ interface PruefhinweisProps {
   ungeprueft: ServiceItem[];
   /** Open items without a last service or due value. */
   unbekannt: ServiceItem[];
+  /** Items whose last service has no record (customer's word / entered without proof). */
+  unbelegt: ServiceItem[];
   onFahrzeug?: (feld: FahrzeugFeld) => void;
   onPosition: (it: ServiceItem, fokus: EditorFokus) => void;
 }
 
 /** What is missing, assumed or unverified, each with a shortcut to the field
     that settles it. Stays visible until the data is entered / checked. */
-function Pruefhinweis({ profil, ungeprueft, unbekannt, onFahrzeug, onPosition }: PruefhinweisProps) {
+function Pruefhinweis({ profil, ungeprueft, unbekannt, unbelegt, onFahrzeug, onPosition }: PruefhinweisProps) {
   // Vehicle data only assumed, not entered: the field to confirm it in
   // (fields already listed as missing are not repeated).
   const annahmen = ([
@@ -68,7 +74,7 @@ function Pruefhinweis({ profil, ungeprueft, unbekannt, onFahrzeug, onPosition }:
     profil.erkannt.antrieb && { label: 'Antrieb (aus Modell/Motor)', feld: 'antrieb' },
     profil.erkannt.getriebe && { label: 'Getriebe (aus Modell/Motor)', feld: 'getriebe' },
   ].filter(Boolean) as { label: string; feld: FahrzeugFeld }[]).filter((a) => !profil.fehltFelder.includes(a.feld));
-  if (!profil.fehlt.length && !annahmen.length && !ungeprueft.length && !unbekannt.length) return null;
+  if (!profil.fehlt.length && !annahmen.length && !ungeprueft.length && !unbekannt.length && !unbelegt.length) return null;
   return (
     <div className="sp-hinweis sp-pruefen" role="note">
       {profil.fehlt.length > 0 && (
@@ -93,8 +99,14 @@ function Pruefhinweis({ profil, ungeprueft, unbekannt, onFahrzeug, onPosition }:
       )}
       {unbekannt.length > 0 && (
         <div className="sp-pruefen-zeile">
-          <span>{unbekannt.length === 1 ? '1 Position hat' : `${unbekannt.length} Positionen haben`} weder letzten Service noch nächste Fälligkeit – es wird nichts angenommen.</span>
-          <button type="button" className="sp-text-btn" onClick={() => onPosition(unbekannt[0], 'naechste')}>{unbekannt[0].name} erfassen</button>
+          <span>{unbekannt.length === 1 ? '1 Position hat' : `${unbekannt.length} Positionen haben`} weder letzten Service noch nächste Fälligkeit – es wird nichts angenommen. Letzten Service aus Serviceheft oder Rechnung nachtragen.</span>
+          <button type="button" className="sp-text-btn" onClick={() => onPosition(unbekannt[0], 'letzte')}>{unbekannt[0].name} nachtragen</button>
+        </div>
+      )}
+      {unbelegt.length > 0 && (
+        <div className="sp-pruefen-zeile">
+          <span>{unbelegt.length === 1 ? '1 letzter Service ist' : `${unbelegt.length} letzte Services sind`} ohne Beleg erfasst.</span>
+          <button type="button" className="sp-text-btn" onClick={() => onPosition(unbelegt[0], 'letzte')}>{unbelegt[0].name} belegen</button>
         </div>
       )}
     </div>
@@ -124,6 +136,9 @@ interface WartungsplanProps {
   onOfferte: (items: ServiceItem[]) => Promise<void>;
   /** Opens the vehicle form at a missing field (e.g. Getriebe). */
   onFahrzeugBearbeiten?: (feld: FahrzeugFeld) => void;
+  /** The vehicle's Aufträge: a service entry can be linked to the one it was done in. */
+  auftraege?: Order[];
+  onAuftrag?: (o: Order) => void;
 }
 
 /** Wartungsplan of a vehicle: one tile per service item (two columns on wide
@@ -132,7 +147,7 @@ interface WartungsplanProps {
     today at the current mileage) or "In Zukunft" in one tap. Details, history
     and undo live in the editor behind the pencil. Due dates / mileages follow
     from the last service plus the interval. */
-export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onFahrzeugBearbeiten }: WartungsplanProps) {
+export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onFahrzeugBearbeiten, auftraege = [], onAuftrag }: WartungsplanProps) {
   const { wartungSpecs, saveWartungSpec } = useApp();
   const items = ohneEntfernteService(vehicle.service ?? []);
   const profil = fahrzeugProfil(vehicle);
@@ -203,9 +218,10 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onF
     return q === 'richtwert' || q === 'standard';
   });
   const unbekannt = mitZustand.filter((x) => x.zustand === 'unbekannt').map((x) => x.item);
+  const unbelegt = mitZustand.map((x) => x.item).filter(ohneBeleg);
   const pruefhinweis = (
     <Pruefhinweis
-      profil={profil} ungeprueft={ungeprueft} unbekannt={unbekannt} onFahrzeug={onFahrzeugBearbeiten}
+      profil={profil} ungeprueft={ungeprueft} unbekannt={unbekannt} unbelegt={unbelegt} onFahrzeug={onFahrzeugBearbeiten}
       onPosition={(item, fokus) => setEdit({ item, neu: false, fokus })}
     />
   );
@@ -237,6 +253,7 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onF
   const sheet = edit && (
     <WartungsplanEditor
       item={edit.item} neu={edit.neu} fokus={edit.fokus} busy={busy} vorlage={vorlageZu(edit.item)} motorcode={profil.motorcode}
+      auftraege={auftraege} onAuftrag={onAuftrag}
       onSave={(it, teilen) => void speichern(it, teilen)} onUndo={() => rueckgaengig(edit.item)} onDelete={() => entfernen(edit.item)} onClose={() => setEdit(null)}
     />
   );
@@ -352,11 +369,12 @@ function WartungsplanKachel({ item, naechste, zustand, busy, vorlage, selected, 
   const badge = BADGE[zustand];
   const intervall = intervallText(item);
   const zuletzt = datumKm(item.letztesDatum, item.letzteKm);
+  const beleg = letzterBeleg(item);
   const istGemacht = zustand === 'gemacht';
   const istZukunft = zustand === 'faellig';
-  const fuss = [zuletzt && `Zuletzt ${zuletzt}`, item.notiz].filter(Boolean).join(' · ');
   const q = quelleVon(item, vorlage);
   const quelle = q && QUELLE[q];
+  const naechsteVonHand = faelligVonHand(item);
   const quelleTitel = q === 'geprueft'
     ? [item.quelleText, item.geprueftAm && `geprüft ${formatDateCH(item.geprueftAm)}`].filter(Boolean).join(' · ') || undefined
     : vorlage?.hinweis ?? HINWEIS_STANDARD;
@@ -378,21 +396,28 @@ function WartungsplanKachel({ item, naechste, zustand, busy, vorlage, selected, 
           <dd>{intervall || <button type="button" className="sp-erfassen" onClick={() => onOpen('intervall')}>Erfassen</button>}</dd>
         </div>
         <div>
-          <dt>Nächste</dt>
-          <dd>
+          <dt>Nächste{naechsteVonHand && <span className="sp-dt-hint"> · von Hand</span>}</dt>
+          <dd title={naechste ? (naechsteVonHand ? 'Von Hand gesetzt' : 'Letzter Service + Intervall') : undefined}>
             {naechste || (istGemacht
               ? <span className="sp-leer">–</span>
               : <button type="button" className="sp-erfassen" onClick={() => onOpen('naechste')} title="Letzten Service oder nächste Fälligkeit eintragen">Erfassen</button>)}
           </dd>
         </div>
       </dl>
-      {fuss && <p className="sp-foot">{fuss}</p>}
+      {/* Three separate facts: proof of the last service, source of the interval, note. */}
+      {zuletzt && beleg && (
+        <p className="sp-quelle" title={beleg.label}>
+          <span className="dot" style={{ background: beleg.farbe }} />
+          Zuletzt {zuletzt} · {beleg.kurz}
+        </p>
+      )}
       {quelle && (
         <p className="sp-quelle" title={quelleTitel}>
           <span className="dot" style={{ background: quelle.dot }} />
           {quelle.label}{q === 'geprueft' && item.quelleText ? ` · ${item.quelleText}` : ''}
         </p>
       )}
+      {item.notiz && <p className="sp-foot">{item.notiz}</p>}
 
       <div className="sp-tile-actions">
         <div className="sp-switch" role="group" aria-label={`Status ${item.name}`}>
@@ -428,6 +453,9 @@ interface EditorProps {
   vorlage?: Vorlage;
   /** The vehicle's Motorkennbuchstabe: a checked interval can be stored for it. */
   motorcode?: string;
+  /** The vehicle's Aufträge, to link a service entry to. */
+  auftraege: Order[];
+  onAuftrag?: (o: Order) => void;
   /** `teilen`: store the checked interval for every vehicle with this Motorkennbuchstabe. */
   onSave: (it: ServiceItem, teilen: boolean) => void;
   /** Undoes the last "Gemacht". */
@@ -436,7 +464,7 @@ interface EditorProps {
   onClose: () => void;
 }
 
-function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, onSave, onUndo, onDelete, onClose }: EditorProps) {
+function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, auftraege, onAuftrag, onSave, onUndo, onDelete, onClose }: EditorProps) {
   const fokusRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = fokusRef.current;
@@ -456,6 +484,11 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, onSave
     notiz: item.notiz ?? '',
     quelleText: item.quelleText ?? '',
   });
+  // Proof of the last service. A new entry starts at the least trusted one:
+  // nothing counts as documented unless picked.
+  const alt = letzterService(item);
+  const [nachweis, setNachweis] = useState<Nachweis>(alt?.nachweis ?? 'kunde');
+  const [auftragId, setAuftragId] = useState(alt?.auftragId ?? '');
   const [geprueft, setGeprueft] = useState(item.quelle === 'geprueft');
   const [teilen, setTeilen] = useState(true);
   const s = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF((p) => ({ ...p, [k]: e.target.value }));
@@ -473,7 +506,7 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, onSave
     // Checked against the OEM schedule: verified. Edited without the check:
     // the vehicle's own value, without a source.
     const quelle: IntervallQuelle | undefined = geprueft ? 'geprueft' : geaendert || warGeprueft ? undefined : item.quelle;
-    onSave({
+    const neuItem: ServiceItem = {
       ...item,
       name: f.name.trim(),
       intervallKm,
@@ -483,13 +516,14 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, onSave
       quelle,
       quelleText: geprueft ? opt(f.quelleText) : undefined,
       geprueftAm: geprueft ? (warGeprueft && !geaendert && item.geprueftAm ? item.geprueftAm : todayISO()) : undefined,
-      letztesDatum: opt(f.letztesDatum),
-      letzteKm: opt(f.letzteKm),
-      faelligDatum: opt(f.faelligDatum),
-      faelligKm: opt(f.faelligKm),
       notiz: opt(f.notiz),
-    }, geprueft && kannTeilen && teilen);
+    };
+    onSave(letztenServiceSetzen(neuItem, {
+      datum: opt(f.letztesDatum), km: opt(f.letzteKm), beleg: { nachweis, auftragId: opt(auftragId) },
+      faelligDatum: opt(f.faelligDatum), faelligKm: opt(f.faelligKm),
+    }), geprueft && kannTeilen && teilen);
   }
+  const auftragVon = (id?: string) => (id ? auftraege.find((o) => o.id === id) : undefined);
 
   const historie = [...(item.historie ?? [])].reverse();
 
@@ -538,10 +572,30 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, onSave
 
         {ohneBasis && <p className="sp-hinweis">Fälligkeit unbekannt: letzten Service (Serviceheft / Rechnung) oder nächste Fälligkeit eintragen. Ohne Angabe wird nichts angenommen.</p>}
         <p className="sp-editor-head">Zuletzt gemacht</p>
-        <div className="cf-grid-2">
+        <div className="cf-grid-2" ref={fokus === 'letzte' ? fokusRef : undefined}>
           <div className="cf-field"><label className="cf-label" htmlFor="sp-ld">Datum</label><input id="sp-ld" className="cf-input" type="date" value={f.letztesDatum} onChange={s('letztesDatum')} /></div>
           <div className="cf-field"><label className="cf-label" htmlFor="sp-lkm">KM-Stand</label><input id="sp-lkm" className="cf-input" type="number" inputMode="numeric" value={f.letzteKm} onChange={s('letzteKm')} /></div>
         </div>
+        {f.letztesDatum && (
+          <div className="cf-grid-2">
+            <div className="cf-field">
+              <label className="cf-label" htmlFor="sp-nachweis">Nachweis</label>
+              <select id="sp-nachweis" className="cf-select" value={nachweis} onChange={(e) => setNachweis(e.target.value as Nachweis)}>
+                {(Object.keys(NACHWEIS) as Nachweis[]).map((n) => <option key={n} value={n}>{NACHWEIS[n].label}</option>)}
+              </select>
+            </div>
+            {auftraege.length > 0 && (
+              <div className="cf-field">
+                <label className="cf-label" htmlFor="sp-auftrag">Auftrag (optional)</label>
+                <select id="sp-auftrag" className="cf-select" value={auftragId} onChange={(e) => setAuftragId(e.target.value)}>
+                  <option value="">Kein Auftrag</option>
+                  {auftraege.map((o) => <option key={o.id} value={o.id}>#{o.orderNumber} · {formatDateCH(o.createdAt)}</option>)}
+                </select>
+              </div>
+            )}
+          </div>
+        )}
+        {!f.letztesDatum && f.letzteKm && <p className="sp-hinweis">Ohne Datum wird der KM-Stand ohne Beleg und ohne Verlaufseintrag gespeichert.</p>}
 
         <p className="sp-editor-head">Nächste Fälligkeit</p>
         <div className="cf-grid-2" ref={fokus === 'naechste' ? fokusRef : undefined}>
@@ -558,11 +612,24 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, onSave
           <div>
             <p className="sp-editor-head">Verlauf</p>
             <ul className="sp-history">
-              {historie.map((h, i) => (
-                <li key={i}><span className="sp-history-check"><SFCheckmark /></span>{datumKm(h.datum, h.km)}</li>
-              ))}
+              {historie.map((h, i) => {
+                const b = eintragNachweis(h);
+                const info = NACHWEIS[b.nachweis];
+                const auftrag = auftragVon(b.auftragId);
+                return (
+                  <li key={i}>
+                    <span className="sp-history-check" style={{ color: info.farbe }}><SFCheckmark /></span>
+                    <span className="sp-history-text">
+                      {datumKm(h.datum, h.km)} · <span className="sp-history-beleg">{info.kurz}</span>
+                      {auftrag && (onAuftrag
+                        ? <> · <button type="button" className="sp-erfassen" onClick={() => onAuftrag(auftrag)}>Auftrag #{auftrag.orderNumber}</button></>
+                        : <> · Auftrag #{auftrag.orderNumber}</>)}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
-            <button type="button" className="sp-text-btn sp-undo" onClick={onUndo} disabled={busy}>Letztes «Gemacht» rückgängig</button>
+            <button type="button" className="sp-text-btn sp-undo" onClick={onUndo} disabled={busy}>Letzten Eintrag rückgängig</button>
           </div>
         )}
 

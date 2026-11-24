@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf';
 import { PAGE_TOP, PAGE_BOTTOM, addPageNumbers } from './pdf-paging';
 import { buildDocumentFilename, formatDateCH } from './utils';
 import { CO_NAME, CO_ADDR, CO_CITY, CO_PHONE } from './company';
-import { fahrzeugLabel, formatKm, naechsteFaelligkeit, ohneEntfernteService, serviceZustand, type ServiceZustand } from './vehicles';
+import { fahrzeugLabel, formatKm, letzterBeleg, naechsteFaelligkeit, ohneEntfernteService, serviceZustand, type ServiceZustand } from './vehicles';
 import { archiveToDrive } from './drive';
 import { quelleVon } from './wartung';
 import type { Customer, ServiceItem, Vehicle } from '../types';
@@ -66,6 +66,9 @@ export async function exportWartungsplanPDF(vehicle: Vehicle, customer: Customer
       const q = quelleVon(item);
       if ((q === 'richtwert' || q === 'standard') && iv[0] !== '-') { iv[0] += ' *'; unsicher = true; }
       const zu = mitTrenner(item.letztesDatum ? formatDateCH(item.letztesDatum) : '', km(item.letzteKm)).split('\n');
+      // A last service without a record says so; documented ones name their proof.
+      const beleg = letzterBeleg(item);
+      if (beleg) zu.push(beleg.kurz);
       const na = mitTrenner(n.datum ? formatDateCH(n.datum) : '', km(n.km ?? undefined)).split('\n');
       const lines = Math.max(name.length + 1, iv.length, zu.length, na.length);
       const h = lines * 3.8 + 2.4;

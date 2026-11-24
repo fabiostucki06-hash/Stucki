@@ -64,10 +64,18 @@ export interface WartungSpec {
   geprueftVon?: string;
 }
 
+/** What proves a service entry: done in this workshop, the vehicle's
+    service book, another workshop's invoice, or only the customer's word. */
+export type Nachweis = 'werkstatt' | 'serviceheft' | 'rechnung' | 'kunde';
+
 export interface ServiceEintrag {
   /** ISO date (yyyy-mm-dd). */
   datum: string;
   km?: string;
+  /** Unset on older entries: those were all made by "Gemacht" (= 'werkstatt'). */
+  nachweis?: Nachweis;
+  /** The Auftrag the work was done in, when linked. */
+  auftragId?: string;
 }
 
 export interface ServiceItem {

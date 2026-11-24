@@ -1,4 +1,4 @@
-import { neueServiceId, plusMonate } from './vehicles';
+import { faelligAus, kmZahl, neueServiceId } from './vehicles';
 import { modelljahrAusVin } from '../../supabase/functions/vin-decode/vds';
 import type { Achsantrieb, Antrieb, FahrzeugFeld, Getriebe, IntervallQuelle, ServiceItem, Steuertrieb, Vehicle, WartungSpec } from '../types';
 
@@ -466,11 +466,9 @@ export function wartungsplanAbgleichen(items: ServiceItem[], v: ProfilQuelle, vo
     if (s.quelleText) n.quelleText = s.quelleText; else delete n.quelleText;
     delete n.geprueftAm;
     // Due values set by "Gemacht" (last service + old interval) follow the new interval.
-    if (i.letztesDatum && i.faelligDatum && i.intervallMonate && i.faelligDatum === plusMonate(i.letztesDatum, i.intervallMonate))
-      n.faelligDatum = s.intervallMonate ? plusMonate(i.letztesDatum, s.intervallMonate) : undefined;
-    const lk = parseInt(i.letzteKm ?? '', 10);
-    if (Number.isFinite(lk) && i.faelligKm && i.intervallKm && parseInt(i.faelligKm, 10) === lk + i.intervallKm)
-      n.faelligKm = s.intervallKm ? String(lk + s.intervallKm) : undefined;
+    const vorher = faelligAus(i, i.letztesDatum, i.letzteKm), nachher = faelligAus(n, i.letztesDatum, i.letzteKm);
+    if (i.faelligDatum && i.faelligDatum === vorher.faelligDatum) n.faelligDatum = nachher.faelligDatum;
+    if (i.faelligKm && kmZahl(i.faelligKm) === kmZahl(vorher.faelligKm)) n.faelligKm = nachher.faelligKm;
     out.push(n);
   }
   for (const [key, s] of soll) if (!gesehen.has(key)) out.push(ausVorlage(s));
@@ -484,12 +482,16 @@ export function mitWartungsplan(v: Vehicle, vorher?: Vehicle, specs: WartungSpec
   return { ...v, service, wartungsprofil: profilSignatur(v, specs) };
 }
 
+/** Source shown for an interval: a stored IntervallQuelle, or 'eigen' = set
+    by the workshop without a check against the OEM schedule. */
+export type QuelleAnzeige = IntervallQuelle | 'eigen';
+
 /** Source of an item's interval for display: stored on newer items; older
     generated items take the one of their Vorlage while they carry its
     interval, else count as Standardwert. Own positions and intervals set by
-    hand without a check have none. */
-export function quelleVon(i: ServiceItem, vorlage?: Vorlage): IntervallQuelle | undefined {
+    hand without a check are 'eigen' (none without an interval). */
+export function quelleVon(i: ServiceItem, vorlage?: Vorlage): QuelleAnzeige | undefined {
   if (i.quelle) return i.quelle;
-  if (!vorlageVon(i) || i.intervallManuell) return undefined;
+  if (!vorlageVon(i) || i.intervallManuell) return i.intervallKm || i.intervallMonate ? 'eigen' : undefined;
   return vorlage && gleich(i, [vorlage.intervallKm, vorlage.intervallMonate]) ? vorlage.quelle : 'standard';
 }

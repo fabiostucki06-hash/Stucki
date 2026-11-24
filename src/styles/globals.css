@@ -1115,6 +1115,9 @@ select.mf-add-pos.df-pauschale-select{-webkit-appearance:none;appearance:none;co
 .sp-history li{display:flex;align-items:center;gap:8px}
 .sp-history-check{display:inline-flex;color:var(--green)}
 .sp-history-check svg{width:12px;height:12px}
+.sp-history-text{min-width:0}
+.sp-history-beleg{color:var(--label)}
+.sp-dt-hint{color:var(--label3);font-weight:400}
 .sp-editor .text-danger-btn{margin-top:0}
 .sp-undo{margin:6px 0 0 -10px}
 @media (max-width:400px){
