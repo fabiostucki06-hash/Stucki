@@ -26,6 +26,8 @@ interface ShortcutInput {
   /** Read on the iPhone (Shortcut running JavaScript on the Safari page); skips the server fetch. */
   import_title?: string;
   import_price?: string;
+  /** ISO code of import_price, when the page states it. */
+  import_currency?: string;
   import_artnr?: string;
   active_offerte_id?: string;
 }
@@ -70,6 +72,7 @@ function readInput(req: VercelLikeRequest): ShortcutInput | null {
     import_text: pick('import_text'),
     import_title: pick('import_title'),
     import_price: pick('import_price'),
+    import_currency: pick('import_currency'),
     import_artnr: pick('import_artnr'),
     active_offerte_id: pick('active_offerte_id') ?? first(q.offerte_id),
   };
@@ -84,6 +87,7 @@ function appImportUrl(req: VercelLikeRequest, input: ShortcutInput): string {
   if (input.import_text) q.set('import_text', input.import_text);
   if (input.import_title) q.set('import_title', input.import_title);
   if (input.import_price) q.set('import_price', input.import_price);
+  if (input.import_currency) q.set('import_currency', input.import_currency);
   if (input.import_artnr) q.set('import_artnr', input.import_artnr);
   if (input.active_offerte_id) q.set('offerte_id', input.active_offerte_id);
   return `${proto}://${host}/?${q}`;
@@ -112,10 +116,10 @@ export async function runShortcutImport(req: VercelLikeRequest): Promise<{ statu
 
   const part = await extractPart({
     url: input.import_url, text: input.import_text,
-    title: input.import_title, price: input.import_price, artnr: input.import_artnr,
+    title: input.import_title, price: input.import_price, currency: input.import_currency, artnr: input.import_artnr,
   });
   const ek = parseFloat(part.ek);
-  console.log('[import-shortcut] parsed:', { url: input.import_url, title: part.title, ek: part.ek, artnr: part.artikelnummer, blocked: part.blocked, error: part.error });
+  console.log('[import-shortcut] parsed:', { url: input.import_url, title: part.title, ek: part.ek, fx: part.ekHinweis, preis: part.preisStatus, artnr: part.artikelnummer, blocked: part.blocked, error: part.error });
 
   let r: Response;
   try {
@@ -150,14 +154,17 @@ export async function runShortcutImport(req: VercelLikeRequest): Promise<{ statu
         success: true, ok: true,
         offertNumber: result.offertNumber, beschreibung: result.beschreibung, artikelnummer: part.artikelnummer, ek: part.ek, vk: result.vk,
         quelle: part.quelle, lieferant: supplierDomain(part.quelle || input.import_url),
-        message: 'Teil zu Offerte hinzugefügt',
+        ekHinweis: part.ekHinweis,
+        message: part.ekHinweis ? `Teil zu Offerte hinzugefügt (EK umgerechnet: ${part.ekHinweis} = CHF ${part.ek})` : 'Teil zu Offerte hinzugefügt',
       },
     };
   }
   const code = result.code ?? 'incomplete_part';
   console.warn('[import-shortcut] not saved:', code);
   const extra: Json = { open_url: appImportUrl(req, input) };
-  if (code === 'incomplete_part' && part.blocked) extra.message = `${ERRORS[code].message} (Shop blockiert Server-Abfragen – aus Safari teilen, dann liest der Kurzbefehl die Seite selbst.)`;
+  // Price found but not confirmed in CHF (unknown currency / no exchange rate).
+  if (code === 'incomplete_part' && part.preisWarnung) extra.message = `${part.preisWarnung} Teil bitte in GarageOS ergänzen.`;
+  else if (code === 'incomplete_part' && part.blocked) extra.message = `${ERRORS[code].message} (Shop blockiert Server-Abfragen – aus Safari teilen, dann liest der Kurzbefehl die Seite selbst.)`;
   return fail(422, code, extra);
 }
 

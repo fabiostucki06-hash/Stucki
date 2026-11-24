@@ -5,6 +5,7 @@ import { needsAttention, decodeMaybeDouble } from './lib/utils';
 import { getActiveOfferteId, setActiveOfferteId, getMargin } from './lib/settings';
 import { vkAusEk } from './lib/marge';
 import { cleanPartTitle } from './lib/partTitle';
+import { detectPrice, resolveChfPrice, fxHinweis } from './lib/currency';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { useIsDesktop } from './hooks/useIsDesktop';
 import { offerteNr, nextVersion, sumPositions, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_BEDINGUNG, ANZAHLUNG_PROZENT, mitMaterialHinweis, ohneMaterialHinweis, ersetzeNummer, OFFERTE_REF, ANZAHLUNG_REF } from './lib/offerte-docs';
@@ -125,6 +126,7 @@ export default function App() {
     const rawTitle = params.get('import_title');
     const rawPrice = params.get('import_price');
     const rawArtnr = params.get('import_artnr');
+    const rawCurrency = params.get('import_currency');
     if (rawUrl || rawText) {
       // URLSearchParams.get() already undoes one layer of percent-encoding; some
       // iOS Shortcuts "URL öffnen" actions re-encode a value that was already
@@ -134,6 +136,7 @@ export default function App() {
       const title = rawTitle ? decodeMaybeDouble(rawTitle) : undefined;
       const price = rawPrice ? decodeMaybeDouble(rawPrice) : undefined;
       const artnr = rawArtnr ? decodeMaybeDouble(rawArtnr) : undefined;
+      const currency = rawCurrency ? decodeMaybeDouble(rawCurrency) : undefined;
 
       // An unresolved Shortcuts variable placeholder (e.g. the literal text
       // "[Textausgabe (URL-codiert)]" instead of the actual shared value) looks
@@ -145,12 +148,12 @@ export default function App() {
       }
 
       setPendingImport({
-        payload: { url, text, title, price, artikelnummer: artnr, _rawUrl: rawUrl ?? undefined, _rawText: rawText ?? undefined },
+        payload: { url, text, title, price, currency, artikelnummer: artnr, _rawUrl: rawUrl ?? undefined, _rawText: rawText ?? undefined },
         offerteId: params.get('offerte_id') || undefined,
         fromBookmarklet: params.get('import_src') === 'bookmarklet',
       });
       params.delete('import_url'); params.delete('import_text');
-      params.delete('import_title'); params.delete('import_price'); params.delete('import_artnr');
+      params.delete('import_title'); params.delete('import_price'); params.delete('import_artnr'); params.delete('import_currency');
       params.delete('offerte_id'); params.delete('import_src');
       const rest = params.toString();
       window.history.replaceState({}, '', window.location.pathname + (rest ? `?${rest}` : ''));
@@ -179,28 +182,41 @@ export default function App() {
     if (!target) { openSheet(payload); return; }
 
     (async () => {
-      let part = { title: payload.title, ek: payload.price, artikelnummer: payload.artikelnummer, link: payload.url };
+      let part: { title?: string; ek?: string; ekHinweis?: string; artikelnummer?: string; link?: string };
       try {
-        // Share-sheet path: nothing extracted client-side yet.
-        if (!part.title && !part.ek) {
+        if (payload.title || payload.price) {
+          // Bookmarklet: price text as read on the page ("EUR 45,00"); into CHF
+          // here. Unknown currency or no exchange rate -> the sheet asks.
+          const chf = await resolveChfPrice(detectPrice(payload.price, payload.currency));
+          if (chf.status === 'unknown_currency' || chf.status === 'rate_failed') { openSheet(payload); return; }
+          part = {
+            title: payload.title, artikelnummer: payload.artikelnummer, link: payload.url,
+            ek: chf.status === 'ok' ? chf.ek : undefined,
+            ekHinweis: chf.status === 'ok' && chf.fx ? fxHinweis(chf.fx) : undefined,
+          };
+        } else {
+          // Share-sheet path: nothing extracted client-side yet; the server
+          // returns the EK already in CHF (or flags it).
           const r = await fetch('/api/import-part', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           });
-          const data: { title?: string; ek?: string; artikelnummer?: string; quelle?: string } = await r.json();
-          part = { title: data.title, ek: data.ek, artikelnummer: data.artikelnummer, link: data.quelle || payload.url };
+          const data: { title?: string; ek?: string; ekHinweis?: string; preisStatus?: string; artikelnummer?: string; quelle?: string } = await r.json();
+          if (data.preisStatus) { openSheet(payload); return; }
+          part = { title: data.title, ek: data.ek, ekHinweis: data.ekHinweis, artikelnummer: data.artikelnummer, link: data.quelle || payload.url };
         }
         const beschreibung = cleanPartTitle(part.title ?? '');
         const ek = parseFloat(part.ek ?? '');
         if (!beschreibung || !(ek > 0)) {
-          openSheet({ ...payload, title: part.title, price: part.ek, artikelnummer: part.artikelnummer });
+          // part.ek is CHF at this point, so say so — the sheet must not re-guess it.
+          openSheet({ ...payload, title: part.title, price: part.ek, currency: part.ek ? 'CHF' : undefined, artikelnummer: part.artikelnummer });
           return;
         }
         const vk = vkAusEk(ek, getMargin());
         await handleAddImportedPartToOfferte(target.id, {
           typ: 'material', beschreibung, menge: '1', stueckpreis: vk, preis: vk,
-          link: part.link || undefined, ek: part.ek, marge: String(getMargin()), artikelnummer: part.artikelnummer || undefined,
+          link: part.link || undefined, ek: part.ek, ekHinweis: part.ekHinweis, marge: String(getMargin()), artikelnummer: part.artikelnummer || undefined,
         });
         setPendingImport(null);
         importStarted.current = false;
@@ -208,7 +224,7 @@ export default function App() {
         // The bookmarklet opened this tab just for the import: hand the user
         // back to the shop page once the toast was readable. Never closes a
         // tab that has been navigated in.
-        if (fromBookmarklet && window.history.length <= 1) setTimeout(() => window.close(), 1800);
+        if (fromBookmarklet && window.history.length <= 1) setTimeout(() => window.close(), part.ekHinweis ? 5000 : 1800);
       } catch (e) {
         console.warn('[Import] direct import failed, falling back to the import sheet:', e);
         openSheet(payload);
@@ -517,7 +533,9 @@ export default function App() {
     const positionen = [...(off.positionen ?? []), position];
     const t = sumPositions(positionen);
     await updateOfferte({ ...off, positionen, totalArbeit: t.totalArbeit.toFixed(2), totalMaterial: t.totalMaterial.toFixed(2), totalBetrag: t.total.toFixed(2), totalZE: t.totalZE });
-    showToast(`Teil erfolgreich zu Offerte #${offerteNr(off)} hinzugefügt!`, 'success');
+    // A converted foreign price says so, so the user can sanity-check the EK.
+    const fx = position.ekHinweis ? ` EK CHF ${position.ek} umgerechnet aus ${position.ekHinweis}.` : '';
+    showToast(`Teil erfolgreich zu Offerte #${offerteNr(off)} hinzugefügt!${fx}`, 'success', fx ? 6000 : undefined);
   }
   function handleStartNewOfferteFromImport(position: MaterialPosition, customerId?: string) {
     setPrefillMat(position);

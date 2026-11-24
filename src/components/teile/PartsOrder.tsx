@@ -106,7 +106,7 @@ export default function PartsOrder({ docLabel, positionen, onSave }: PartsOrderP
                     <div className="po-item-body">
                       <div className="po-item-title">{pos.beschreibung}</div>
                       <div className="po-item-meta">
-                        {[`${pos.menge || '1'}×`, pos.artikelnummer && `Art.-Nr. ${pos.artikelnummer}`, pos.ek && `EK CHF ${pos.ek}`, group.supplier.id === 'other' && link?.host]
+                        {[`${pos.menge || '1'}×`, pos.artikelnummer && `Art.-Nr. ${pos.artikelnummer}`, pos.ek && `EK CHF ${pos.ek}${pos.ekHinweis ? ` (aus ${pos.ekHinweis})` : ''}`, group.supplier.id === 'other' && link?.host]
                           .filter(Boolean).join(' · ')}
                       </div>
                     </div>

@@ -5,6 +5,7 @@ import { getMargin } from '../../lib/settings';
 import { margeAusPreisen } from '../../lib/marge';
 import { cleanPartTitle } from '../../lib/partTitle';
 import { offerteNr } from '../../lib/offerte-docs';
+import { detectPrice, resolveChfPrice, fxHinweis, preisWarnung as warnungFuer } from '../../lib/currency';
 import type { Customer, MaterialPosition, Offerte, MaterialCatalogItem } from '../../types';
 
 export interface ImportPayload {
@@ -13,7 +14,10 @@ export interface ImportPayload {
   /** Already extracted client-side (e.g. by the desktop bookmarklet, which has
       direct DOM access to the product page) — skips the server-side re-fetch. */
   title?: string;
+  /** Price as read on the shop page, currency included where shown ("EUR 45,00"). */
   price?: string;
+  /** ISO code from the page's structured data, if any. */
+  currency?: string;
   artikelnummer?: string;
   /** Pre-decode raw query values, kept only for the failure-path debug hint
       below (see "what was received vs. decoded"). */
@@ -40,6 +44,8 @@ interface ParsedPart {
   artikelnummer: string;
   quelle: string;
   blocked?: boolean;
+  ekHinweis?: string;
+  preisWarnung?: string;
 }
 
 const round2 = (n: number) => (Number.isFinite(n) ? n.toFixed(2) : '');
@@ -57,6 +63,10 @@ export default function ImportPartSheet({ payload, customers, offerten, defaultO
   const openDrafts = offerten.filter((o) => o.status === 'entwurf' || o.status === 'versendet');
   const [targetOfferteId, setTargetOfferteId] = useState(() => (openDrafts.some((o) => o.id === defaultOfferteId) ? defaultOfferteId! : ''));
   const [busy, setBusy] = useState(false);
+  /** Set when the EK was converted from a foreign currency (stored on the position). */
+  const [ekHinweis, setEkHinweis] = useState<string | undefined>(undefined);
+  /** Price found but not confirmed in CHF: the user must enter the EK. */
+  const [preisWarnung, setPreisWarnung] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<{ raw: string; decoded: string } | null>(null);
   const ekInputRef = useRef<HTMLInputElement>(null);
 
@@ -64,16 +74,26 @@ export default function ImportPartSheet({ payload, customers, offerten, defaultO
     // Bookmarklet path: title/price already extracted client-side from the live,
     // JS-rendered product page — more reliable than a server-side re-fetch (which
     // sees raw HTML and can hit anti-bot blocks), so use it directly.
+    let cancelled = false;
     if (payload.title || payload.price) {
       setBeschreibung(cleanPartTitle(payload.title || ''));
-      setEk(payload.price || '');
       setArtikelnummer(payload.artikelnummer || '');
-      if (payload.price) setStueckpreis(round2(parseFloat(payload.price) * (1 + margin / 100)));
-      setLoading(false);
-      return;
+      (async () => {
+        // Into CHF: foreign prices at the ECB rate; unknown currency or no
+        // rate leaves the EK empty with a warning — never a guessed value.
+        const chf = await resolveChfPrice(detectPrice(payload.price, payload.currency));
+        if (cancelled) return;
+        if (chf.status === 'ok') {
+          setEk(chf.ek);
+          setStueckpreis(round2(parseFloat(chf.ek) * (1 + margin / 100)));
+          setEkHinweis(chf.fx ? fxHinweis(chf.fx) : undefined);
+        }
+        setPreisWarnung(warnungFuer(chf));
+        setLoading(false);
+      })();
+      return () => { cancelled = true; };
     }
 
-    let cancelled = false;
     (async () => {
       try {
         const r = await fetch('/api/import-part', {
@@ -88,6 +108,8 @@ export default function ImportPartSheet({ payload, customers, offerten, defaultO
         setArtikelnummer(data.artikelnummer || '');
         if (data.quelle) setQuelle(data.quelle);
         if (data.ek) setStueckpreis(round2(parseFloat(data.ek) * (1 + margin / 100)));
+        setEkHinweis(data.ekHinweis);
+        setPreisWarnung(data.preisWarnung ?? null);
         if (!data.ok) {
           const raw = payload._rawUrl || payload._rawText || '';
           const decoded = payload.url || payload.text || '';
@@ -129,6 +151,9 @@ export default function ImportPartSheet({ payload, customers, offerten, defaultO
 
   function handleEkChange(v: string) {
     setEk(v);
+    // Typed by hand: no longer the converted value, and confirmed by the user.
+    setEkHinweis(undefined);
+    setPreisWarnung(null);
     const n = parseFloat(v);
     if (Number.isFinite(n)) setStueckpreis(round2(n * (1 + margin / 100)));
   }
@@ -138,7 +163,7 @@ export default function ImportPartSheet({ payload, customers, offerten, defaultO
     const mg = parseFloat(menge) || 1;
     if (!beschreibung.trim() || !sp) return null;
     const ekNum = parseFloat(ek) || 0;
-    return { typ: 'material', beschreibung: beschreibung.trim(), menge: String(mg), stueckpreis: stueckpreis, preis: (sp * mg).toFixed(2), link: quelle || undefined, ek: ek || undefined, marge: ekNum > 0 ? margeAusPreisen(ekNum, sp) : undefined, artikelnummer: artikelnummer || undefined };
+    return { typ: 'material', beschreibung: beschreibung.trim(), menge: String(mg), stueckpreis: stueckpreis, preis: (sp * mg).toFixed(2), link: quelle || undefined, ek: ek || undefined, ekHinweis: ek ? ekHinweis : undefined, marge: ekNum > 0 ? margeAusPreisen(ekNum, sp) : undefined, artikelnummer: artikelnummer || undefined };
   }
 
   async function handleAddToOfferte() {
@@ -221,7 +246,7 @@ export default function ImportPartSheet({ payload, customers, offerten, defaultO
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
           <div className="cf-field">
-            <label className="cf-label">Einkaufspreis (EK)</label>
+            <label className="cf-label">Einkaufspreis (EK, CHF)</label>
             <input ref={ekInputRef} className="cf-input" type="number" value={ek} onChange={(e) => handleEkChange(e.target.value)} placeholder="0.00" />
           </div>
           <div className="cf-field">
@@ -253,6 +278,16 @@ export default function ImportPartSheet({ payload, customers, offerten, defaultO
             </div>
           </div>
         </div>
+        {preisWarnung && (
+          <div role="alert" style={{ fontSize: 12, color: 'var(--orange)', background: 'var(--orange-tint)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', marginTop: 10 }}>
+            {preisWarnung}
+          </div>
+        )}
+        {ekHinweis && (
+          <p style={{ fontSize: 11, color: 'var(--label2)', marginTop: 8, marginBottom: 0, fontVariantNumeric: 'tabular-nums' }}>
+            EK umgerechnet aus {ekHinweis}
+          </p>
+        )}
         <p style={{ fontSize: 11, color: 'var(--label3)', marginTop: 8, marginBottom: 0 }}>
           VK = EK + {margin}% Marge (einstellbar unter Einstellungen → Teile-Import).
         </p>

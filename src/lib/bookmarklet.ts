@@ -9,6 +9,9 @@
     The shop page can't read GarageOS's storage (other origin), so which
     Offerte is active is decided in the opened tab; `import_src=bookmarklet`
     lets that tab close itself again once the part went straight into it.
+    The price goes out as the raw text next to it ("EUR 45,00", "29.90 CHF")
+    plus `import_currency` from the page's structured data, if any; GarageOS
+    reads the currency from both and converts to CHF (lib/currency.ts).
     NOTE: no `//` line comments inside the `code` template below — whitespace
     collapse below turns a trailing newline into a space, which would make an
     unterminated `//` comment swallow the rest of the script. */
@@ -17,15 +20,22 @@ export function buildImportBookmarklet(origin: string): string {
     var d=document,b=(d.body&&d.body.innerText)||'';
     var og=d.querySelector('meta[property="og:title"]');
     var t=(og&&og.content)||d.title||'';
-    var pe=d.querySelector('.product-price, .price-value, [data-price], .p-price');
-    var pt=pe?((pe.getAttribute&&pe.getAttribute('data-price'))||pe.innerText||''):'';
-    var pm=pt.match(/([\\d]{1,3}(?:[.'\\s]\\d{3})*(?:[.,]\\d{2})?)/) || b.match(/(?:CHF|EUR|\\u20ac|Fr\\.?)\\s?([\\d]{1,3}(?:[.'\\s]\\d{3})*(?:[.,]\\d{2})?)/i);
-    var p=pm?pm[1].replace(/['\\s]/g,'').replace(',', '.'):'';
+    var cm=d.querySelector('meta[property="product:price:currency"],meta[property="og:price:currency"],[itemprop="priceCurrency"]');
+    var c=cm?(cm.getAttribute('content')||cm.textContent||''):'';
+    if(!c){var lj=d.querySelectorAll('script[type="application/ld+json"]');
+      for(var i=0;i<lj.length&&!c;i++){var mm=(lj[i].textContent||'').match(/"priceCurrency"\\s*:\\s*"([A-Za-z]{3})"/);if(mm)c=mm[1];}}
+    c=c.trim();c=/^[A-Za-z]{3}$/.test(c)?c.toUpperCase():'';
+    var pe=d.querySelector('.x-price-primary, [itemprop="price"], .product-price, .price-value, [data-price], .p-price');
+    var pt=pe?(pe.innerText||'').trim():'';
+    if(pe&&!/\\d/.test(pt))pt=pe.getAttribute('data-price')||pe.getAttribute('content')||'';
+    if(!/\\d/.test(pt)){var bm=b.match(/(?:CHF|EUR|USD|GBP|US ?\\$|Fr\\.|\\u20ac|\\u00a3)\\s?\\d[\\d.,'\\s]*|\\d[\\d.,']*\\s?(?:CHF|EUR|USD|GBP|\\u20ac|\\u00a3)/i);pt=bm?bm[0]:'';}
+    var p=pt.replace(/\\s+/g,' ').trim().slice(0,80);
     var am=b.match(/(?:Art(?:ikel)?\\.?-?Nr\\.?|Artikelnummer|SKU|MPN)[:\\s]*([A-Za-z0-9\\-\\/]{3,})/i);
     var a=am?am[1]:'';
     var q='import_url='+encodeURIComponent(location.href)
       +'&import_title='+encodeURIComponent(t.trim())
       +'&import_price='+encodeURIComponent(p)
+      +'&import_currency='+encodeURIComponent(c)
       +'&import_artnr='+encodeURIComponent(a)
       +'&import_src=bookmarklet';
     var u='${origin}/?'+q;

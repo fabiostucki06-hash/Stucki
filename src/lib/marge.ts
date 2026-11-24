@@ -33,6 +33,8 @@ export function setMaterialFeld<P extends MaterialPosition>(p: P, key: string, v
     return { ...p, [key]: value };
   }
   const n = { ...p, [key]: value };
+  // A new EK replaces any earlier currency conversion note (set again by the caller if converted).
+  if (key === 'ek') delete n.ekHinweis;
   const ek = fN(n.ek);
   if ((key === 'ek' || key === 'marge') && ek > 0) {
     if (key === 'ek' && !n.marge?.trim()) n.marge = String(getMargin());

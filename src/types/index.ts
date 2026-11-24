@@ -193,6 +193,8 @@ export interface MaterialPosition {
   ek?: string;
   /** Margin (%) on `ek` that gave `stueckpreis` (see lib/marge). Internal only, like `ek`. */
   marge?: string;
+  /** How `ek` was converted from a foreign shop price ("EUR 45.00 × 0.9186 (EZB 23.11.2026)"). Internal only, like `ek`. */
+  ekHinweis?: string;
   artikelnummer?: string;
   /** Ticked off in "Teile bestellen". Internal only. */
   bestellt?: boolean;

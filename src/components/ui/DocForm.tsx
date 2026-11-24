@@ -1,3 +1,4 @@
+import { showToast } from './Toast';
 import { Fragment, useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from 'react';
 import Spinner from './Spinner';
 import { SFCheckmark, SFPlus, SFXmark } from '../Icons';
@@ -250,7 +251,7 @@ export function PositionenEditor({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: link.href }),
         });
-        const data: { title?: string; ek?: string; artikelnummer?: string } = await r.json();
+        const data: { title?: string; ek?: string; ekHinweis?: string; preisWarnung?: string; artikelnummer?: string } = await r.json();
         const row = materialRef.current.findIndex((m) => m.link === link.href);
         if (row < 0) return;
         const pos = materialRef.current[row];
@@ -258,6 +259,10 @@ export function PositionenEditor({
         // Setting the EK recalculates the VK; a VK typed in by hand is put back
         // afterwards, which turns it into the row's Marge instead.
         onMaterialChange(row, 'ek', data.ek ?? '');
+        // EK is CHF; a foreign shop price was converted (note kept) or, without
+        // a known currency / rate, left empty for the user to fill in.
+        if (data.ekHinweis) onMaterialChange(row, 'ekHinweis', data.ekHinweis);
+        if (data.preisWarnung) showToast(data.preisWarnung, 'error', 7000);
         if (parseFloat(pos.stueckpreis) > 0) onMaterialChange(row, 'stueckpreis', pos.stueckpreis);
         onMaterialChange(row, 'artikelnummer', data.artikelnummer ?? '');
       } catch (err) {
