@@ -1,7 +1,7 @@
 import { showToast } from './Toast';
-import { Fragment, useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
 import Spinner from './Spinner';
-import { SFCheckmark, SFPlus, SFXmark } from '../Icons';
+import { SFCheckmark, SFChevronUp, SFGrip, SFPlus, SFXmark } from '../Icons';
 import type { AutoSaveStatus } from '../../hooks/useAutoSave';
 import { findPartLink, parsePartLink } from '../../lib/utils';
 import { parsePartTitle, partNameFromUrl } from '../../lib/partTitle';
@@ -182,6 +182,19 @@ export function onEnterNextRow(e: KeyboardEvent<HTMLElement>, isLast: boolean, a
   next?.focus();
 }
 
+/** Moves the item at `from` to index `to` (the item ends up where `to` was).
+    Only the order changes; the items themselves are passed through untouched. */
+export function arrayMove<T>(list: T[], from: number, to: number): T[] {
+  if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) return list;
+  const next = [...list];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
+}
+
+type MoveGroup = 'material' | 'arbeit' | 'pauschale';
+interface DragState { group: MoveGroup; from: number; over: number }
+
 interface PositionenEditorProps {
   arbeit: ArbeitRow[];
   material: MaterialRow[];
@@ -194,6 +207,9 @@ interface PositionenEditorProps {
   onMaterialRemove: (i: number) => void;
   /** Inserts a ready-made fixed-price row (Versandkosten, Pauschale). */
   onMaterialInsert: (row: MaterialRow) => void;
+  /** Reorders rows: moves the row at `from` to `to` (indices of the arbeit / material arrays). */
+  onArbeitMove: (from: number, to: number) => void;
+  onMaterialMove: (from: number, to: number) => void;
   /** Materialofferte: material prices only, no ZE on the parts. */
   ohneZe?: boolean;
 }
@@ -205,6 +221,7 @@ export function PositionenEditor({
   arbeit, material,
   onArbeitChange, onArbeitAdd, onArbeitRemove, onKiZE,
   onMaterialChange, onMaterialAdd, onMaterialRemove, onMaterialInsert, ohneZe,
+  onArbeitMove, onMaterialMove,
 }: PositionenEditorProps) {
   const { pauschalen } = useSettings();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -303,6 +320,99 @@ export function PositionenEditor({
   const letzteTeilZeile = material.reduce((last, p, i) => (p.art === 'pauschale' ? last : i), -1);
   const pauschalZeilen = material.map((pos, i) => ({ pos, i })).filter(({ pos }) => pos.art === 'pauschale');
 
+  /* -- Reordering: up / down buttons, or drag the grip handle (pointer events, so
+     it works with mouse and touch alike). Each group is reordered on its own; the
+     row data is moved as is, no value is touched. -- */
+  const reihenfolge: Record<MoveGroup, number[]> = {
+    material: material.flatMap((p, i) => (p.art === 'pauschale' ? [] : [i])),
+    arbeit: arbeit.map((_, i) => i),
+    pauschale: pauschalZeilen.map(({ i }) => i),
+  };
+  // A KI estimate writes its result back by row index, so Arbeit stays put meanwhile.
+  const arbeitBusy = arbeit.some((p) => p.zeLoading);
+  const moveFn = (g: MoveGroup) => (g === 'arbeit' ? onArbeitMove : onMaterialMove);
+  const [drag, setDrag] = useState<DragState | null>(null);
+  // After an up / down move the focus follows the row to its new place.
+  const pendingMoveFocus = useRef<{ group: MoveGroup; idx: number; dir: 'up' | 'down' } | null>(null);
+  useEffect(() => {
+    const f = pendingMoveFocus.current;
+    if (!f) return;
+    pendingMoveFocus.current = null;
+    const row = rootRef.current?.querySelector<HTMLElement>(`[data-df-row="${f.group}"][data-df-idx="${f.idx}"]`);
+    const btn = row?.querySelector<HTMLButtonElement>(`.df-move-${f.dir}`);
+    (btn && !btn.disabled ? btn : row?.querySelector<HTMLButtonElement>('.df-move-btn:not(:disabled)'))?.focus();
+  });
+
+  function moveBy(group: MoveGroup, idx: number, dir: -1 | 1) {
+    const order = reihenfolge[group];
+    const target = order[order.indexOf(idx) + dir];
+    if (target === undefined) return;
+    pendingMoveFocus.current = { group, idx: target, dir: dir < 0 ? 'up' : 'down' };
+    moveFn(group)(idx, target);
+  }
+
+  /** Row index under the pointer within the dragged group (clamped to first / last row). */
+  function rowAt(group: MoveGroup, y: number): number | null {
+    const rows = rootRef.current?.querySelectorAll<HTMLElement>(`[data-df-row="${group}"]`);
+    if (!rows?.length) return null;
+    for (const r of rows) {
+      if (y < r.getBoundingClientRect().bottom) return Number(r.dataset.dfIdx);
+    }
+    return Number(rows[rows.length - 1].dataset.dfIdx);
+  }
+
+  function onGripDown(e: PointerEvent<HTMLElement>, group: MoveGroup, idx: number) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setDrag({ group, from: idx, over: idx });
+  }
+  function onGripMove(e: PointerEvent<HTMLElement>) {
+    if (!drag) return;
+    const over = rowAt(drag.group, e.clientY);
+    if (over != null && over !== drag.over) setDrag({ ...drag, over });
+  }
+  function onGripUp() {
+    if (drag && drag.over !== drag.from) moveFn(drag.group)(drag.from, drag.over);
+    setDrag(null);
+  }
+
+  /** Data attributes + drag highlight class for a reorderable row. */
+  function rowProps(group: MoveGroup, idx: number) {
+    let cls = '';
+    if (drag?.group === group) {
+      const order = reihenfolge[group];
+      if (drag.from === idx) cls = ' df-dragging';
+      else if (drag.over === idx) cls = order.indexOf(drag.over) > order.indexOf(drag.from) ? ' df-drop-after' : ' df-drop-before';
+    }
+    return { data: { 'data-df-row': group, 'data-df-idx': idx }, cls };
+  }
+
+  /** Up / grip / down controls of a row (plain render function, not a component,
+      so the grip keeps its pointer capture across re-renders while dragging). */
+  function moveCell(group: MoveGroup, idx: number, disabled = false) {
+    const order = reihenfolge[group];
+    if (order.length < 2) return <span className="df-c-move" />;
+    const pos = order.indexOf(idx);
+    return (
+      <div className="df-c-move">
+        <button
+          type="button" className="df-move-btn df-move-up" onClick={() => moveBy(group, idx, -1)}
+          disabled={disabled || pos === 0} aria-label="Position nach oben verschieben" title="Nach oben"
+        ><SFChevronUp /></button>
+        <span
+          className={`df-grip${disabled ? ' disabled' : ''}`} title="Ziehen zum Verschieben" aria-hidden="true"
+          onPointerDown={disabled ? undefined : (e) => onGripDown(e, group, idx)}
+          onPointerMove={onGripMove} onPointerUp={onGripUp} onPointerCancel={() => setDrag(null)}
+        ><SFGrip /></span>
+        <button
+          type="button" className="df-move-btn df-move-down" onClick={() => moveBy(group, idx, 1)}
+          disabled={disabled || pos === order.length - 1} aria-label="Position nach unten verschieben" title="Nach unten"
+        ><SFChevronUp down /></button>
+      </div>
+    );
+  }
+
   return (
     <div ref={rootRef}>
       <div className="df-group-hdr">
@@ -311,7 +421,7 @@ export function PositionenEditor({
         <span className="df-group-sum">{fCHF(sum(teile))}</span>
       </div>
       <div className="df-cols df-material">
-        <span>Beschreibung</span><span className="r">Menge</span><span className="r" title="Einkaufspreis pro Stück (intern)">EK CHF</span><span className="r" title="Aufschlag auf den EK (intern)">Marge %</span><span className="r" title="Verkaufspreis pro Stück – erscheint auf dem PDF">VK CHF</span><span className="r" title="Arbeitszeit zum Material: 100 ZE = 60 Min.">ZE</span><span className="r">Total</span><span />
+        <span className="df-c-move" /><span className="df-c-desc">Beschreibung</span><span className="r">Menge</span><span className="r" title="Einkaufspreis pro Stück (intern)">EK CHF</span><span className="r" title="Aufschlag auf den EK (intern)">Marge %</span><span className="r" title="Verkaufspreis pro Stück – erscheint auf dem PDF">VK CHF</span><span className="r" title="Arbeitszeit zum Material: 100 ZE = 60 Min.">ZE</span><span className="r">Total</span><span />
       </div>
       {material.map((pos, i) => {
         if (pos.art === 'pauschale') return null;
@@ -319,9 +429,11 @@ export function PositionenEditor({
         // Versandkosten: fixed price, no EK / Marge / ZE.
         const fest = !!pos.art;
         const festTitel = 'Versandkosten: Betrag wird 1:1 weiterverrechnet, ohne Marge';
+        const row = rowProps('material', i);
         return (
         <Fragment key={i}>
-        <div className={`df-line df-material${fest ? ' df-fest' : ''}`} onKeyDown={(e) => onEnterNextRow(e, i === letzteTeilZeile, addMaterial)}>
+        <div {...row.data} className={`df-line df-material${fest ? ' df-fest' : ''}${row.cls}`} onKeyDown={(e) => onEnterNextRow(e, i === letzteTeilZeile, addMaterial)}>
+          {moveCell('material', i)}
           <div className="df-c-desc df-desc" aria-busy={busy}>
             {fest && <span className={`df-tag df-tag-${pos.art}`} title={festTitel}>{positionsArt(pos)}</span>}
             <input
@@ -406,10 +518,11 @@ export function PositionenEditor({
         <span className="df-group-sum">{zeSumme(arbeit)} ZE</span>
       </div>
       <div className="df-cols df-arbeit">
-        <span>Beschreibung</span><span className="r">ZE</span><span /><span className="r">Min.</span><span className="r">Preis</span><span />
+        <span className="df-c-move" /><span className="df-c-desc">Beschreibung</span><span className="r">ZE</span><span /><span className="r">Min.</span><span className="r">Preis</span><span />
       </div>
-      {arbeit.map((pos, i) => (
-        <div key={i} className="df-line df-arbeit" onKeyDown={(e) => onEnterNextRow(e, i === arbeit.length - 1, addArbeit)}>
+      {arbeit.map((pos, i) => { const row = rowProps('arbeit', i); return (
+        <div key={i} {...row.data} className={`df-line df-arbeit${row.cls}`} onKeyDown={(e) => onEnterNextRow(e, i === arbeit.length - 1, addArbeit)}>
+          {moveCell('arbeit', i, arbeitBusy)}
           <input
             className="df-inp df-c-desc" data-df-desc="arbeit"
             value={pos.beschreibung} onChange={(e) => onArbeitChange(i, 'beschreibung', e.target.value)}
@@ -438,9 +551,10 @@ export function PositionenEditor({
             ? <button type="button" className="mf-pos-del df-c-del" onClick={() => onArbeitRemove(i)} aria-label="Position entfernen"><SFXmark /></button>
             : <span className="df-c-del" />}
         </div>
-      ))}
-      {pauschalZeilen.map(({ pos, i }) => (
-        <div key={`p${i}`} className="df-line df-arbeit df-fest">
+      ); })}
+      {pauschalZeilen.map(({ pos, i }) => { const row = rowProps('pauschale', i); return (
+        <div key={`p${i}`} {...row.data} className={`df-line df-arbeit df-fest${row.cls}`}>
+          {moveCell('pauschale', i)}
           <div className="df-c-desc df-desc">
             <span className="df-tag df-tag-pauschale" title="Pauschale: Festpreis, ohne Stundensatz, ZE und Marge">Pauschale</span>
             <input
@@ -463,7 +577,7 @@ export function PositionenEditor({
           <span className="df-total df-c-total">{pos.preis ? fCHF(parseFloat(pos.preis)) : '—'}</span>
           <button type="button" className="mf-pos-del df-c-del" onClick={() => onMaterialRemove(i)} aria-label="Pauschale entfernen"><SFXmark /></button>
         </div>
-      ))}
+      ); })}
       <div className="df-add-row">
         <button type="button" className="mf-add-pos" onClick={addArbeit}><SFPlus size={12} /> Arbeit</button>
         {pauschalen.length > 0 && (

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { FormCard, FormBar, SaveStatus, SummaryRow, VehicleSelect, PositionenEditor, fCHF, type ArbeitRow, type MaterialRow } from '../ui/DocForm';
+import { FormCard, FormBar, SaveStatus, SummaryRow, VehicleSelect, PositionenEditor, arrayMove, fCHF, type ArbeitRow, type MaterialRow } from '../ui/DocForm';
 import type { Customer, ArbeitPosition, MaterialPosition, Offerte, OfferteStatus } from '../../types';
 import { offerteNotizen, anzahlungErforderlich, anzahlungMoeglich, anzahlungAufteilung, sindVorkasseTerms, ANZAHLUNG_PROZENT, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ } from '../../lib/offerte-docs';
 import NummerField, { parseNummer } from '../ui/NummerField';
@@ -300,6 +300,7 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
           arbeit={arbeit} material={material}
           onArbeitChange={updA} onArbeitAdd={addA} onArbeitRemove={remA} onKiZE={kiZE}
           onMaterialChange={updM} onMaterialAdd={addM} onMaterialRemove={remM} onMaterialInsert={insM}
+          onArbeitMove={(f, t) => setArbeit((a) => arrayMove(a, f, t))} onMaterialMove={(f, t) => setMaterial((m) => arrayMove(m, f, t))}
           ohneZe={istMaterial}
         />
       </FormCard>

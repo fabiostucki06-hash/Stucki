@@ -83,6 +83,22 @@ export const SFXmark = () => (
   </svg>
 );
 
+/** Drag handle for reorderable rows: two columns of three dots. */
+export const SFGrip = () => (
+  <svg width={10} height={16} viewBox="0 0 10 16" fill="currentColor" aria-hidden="true">
+    <circle cx={2.5} cy={3} r={1.6}/><circle cx={7.5} cy={3} r={1.6}/>
+    <circle cx={2.5} cy={8} r={1.6}/><circle cx={7.5} cy={8} r={1.6}/>
+    <circle cx={2.5} cy={13} r={1.6}/><circle cx={7.5} cy={13} r={1.6}/>
+  </svg>
+);
+
+/** Small up (default) / down chevron for move buttons. */
+export const SFChevronUp = ({ down = false }: { down?: boolean }) => (
+  <svg width={12} height={12} viewBox="0 0 12 12" fill="none" aria-hidden="true">
+    <path d={down ? 'M2.5 4.5L6 8l3.5-3.5' : 'M2.5 7.5L6 4l3.5 3.5'} stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 export const SFCheckmark = () => (
   <svg width={14} height={14} viewBox="0 0 14 14" fill="none" aria-hidden="true">
     <path d="M2 7.3l3.4 3.4L12 3.6" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"/>

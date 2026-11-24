@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { FormCard, FormBar, SaveStatus, SummaryRow, VehicleSelect, PositionenEditor, fCHF, type ArbeitRow, type MaterialRow } from '../ui/DocForm';
+import { FormCard, FormBar, SaveStatus, SummaryRow, VehicleSelect, PositionenEditor, arrayMove, fCHF, type ArbeitRow, type MaterialRow } from '../ui/DocForm';
 import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL, rechnungArt } from '../../lib/rechnung-totals';
 import { useDokNummer } from '../../hooks/useDokNummer';
 import { offerteNr } from '../../lib/offerte-docs';
@@ -417,6 +417,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
           arbeit={arbeit} material={material}
           onArbeitChange={updA} onArbeitAdd={addA} onArbeitRemove={remA} onKiZE={kiZE}
           onMaterialChange={updM} onMaterialAdd={addM} onMaterialRemove={remM} onMaterialInsert={insM}
+          onArbeitMove={(f, t) => setArbeit((a) => arrayMove(a, f, t))} onMaterialMove={(f, t) => setMaterial((m) => arrayMove(m, f, t))}
         />
       </FormCard>
 
