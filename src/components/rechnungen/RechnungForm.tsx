@@ -107,7 +107,8 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
   });
   const [material,     setMaterial]     = useState<MaterialRow[]>(() => {
     const mp = (initial?.positionen ?? []).filter((p): p is MaterialPosition => p.typ === 'material');
-    return mp.length ? [...mp] : [newMaterial()];
+    // A new Rechnung starts with an empty row to type into; a stored one without parts stays without.
+    return mp.length || initial ? [...mp] : [newMaterial()];
   });
   const [notizen,      setNotizen]      = useState(initial?.notizen ?? '');
   const [kategorie,    setKategorie]    = useState<RechnungKategorie | ''>(initial?.kategorie ?? '');
@@ -146,7 +147,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
         return { ...p, preis: p.preis || (fehlt ? '' : materialPreis(p)) };
       });
     setArbeit(arbeitRows.length ? arbeitRows : [newArbeit()]);
-    setMaterial(materialRows.length ? materialRows : [newMaterial()]);
+    setMaterial(materialRows);
     // Beanstandungen go into the Notizen (printed on the Rechnung). Those already
     // listed as an Arbeitsposition (Auftrag from an Offerte) aren't repeated.
     // auftrag.notizen are internal and must never be copied onto a Rechnung.
@@ -181,7 +182,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
         return { ...p, preis: p.preis || (fehlt ? '' : materialPreis(p)) };
       });
     setArbeit(arbeitRows.length ? arbeitRows : [newArbeit()]);
-    setMaterial(materialRows.length ? materialRows : [newMaterial()]);
+    setMaterial(materialRows);
   }
 
   function handleZahlungsFristChange(val: string) {

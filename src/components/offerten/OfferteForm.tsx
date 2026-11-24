@@ -111,7 +111,8 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
     // A Materialofferte prices the parts only: no ZE on its positions.
     if (mp.length) return istMaterial ? mp.map(ohneMaterialZe) : [...mp];
     if (!initial && prefillMaterial) return [{ ...prefillMaterial }];
-    return [{ ...newMaterial(), wartung: tagFuer([]) }];
+    // A new Offerte starts with an empty row to type into; a stored one without parts stays without.
+    return initial ? [] : [{ ...newMaterial(), wartung: tagFuer([]) }];
   });
   const [notizen,    setNotizen]    = useState(() => offerteNotizen(initial?.notizen, initial ? anzahlungErforderlich(initial) : false));
   const [gueltigBis, setGueltigBis] = useState(initial?.gueltigBis ?? '');

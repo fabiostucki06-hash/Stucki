@@ -512,9 +512,8 @@ export function PositionenEditor({
             />
           </label>
           <span className="df-total df-c-total">{pos.preis ? fCHF(parseFloat(pos.preis)) : '—'}</span>
-          {teile.length > 1
-            ? <button type="button" className="mf-pos-del df-c-del" onClick={() => onMaterialRemove(i)} aria-label="Position entfernen"><SFXmark /></button>
-            : <span className="df-c-del" />}
+          {/* Every part can be removed, the last one too: the list may be empty ("+ Material" adds one). */}
+          <button type="button" className="mf-pos-del df-c-del" onClick={() => onMaterialRemove(i)} aria-label="Position entfernen"><SFXmark /></button>
         </div>
         {!fest && parseFloat(pos.ze ?? '') > 0 && (
           <div className="df-ze-hint">
