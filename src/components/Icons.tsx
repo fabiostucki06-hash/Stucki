@@ -2,7 +2,7 @@ import { useId, type ReactNode } from 'react';
 
 /* GarageOS icon set – filled glyphs in the spirit of Apple's "Liquid Glass" app icons:
    solid, rounded silhouettes with detail cut out of the shape (not drawn on top), so
-   they read cleanly at 16–20px and sit well on the glossy colour tiles (.icon-tile).
+   they read cleanly at 16–20px and sit well on the neutral icon tiles (.icon-tile).
    Pure line glyphs (chevron, plus, close, menu …) use a heavy rounded stroke instead.
    Every export keeps its earlier name and props, so call sites stay unchanged. */
 

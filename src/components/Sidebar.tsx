@@ -2,7 +2,7 @@ import { SFHouse, SFWrench, SFDoc, SFBox, SFDocCheck, SFReceipt, SFReceiptHalf, 
 import type { TabId } from '../types';
 import { BUILD_LABEL } from '../lib/buildInfo';
 
-/** `tile` picks the glossy icon-tile colour (.tile-* in globals.css). */
+/** `tile` is kept for markup stability; tiles render neutral (see .icon-tile in globals.css). */
 const SIDEBAR_ITEMS: { id: TabId; icon: React.ReactNode; label: string; tile: string }[] = [
   { id: 'dashboard',              icon: <SFHouse />,        label: 'Home',                  tile: 'blue'   },
   { id: 'auftraege',              icon: <SFWrench />,       label: 'Aufträge',              tile: 'orange' },

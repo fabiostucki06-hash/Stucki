@@ -44,9 +44,10 @@ in Komponenten, wenn ein Token existiert.
 - **Keine** Glas-Effekte, Glanz-Gradients, inset-Shines oder text-shadows.
   Einzige Ausnahme: Nav-Bar (transluzent schwarz + blur/saturate).
 - **Icons:** gefüllte Glyphen aus `Icons.tsx` (Details ausgestanzt, Linien-Glyphen mit kräftigem
-  runden Strich). Navigation (Sidebar) und Einstellungen-Kategorien: Glyph weiss auf glänzender
-  Farbkachel `.icon-tile tile-<farbe>` (Liquid-Glass-Stil). **Einzige Stelle mit Glanz/Gradient**;
-  Inline-Icons in Buttons, Bannern, Listen bekommen keine Kachel.
+  runden Strich). Navigation (Sidebar) und Einstellungen-Kategorien: Glyph weiss auf neutraler,
+  flacher Kachel `.icon-tile` (Surface-2, aktiv/hover `--border-strong`). **Keine** Farbe pro Eintrag,
+  kein Glanz/Gradient (`tile-<farbe>`-Klassen sind wirkungslos). Inline-Icons in Buttons, Bannern,
+  Listen bekommen keine Kachel.
 - Container (Cards, Listen, Panels) heben sich durch Tonstufe vom Schwarz ab, **ohne Rahmen**.
   Linien nur als eingerückte Haarlinie zwischen Listenzeilen (iOS-Stil, `.list-row::after`).
   Schatten nur für schwebende Ebenen (Dialoge, Menüs, Toasts): `var(--shadow-lg)`.
