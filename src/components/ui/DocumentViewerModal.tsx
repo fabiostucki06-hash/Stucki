@@ -35,7 +35,7 @@ export default function DocumentViewerModal({ doc, url, loading, error, deleting
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 900, display: 'flex', flexDirection: 'column', background: 'rgba(9,9,11,0.96)', animation: 'fade-in 0.15s ease' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 900, display: 'flex', flexDirection: 'column', background: 'rgba(0,0,0,0.96)', animation: 'fade-in 0.15s ease' }}
       onClick={onClose}
     >
       <div

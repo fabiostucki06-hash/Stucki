@@ -266,8 +266,8 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
             className="df-span2"
             style={{
               display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, cursor: 'pointer',
-              background: mitAnzahlung ? 'rgba(59,130,246,0.12)' : 'var(--fill3)',
-              border: `1px solid ${mitAnzahlung ? 'rgba(59,130,246,0.45)' : 'transparent'}`,
+              background: mitAnzahlung ? 'var(--accent-soft)' : 'var(--fill3)',
+              border: `1px solid ${mitAnzahlung ? 'var(--ring)' : 'transparent'}`,
             }}
           >
             <input

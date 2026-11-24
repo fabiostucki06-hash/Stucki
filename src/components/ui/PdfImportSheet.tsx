@@ -78,7 +78,7 @@ export default function PdfImportSheet({ token, defaultZiel, onImported }: PdfIm
         style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
           minHeight: 180, padding: 24, borderRadius: 16, textAlign: 'center', cursor: busy ? 'default' : 'pointer',
-          background: dragOver ? 'rgba(59,130,246,0.14)' : 'var(--card-bg)',
+          background: dragOver ? 'var(--accent-soft)' : 'var(--card-bg)',
           border: `1px dashed ${dragOver ? 'var(--accent)' : 'var(--border-strong)'}`,
           transition: 'background 0.15s ease, border-color 0.15s ease',
         }}

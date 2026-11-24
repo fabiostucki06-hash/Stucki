@@ -6,49 +6,49 @@
    Apple-inspired rhythm: large confident titles, generous air between sections,
    compact rows inside them. */
 :root {
-  /* ── Canvas & surfaces (zinc) ── one dark canvas, two quiet elevations. */
-  --bg:          #09090b;   /* app canvas */
-  --surface:     #121217;   /* cards, lists, sheets */
-  --surface-2:   #18181b;   /* inputs, raised rows, segmented controls */
-  --surface-hover: #1f1f23;
-  --border:      #27272a;   /* 1px separation */
-  --border-strong: #3f3f46;
+  /* ── Canvas & surfaces ── Apple dark: true black canvas, grey tone steps. */
+  --bg:          #000000;   /* app canvas */
+  --surface:     #1c1c1e;   /* cards, lists, sheets */
+  --surface-2:   #2c2c2e;   /* inputs, raised rows, segmented controls */
+  --surface-hover: #2a2a2d;
+  --border:      #38383a;   /* hairline separators inside lists */
+  --border-strong: #48484a;
 
-  /* ── Text (slate) ── */
-  --label:  #f8fafc;   /* primary values */
-  --label2: #94a3b8;   /* secondary labels, metadata */
-  --label3: #64748b;   /* tertiary, hints */
-  --label4: #475569;   /* disabled */
+  /* ── Text ── */
+  --label:  #ffffff;   /* primary values */
+  --label2: #98989f;   /* secondary labels, metadata */
+  --label3: #6e6e73;   /* tertiary, hints */
+  --label4: #48484a;   /* disabled */
 
-  /* ── Accent ── one blue for key actions; everything else stays neutral. */
-  --accent:       #3b82f6;
-  --accent-hover: #60a5fa;
-  --accent-text:  #93c5fd;   /* accent used as text on dark */
-  --accent-soft:  rgba(59,130,246,0.12);
-  --ring:         rgba(59,130,246,0.40);
+  /* ── Accent ── iOS system blue for key actions; everything else stays neutral. */
+  --accent:       #0a84ff;
+  --accent-hover: #409cff;
+  --accent-text:  #4da3ff;
+  --accent-soft:  rgba(10,132,255,0.16);
+  --ring:         rgba(10,132,255,0.45);
   --blue:   var(--accent-text);
-  --blue-d: #2563eb;
-  --accent-chip-rgb:   147 197 253;
-  --accent-light-rgb:  96 165 250;
-  --accent-hover-rgb:  96 165 250;
-  --accent-rgb:        59 130 246;
-  --accent-dark-rgb:   37 99 235;
-  --accent-border-rgb: 37 99 235;
+  --blue-d: #0071e3;
+  --accent-chip-rgb:   77 163 255;
+  --accent-light-rgb:  64 156 255;
+  --accent-hover-rgb:  64 156 255;
+  --accent-rgb:        10 132 255;
+  --accent-dark-rgb:   0 113 227;
+  --accent-border-rgb: 0 113 227;
 
-  /* ── Semantic: text tone + muted tint ── */
-  --green:  #4ade80;  --green-solid: #16a34a;  --green-tint:  rgba(34,197,94,0.12);
-  --orange: #fbbf24;  --orange-tint: rgba(245,158,11,0.12);
-  --red:    #f87171;  --red-solid:   #dc2626;  --red-tint:    rgba(239,68,68,0.12);
-  --purple: #c4b5fd;  --purple-tint: rgba(139,92,246,0.14);
-  --teal:   #67e8f9;
-  --yellow: #fde047;
-  --indigo: #a5b4fc;  --indigo-tint: rgba(99,102,241,0.14);
-  --gray-tint: rgba(148,163,184,0.12);
+  /* ── Semantic: iOS dark system colours + muted tint ── */
+  --green:  #30d158;  --green-solid: #248a3d;  --green-tint:  rgba(48,209,88,0.15);
+  --orange: #ff9f0a;  --orange-tint: rgba(255,159,10,0.15);
+  --red:    #ff453a;  --red-solid:   #d70015;  --red-tint:    rgba(255,69,58,0.15);
+  --purple: #bf5af2;  --purple-tint: rgba(191,90,242,0.16);
+  --teal:   #64d2ff;
+  --yellow: #ffd60a;
+  --indigo: #7d7aff;  --indigo-tint: rgba(94,92,230,0.18);
+  --gray-tint: rgba(142,142,147,0.16);
 
   /* Legacy names, mapped onto the flat system. */
-  --fill1: rgba(255,255,255,0.08);
-  --fill2: rgba(255,255,255,0.06);
-  --fill3: rgba(255,255,255,0.04);
+  --fill1: rgba(120,120,128,0.36);
+  --fill2: rgba(120,120,128,0.32);
+  --fill3: rgba(118,118,128,0.24);
   --fill4: var(--surface);
   --bg2: var(--surface);
   --bg3: var(--surface-2);
@@ -61,27 +61,28 @@
   --glass-shine:  0 0 #0000;
   --glass-blur:   none;
   --shadow-sm: 0 0 #0000;
-  --shadow-md: 0 1px 2px rgba(0,0,0,0.3);
-  --shadow-lg: 0 8px 24px rgba(0,0,0,0.4);
-  --shadow-xl: 0 16px 48px rgba(0,0,0,0.5);
+  --shadow-md: 0 1px 2px rgba(0,0,0,0.4);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,0.6);
+  --shadow-xl: 0 20px 60px rgba(0,0,0,0.7);
 
   --input-bg:           var(--surface-2);
   --input-bg-focus:     var(--surface-2);
-  --input-border:       var(--border);
+  --input-border:       transparent;
   --input-border-focus: var(--accent);
   --input-text:         var(--label);
   --input-placeholder:  var(--label3);
 
-  --sidebar-width: 232px;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 10px;
-  --radius-xl: 12px;
+  --sidebar-width: 248px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
 
   /* Type: SF Display for titles and figures, SF Text for running copy. */
   --font-display: -apple-system,BlinkMacSystemFont,"SF Pro Display","Inter","Helvetica Neue",Arial,sans-serif;
   --page-gutter: 16px;
   --section-gap: 28px;
+  --seg-active: #636366;
 }
 
 
@@ -1209,4 +1210,86 @@ select.mf-add-pos.df-pauschale-select{-webkit-appearance:none;appearance:none;co
   .stx-kpis{grid-template-columns:1.6fr 1fr 1fr 1fr}
   .stx-hero,.stx-kpis .stx-card:last-child{grid-column:auto}
   .stx-columns{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
+}
+
+
+/* ══ APPLE DARK LAYER ══ Screen-only overrides that give the app its Apple feel:
+   containers separate from the black canvas by tone, not by outline; iOS inset
+   separators; large titles; capsule actions. Print and PDFs are untouched. */
+@media screen{
+  body{font-size:16px;letter-spacing:-0.01em}
+
+  /* Containers: tone step instead of a 1px outline. */
+  .card,.inset-card,.inset-grouped-list,.form-section,.glass-panel,.stat-card,.login-card,.settings-details{border-color:transparent}
+  .inset-grouped-list,.form-section,.card,.inset-card,.glass-panel{border-radius:var(--radius-lg)}
+
+  /* Titles */
+  .sf-title1{font-size:34px;font-weight:700;letter-spacing:-0.022em;line-height:1.08}
+  .page-head{padding:22px 0 16px}
+
+  /* Section headings: sentence case, bold, full ink (Apple app style). */
+  .section-header{font-family:var(--font-display);font-size:20px;font-weight:700;letter-spacing:-0.015em;text-transform:none;color:var(--label);padding:var(--section-gap) 16px 10px}
+
+  /* Lists: taller rows, iOS inset hairline separators. */
+  .list-row{min-height:52px;padding:12px 16px;border-bottom:none}
+  .list-row::after{content:'';position:absolute;left:16px;right:0;bottom:0;height:1px;background:var(--border);transform:scaleY(0.6);transform-origin:bottom;pointer-events:none}
+  .list-row:last-child::after{display:none}
+  .list-row:hover{background:var(--surface-hover)}
+
+  /* Buttons: rounded, generous, iOS blue; small header actions are capsules. */
+  .btn-system{height:48px;border-radius:12px;font-size:16px;font-weight:600;letter-spacing:-0.01em}
+  .btn-system.btn-secondary{background:var(--surface-2);border-color:transparent}
+  .btn-system.btn-secondary:hover{background:#3a3a3c;border-color:transparent}
+  .btn-system.btn-destructive{background:var(--surface-2);border-color:transparent}
+  .btn-tinted{height:36px;padding:0 16px;border-radius:980px;font-size:15px}
+  .btn-tinted.btn-quiet{background:var(--surface-2);border-color:transparent}
+  .btn-tinted.btn-quiet:hover{background:#3a3a3c}
+  .bar-btn{border-radius:980px}
+
+  /* Pills & segmented control (iOS style). */
+  .pill-btn{padding:7px 14px;font-size:14px}
+  .pill-btn-inactive{background:var(--surface)!important;border-color:transparent!important}
+  .pill-btn-inactive:hover{background:var(--surface-2)!important}
+  .seg-ctrl{background:var(--fill3);border-color:transparent;border-radius:9px;padding:2px}
+  .seg-item{border-radius:7px;height:30px;font-size:13px}
+  .seg-item.active{background:var(--seg-active);color:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.35)}
+
+  /* Inputs & search: filled, borderless; blue ring on focus. */
+  .text-field-standalone{border-color:transparent;border-radius:var(--radius-md)}
+  .search-bar{background:var(--surface);border-color:transparent;border-radius:var(--radius-md);padding:9px 12px}
+  .search-bar input{font-size:16px}
+
+  /* Stats: big display figures. */
+  .stat-card{border-radius:var(--radius-xl);padding:16px 18px}
+  .stat-number{font-size:32px;font-weight:700}
+  .stat-label{font-size:13px;color:var(--label2)}
+
+  /* Badges: a touch larger and bolder. */
+  .badge{font-size:12px;font-weight:600;padding:3px 9px}
+
+  /* Chrome */
+  .nav-bar{background:rgba(0,0,0,0.72);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px)}
+  .sb{background:var(--surface);border-right-color:var(--border)}
+  .sb.sb-docked{background:var(--bg);border-right-color:#1c1c1e}
+  .sb-item{min-height:40px;font-size:15px;border-radius:var(--radius-md);color:var(--label)}
+  .sb-item .sb-icon{color:var(--accent-text)}
+  .sb-item.active{background:var(--surface-2);box-shadow:none}
+  .sb-item:hover{background:var(--surface)}
+  .sb-logout{color:var(--red)}
+
+  /* Sheets & menus */
+  .sheet-container{border-color:transparent;border-radius:14px 14px 0 0}
+  .context-menu{border-color:transparent;border-radius:var(--radius-lg)}
+  .alert-warning,.alert-danger{border-color:transparent}
+}
+@media screen and (min-width:1024px){
+  .sf-title1{font-size:40px}
+  .stat-number{font-size:40px}
+  .stat-card{padding:20px 22px}
+  .sheet-container{border-radius:var(--radius-xl)}
+  .list-row::after{left:20px}
+}
+@media screen and (max-width:640px){
+  .sf-title1{font-size:32px}
+  .section-header{font-size:19px;padding:24px 16px 8px}
 }
