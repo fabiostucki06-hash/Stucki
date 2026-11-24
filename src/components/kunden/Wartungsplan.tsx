@@ -271,6 +271,7 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onF
         const x = rechercheAnwenden(lokalItems, r, lokal);
         b.lookup = x.bericht;
         b.hinweis = r.hinweis || undefined;
+        if (r.fehler) b.fehler = r.fehler;
         neu = { ...lokal, service: x.items, wartungsRecherche: { schluessel, am: todayISO(), belegt: x.bericht.belegt.length, offen: x.bericht.offen.length } };
       } catch (e) {
         b.fehler = e instanceof LookupError || e instanceof Error ? e.message : 'unbekannter Fehler';

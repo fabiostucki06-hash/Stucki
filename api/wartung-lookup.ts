@@ -22,6 +22,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { VercelLikeRequest, VercelLikeResponse } from './import-part.js';
 import { SUPA_KEY, SUPA_URL, supabaseUserId } from './_drive.js';
+import { referenzFuer } from './_referenz.js';
 import { GeminiError, NOT_CONFIGURED, anthropicKey, geminiGenerate, geminiKey, jsonAusText, zielUrl } from './_gemini.js';
 
 const MODEL = 'claude-opus-5-5';
@@ -260,27 +261,49 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
   // Identical specs: answered from the shared cache, only missing items are researched.
   const schluessel = cacheSchluessel(fahrzeug);
   const cache = await cacheLesen(token, schluessel);
-  const ausCache = positionen.flatMap((p) => { const c = cache.get(p.key); return c ? [c] : []; });
-  const offen = positionen.filter((p) => !cache.has(p.key));
+  // Built-in verified reference (api/_referenz.ts): no AI call for these items,
+  // and it replaces a cached "no source found" for the same item.
+  const ref = referenzFuer(fahrzeug);
+  const ausReferenz: CachePosition[] = ref ? positionen.flatMap((p) => {
+    const r = ref.positionen.find((x) => x.key === p.key);
+    if (!r || cache.get(p.key)?.status === 'belegt') return [];
+    return [{ key: p.key, status: 'belegt', anwendbar: 'ja', intervallKm: r.intervallKm, intervallMonate: r.intervallMonate,
+      quelleTyp: ref.quelleTyp, quelleText: ref.quelleText, quelleUrl: ref.quelleUrl, hinweis: r.hinweis }];
+  }) : [];
+  await cacheSchreiben(token, schluessel, ausReferenz);
+  const ausReferenzKeys = new Set(ausReferenz.map((p) => p.key));
+  const ausCache = positionen.flatMap((p) => { const c = cache.get(p.key); return c && !ausReferenzKeys.has(p.key) ? [c] : []; });
+  const bekannt = [...ausCache, ...ausReferenz];
+  const offen = positionen.filter((p) => !cache.has(p.key) && !ausReferenzKeys.has(p.key));
+  const quelleHinweis = [ausCache.length ? 'Recherche-Speicher' : '', ausReferenz.length ? ref?.quelleText : ''].filter(Boolean).join(' + ');
   if (!offen.length) {
-    return res.status(200).json({ ok: true, cached: true, result: { positionen: ausCache, hinweis: 'Aus dem Recherche-Speicher (gleiche Fahrzeugkonfiguration).' } });
+    return res.status(200).json({ ok: true, cached: true, result: { positionen: bekannt, hinweis: `Ohne KI-Anfrage beantwortet (${quelleHinweis}).` } });
   }
 
+  // One single batched request for all items still open.
   const anfrage = `Fahrzeug:\n${FELDER.filter((k) => fahrzeug[k]).map((k) => `- ${k}: ${fahrzeug[k]}`).join('\n')}\n\nPositionen:\n${
     offen.map((p) => `- ${p.key}: ${p.name}`).join('\n')}`;
+  /** The AI failed: what is known from cache / reference still goes back (200 + fehler), else the error. */
+  const fehlschlag = (status: number, error: string, extra: Record<string, unknown> = {}) => bekannt.length
+    ? res.status(200).json({ ok: true, cached: true, fehler: error, ...extra,
+      result: { positionen: bekannt, hinweis: `Teilweise ohne KI beantwortet (${quelleHinweis}); übrige Positionen nicht recherchiert.` } })
+    : res.status(status).json({ ok: false, error, ...extra });
   try {
     const { ki, urls } = gemini ? await mitGemini(anfrage) : await mitClaude(claude, anfrage);
-    if (!ki) return res.status(502).json({ ok: false, error: 'Die Recherche lieferte kein auswertbares Ergebnis' });
+    if (!ki) return fehlschlag(502, 'Die Recherche lieferte kein auswertbares Ergebnis');
     const neu = auswerten(ki, offen, urls);
     await cacheSchreiben(token, schluessel, neu.positionen);
-    return res.status(200).json({ ok: true, cached: false, result: { positionen: [...ausCache, ...neu.positionen], hinweis: neu.hinweis } });
+    return res.status(200).json({ ok: true, cached: false, result: { positionen: [...bekannt, ...neu.positionen], hinweis: neu.hinweis } });
   } catch (e) {
-    if (e instanceof GeminiError) return res.status(e.status).json({ ok: false, ...(e.code ? { code: e.code } : {}), error: e.message });
-    if (e instanceof Anthropic.RateLimitError) return res.status(429).json({ ok: false, error: 'Zu viele Anfragen – bitte kurz warten und erneut versuchen' });
-    if (e instanceof Anthropic.AuthenticationError) return res.status(502).json({ ok: false, code: 'invalid_key', error: 'Der Anthropic API Key in Vercel ist ungültig oder wurde widerrufen.' });
-    if (e instanceof Anthropic.APIError) return res.status(502).json({ ok: false, error: `KI-Dienst nicht erreichbar (${e.status ?? 'Netzwerk'})` });
+    if (e instanceof GeminiError) {
+      console.error(`[wartung-lookup] Gemini ${e.status}${e.quota ? ` quota=${e.quota}` : ''}: ${e.detail ?? e.message}`);
+      return fehlschlag(e.status, e.message, { ...(e.code ? { code: e.code } : {}), ...(e.quota ? { quota: e.quota, detail: e.detail } : {}) });
+    }
+    if (e instanceof Anthropic.RateLimitError) return fehlschlag(429, 'Zu viele Anfragen – bitte kurz warten und erneut versuchen');
+    if (e instanceof Anthropic.AuthenticationError) return fehlschlag(502, 'Der Anthropic API Key in Vercel ist ungültig oder wurde widerrufen.', { code: 'invalid_key' });
+    if (e instanceof Anthropic.APIError) return fehlschlag(502, `KI-Dienst nicht erreichbar (${e.status ?? 'Netzwerk'})`);
     console.error('[wartung-lookup]', e);
-    return res.status(500).json({ ok: false, error: 'Unerwarteter Fehler bei der Recherche' });
+    return fehlschlag(500, 'Unerwarteter Fehler bei der Recherche');
   }
 }
 

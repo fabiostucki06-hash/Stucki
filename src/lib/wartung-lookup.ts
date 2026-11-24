@@ -19,7 +19,12 @@ export interface LookupPosition {
   quelleUrl: string;
   hinweis: string;
 }
-export interface LookupResult { positionen: LookupPosition[]; hinweis: string }
+export interface LookupResult {
+  positionen: LookupPosition[];
+  hinweis: string;
+  /** The AI part failed (e.g. Gemini quota); positionen are only what cache / built-in reference knew. */
+  fehler?: string;
+}
 
 export class LookupError extends Error {
   constructor(message: string, readonly code?: 'not_configured' | 'invalid_key') { super(message); }
@@ -45,12 +50,12 @@ export async function intervalleRecherchieren(v: Vehicle, items: ServiceItem[], 
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ fahrzeug, positionen }),
   });
-  const json = (await r.json().catch(() => null)) as { ok?: boolean; result?: LookupResult; error?: string; code?: string } | null;
+  const json = (await r.json().catch(() => null)) as { ok?: boolean; result?: LookupResult; error?: string; code?: string; fehler?: string } | null;
   if (!r.ok || !json?.ok || !json.result) {
     const code = json?.code === 'not_configured' || json?.code === 'invalid_key' ? json.code : undefined;
     throw new LookupError(json?.error || `Recherche fehlgeschlagen (${r.status})`, code);
   }
-  return json.result;
+  return json.fehler ? { ...json.result, fehler: json.fehler } : json.result;
 }
 
 /** What the lookup did, by item name. */
