@@ -191,6 +191,9 @@ export interface ArbeitPosition {
   zeKI?: boolean;
   zeLoading?: boolean;
   zeHint?: string;
+  /** Wartungsplan item (lib/wartung-teile teilKey) the line belongs to, in an
+      Offerte made from the Wartungsplan. Internal only. */
+  wartung?: string;
 }
 
 export interface MaterialPosition {
@@ -219,6 +222,8 @@ export interface MaterialPosition {
   artikelnummer?: string;
   /** Ticked off in "Teile bestellen". Internal only. */
   bestellt?: boolean;
+  /** See ArbeitPosition.wartung. */
+  wartung?: string;
 }
 
 /** How far the parts of an Auftrag / accepted Offerte are ordered. Derived
@@ -273,6 +278,37 @@ export interface Offerte {
       Vorkasse terms apply. Unset on older Offerten: derived from the terms. */
   anzahlungErforderlich?: boolean;
   ab?: AuftragsBestaetigung;
+  /** Made from the Wartungsplan: the vehicle and the items it quotes. The
+      positions entered per item are remembered for the next Offerte
+      (lib/wartung-teile). */
+  wartung?: OfferteWartung;
+}
+
+export interface OfferteWartung {
+  vehicleId: string;
+  /** `text` = the Arbeit description generated for the item. */
+  items: { key: string; name: string; text: string }[];
+}
+
+/** Positions entered for one Wartungsplan item (table `maintenance_parts`),
+    reused by the next Offerte from the Wartungsplan. Stored per vehicle and,
+    when Marke / Modell / Motorcode are entered, per vehicle configuration. */
+export interface WartungTeile {
+  /** `fz:<vehicleId>:<key>` or `konfig:<konfig>:<key>`. */
+  id: string;
+  key: string;
+  name: string;
+  /** The vehicle it was entered for (also on configuration rows). */
+  vehicleId: string;
+  /** Configuration rows only (lib/wartung-teile teileKonfig). */
+  konfig?: string;
+  /** Vehicle it was entered for, readable ("VW Golf · ZH 12345"). */
+  fahrzeug?: string;
+  /** Lines as entered; `autoText`: description generated from the item. */
+  positionen: (Position & { autoText?: boolean })[];
+  offertId?: string;
+  updatedAt: string;
+  von?: string;
 }
 
 export type RechnungStatus = 'entwurf' | 'versendet' | 'bezahlt' | 'storniert';

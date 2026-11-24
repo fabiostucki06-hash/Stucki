@@ -46,7 +46,7 @@ import RechnungForm from './components/rechnungen/RechnungForm';
 import RechnungDetail from './components/rechnungen/RechnungDetail';
 
 import type { MaterialPosition, Customer, Order, Offerte, Position, Rechnung, ServiceItem, TabId, Vehicle } from './types';
-import { wartungsPositionen } from './lib/vehicles';
+import { gespeicherteTeile, konfigText, teilKey, wartungsOfferte } from './lib/wartung-teile';
 
 export default function App() {
   const {
@@ -58,7 +58,7 @@ export default function App() {
     addOrder, updateOrder, deleteOrder,
     addOfferte, updateOfferte, deleteOfferte,
     addRechnung, updateRechnung, deleteRechnung,
-    addMaterial, docKunde,
+    addMaterial, docKunde, wartungTeile,
   } = useApp();
 
   const updateAvailable = useVersionCheck();
@@ -357,20 +357,31 @@ export default function App() {
     await deleteOfferte(id); setSelOff(null);
     if (getActiveOfferteId() === id) setActiveOfferteId('');
   }
-  /** "Offerte erstellen" in the Wartungsplan: a draft for the vehicle with one
-      position per picked (or due) item, opened in the Offerten tab for pricing.
-      An Offerte is only a proposal: the vehicle and its Wartungsplan are not
-      written here. Intervals advance only via "Gemacht" (serviceErledigt). */
+  /** "Offerte erstellen" in the Wartungsplan: a draft for the vehicle, opened
+      in the Offerten tab for pricing. Per picked (or due) item it carries the
+      positions entered for that item before (this vehicle, or – after asking –
+      a vehicle with the same Marke / Modell / Motorcode), else one Arbeit line
+      without price. Nothing is assumed. An Offerte is only a proposal: the
+      vehicle and its Wartungsplan are not written here. Intervals advance only
+      via "Gemacht" (serviceErledigt). */
   async function handleOfferteAusWartungsplan(vehicle: Vehicle, items: ServiceItem[]) {
-    const positionen = wartungsPositionen(items);
+    // Parts entered on another vehicle of the same configuration: only after confirmation.
+    const fremd = items.filter((it) => gespeicherteTeile(vehicle, teilKey(it), wartungTeile)?.konfig);
+    const konfigOk = fremd.length > 0 && window.confirm(
+      `Für ${fremd.map((it) => it.name).join(', ')} sind Teile von einem Fahrzeug mit gleicher Konfiguration gespeichert (${konfigText(vehicle)}).
+
+In die Offerte übernehmen? Teile und Preise danach prüfen.`,
+    );
+    const { positionen, wartung, uebernommen } = wartungsOfferte(vehicle, items, wartungTeile, (_, konfig) => !konfig || konfigOk);
     const t = sumPositions(positionen);
     const created = await addOfferte({
       customerId: vehicle.customerId, vehicleId: vehicle.id,
-      titel: 'Wartung gemäss Wartungsplan', positionen,
+      titel: 'Wartung gemäss Wartungsplan', positionen, wartung,
       zahlungsziel: '10',
       totalBetrag: t.total.toFixed(2), totalArbeit: t.totalArbeit.toFixed(2),
       totalMaterial: t.totalMaterial.toFixed(2), totalZE: t.totalZE,
     });
+    if (uebernommen.length) showToast(`Gespeicherte Teile übernommen: ${uebernommen.join(', ')}`, 'success', 5000);
     setSelC(null); setTab('offerten'); setSelOff(created);
   }
   async function handleDuplicateOfferte(offerte: Offerte) {

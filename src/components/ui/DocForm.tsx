@@ -212,6 +212,9 @@ interface PositionenEditorProps {
   onMaterialMove: (from: number, to: number) => void;
   /** Materialofferte: material prices only, no ZE on the parts. */
   ohneZe?: boolean;
+  /** Offerte from the Wartungsplan: its items; each line can be assigned to
+      one (key `wartung`, set via onArbeitChange / onMaterialChange). */
+  wartung?: { key: string; name: string }[];
 }
 
 const sum = (rows: { preis: string }[]) => rows.reduce((s, p) => s + (parseFloat(p.preis) || 0), 0);
@@ -221,7 +224,7 @@ export function PositionenEditor({
   arbeit, material,
   onArbeitChange, onArbeitAdd, onArbeitRemove, onKiZE,
   onMaterialChange, onMaterialAdd, onMaterialRemove, onMaterialInsert, ohneZe,
-  onArbeitMove, onMaterialMove,
+  onArbeitMove, onMaterialMove, wartung,
 }: PositionenEditorProps) {
   const { pauschalen } = useSettings();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -413,6 +416,21 @@ export function PositionenEditor({
     );
   }
 
+  /** Wartungsplan item of a line (plain render function like moveCell). */
+  function wartungCell(value: string | undefined, onChange: (v: string) => void) {
+    if (!wartung?.length) return null;
+    const name = wartung.find((w) => w.key === value)?.name;
+    return (
+      <select
+        className={`df-tag df-wartung${value ? '' : ' df-wartung-leer'}`} value={value ?? ''} onChange={(e) => onChange(e.target.value)}
+        aria-label="Wartungsposition" title={name ? `Gehört zu ${name}: wird für die nächste Offerte aus dem Wartungsplan gespeichert` : 'Keiner Wartungsposition zugeordnet: wird nicht gespeichert'}
+      >
+        <option value="">Ohne Zuordnung</option>
+        {wartung.map((w) => <option key={w.key} value={w.key}>{w.name}</option>)}
+      </select>
+    );
+  }
+
   return (
     <div ref={rootRef}>
       <div className="df-group-hdr">
@@ -447,6 +465,7 @@ export function PositionenEditor({
               aria-label={`Beschreibung ${positionsArt(pos)}`}
             />
             {busy && <span className="df-desc-busy" role="status" aria-label="Link wird geladen"><Spinner size={12} /></span>}
+            {wartungCell(pos.wartung, (v) => onMaterialChange(i, 'wartung', v))}
           </div>
           <label className="df-cell df-c-qty">
             <span className="df-cell-lbl">Menge</span>
@@ -523,11 +542,14 @@ export function PositionenEditor({
       {arbeit.map((pos, i) => { const row = rowProps('arbeit', i); return (
         <div key={i} {...row.data} className={`df-line df-arbeit${row.cls}`} onKeyDown={(e) => onEnterNextRow(e, i === arbeit.length - 1, addArbeit)}>
           {moveCell('arbeit', i, arbeitBusy)}
-          <input
-            className="df-inp df-c-desc" data-df-desc="arbeit"
-            value={pos.beschreibung} onChange={(e) => onArbeitChange(i, 'beschreibung', e.target.value)}
-            placeholder="Arbeitsschritt…" aria-label="Beschreibung Arbeit"
-          />
+          <div className="df-c-desc df-desc">
+            <input
+              className="df-inp" data-df-desc="arbeit"
+              value={pos.beschreibung} onChange={(e) => onArbeitChange(i, 'beschreibung', e.target.value)}
+              placeholder="Arbeitsschritt…" aria-label="Beschreibung Arbeit"
+            />
+            {wartungCell(pos.wartung, (v) => onArbeitChange(i, 'wartung', v))}
+          </div>
           <label className="df-cell df-c-ze">
             <span className="df-cell-lbl">ZE</span>
             <input
@@ -562,6 +584,7 @@ export function PositionenEditor({
               value={pos.beschreibung} onChange={(e) => onMaterialChange(i, 'beschreibung', e.target.value)}
               placeholder="Pauschale…" aria-label="Beschreibung Pauschale"
             />
+            {wartungCell(pos.wartung, (v) => onMaterialChange(i, 'wartung', v))}
           </div>
           <span className="df-cell df-c-ze df-ze-min" title="Festpreis: keine ZE">—</span>
           <span className="df-c-ki" />

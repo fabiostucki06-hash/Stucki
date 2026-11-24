@@ -74,6 +74,7 @@ const toArbeitPosition = (p: ArbeitRow): ArbeitPosition => ({
   preis: p.preis,
   zeKI: p.zeKI,
   zeHint: p.zeHint,
+  wartung: p.wartung || undefined,
 });
 const newMaterial = (): MaterialRow => ({ typ: 'material', beschreibung: '', menge: '1', stueckpreis: '', preis: '' });
 
@@ -86,6 +87,12 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
   const [dupOk, setDupOk] = useState<number | null>(null);
   // Only a Materialofferte offers the 50% Anzahlung; a new Offerte from this form is a normal one.
   const istMaterial = !!initial && anzahlungMoeglich(initial);
+  // Offerte from the Wartungsplan: every line can be assigned to a plan item;
+  // the lines of an item are remembered for the next Offerte (lib/wartung-teile).
+  const wartungItems = istMaterial ? undefined : initial?.wartung?.items;
+  /** Item a new line belongs to: that of the last line in its list, or the only item. */
+  const tagFuer = (rows: { wartung?: string }[]) =>
+    rows[rows.length - 1]?.wartung || (wartungItems?.length === 1 ? wartungItems[0].key : undefined);
   const [mitAnzahlung, setMitAnzahlung] = useState(() => (initial ? anzahlungErforderlich(initial) : false));
   const { vehiclesOf, docVehicle, naechsteNummer } = useApp();
   const nummerung = useDokNummer(initial?.offertNumber, nummerVorschlag, () => naechsteNummer('offerten'));
@@ -95,7 +102,7 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
   const [titel,      setTitel]      = useState(initial?.titel ?? '');
   const [arbeit,     setArbeit]     = useState<ArbeitRow[]>(() => {
     const ap = (initial?.positionen ?? []).filter((p): p is ArbeitPosition => p.typ === 'arbeit');
-    return ap.length ? ap.map((p) => ({ ...p, zeLoading: false, zeHint: p.zeHint ?? '' })) : [newArbeit()];
+    return ap.length ? ap.map((p) => ({ ...p, zeLoading: false, zeHint: p.zeHint ?? '' })) : [{ ...newArbeit(), wartung: tagFuer([]) }];
   });
   const [material,   setMaterial]   = useState<MaterialRow[]>(() => {
     const mp = (initial?.positionen ?? [])
@@ -104,7 +111,7 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
     // A Materialofferte prices the parts only: no ZE on its positions.
     if (mp.length) return istMaterial ? mp.map(ohneMaterialZe) : [...mp];
     if (!initial && prefillMaterial) return [{ ...prefillMaterial }];
-    return [newMaterial()];
+    return [{ ...newMaterial(), wartung: tagFuer([]) }];
   });
   const [notizen,    setNotizen]    = useState(() => offerteNotizen(initial?.notizen, initial ? anzahlungErforderlich(initial) : false));
   const [gueltigBis, setGueltigBis] = useState(initial?.gueltigBis ?? '');
@@ -113,7 +120,7 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
 
   const selectedVehicle = vehiclesOf(cid).find((v) => v.id === vid);
 
-  const addA = () => setArbeit((a) => [...a, newArbeit()]);
+  const addA = () => setArbeit((a) => [...a, { ...newArbeit(), wartung: tagFuer(a) }]);
   const remA = (i: number) => setArbeit((a) => a.filter((_, j) => j !== i));
   const updA = (i: number, k: string, v: string) => setArbeit((a) => {
     const n = [...a]; n[i] = { ...n[i], [k]: v };
@@ -139,7 +146,7 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
     }
   };
 
-  const addM = () => setMaterial((m) => [...m, newMaterial()]);
+  const addM = () => setMaterial((m) => [...m, { ...newMaterial(), wartung: tagFuer(m.filter((p) => !p.art)) }]);
   const remM = (i: number) => setMaterial((m) => m.filter((_, j) => j !== i));
   /** Versandkosten / Pauschale: replaces untouched empty rows, so the list doesn't keep a blank line. */
   const insM = (row: MaterialRow) => setMaterial((m) => [
@@ -179,7 +186,7 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
     : [];
   const data: OfferteData | null = hinweis || nr == null ? null : {
     offertNumber: nr, customerId: cid, vehicleId: vid || undefined, titel,
-    positionen: materialZuerst([...material.filter((p) => p.art || p.beschreibung.trim()), ...autoPauschale, ...arbeit.filter((p) => p.beschreibung.trim()).map(toArbeitPosition)]),
+    positionen: materialZuerst([...material.filter((p) => p.art || p.beschreibung.trim()).map((p) => ({ ...p, wartung: p.wartung || undefined })), ...autoPauschale, ...arbeit.filter((p) => p.beschreibung.trim()).map(toArbeitPosition)]),
     notizen, gueltigBis, zahlungsziel, status,
     ...zahlungsterms(),
     totalBetrag: (totA + totMeff).toFixed(2), totalArbeit: totA.toFixed(2),
@@ -295,13 +302,13 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
       </FormCard>
 
       {/* ── 2: Positionen ── */}
-      <FormCard title="Positionen" hint="Enter fügt die nächste Zeile hinzu">
+      <FormCard title="Positionen" hint={wartungItems ? 'Zeilen einer Wartungsposition werden für die nächste Offerte gespeichert' : 'Enter fügt die nächste Zeile hinzu'}>
         <PositionenEditor
           arbeit={arbeit} material={material}
           onArbeitChange={updA} onArbeitAdd={addA} onArbeitRemove={remA} onKiZE={kiZE}
           onMaterialChange={updM} onMaterialAdd={addM} onMaterialRemove={remM} onMaterialInsert={insM}
           onArbeitMove={(f, t) => setArbeit((a) => arrayMove(a, f, t))} onMaterialMove={(f, t) => setMaterial((m) => arrayMove(m, f, t))}
-          ohneZe={istMaterial}
+          ohneZe={istMaterial} wartung={wartungItems}
         />
       </FormCard>
 

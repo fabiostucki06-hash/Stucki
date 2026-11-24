@@ -12,9 +12,10 @@ import {
   vorlageVon, wartungsVorlagen, type AbgleichBericht, type FahrzeugProfil, type QuelleAnzeige, type Vorlage,
 } from '../../lib/wartung';
 import { exportWartungsplanPDF } from '../../lib/pdf-wartungsplan';
+import { gespeicherteTeile, teilKey } from '../../lib/wartung-teile';
 import { LookupError, intervalleRecherchieren, lookupKonfiguriert, rechercheAnwenden, type LookupBericht } from '../../lib/wartung-lookup';
 import { useApp } from '../../context/AppContext';
-import type { Customer, FahrzeugFeld, IntervallQuelle, Nachweis, Order, ServiceItem, Vehicle, WartungSpec } from '../../types';
+import type { Customer, FahrzeugFeld, IntervallQuelle, Nachweis, Order, ServiceItem, Vehicle, WartungSpec, WartungTeile } from '../../types';
 
 /** Status groups, in display order. "Jetzt fällig" = overdue or due soon;
     "Fälligkeit unbekannt" = no last service / due value entered (nothing assumed). */
@@ -187,7 +188,7 @@ const autoVersucht = new Set<string>();
     and undo live in the editor behind the pencil. Due dates / mileages follow
     from the last service plus the interval. */
 export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onFahrzeugBearbeiten, auftraege = [], onAuftrag }: WartungsplanProps) {
-  const { wartungSpecs, saveWartungSpec, token } = useApp();
+  const { wartungSpecs, saveWartungSpec, wartungTeile, token } = useApp();
   const items = ohneEntfernteService(vehicle.service ?? []);
   const profil = fahrzeugProfil(vehicle);
   const vorlagen = wartungsVorlagen(vehicle, wartungSpecs);
@@ -440,6 +441,7 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onF
                 <WartungsplanKachel
                   key={item.id} item={item} naechste={naechsteText(item)} zustand={zustand} busy={busy}
                   vorlage={vorlageZu(item)}
+                  teile={gespeicherteTeile(vehicle, teilKey(item), wartungTeile)}
                   selected={auswahl.has(item.id)}
                   onSelect={() => umschalten(item.id)}
                   onGemacht={() => gemacht(item)}
@@ -464,6 +466,8 @@ interface KachelProps {
   busy: boolean;
   /** The Vorlage the item was made from: source and what to check. */
   vorlage?: Vorlage;
+  /** Positions entered for this item in an earlier Offerte (lib/wartung-teile). */
+  teile?: { teile: WartungTeile; konfig: boolean };
   /** Picked for the Offerte. */
   selected: boolean;
   onSelect: () => void;
@@ -475,7 +479,7 @@ interface KachelProps {
 /** Tile: name + badge · Intervall / Nächste · status switch + pencil.
     "Gemacht" ticks the item off (again, when it is due); "In Zukunft" flags a
     done item as upcoming. The active side shows the current status. */
-function WartungsplanKachel({ item, naechste, zustand, busy, vorlage, selected, onSelect, onGemacht, onVormerken, onOpen }: KachelProps) {
+function WartungsplanKachel({ item, naechste, zustand, busy, vorlage, teile, selected, onSelect, onGemacht, onVormerken, onOpen }: KachelProps) {
   const badge = BADGE[zustand];
   const intervall = intervallText(item);
   const zuletzt = datumKm(item.letztesDatum, item.letzteKm);
@@ -526,6 +530,17 @@ function WartungsplanKachel({ item, naechste, zustand, busy, vorlage, selected, 
         <p className="sp-quelle" title={quelleTitel}>
           <span className="dot" style={{ background: quelle.dot }} />
           {quelle.label}{(q === 'geprueft' || q === 'recherchiert') && item.quelleText ? ` · ${item.quelleText}` : ''}
+        </p>
+      )}
+      {teile && (
+        <p
+          className="sp-quelle"
+          title={teile.konfig
+            ? `Erfasst bei ${teile.teile.fahrzeug ?? 'einem anderen Fahrzeug'} mit gleicher Konfiguration – wird nach Rückfrage in die Offerte übernommen`
+            : 'Wird beim Erstellen der Offerte vorausgefüllt'}
+        >
+          <span className="dot" style={{ background: teile.konfig ? 'var(--label3)' : 'var(--accent)' }} />
+          {teile.konfig ? 'Teile gleicher Konfiguration' : 'Teile gespeichert'} · {teile.teile.positionen.length} {teile.teile.positionen.length === 1 ? 'Position' : 'Positionen'}
         </p>
       )}
       {item.notiz && <p className="sp-foot">{item.notiz}</p>}

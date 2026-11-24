@@ -860,6 +860,12 @@ select.mf-add-pos.df-pauschale-select{-webkit-appearance:none;appearance:none;co
 .df-tag{flex-shrink:0;font-size:10.5px;font-weight:700;letter-spacing:0.02em;border-radius:6px;padding:3px 7px;white-space:nowrap;box-shadow:none}
 .df-tag-versand{color:var(--orange);background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35)}
 .df-tag-pauschale{color:var(--blue);background:rgb(var(--accent-rgb) / 0.12);border:1px solid rgb(var(--accent-rgb) / 0.30)}
+/* Wartungsplan item of a line (Offerte from the Wartungsplan): tinted when assigned, grey when not. */
+.df-wartung{appearance:none;-webkit-appearance:none;max-width:10rem;overflow:hidden;text-overflow:ellipsis;font-family:inherit;color:var(--accent-text);background:var(--accent-soft);border:1px solid transparent;cursor:pointer;outline:none;transition:background 0.12s}
+.df-wartung.df-wartung-leer{color:var(--label3);background:var(--surface-2)}
+.df-wartung:hover{background:var(--surface-hover)}
+.df-wartung:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
+.df-wartung option{color:var(--label);background:var(--surface)}
 
 /* ── AKTIVE OFFERTE ── */
 .ao-pill{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:980px;font-family:inherit;font-size:12.5px;font-weight:500;white-space:nowrap;cursor:pointer;color:var(--green);background:var(--green-tint);border:1px solid rgba(34,197,94,0.30);transition:background 0.12s}

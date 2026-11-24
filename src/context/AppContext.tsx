@@ -8,7 +8,8 @@ import { alsReineMaterialofferte, mitGetrenntenTotals } from '../lib/ze';
 import { hoechsteRechnungNr, rechnungArt, rechnungDocName } from '../lib/rechnung-totals';
 import { hatFahrzeugDaten, kundeMitFahrzeug, legacyFahrzeug, sortiereFahrzeuge, splitFahrzeug } from '../lib/vehicles';
 import { mitWartungsplan, profilSignatur } from '../lib/wartung';
-import type { Customer, FahrzeugFelder, Order, Offerte, Rechnung, RechnungArt, MaterialCatalogItem, SyncStatus, Vehicle, WartungSpec } from '../types';
+import { teileAusOfferte } from '../lib/wartung-teile';
+import type { Customer, FahrzeugFelder, Order, Offerte, Rechnung, RechnungArt, MaterialCatalogItem, SyncStatus, Vehicle, WartungSpec, WartungTeile } from '../types';
 
 /** Anything that belongs to a customer's vehicle: Auftrag, Offerte, Rechnung. */
 type FahrzeugDok = { customerId: string; vehicleId?: string };
@@ -29,6 +30,9 @@ interface AppContextValue {
   /** Intervals checked against the OEM schedule, per Motorkennbuchstabe (lib/wartung). */
   wartungSpecs: WartungSpec[];
   saveWartungSpec: (s: WartungSpec) => Promise<void>;
+  /** Positions entered per Wartungsplan item (lib/wartung-teile); stored
+      automatically when an Offerte from the Wartungsplan is saved. */
+  wartungTeile: WartungTeile[];
   orders: Order[];
   offerten: Offerte[];
   rechnungen: Rechnung[];
@@ -89,6 +93,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [kunden, setKunden] = useState<Customer[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [wartungSpecs, setWartungSpecs] = useState<WartungSpec[]>([]);
+  const [wartungTeile, setWartungTeile] = useState<WartungTeile[]>([]);
+  // Latest rows for the comparison in teileMerken (called from save chains that may hold an old render).
+  const teileRef = useRef<WartungTeile[]>([]);
+  teileRef.current = wartungTeile;
   const [orders, setOrders] = useState<Order[]>([]);
   const [offerten, setOfferten] = useState<Offerte[]>([]);
   const [rechnungen, setRechnungen] = useState<Rechnung[]>([]);
@@ -144,13 +152,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const sync = async () => {
       lastSyncAt.current = Date.now();
       const seq = writeSeq.current;
-      const [cr, vr, or, offr, rechr, specr] = await Promise.all([
+      const [cr, vr, or, offr, rechr, specr, teiler] = await Promise.all([
         db.get('customers', token),
         db.get('vehicles', token).catch((e) => { console.error('[Supabase] get(vehicles):', e); return null; }),
         db.get('orders', token),
         db.get('offerten', token).catch((e) => { console.error('[Supabase] get(offerten):', e); return null; }),
         db.get('rechnungen', token).catch((e) => { console.error('[Supabase] get(rechnungen):', e); return null; }),
         db.get('maintenance_specs', token).catch((e) => { console.error('[Supabase] get(maintenance_specs):', e); return null; }),
+        db.get('maintenance_parts', token).catch((e) => { console.error('[Supabase] get(maintenance_parts):', e); return null; }),
       ]);
       // A save overlapped this fetch: the response may predate it and would revert local state.
       if (cancelled || writesInFlight.current > 0 || seq !== writeSeq.current) return;
@@ -158,6 +167,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (Array.isArray(cr)) setKunden(parseRows(cr) as Customer[]);
       if (Array.isArray(vr)) setVehicles(parseRows(vr) as Vehicle[]);
       if (Array.isArray(specr)) setWartungSpecs(parseRows(specr) as unknown as WartungSpec[]);
+      if (Array.isArray(teiler)) setWartungTeile(parseRows(teiler) as unknown as WartungTeile[]);
       if (Array.isArray(or)) setOrders((parseRows(or) as Order[]).map(mitGetrenntenTotals));
       if (Array.isArray(offr)) {
         setOfferten((parseRows(offr) as Offerte[]).map((o) => (o.art === 'material' ? alsReineMaterialofferte(o) : mitGetrenntenTotals(o))));
@@ -378,7 +388,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
       saved = pickRow<Offerte>(rows) ?? upd;
     });
     setOfferten((p) => p.map((o) => (o.id === saved.id ? saved : o)));
+    void teileMerken(saved);
     return saved;
+  }
+
+  /** Offerte from the Wartungsplan saved: the positions entered per item are
+      stored for the next one (only rows that changed). The Offerte is saved
+      already, so a failure here is reported but doesn't fail the save. */
+  async function teileMerken(o: Offerte) {
+    if (!o.wartung) return;
+    const v = vehicles.find((x) => x.id === o.wartung!.vehicleId);
+    const rows = teileAusOfferte(o, v, teileRef.current, userEmail ?? undefined);
+    if (!rows.length) return;
+    const vorher = teileRef.current;
+    teileRef.current = [...vorher.filter((t) => !rows.some((r) => r.id === t.id)), ...rows];
+    setWartungTeile(teileRef.current);
+    try {
+      for (const r of rows) await db.upsert('maintenance_parts', { id: r.id, data: r, updated_at: r.updatedAt }, token!);
+    } catch (e) {
+      console.error('[Supabase] upsert(maintenance_parts):', e);
+      // Back to the stored rows, so the next save of the Offerte tries again.
+      teileRef.current = vorher;
+      setWartungTeile(vorher);
+      showToast('Teile für den Wartungsplan nicht gespeichert', 'error');
+    }
   }
 
   async function deleteOfferte(id: string) {
@@ -429,7 +462,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AppContext.Provider value={{ customers, vehicles, vehiclesOf, docVehicle, docKunde, addVehicle, updateVehicle, deleteVehicle, wartungSpecs, saveWartungSpec, orders, offerten, rechnungen, naechsteNummer, loading, syncStatus, token, userEmail, authChecked, sessionExpired, updateToken, addCustomer, updateCustomer, deleteCustomer, addOrder, updateOrder, deleteOrder, addOfferte, updateOfferte, deleteOfferte, addRechnung, updateRechnung, deleteRechnung, addMaterial, handleLogin, handleLogout }}>
+    <AppContext.Provider value={{ customers, vehicles, vehiclesOf, docVehicle, docKunde, addVehicle, updateVehicle, deleteVehicle, wartungSpecs, saveWartungSpec, wartungTeile, orders, offerten, rechnungen, naechsteNummer, loading, syncStatus, token, userEmail, authChecked, sessionExpired, updateToken, addCustomer, updateCustomer, deleteCustomer, addOrder, updateOrder, deleteOrder, addOfferte, updateOfferte, deleteOfferte, addRechnung, updateRechnung, deleteRechnung, addMaterial, handleLogin, handleLogout }}>
       {children}
     </AppContext.Provider>
   );
