@@ -152,6 +152,7 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte }: W
   const faellige = mitZustand.filter((x) => GRUPPE_VON[x.zustand] === 'faellig').map((x) => x.item);
 
   // Positions picked for the Offerte. Without a pick it covers the due items.
+  // Picking and quoting never touch the plan: only "Gemacht" advances an interval.
   const [auswahl, setAuswahl] = useState<Set<string>>(() => new Set());
   const ausgewaehlt = mitZustand.filter((x) => auswahl.has(x.item.id)).map((x) => x.item);
   const offerteItems = ausgewaehlt.length ? ausgewaehlt : faellige;

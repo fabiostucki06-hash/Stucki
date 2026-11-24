@@ -358,7 +358,9 @@ export default function App() {
     if (getActiveOfferteId() === id) setActiveOfferteId('');
   }
   /** "Offerte erstellen" in the Wartungsplan: a draft for the vehicle with one
-      position per due item, opened in the Offerten tab for pricing. */
+      position per picked (or due) item, opened in the Offerten tab for pricing.
+      An Offerte is only a proposal: the vehicle and its Wartungsplan are not
+      written here. Intervals advance only via "Gemacht" (serviceErledigt). */
   async function handleOfferteAusWartungsplan(vehicle: Vehicle, items: ServiceItem[]) {
     const positionen = wartungsPositionen(items);
     const t = sumPositions(positionen);

@@ -103,7 +103,8 @@ export function plusMonate(iso: string, n: number): string {
 }
 
 /** Ticks an item off as done on `datum` at `km`: logged in the history, next
-    due date / mileage moved on by the interval. */
+    due date / mileage moved on by the interval. The only place an interval
+    advances; call it for work actually done ("Gemacht"), never for an Offerte. */
 export function serviceErledigt(item: ServiceItem, datum: string, km?: string): ServiceItem {
   const kmN = kmZahl(km);
   return {
@@ -197,7 +198,8 @@ export function anstehendeServices(v: Vehicle | undefined): { item: ServiceItem;
 
 /** Offerte positions for Wartungsplan items: one Arbeit line each (note and
     interval appended), without ZE / price yet, so the Offerte is priced
-    afterwards. Only values set on the item are carried over, nothing assumed. */
+    afterwards. Only values set on the item are carried over, nothing assumed.
+    Read-only: the items (last service, next due, status) stay as they are. */
 export const wartungsPositionen = (items: ServiceItem[]): ArbeitPosition[] =>
   items.map((i) => ({
     typ: 'arbeit',
