@@ -467,7 +467,7 @@ interface KachelProps {
   /** The Vorlage the item was made from: source and what to check. */
   vorlage?: Vorlage;
   /** Positions entered for this item in an earlier Offerte (lib/wartung-teile). */
-  teile?: { teile: WartungTeile; konfig: boolean };
+  teile?: WartungTeile;
   /** Picked for the Offerte. */
   selected: boolean;
   onSelect: () => void;
@@ -533,14 +533,9 @@ function WartungsplanKachel({ item, naechste, zustand, busy, vorlage, teile, sel
         </p>
       )}
       {teile && (
-        <p
-          className="sp-quelle"
-          title={teile.konfig
-            ? `Erfasst bei ${teile.teile.fahrzeug ?? 'einem anderen Fahrzeug'} mit gleicher Konfiguration – wird nach Rückfrage in die Offerte übernommen`
-            : 'Wird beim Erstellen der Offerte vorausgefüllt'}
-        >
-          <span className="dot" style={{ background: teile.konfig ? 'var(--label3)' : 'var(--accent)' }} />
-          {teile.konfig ? 'Teile gleicher Konfiguration' : 'Teile gespeichert'} · {teile.teile.positionen.length} {teile.teile.positionen.length === 1 ? 'Position' : 'Positionen'}
+        <p className="sp-quelle" title="Wird beim Erstellen der Offerte für dieses Fahrzeug vorausgefüllt">
+          <span className="dot" style={{ background: 'var(--accent)' }} />
+          Teile gespeichert · {teile.positionen.length} {teile.positionen.length === 1 ? 'Position' : 'Positionen'}
         </p>
       )}
       {item.notiz && <p className="sp-foot">{item.notiz}</p>}

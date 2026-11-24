@@ -167,7 +167,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (Array.isArray(cr)) setKunden(parseRows(cr) as Customer[]);
       if (Array.isArray(vr)) setVehicles(parseRows(vr) as Vehicle[]);
       if (Array.isArray(specr)) setWartungSpecs(parseRows(specr) as unknown as WartungSpec[]);
-      if (Array.isArray(teiler)) setWartungTeile(parseRows(teiler) as unknown as WartungTeile[]);
+      // Per-vehicle rows only (lib/wartung-teile): parts never move to another vehicle.
+      if (Array.isArray(teiler)) setWartungTeile((parseRows(teiler) as unknown as WartungTeile[]).filter((t) => t.id.startsWith('fz:')));
       if (Array.isArray(or)) setOrders((parseRows(or) as Order[]).map(mitGetrenntenTotals));
       if (Array.isArray(offr)) {
         setOfferten((parseRows(offr) as Offerte[]).map((o) => (o.art === 'material' ? alsReineMaterialofferte(o) : mitGetrenntenTotals(o))));
@@ -393,20 +394,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   /** Offerte from the Wartungsplan saved: the positions entered per item are
-      stored for the next one (only rows that changed). The Offerte is saved
-      already, so a failure here is reported but doesn't fail the save. */
+      stored for the next one of the same vehicle (only rows that changed);
+      items whose stored lines were removed in it are cleared. The Offerte is
+      saved already, so a failure here is reported but doesn't fail the save. */
   async function teileMerken(o: Offerte) {
     if (!o.wartung) return;
     const v = vehicles.find((x) => x.id === o.wartung!.vehicleId);
-    const rows = teileAusOfferte(o, v, teileRef.current, userEmail ?? undefined);
-    if (!rows.length) return;
+    const { speichern, loeschen } = teileAusOfferte(o, v, teileRef.current, userEmail ?? undefined);
+    if (!speichern.length && !loeschen.length) return;
     const vorher = teileRef.current;
-    teileRef.current = [...vorher.filter((t) => !rows.some((r) => r.id === t.id)), ...rows];
+    teileRef.current = [...vorher.filter((t) => !loeschen.includes(t.id) && !speichern.some((r) => r.id === t.id)), ...speichern];
     setWartungTeile(teileRef.current);
     try {
-      for (const r of rows) await db.upsert('maintenance_parts', { id: r.id, data: r, updated_at: r.updatedAt }, token!);
+      for (const r of speichern) await db.upsert('maintenance_parts', { id: r.id, data: r, updated_at: r.updatedAt }, token!);
+      for (const id of loeschen) await db.delete('maintenance_parts', id, token!);
     } catch (e) {
-      console.error('[Supabase] upsert(maintenance_parts):', e);
+      console.error('[Supabase] maintenance_parts:', e);
       // Back to the stored rows, so the next save of the Offerte tries again.
       teileRef.current = vorher;
       setWartungTeile(vorher);

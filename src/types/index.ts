@@ -288,20 +288,20 @@ export interface OfferteWartung {
   vehicleId: string;
   /** `text` = the Arbeit description generated for the item. */
   items: { key: string; name: string; text: string }[];
+  /** Items whose stored positions were pre-filled into this Offerte. */
+  vorbelegt?: string[];
 }
 
 /** Positions entered for one Wartungsplan item (table `maintenance_parts`),
-    reused by the next Offerte from the Wartungsplan. Stored per vehicle and,
-    when Marke / Modell / Motorcode are entered, per vehicle configuration. */
+    reused by the next Offerte from the Wartungsplan for the same vehicle.
+    Stored strictly per vehicle, never shared with another one. */
 export interface WartungTeile {
-  /** `fz:<vehicleId>:<key>` or `konfig:<konfig>:<key>`. */
+  /** `fz:<vehicleId>:<key>`. */
   id: string;
   key: string;
   name: string;
-  /** The vehicle it was entered for (also on configuration rows). */
+  /** The vehicle it was entered for. */
   vehicleId: string;
-  /** Configuration rows only (lib/wartung-teile teileKonfig). */
-  konfig?: string;
   /** Vehicle it was entered for, readable ("VW Golf · ZH 12345"). */
   fahrzeug?: string;
   /** Lines as entered; `autoText`: description generated from the item. */

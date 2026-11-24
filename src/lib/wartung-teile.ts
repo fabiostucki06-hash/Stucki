@@ -1,15 +1,16 @@
 import { wartungsPositionen } from './vehicles';
-import { ACHSANTRIEBE, GETRIEBE, labelVon, vorlageVon } from './wartung';
+import { vorlageVon } from './wartung';
 import { materialZuerst } from './utils';
 import type { ArbeitPosition, MaterialPosition, Offerte, OfferteWartung, Position, ServiceItem, Vehicle, WartungTeile } from '../types';
 
-/* Parts per Wartungsplan item: the positions entered in an Offerte made from
-   the Wartungsplan are remembered per item and vehicle (table
-   `maintenance_parts`) and pre-filled into the next such Offerte. Only lines
-   that were actually entered are stored and reused: without a stored entry
-   the item gets its plain Arbeit line, never an assumed part or price.
-   Nothing here touches the Wartungsplan itself (intervals only advance via
-   "Gemacht"). */
+/* Parts per Wartungsplan item and vehicle: the positions entered in an Offerte
+   made from the Wartungsplan are remembered per item for exactly that vehicle
+   (table `maintenance_parts`, id `fz:<vehicleId>:<item key>`) and pre-filled
+   into the next such Offerte for the same vehicle. They are never offered on
+   another vehicle. Only lines that were actually entered are stored and
+   reused: without a stored entry the item gets its plain Arbeit line, never an
+   assumed part or price. Nothing here touches the Wartungsplan itself
+   (intervals only advance via "Gemacht"). */
 
 type TeilPosition = WartungTeile['positionen'][number];
 
@@ -18,63 +19,38 @@ export function teilKey(i: ServiceItem): string {
   return vorlageVon(i) ?? `eigen:${i.name.trim().toLowerCase().replace(/\s+/g, ' ')}`;
 }
 
-const norm = (s?: string) => (s ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
-const normCode = (s?: string) => (s ?? '').replace(/[\s-]+/g, '').toUpperCase();
-
-/** Configuration the parts of one vehicle also fit: Marke, Modell and
-    Motorcode as entered on the vehicle (never inferred), plus Getriebe and
-    Antrieb when entered. Without all three, parts stay with the vehicle. */
-export function teileKonfig(v: Vehicle): string | undefined {
-  const marke = norm(v.marke), modell = norm(v.modell), code = normCode(v.motorcode);
-  if (!marke || !modell || !code) return undefined;
-  return [marke, modell, code, v.getriebe ?? '', v.achsantrieb ?? ''].join('|');
-}
-
-/** "VW Golf · Motor CFFB · DSG" */
-export function konfigText(v: Vehicle): string {
-  return [
-    [v.marke, v.modell].filter(Boolean).join(' '),
-    v.motorcode && `Motor ${normCode(v.motorcode)}`,
-    labelVon(GETRIEBE, v.getriebe),
-    labelVon(ACHSANTRIEBE, v.achsantrieb),
-  ].filter(Boolean).join(' · ');
-}
-
 export const fzId = (vehicleId: string, key: string) => `fz:${vehicleId}:${key}`;
-export const konfigId = (konfig: string, key: string) => `konfig:${konfig}:${key}`;
 
-/** Stored parts for an item: the vehicle's own first, else those of the same
-    configuration (entered on another vehicle). */
-export function gespeicherteTeile(v: Vehicle, key: string, alle: WartungTeile[]): { teile: WartungTeile; konfig: boolean } | undefined {
-  const eigen = alle.find((t) => t.id === fzId(v.id, key));
-  if (eigen) return { teile: eigen, konfig: false };
-  const k = teileKonfig(v);
-  const fremd = k ? alle.find((t) => t.id === konfigId(k, key)) : undefined;
-  return fremd ? { teile: fremd, konfig: true } : undefined;
+/** Stored positions of this vehicle for an item (never those of another vehicle). */
+export function gespeicherteTeile(v: Vehicle, key: string, alle: WartungTeile[]): WartungTeile | undefined {
+  const t = alle.find((x) => x.id === fzId(v.id, key) && x.vehicleId === v.id);
+  return t?.positionen.length ? t : undefined;
 }
 
-/** Positions of an Offerte from the Wartungsplan: per item the stored lines
-    (`uebernehmen` decides per item), else the generated Arbeit line. Every
-    line carries its item's key, so what is entered can be stored again. */
+/** Positions of an Offerte from the Wartungsplan: per item the lines stored
+    for this vehicle, else the generated Arbeit line. Every line carries its
+    item's key, so what is entered can be stored again. */
 export function wartungsOfferte(
-  v: Vehicle, items: ServiceItem[], alle: WartungTeile[], uebernehmen: (key: string, konfig: boolean) => boolean,
+  v: Vehicle, items: ServiceItem[], alle: WartungTeile[],
 ): { positionen: Position[]; wartung: OfferteWartung; uebernommen: string[] } {
   const texte = wartungsPositionen(items);
   const uebernommen: string[] = [];
+  const vorbelegt: string[] = [];
   const positionen: Position[] = items.flatMap((it, i) => {
     const key = teilKey(it);
     const text = texte[i].beschreibung;
     const g = gespeicherteTeile(v, key, alle);
-    if (g && g.teile.positionen.length && uebernehmen(key, g.konfig)) {
+    if (g) {
       uebernommen.push(it.name);
-      return g.teile.positionen.map(({ autoText, ...p }): Position =>
+      vorbelegt.push(key);
+      return g.positionen.map(({ autoText, ...p }): Position =>
         p.typ === 'arbeit' ? { ...p, beschreibung: autoText ? text : p.beschreibung, wartung: key } : { ...p, wartung: key });
     }
     return [{ ...texte[i], wartung: key }];
   });
   return {
     positionen: materialZuerst(positionen),
-    wartung: { vehicleId: v.id, items: items.map((it, i) => ({ key: teilKey(it), name: it.name, text: texte[i].beschreibung })) },
+    wartung: { vehicleId: v.id, items: items.map((it, i) => ({ key: teilKey(it), name: it.name, text: texte[i].beschreibung })), vorbelegt },
     uebernommen,
   };
 }
@@ -94,29 +70,35 @@ function alsTeil(p: Position, text: string): TeilPosition {
 const erfasst = (p: TeilPosition) =>
   p.typ === 'material' ? !!p.beschreibung.trim() || !!p.art : parseFloat(p.ze) > 0 || !p.autoText;
 
-/** Rows to store after an Offerte from the Wartungsplan was saved: per item
-    with entered lines, one for the vehicle and one for its configuration.
-    Only rows that differ from the stored ones are returned. A Materialofferte
-    (parts without their working time) or an Offerte moved to another vehicle
-    stores nothing. */
-export function teileAusOfferte(o: Offerte, v: Vehicle | undefined, alle: WartungTeile[], von?: string): WartungTeile[] {
+/** Changes to the stored positions after an Offerte from the Wartungsplan was
+    saved, for its vehicle only: `speichern` = items whose entered lines differ
+    from the stored ones; `loeschen` = ids of items whose stored lines were
+    removed in this Offerte (they were pre-filled into it, or stored from it,
+    and nothing is entered for the item anymore). A Materialofferte (parts
+    without their working time) or an Offerte moved to another vehicle changes
+    nothing. */
+export function teileAusOfferte(
+  o: Offerte, v: Vehicle | undefined, alle: WartungTeile[], von?: string,
+): { speichern: WartungTeile[]; loeschen: string[] } {
+  const leer = { speichern: [], loeschen: [] };
   const w = o.wartung;
-  if (!w || !v || o.art === 'material' || v.id !== w.vehicleId || (o.vehicleId && o.vehicleId !== v.id)) return [];
-  const konfig = teileKonfig(v);
-  const out: WartungTeile[] = [];
+  if (!w || !v || o.art === 'material' || v.id !== w.vehicleId || (o.vehicleId && o.vehicleId !== v.id)) return leer;
+  const speichern: WartungTeile[] = [];
+  const loeschen: string[] = [];
   for (const it of w.items) {
+    const id = fzId(v.id, it.key);
+    const alt = alle.find((t) => t.id === id);
     const positionen = (o.positionen ?? []).filter((p) => p.wartung === it.key).map((p) => alsTeil(p, it.text));
-    if (!positionen.some(erfasst)) continue;
-    const basis = {
-      key: it.key, name: it.name, vehicleId: v.id, fahrzeug: [v.marke, v.modell, v.kennzeichen].filter(Boolean).join(' ') || undefined,
-      positionen, offertId: o.id, updatedAt: new Date().toISOString(), von,
-    };
-    const rows: WartungTeile[] = [{ ...basis, id: fzId(v.id, it.key) }];
-    if (konfig) rows.push({ ...basis, id: konfigId(konfig, it.key), konfig });
-    for (const r of rows) {
-      const alt = alle.find((t) => t.id === r.id);
-      if (!alt || JSON.stringify(alt.positionen) !== JSON.stringify(r.positionen) || alt.name !== r.name) out.push(r);
+    if (!positionen.some(erfasst)) {
+      if (alt && (alt.offertId === o.id || w.vorbelegt?.includes(it.key))) loeschen.push(id);
+      continue;
     }
+    if (alt && JSON.stringify(alt.positionen) === JSON.stringify(positionen) && alt.name === it.name) continue;
+    speichern.push({
+      id, key: it.key, name: it.name, vehicleId: v.id,
+      fahrzeug: [v.marke, v.modell, v.kennzeichen].filter(Boolean).join(' ') || undefined,
+      positionen, offertId: o.id, updatedAt: new Date().toISOString(), von,
+    });
   }
-  return out;
+  return { speichern, loeschen };
 }

@@ -46,7 +46,7 @@ import RechnungForm from './components/rechnungen/RechnungForm';
 import RechnungDetail from './components/rechnungen/RechnungDetail';
 
 import type { MaterialPosition, Customer, Order, Offerte, Position, Rechnung, ServiceItem, TabId, Vehicle } from './types';
-import { gespeicherteTeile, konfigText, teilKey, wartungsOfferte } from './lib/wartung-teile';
+import { wartungsOfferte } from './lib/wartung-teile';
 
 export default function App() {
   const {
@@ -359,20 +359,12 @@ export default function App() {
   }
   /** "Offerte erstellen" in the Wartungsplan: a draft for the vehicle, opened
       in the Offerten tab for pricing. Per picked (or due) item it carries the
-      positions entered for that item before (this vehicle, or – after asking –
-      a vehicle with the same Marke / Modell / Motorcode), else one Arbeit line
-      without price. Nothing is assumed. An Offerte is only a proposal: the
+      positions entered for that item on this vehicle before (never those of
+      another vehicle), else one Arbeit line without price. Nothing is assumed. An Offerte is only a proposal: the
       vehicle and its Wartungsplan are not written here. Intervals advance only
       via "Gemacht" (serviceErledigt). */
   async function handleOfferteAusWartungsplan(vehicle: Vehicle, items: ServiceItem[]) {
-    // Parts entered on another vehicle of the same configuration: only after confirmation.
-    const fremd = items.filter((it) => gespeicherteTeile(vehicle, teilKey(it), wartungTeile)?.konfig);
-    const konfigOk = fremd.length > 0 && window.confirm(
-      `Für ${fremd.map((it) => it.name).join(', ')} sind Teile von einem Fahrzeug mit gleicher Konfiguration gespeichert (${konfigText(vehicle)}).
-
-In die Offerte übernehmen? Teile und Preise danach prüfen.`,
-    );
-    const { positionen, wartung, uebernommen } = wartungsOfferte(vehicle, items, wartungTeile, (_, konfig) => !konfig || konfigOk);
+    const { positionen, wartung, uebernommen } = wartungsOfferte(vehicle, items, wartungTeile);
     const t = sumPositions(positionen);
     const created = await addOfferte({
       customerId: vehicle.customerId, vehicleId: vehicle.id,
