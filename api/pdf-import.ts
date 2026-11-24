@@ -10,7 +10,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { VercelLikeRequest, VercelLikeResponse } from './import-part.js';
-import { supabaseUserOk } from './drive-upload.js';
+import { supabaseUserId } from './_drive.js';
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -90,7 +90,7 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
 
   const auth = req.headers?.authorization;
   const token = (Array.isArray(auth) ? auth[0] : auth)?.replace(/^Bearer\s+/i, '');
-  if (!token || !(await supabaseUserOk(token))) return res.status(401).json({ ok: false, error: 'Nicht angemeldet' });
+  if (!token || !(await supabaseUserId(token))) return res.status(401).json({ ok: false, error: 'Nicht angemeldet' });
 
   if (!configured) {
     return res.status(501).json({ ok: false, configured: false, code: 'not_configured', error: 'Der Anthropic API Key ist in Vercel nicht konfiguriert (Umgebungsvariable ANTHROPIC_API_KEY fehlt).' });
