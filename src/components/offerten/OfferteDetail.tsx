@@ -1,21 +1,19 @@
 import { useState, useEffect } from 'react';
 import Sheet from '../ui/Sheet';
 import Spinner from '../ui/Spinner';
-import { SFPlus, SFXmark, SFWarning } from '../Icons';
+import { SFWarning } from '../Icons';
 import { PartLink, PosWerte, SaveStatus } from '../ui/DocForm';
 import { DocActions, DocSummary, type DocAction } from '../ui/DocActions';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { ActiveOfferteBanner } from './ActiveOfferte';
 import PartsOrder from '../teile/PartsOrder';
 import { exportOffertePDF, exportAuftragsbestaetigungPDF } from '../../lib/pdf-offerte';
-import { CO_NAME, STD_SATZ } from '../../lib/company';
+import { CO_NAME } from '../../lib/company';
 import { useSettings } from '../../hooks/useSettings';
 import { formatDateCH, buildDocumentFilename, printWithFilename } from '../../lib/utils';
-import { offerteNr, sumPositions, todayISO, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_PROZENT, offerteNotizen, anzahlungErforderlich, anzahlungMoeglich, anzahlungAufteilung, sindVorkasseTerms } from '../../lib/offerte-docs';
-import { materialPreis, zeBetrag } from '../../lib/ze';
-import { setMaterialFeld } from '../../lib/marge';
+import { offerteNr, sumPositions, todayISO, roundToRappen, ANZAHLUNG_PROZENT, offerteNotizen, anzahlungErforderlich, anzahlungMoeglich, anzahlungAufteilung } from '../../lib/offerte-docs';
 import { festpreisSummen, positionsArt, positionsText } from '../../lib/sonderpositionen';
-import type { AuftragsBestaetigung, Customer, Offerte, OfferteStatus, Position, ArbeitPosition, MaterialPosition, Rechnung } from '../../types';
+import type { AuftragsBestaetigung, Customer, Offerte, OfferteStatus, Position, Rechnung } from '../../types';
 
 interface OfferteDetailProps {
   offerte: Offerte;
@@ -42,12 +40,6 @@ interface OfferteDetailProps {
       the AB, so "Dokumente" offers only the AB PDF and prints as AB. */
   view?: 'ab';
 }
-
-const HDR: React.CSSProperties = {
-  fontSize: 9, fontWeight: 700, color: 'var(--label3)',
-  textTransform: 'uppercase', letterSpacing: '0.06em',
-  marginBottom: 2, display: 'block',
-};
 
 type StatusMeta = { c: string; l: string };
 const ST_META: Record<OfferteStatus, StatusMeta> = {
@@ -76,10 +68,10 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   const [creatingAnz, setCreatingAnz] = useState(false);
   const [creatingAb, setCreatingAb] = useState(false);
   const [dirty, setDirty] = useState(false);
-  /** View mode (default): positions, prices and terms are read-only; only the
-      document status and Angenommen / Abgelehnt per position stay tappable.
-      "Bearbeiten" in the bar unlocks inline editing, "Fertig" saves and locks again. */
-  const [editing, setEditing] = useState(false);
+  /* Positions, prices, Zahlungsziel and Anzahlung are read-only here; "Bearbeiten"
+     opens the full edit form (OfferteForm). The document status, Angenommen /
+     Abgelehnt per position and the free-text terms / AB fields (not part of the
+     form) stay editable in place and save themselves. */
 
   // The offerte prop can change under us while this component stays mounted
   // (edit sheet saved, background revalidate, another device). Re-seed the local
@@ -97,12 +89,6 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
     setMitAnzahlung(anzahlungErforderlich(offerte));
     setAb(offerte.ab ?? {});
   }, [dirty, offerte.id, offerte.positionen, offerte.zahlungsziel, offerte.zahlungsbedingung, offerte.zusatznotiz, offerte.anzahlungErforderlich, offerte.ab]);
-
-  const [addingTyp, setAddingTyp] = useState<'arbeit' | 'material' | null>(null);
-  const [newBeschreibung, setNewBeschreibung] = useState('');
-  const [newZE, setNewZE] = useState('');
-  const [newMenge, setNewMenge] = useState('1');
-  const [newPreis, setNewPreis] = useState('');
 
   const sc = ST_META[offerte.status] ?? ST_META.entwurf;
   const isExpired = offerte.gueltigBis && new Date(offerte.gueltigBis) < new Date();
@@ -172,28 +158,8 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   const abOrt = ab.ort ?? 'Thalheim AG';
   const abDatum = ab.datum ?? todayISO();
 
-  function handleZahlungszielChange(val: string) {
-    setZahlungsziel(val);
-    setDirty(true);
-  }
-
   function updAb(key: keyof AuftragsBestaetigung, val: string) {
     setAb((prev) => ({ ...prev, [key]: val }));
-    setDirty(true);
-  }
-
-  /** 50% Anzahlung (Materialofferte only) on: the Vorkasse terms are filled in
-      unless own terms exist. Off: billed at 100% again, the Vorkasse terms are removed. */
-  function toggleAnzahlung(on: boolean) {
-    setMitAnzahlung(on);
-    if (on && !zahlungsbedingung.trim() && !zusatznotiz.trim()) {
-      setZahlungsbedingung(VORKASSE_BEDINGUNG);
-      setZusatznotiz(SCHLUSSRECHNUNG_NOTIZ);
-    }
-    if (!on && sindVorkasseTerms(zahlungsbedingung, zusatznotiz)) {
-      setZahlungsbedingung('');
-      setZusatznotiz('');
-    }
     setDirty(true);
   }
 
@@ -210,62 +176,6 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
 
   function getAcceptedIndices() {
     return posAccepted.map((v, i) => (v ? i : -1)).filter((i) => i >= 0);
-  }
-
-  function updPos(i: number, key: string, val: string) {
-    setPositionen((prev) => {
-      const next = [...prev];
-      const cur = next[i];
-      const pos = (cur.typ === 'material' ? setMaterialFeld(cur, key, val) : { ...cur, [key]: val }) as Position;
-      if (pos.typ === 'arbeit') {
-        // Arbeit is entered in ZE only; Arbeit Total = all ZE at the Std.Satz.
-        pos.preis = zeBetrag(parseFloat((pos as ArbeitPosition).ze) || 0).toFixed(2);
-      } else {
-        // Menge × Stückpreis only; the ZE count as Arbeit (see positionTotals).
-        const mp = pos as MaterialPosition;
-        if (parseFloat(mp.stueckpreis) || parseFloat(mp.ze ?? '')) pos.preis = materialPreis(mp);
-      }
-      next[i] = pos;
-      return next;
-    });
-    setDirty(true);
-  }
-
-  function removePosition(i: number) {
-    setPositionen((prev) => prev.filter((_, j) => j !== i));
-    setPosAccepted((prev) => prev.filter((_, j) => j !== i));
-    setDirty(true);
-  }
-
-  function resetNewPos() {
-    setAddingTyp(null);
-    setNewBeschreibung('');
-    setNewZE('');
-    setNewMenge('1');
-    setNewPreis('');
-  }
-
-  function addPosition() {
-    if (!addingTyp || !newBeschreibung.trim()) return;
-    const pos: Position = addingTyp === 'arbeit'
-      ? {
-          typ: 'arbeit',
-          beschreibung: newBeschreibung.trim(),
-          ze: newZE,
-          stundenansatz: STD_SATZ,
-          preis: zeBetrag(parseFloat(newZE) || 0).toFixed(2),
-        }
-      : {
-          typ: 'material',
-          beschreibung: newBeschreibung.trim(),
-          menge: newMenge || '1',
-          stueckpreis: newPreis || '0',
-          preis: ((parseFloat(newMenge) || 1) * (parseFloat(newPreis) || 0)).toFixed(2),
-        };
-    setPositionen((prev) => [...prev, pos]);
-    setPosAccepted((prev) => [...prev, true]);
-    setDirty(true);
-    resetNewPos();
   }
 
   /* Every write from this sheet goes through here, so a status change can't drop
@@ -304,12 +214,6 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
   async function formularOeffnen() {
     if (!dirty) { onEdit(offerte); return; }
     if (await autoSave.flush()) onEdit(buildPayload());
-  }
-  /** Leaves edit mode once the inline edits are stored; a failed save keeps it open. */
-  async function fertig() {
-    if (dirty && !(await autoSave.flush())) return;
-    resetNewPos();
-    setEditing(false);
   }
   const saveStatus = (dirty || autoSave.status !== 'idle') && <SaveStatus status={autoSave.status} onRetry={autoSave.retry} />;
 
@@ -418,9 +322,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
       onClose={onClose}
       full
       back
-      barRight={editing
-        ? <button onClick={fertig} disabled={autoSave.status === 'saving'} className="bar-btn" style={{ fontWeight: 700 }}>Fertig</button>
-        : <button onClick={() => setEditing(true)} className="bar-btn">Bearbeiten</button>}
+      barRight={<button onClick={formularOeffnen} disabled={autoSave.status === 'saving'} className="bar-btn">Bearbeiten</button>}
     >
       <ActiveOfferteBanner offerte={offerte} customer={customer} />
 
@@ -464,20 +366,14 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
         ))}
       </DocSummary>
 
-      {editing && (
-        <div className="edit-meta-row no-print">
-          <button onClick={formularOeffnen} className="mf-btn-cancel">Titel, Kunde &amp; Details…</button>
-        </div>
-      )}
-
       {anzahlungMoeglich(offerte) && <label
         className="glass-panel no-print"
-        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', marginBottom: 12, cursor: editing ? 'pointer' : 'default' }}
+        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', marginBottom: 12, cursor: 'default' }}
       >
         <input
-          type="checkbox" checked={mitAnzahlung} onChange={(e) => toggleAnzahlung(e.target.checked)}
-          disabled={!editing}
-          style={{ width: 22, height: 22, accentColor: 'var(--accent)', flexShrink: 0, cursor: editing ? 'pointer' : 'default' }}
+          type="checkbox" checked={mitAnzahlung} readOnly
+          disabled
+          style={{ width: 22, height: 22, accentColor: 'var(--accent)', flexShrink: 0, cursor: 'default' }}
         />
         <span style={{ flex: 1 }}>
           <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: 'var(--label)' }}>{ANZAHLUNG_PROZENT}% Anzahlung erforderlich</span>
@@ -494,43 +390,25 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
           <div className="ab-panel-title">Zahlungsbedingungen</div>
           <div className="cf-field">
             <label className="cf-label">Bemerkung / Zahlungsbedingung</label>
-            {editing
-              ? <textarea className="cf-textarea" rows={2} value={zahlungsbedingung} onChange={(e) => { setZahlungsbedingung(e.target.value); setDirty(true); }} />
-              : <div className={`ro-text${zahlungsbedingung ? '' : ' ro-empty'}`}>{zahlungsbedingung || '—'}</div>}
+            <textarea className="cf-textarea" rows={2} value={zahlungsbedingung} onChange={(e) => { setZahlungsbedingung(e.target.value); setDirty(true); }} />
           </div>
           <div className="cf-field">
             <label className="cf-label">Zusatznotiz</label>
-            {editing
-              ? <textarea className="cf-textarea" rows={2} value={zusatznotiz} onChange={(e) => { setZusatznotiz(e.target.value); setDirty(true); }} />
-              : <div className={`ro-text${zusatznotiz ? '' : ' ro-empty'}`}>{zusatznotiz || '—'}</div>}
+            <textarea className="cf-textarea" rows={2} value={zusatznotiz} onChange={(e) => { setZusatznotiz(e.target.value); setDirty(true); }} />
           </div>
-          {editing && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-              <button onClick={removeTerms} className="mf-btn-cancel">Standard (Tage netto) verwenden</button>
-            </div>
-          )}
+          <div className="no-print" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+            <button onClick={removeTerms} className="mf-btn-cancel">Standard (Tage netto) verwenden</button>
+          </div>
         </div>
       ) : (
       <div style={{ padding: '2px 2px 0', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 13.5, color: 'var(--label2)' }}>
         <span>Zahlungsziel</span>
-        {editing ? (
-          <input
-            type="number"
-            value={zahlungsziel}
-            onChange={(e) => handleZahlungszielChange(e.target.value)}
-            min={1}
-            style={{
-              width: 48, padding: '3px 6px', fontSize: 14, fontWeight: 600, color: 'var(--label)',
-              background: 'var(--input-bg)', border: '1px solid var(--border)',
-              borderRadius: 6, textAlign: 'center', outline: 'none',
-            }}
-          />
-        ) : <span style={{ color: 'var(--label)', fontWeight: 600 }}>{zahlungsziel || '—'}</span>}
+        <span style={{ color: 'var(--label)', fontWeight: 600 }}>{zahlungsziel || '—'}</span>
         <span>Tage netto</span>
       </div>
       )}
 
-      {/* ── Positionen – read-only with Accept/Reject; inline editable in edit mode ── */}
+      {/* ── Positionen – read-only with Accept/Reject; edited in the full form (Bearbeiten) ── */}
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 0 }}>
         <p className="section-header" style={{ margin: 0 }}>Positionen</p>
         {saveStatus && <span style={{ marginRight: 20 }}>{saveStatus}</span>}
@@ -559,65 +437,12 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
                   </div>
                 </div>
 
-                {/* Read-only values; inline inputs only in edit mode */}
-                {!editing ? <PosWerte pos={pos} /> : pos.typ === 'arbeit' ? (
-                  <div className="pos-line-inputs" style={{ display: 'flex', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                      <span style={HDR}>ZE</span>
-                      <input
-                        className="mf-pos-num"
-                        type="number"
-                        value={(pos as ArbeitPosition).ze}
-                        onChange={(e) => updPos(i, 'ze', e.target.value)}
-                        placeholder="—"
-                        min={0}
-                        style={{ width: 44, padding: '3px 5px', fontSize: 13 }}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="pos-line-inputs" style={{ display: 'flex', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                      <span style={HDR}>ST.</span>
-                      <input
-                        className="mf-pos-num"
-                        type="number"
-                        value={(pos as MaterialPosition).menge}
-                        onChange={(e) => updPos(i, 'menge', e.target.value)}
-                        min={1}
-                        style={{ width: 40, padding: '3px 5px', fontSize: 13 }}
-                      />
-                    </div>
-                    <span style={{ fontSize: 11, color: 'var(--label3)', paddingBottom: 4, flexShrink: 0 }}>×</span>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                      <span style={HDR}>CHF</span>
-                      <input
-                        className="mf-pos-num"
-                        type="number"
-                        value={(pos as MaterialPosition).stueckpreis}
-                        onChange={(e) => updPos(i, 'stueckpreis', e.target.value)}
-                        placeholder="0.00"
-                        min={0}
-                        style={{ width: 58, padding: '3px 5px', fontSize: 13 }}
-                      />
-                    </div>
-                  </div>
-                )}
+                <PosWerte pos={pos} />
 
                 <div className="pos-line-total" style={{ fontWeight: 600, fontSize: 15, color: 'var(--label)', flexShrink: 0, minWidth: 68, textAlign: 'right' }}>
                   {pos.typ === 'arbeit' ? '—' : `CHF ${(parseFloat(pos.preis || '0')).toFixed(2)}`}
                 </div>
 
-                {editing && (
-                  <button
-                    onClick={() => removePosition(i)}
-                    className="del-btn-visible"
-                    title="Position löschen"
-                    aria-label="Position löschen"
-                  >
-                    <SFXmark />
-                  </button>
-                )}
               </div>
               <div className="pos-accept" style={{ display: 'flex', gap: 6 }}>
                 <button
@@ -644,56 +469,6 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
             </div>
           );
         })}
-
-        {/* ── Add new position (edit mode only) ── */}
-        {editing && <div style={{ padding: '10px 16px' }}>
-          {!addingTyp ? (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setAddingTyp('arbeit')} className="mf-add-pos"><SFPlus size={12} /> Arbeitsposition</button>
-              <button onClick={() => setAddingTyp('material')} className="mf-add-pos green"><SFPlus size={12} /> Materialposition</button>
-            </div>
-          ) : (
-            <div onKeyDown={(e) => {
-              // Keyboard entry: Enter adds the position, Escape cancels it.
-              if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') { e.preventDefault(); addPosition(); }
-              else if (e.key === 'Escape') { e.preventDefault(); resetNewPos(); }
-            }}>
-              <div className="cf-field" style={{ marginBottom: 8 }}>
-                <label className="cf-label">Bezeichnung</label>
-                <input
-                  className="cf-input"
-                  value={newBeschreibung}
-                  onChange={(e) => setNewBeschreibung(e.target.value)}
-                  placeholder={addingTyp === 'arbeit' ? 'z.B. Ölwechsel' : 'z.B. Ölfilter'}
-                  autoFocus
-                />
-              </div>
-              {addingTyp === 'arbeit' ? (
-                <div className="cf-grid-2" style={{ marginBottom: 10 }}>
-                  <div className="cf-field">
-                    <label className="cf-label">ZE</label>
-                    <input className="cf-input" type="number" min={0} value={newZE} onChange={(e) => setNewZE(e.target.value)} placeholder="0" />
-                  </div>
-                </div>
-              ) : (
-                <div className="cf-grid-2" style={{ marginBottom: 10 }}>
-                  <div className="cf-field">
-                    <label className="cf-label">Stk.</label>
-                    <input className="cf-input" type="number" min={1} value={newMenge} onChange={(e) => setNewMenge(e.target.value)} placeholder="1" />
-                  </div>
-                  <div className="cf-field">
-                    <label className="cf-label">CHF</label>
-                    <input className="cf-input" type="number" min={0} value={newPreis} onChange={(e) => setNewPreis(e.target.value)} placeholder="0.00" />
-                  </div>
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <button onClick={resetNewPos} className="mf-btn-cancel">Abbrechen</button>
-                <button onClick={addPosition} disabled={!newBeschreibung.trim()} className="mf-btn-save">Hinzufügen</button>
-              </div>
-            </div>
-          )}
-        </div>}
 
         {/* Accepted subtotal */}
         {positionen.length > 0 && (
@@ -761,9 +536,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
           </div>
           <div className="cf-field" style={{ marginBottom: 10 }}>
             <label className="cf-label">Ungefährer Zeitpunkt der Fertigstellung</label>
-            {editing
-              ? <input className="cf-input" value={ab.fertigstellung ?? ''} onChange={(e) => updAb('fertigstellung', e.target.value)} placeholder="z.B. KW 45 / Ende November" />
-              : <div className={`ro-text${ab.fertigstellung ? '' : ' ro-empty'}`}>{ab.fertigstellung || '—'}</div>}
+            <input className="cf-input" value={ab.fertigstellung ?? ''} onChange={(e) => updAb('fertigstellung', e.target.value)} placeholder="z.B. KW 45 / Ende November" />
           </div>
           {/* Signature blocks: hidden on screen, printed only (same layout as the PDF).
               Werkstatt is filled from the settings; the Kunde block keeps Ort, Datum,
