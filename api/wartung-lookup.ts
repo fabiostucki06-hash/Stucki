@@ -1,21 +1,24 @@
 // Vercel Node serverless function (not part of the Vite app bundle / tsc -b build).
 // Researches the manufacturer's service intervals for one exact vehicle
-// configuration with Claude + web search:
+// configuration with Google Gemini + Google Search grounding (Claude + web
+// search only as a fallback when just ANTHROPIC_API_KEY is set):
 //   POST /api/wartung-lookup  { fahrzeug: {...}, positionen: [{ key, name }] } → { ok: true, result: LookupResult }
-//   GET  /api/wartung-lookup  → { configured } (whether ANTHROPIC_API_KEY is set)
+//   GET  /api/wartung-lookup  → { configured, provider }
 //   Authorization: Bearer <Supabase access token of the signed-in user>
 //
 // No guessing: an interval only counts as found ('belegt') when the model names
 // a manufacturer or technical-data source AND that source's URL is one the web
 // search actually returned in this request. Anything else comes back as
 // 'unbelegt' with its intervals cleared, and the app keeps its Richtwert.
-// Environment variable: ANTHROPIC_API_KEY (required).
+// Gemini's grounding links are Google redirects: they are resolved to the
+// real pages before the check.
+// Environment variables: GEMINI_API_KEY (primary), GEMINI_MODEL (optional),
+// ANTHROPIC_API_KEY (optional fallback).
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { VercelLikeRequest, VercelLikeResponse } from './import-part.js';
 import { supabaseUserId } from './_drive.js';
-
-declare const process: { env: Record<string, string | undefined> };
+import { GeminiError, NOT_CONFIGURED, anthropicKey, geminiGenerate, geminiKey, jsonAusText, zielUrl } from './_gemini.js';
 
 const MODEL = 'claude-opus-5-5';
 
@@ -95,21 +98,101 @@ function gefundeneUrls(content: unknown[], into: Set<string>) {
 }
 
 const zahl = (n: unknown, max: number) => (typeof n === 'number' && Number.isFinite(n) && n > 0 && n <= max ? Math.round(n) : 0);
+const text = (s: unknown, max: number) => (typeof s === 'string' ? s.trim().slice(0, max) : '');
+
+type KiAntwort = { positionen?: Partial<KiPosition>[]; hinweis?: string };
+
+/** The model's answer checked against the search: an interval is only
+    'belegt' with a recognized source whose page the search really returned. */
+function auswerten(ki: KiAntwort, positionen: { key: Key }[], urls: Set<string>) {
+  const angefragt = new Set(positionen.map((p) => p.key));
+  const gesehen = new Set<Key>();
+  const ergebnis = (Array.isArray(ki.positionen) ? ki.positionen : []).flatMap((p) => {
+    const key = p.key as Key;
+    if (!angefragt.has(key) || gesehen.has(key)) return [];
+    gesehen.add(key);
+    const quelleTyp = p.quelleTyp === 'hersteller' || p.quelleTyp === 'fachdaten' ? p.quelleTyp : 'keine';
+    const anwendbar = p.anwendbar === 'ja' || p.anwendbar === 'nein' ? p.anwendbar : 'unklar';
+    const roh = text(p.quelleUrl, 500);
+    const url = /^https?:\/\//i.test(roh) ? roh : '';
+    const belegt = quelleTyp !== 'keine' && !!url && urls.has(urlSchluessel(url));
+    const km = belegt ? zahl(p.intervallKm, 400_000) : 0;
+    const monate = belegt ? zahl(p.intervallMonate, 240) : 0;
+    return [{
+      key,
+      status: belegt && (anwendbar === 'nein' || km || monate) ? 'belegt' : 'unbelegt',
+      anwendbar: belegt ? anwendbar : 'unklar',
+      intervallKm: km || undefined,
+      intervallMonate: monate || undefined,
+      quelleTyp: belegt ? quelleTyp : 'keine',
+      quelleText: belegt ? text(p.quelleText, 120) : '',
+      quelleUrl: belegt ? url : '',
+      hinweis: text(p.hinweis, 240),
+    }];
+  });
+  return { positionen: ergebnis, hinweis: text(ki.hinweis, 300) };
+}
+
+const ANWEISUNG_JSON = `Antworte am Ende ausschliesslich mit einem JSON-Objekt (ohne weiteren Text) in dieser Form:
+{"positionen":[{"key":"<key der Position>","anwendbar":"ja|nein|unklar","intervallKm":<Zahl, 0 wenn keines belegt>,"intervallMonate":<Zahl, 0 wenn keines belegt>,"quelleTyp":"hersteller|fachdaten|keine","quelleText":"<kurze Quellenangabe oder leer>","quelleUrl":"<URL der Seite aus den Suchergebnissen, die das Intervall enthält, oder leer>","hinweis":"<kurz auf Deutsch oder leer>"}],"hinweis":"<ein Satz zur Recherche oder leer>"}
+- Genau eine Zeile pro angefragter Position.
+- "nein" nur, wenn eine Quelle belegt, dass die Position bei genau dieser Konfiguration entfällt.
+- quelleTyp "hersteller" = Serviceplan, Betriebsanleitung, Wartungsheft, Herstellerportal; "fachdaten" = Autodata, HaynesPro, TecDoc, ADAC, Teilehersteller-Katalog. Foren, Blogs, Händler-Werbeseiten = "keine".`;
+
+/** Google Search grounding: every page the search used, resolved from Google's redirect links. */
+async function mitGemini(anfrage: string): Promise<{ ki: KiAntwort | null; urls: Set<string> }> {
+  const a = await geminiGenerate({
+    system: `${SYSTEM.replace(/\n- Melde das Ergebnis.*$/s, '')}\n\n${ANWEISUNG_JSON}`,
+    parts: [{ text: anfrage }],
+    search: true,
+    timeoutMs: 200_000,
+  });
+  const ziele = await Promise.all(a.quellen.map((q) => zielUrl(q.uri)));
+  const urls = new Set(ziele.filter((u): u is string => !!u).map(urlSchluessel).filter(Boolean));
+  return { ki: jsonAusText<KiAntwort>(a.text), urls };
+}
+
+async function mitClaude(apiKey: string, anfrage: string): Promise<{ ki: KiAntwort | null; urls: Set<string> }> {
+  const client = new Anthropic({ apiKey, timeout: 110_000, maxRetries: 1 });
+  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: 'user', content: anfrage }];
+  const urls = new Set<string>();
+  // Server-side web search can pause a long turn (pause_turn): continue it, at most a few times.
+  for (let runde = 0; runde < 4; runde++) {
+    const r = await client.beta.messages.create({
+      model: MODEL,
+      max_tokens: 16000,
+      system: SYSTEM,
+      output_config: { effort: 'medium' },
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+      tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 8 }, TOOL],
+      tool_choice: { type: 'auto' },
+      messages,
+    } as unknown as Anthropic.Beta.MessageCreateParamsNonStreaming);
+    gefundeneUrls(r.content, urls);
+    const call = r.content.find((b) => b.type === 'tool_use' && b.name === TOOL.name);
+    if (call && call.type === 'tool_use') return { ki: call.input as KiAntwort, urls };
+    if (r.stop_reason === 'refusal') return { ki: null, urls };
+    messages.push({ role: 'assistant', content: r.content });
+    // Ended without reporting: ask once more for the report.
+    if (r.stop_reason !== 'pause_turn') messages.push({ role: 'user', content: 'Melde jetzt das Ergebnis mit intervalle_melden.' });
+  }
+  return { ki: null, urls };
+}
 
 export default async function handler(req: VercelLikeRequest, res: VercelLikeResponse) {
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim() ?? '';
-  const configured = !!apiKey;
-  if (req.method === 'GET') return res.status(200).json({ ok: true, configured });
+  // Gemini is the primary provider; Claude only when no Gemini key is set.
+  const gemini = geminiKey(), claude = anthropicKey();
+  const configured = !!gemini || !!claude;
+  if (req.method === 'GET') return res.status(200).json({ ok: true, configured, provider: gemini ? 'gemini' : claude ? 'anthropic' : null });
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Nur GET/POST' });
 
   const auth = req.headers?.authorization;
   const token = (Array.isArray(auth) ? auth[0] : auth)?.replace(/^Bearer\s+/i, '');
   if (!token || !(await supabaseUserId(token))) return res.status(401).json({ ok: false, error: 'Nicht angemeldet' });
-  if (!configured) {
-    return res.status(501).json({ ok: false, configured: false, code: 'not_configured', error: 'Der Anthropic API Key ist in Vercel nicht konfiguriert (Umgebungsvariable ANTHROPIC_API_KEY fehlt).' });
-  }
+  if (!configured) return res.status(501).json({ ok: false, configured: false, code: 'not_configured', error: NOT_CONFIGURED });
 
-  let fahrzeug: Fahrzeug = {};
+  const fahrzeug: Fahrzeug = {};
   let positionen: { key: Key; name: string }[] = [];
   try {
     const body = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body ?? {}) as { fahrzeug?: Record<string, unknown>; positionen?: unknown[] };
@@ -126,59 +209,14 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
   if (!fahrzeug.marke || !fahrzeug.modell) return res.status(400).json({ ok: false, error: 'Marke und Modell fehlen' });
   if (!positionen.length) return res.status(400).json({ ok: false, error: 'Keine Positionen angefragt' });
 
-  const client = new Anthropic({ apiKey, timeout: 110_000, maxRetries: 1 });
-  const messages: Anthropic.Beta.BetaMessageParam[] = [{
-    role: 'user',
-    content: `Fahrzeug:\n${FELDER.filter((k) => fahrzeug[k]).map((k) => `- ${k}: ${fahrzeug[k]}`).join('\n')}\n\nPositionen:\n${
-      positionen.map((p) => `- ${p.key}: ${p.name}`).join('\n')}`,
-  }];
-  const urls = new Set<string>();
+  const anfrage = `Fahrzeug:\n${FELDER.filter((k) => fahrzeug[k]).map((k) => `- ${k}: ${fahrzeug[k]}`).join('\n')}\n\nPositionen:\n${
+    positionen.map((p) => `- ${p.key}: ${p.name}`).join('\n')}`;
   try {
-    // Server-side web search can pause a long turn (pause_turn): continue it, at most a few times.
-    for (let runde = 0; runde < 4; runde++) {
-      const r = await client.beta.messages.create({
-        model: MODEL,
-        max_tokens: 16000,
-        system: SYSTEM,
-        output_config: { effort: 'medium' },
-        betas: ['server-side-fallback-2026-07-01'],
-        fallbacks: 'default',
-        tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 8 }, TOOL],
-        tool_choice: { type: 'auto' },
-        messages,
-      } as unknown as Anthropic.Beta.MessageCreateParamsNonStreaming);
-      gefundeneUrls(r.content, urls);
-      const call = r.content.find((b) => b.type === 'tool_use' && b.name === TOOL.name);
-      if (call && call.type === 'tool_use') {
-        const ki = call.input as { positionen: KiPosition[]; hinweis: string };
-        const angefragt = new Set(positionen.map((p) => p.key));
-        const ergebnis = (ki.positionen ?? []).filter((p) => angefragt.has(p.key)).map((p) => {
-          const url = /^https?:\/\//i.test(p.quelleUrl) ? p.quelleUrl.trim() : '';
-          // Verified only with a recognized source the search really returned.
-          const belegt = p.quelleTyp !== 'keine' && !!url && urls.has(urlSchluessel(url));
-          const km = belegt ? zahl(p.intervallKm, 400_000) : 0;
-          const monate = belegt ? zahl(p.intervallMonate, 240) : 0;
-          return {
-            key: p.key,
-            status: belegt && (p.anwendbar === 'nein' || km || monate) ? 'belegt' : 'unbelegt',
-            anwendbar: belegt ? p.anwendbar : 'unklar',
-            intervallKm: km || undefined,
-            intervallMonate: monate || undefined,
-            quelleTyp: belegt ? p.quelleTyp : 'keine',
-            quelleText: belegt ? p.quelleText.slice(0, 120) : '',
-            quelleUrl: belegt ? url : '',
-            hinweis: p.hinweis.slice(0, 240),
-          };
-        });
-        return res.status(200).json({ ok: true, result: { positionen: ergebnis, hinweis: ki.hinweis?.slice(0, 300) ?? '' } });
-      }
-      if (r.stop_reason === 'refusal') return res.status(422).json({ ok: false, error: 'Die Recherche wurde abgelehnt' });
-      messages.push({ role: 'assistant', content: r.content });
-      // Ended without reporting: ask once more for the report.
-      if (r.stop_reason !== 'pause_turn') messages.push({ role: 'user', content: 'Melde jetzt das Ergebnis mit intervalle_melden.' });
-    }
-    return res.status(502).json({ ok: false, error: 'Die Recherche lieferte kein Ergebnis' });
+    const { ki, urls } = gemini ? await mitGemini(anfrage) : await mitClaude(claude, anfrage);
+    if (!ki) return res.status(502).json({ ok: false, error: 'Die Recherche lieferte kein auswertbares Ergebnis' });
+    return res.status(200).json({ ok: true, result: auswerten(ki, positionen, urls) });
   } catch (e) {
+    if (e instanceof GeminiError) return res.status(e.status).json({ ok: false, ...(e.code ? { code: e.code } : {}), error: e.message });
     if (e instanceof Anthropic.RateLimitError) return res.status(429).json({ ok: false, error: 'Zu viele Anfragen – bitte kurz warten und erneut versuchen' });
     if (e instanceof Anthropic.AuthenticationError) return res.status(502).json({ ok: false, code: 'invalid_key', error: 'Der Anthropic API Key in Vercel ist ungültig oder wurde widerrufen.' });
     if (e instanceof Anthropic.APIError) return res.status(502).json({ ok: false, error: `KI-Dienst nicht erreichbar (${e.status ?? 'Netzwerk'})` });
@@ -186,3 +224,4 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
     return res.status(500).json({ ok: false, error: 'Unerwarteter Fehler bei der Recherche' });
   }
 }
+

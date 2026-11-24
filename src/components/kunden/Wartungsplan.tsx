@@ -259,7 +259,7 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onF
     const b: Bericht = { abgleich: abgleichBericht(items, lokalItems), ohneLetzten: [] };
     let neu: Vehicle = lokal;
     const ok = await lookupKonfiguriert();
-    if (!ok) b.fehler = ok === false ? 'KI-Recherche ist nicht eingerichtet (ANTHROPIC_API_KEY in Vercel fehlt).' : 'Server nicht erreichbar.';
+    if (!ok) b.fehler = ok === false ? 'KI-Recherche ist nicht eingerichtet (GEMINI_API_KEY in Vercel fehlt).' : 'Server nicht erreichbar.';
     else if (!token) b.fehler = 'nicht angemeldet.';
     else {
       setRecherche(true);

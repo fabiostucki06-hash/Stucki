@@ -37,14 +37,14 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-/** Import failure; `code` is set when the Anthropic API key in Vercel is the cause. */
+/** Import failure; `code` is set when the AI key in Vercel (GEMINI_API_KEY) is the cause. */
 export class PdfImportError extends Error {
   constructor(message: string, readonly code?: 'not_configured' | 'invalid_key') {
     super(message);
   }
 }
 
-/** Whether ANTHROPIC_API_KEY is set on the server; null when the check itself failed. */
+/** Whether an AI key (GEMINI_API_KEY, else ANTHROPIC_API_KEY) is set on the server; null when the check itself failed. */
 export async function pdfImportConfigured(): Promise<boolean | null> {
   try {
     const r = await fetch('/api/pdf-import');

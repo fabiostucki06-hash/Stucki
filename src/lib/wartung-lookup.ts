@@ -26,7 +26,7 @@ export class LookupError extends Error {
 }
 
 let konfiguriert: Promise<boolean | null> | undefined;
-/** Whether ANTHROPIC_API_KEY is set on the server (asked once); null when the check failed. */
+/** Whether an AI key (GEMINI_API_KEY, else ANTHROPIC_API_KEY) is set on the server (asked once); null when the check failed. */
 export function lookupKonfiguriert(): Promise<boolean | null> {
   konfiguriert ??= fetch('/api/wartung-lookup')
     .then((r) => r.json() as Promise<{ configured?: boolean }>)

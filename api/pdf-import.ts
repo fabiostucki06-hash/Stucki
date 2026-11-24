@@ -1,18 +1,19 @@
 // Vercel Node serverless function (not part of the Vite app bundle / tsc -b build).
-// Reads an uploaded PDF (Offerte, Rechnung, Kostenvoranschlag …) with Claude and
+// Reads an uploaded PDF (Offerte, Rechnung, Kostenvoranschlag …) with Google
+// Gemini (Claude only as a fallback when just ANTHROPIC_API_KEY is set) and
 // returns its data as structured JSON, from which the app creates a draft:
 //   POST /api/pdf-import  { data: <base64 PDF>, filename? } → { ok: true, result: PdfImportResult }
-//   GET  /api/pdf-import  → { configured } (whether ANTHROPIC_API_KEY is set)
+//   GET  /api/pdf-import  → { configured, provider }
 //   Authorization: Bearer <Supabase access token of the signed-in user>
-// The PDF goes to Claude as a document block (text and scanned pages alike), so
+// The PDF goes to the model as a document (text and scanned pages alike), so
 // no separate PDF parser or OCR step is needed.
-// Environment variable: ANTHROPIC_API_KEY (required).
+// Environment variables: GEMINI_API_KEY (primary), GEMINI_MODEL (optional),
+// ANTHROPIC_API_KEY (optional fallback).
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { VercelLikeRequest, VercelLikeResponse } from './import-part.js';
 import { supabaseUserId } from './_drive.js';
-
-declare const process: { env: Record<string, string | undefined> };
+import { GeminiError, NOT_CONFIGURED, anthropicKey, geminiGenerate, geminiKey, jsonAusText } from './_gemini.js';
 
 const MAX_BYTES = 3 * 1024 * 1024; // base64 adds a third; Vercel caps request bodies at 4.5 MB
 
@@ -83,9 +84,11 @@ Was im Dokument nicht steht: Text als "", Zahlen als 0. Nichts erfinden.`;
 
 export default async function handler(req: VercelLikeRequest, res: VercelLikeResponse) {
   // Trimmed: a key pasted into Vercel with a trailing newline would fail authentication.
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim() ?? '';
-  const configured = !!apiKey;
-  if (req.method === 'GET') return res.status(200).json({ ok: true, configured });
+  // Gemini is the primary provider; Claude only when no Gemini key is set.
+  const gemini = geminiKey();
+  const apiKey = anthropicKey();
+  const configured = !!gemini || !!apiKey;
+  if (req.method === 'GET') return res.status(200).json({ ok: true, configured, provider: gemini ? 'gemini' : apiKey ? 'anthropic' : null });
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Nur GET/POST' });
 
   const auth = req.headers?.authorization;
@@ -93,7 +96,7 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
   if (!token || !(await supabaseUserId(token))) return res.status(401).json({ ok: false, error: 'Nicht angemeldet' });
 
   if (!configured) {
-    return res.status(501).json({ ok: false, configured: false, code: 'not_configured', error: 'Der Anthropic API Key ist in Vercel nicht konfiguriert (Umgebungsvariable ANTHROPIC_API_KEY fehlt).' });
+    return res.status(501).json({ ok: false, configured: false, code: 'not_configured', error: NOT_CONFIGURED });
   }
 
   let data: string;
@@ -106,6 +109,25 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
   if (!data || !/^[A-Za-z0-9+/]+=*$/.test(data)) return res.status(400).json({ ok: false, error: 'Keine PDF-Datei erhalten' });
   if (data.length * 0.75 > MAX_BYTES) return res.status(413).json({ ok: false, error: 'PDF ist zu gross (max. 3 MB)' });
   if (!data.startsWith('JVBER')) return res.status(400).json({ ok: false, error: 'Die Datei ist kein PDF' }); // "%PDF"
+
+  if (gemini) {
+    try {
+      const a = await geminiGenerate({
+        parts: [{ inline_data: { mime_type: 'application/pdf', data } }, { text: PROMPT }],
+        schema: SCHEMA as unknown as Record<string, unknown>,
+        maxOutputTokens: 32000,
+      });
+      if (a.finishReason === 'MAX_TOKENS') return res.status(422).json({ ok: false, error: 'Das Dokument hat zu viele Positionen für einen Import' });
+      if (a.finishReason && a.finishReason !== 'STOP') return res.status(422).json({ ok: false, error: 'Das Dokument konnte nicht ausgewertet werden' });
+      const result = jsonAusText<Record<string, unknown>>(a.text);
+      if (!result) return res.status(502).json({ ok: false, error: 'Antwort der KI war unvollständig' });
+      return res.status(200).json({ ok: true, result });
+    } catch (e) {
+      if (e instanceof GeminiError) return res.status(e.status).json({ ok: false, ...(e.code ? { code: e.code } : {}), error: e.message });
+      console.error('[pdf-import]', e);
+      return res.status(500).json({ ok: false, error: 'Unerwarteter Fehler beim Import' });
+    }
+  }
 
   const client = new Anthropic({ apiKey });
   try {

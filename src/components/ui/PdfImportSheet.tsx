@@ -6,7 +6,7 @@ import { SFDoc } from '../Icons';
 export type PdfImportZiel = 'offerte' | 'rechnung';
 
 const VERCEL_ENV_URL = 'https://vercel.com/fabiostucki06-hashs-projects/stucki/settings/environment-variables';
-const ANTHROPIC_KEYS_URL = 'https://console.anthropic.com/settings/keys';
+const GEMINI_KEYS_URL = 'https://aistudio.google.com/apikey';
 
 interface PdfImportSheetProps {
   token: string;
@@ -16,14 +16,14 @@ interface PdfImportSheetProps {
   onImported: (result: PdfImportResult, ziel: PdfImportZiel, filename: string) => Promise<void>;
 }
 
-/* Upload a PDF (drop or pick), read it on the server with Claude, then hand the
+/* Upload a PDF (drop or pick), read it on the server with Gemini, then hand the
    structured data to the app, which creates the draft. */
 export default function PdfImportSheet({ token, defaultZiel, onImported }: PdfImportSheetProps) {
   const [ziel, setZiel] = useState<PdfImportZiel>(defaultZiel);
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  /** Set when the Anthropic API key in Vercel is missing or rejected: shows the setup steps. */
+  /** Set when the AI key (GEMINI_API_KEY) in Vercel is missing or rejected: shows the setup steps. */
   const [keyProblem, setKeyProblem] = useState<'not_configured' | 'invalid_key' | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -33,7 +33,7 @@ export default function PdfImportSheet({ token, defaultZiel, onImported }: PdfIm
     void pdfImportConfigured().then((ok) => {
       if (cancelled || ok !== false) return;
       setKeyProblem('not_configured');
-      setError('Der Anthropic API Key ist in Vercel nicht konfiguriert (Umgebungsvariable ANTHROPIC_API_KEY fehlt).');
+      setError('Kein KI-Schlüssel in Vercel konfiguriert (Umgebungsvariable GEMINI_API_KEY fehlt).');
     });
     return () => { cancelled = true; };
   }, []);
@@ -111,15 +111,15 @@ export default function PdfImportSheet({ token, defaultZiel, onImported }: PdfIm
           <ol style={{ margin: '8px 0 0', paddingLeft: 20 }}>
             <li>
               {keyProblem === 'invalid_key' ? 'Neuen' : 'Einen'} API Key in der{' '}
-              <a href={ANTHROPIC_KEYS_URL} target="_blank" rel="noreferrer" style={{ color: 'var(--blue)' }}>Anthropic Console</a> erstellen und kopieren.
+              <a href={GEMINI_KEYS_URL} target="_blank" rel="noreferrer" style={{ color: 'var(--blue)' }}>Google AI Studio</a> erstellen und kopieren.
             </li>
             <li>
               <a href={VERCEL_ENV_URL} target="_blank" rel="noreferrer" style={{ color: 'var(--blue)' }}>Vercel → Projekt „stucki“ → Settings → Environment Variables</a> öffnen.
             </li>
             <li>
               {keyProblem === 'invalid_key'
-                ? <>Den Wert von <code>ANTHROPIC_API_KEY</code> durch den neuen Key ersetzen.</>
-                : <>Variable <code>ANTHROPIC_API_KEY</code> mit dem Key als Wert hinzufügen, Environment „Production“ (und bei Bedarf „Preview“).</>}
+                ? <>Den Wert von <code>GEMINI_API_KEY</code> durch den neuen Key ersetzen.</>
+                : <>Variable <code>GEMINI_API_KEY</code> mit dem Key als Wert hinzufügen, Environment „Production“ (und bei Bedarf „Preview“).</>}
             </li>
             <li>Unter „Deployments“ das neueste Deployment neu deployen („Redeploy“) – erst dann ist der Key aktiv.</li>
           </ol>
