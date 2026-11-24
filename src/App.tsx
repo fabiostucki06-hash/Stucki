@@ -4,7 +4,7 @@ import { showToast } from './components/ui/Toast';
 import { needsAttention, decodeMaybeDouble } from './lib/utils';
 import { getActiveOfferteId, setActiveOfferteId, getMargin } from './lib/settings';
 import { vkAusEk } from './lib/marge';
-import { cleanPartTitle } from './lib/partTitle';
+import { parsePartTitle } from './lib/partTitle';
 import { detectPrice, resolveChfPrice, fxHinweis } from './lib/currency';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { useIsDesktop } from './hooks/useIsDesktop';
@@ -206,7 +206,9 @@ export default function App() {
           if (data.preisStatus) { openSheet(payload); return; }
           part = { title: data.title, ek: data.ek, ekHinweis: data.ekHinweis, artikelnummer: data.artikelnummer, link: data.quelle || payload.url };
         }
-        const beschreibung = cleanPartTitle(part.title ?? '');
+        const parsed = parsePartTitle(part.title ?? '');
+        const beschreibung = parsed.name;
+        const artikelnummer = part.artikelnummer || parsed.artikelnummer;
         const ek = parseFloat(part.ek ?? '');
         if (!beschreibung || !(ek > 0)) {
           // part.ek is CHF at this point, so say so — the sheet must not re-guess it.
@@ -216,7 +218,7 @@ export default function App() {
         const vk = vkAusEk(ek, getMargin());
         await handleAddImportedPartToOfferte(target.id, {
           typ: 'material', beschreibung, menge: '1', stueckpreis: vk, preis: vk,
-          link: part.link || undefined, ek: part.ek, ekHinweis: part.ekHinweis, marge: String(getMargin()), artikelnummer: part.artikelnummer || undefined,
+          link: part.link || undefined, ek: part.ek, ekHinweis: part.ekHinweis, marge: String(getMargin()), artikelnummer: artikelnummer || undefined,
         });
         setPendingImport(null);
         importStarted.current = false;

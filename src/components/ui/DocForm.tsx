@@ -4,7 +4,7 @@ import Spinner from './Spinner';
 import { SFCheckmark, SFPlus, SFXmark } from '../Icons';
 import type { AutoSaveStatus } from '../../hooks/useAutoSave';
 import { findPartLink, parsePartLink } from '../../lib/utils';
-import { cleanPartTitle, partNameFromUrl } from '../../lib/partTitle';
+import { parsePartTitle, partNameFromUrl } from '../../lib/partTitle';
 import { getMargin } from '../../lib/settings';
 import type { ArbeitPosition, MaterialPosition } from '../../types';
 import { materialSatz, zeMinuten, zeText } from '../../lib/ze';
@@ -255,7 +255,7 @@ export function PositionenEditor({
         const row = materialRef.current.findIndex((m) => m.link === link.href);
         if (row < 0) return;
         const pos = materialRef.current[row];
-        if (data.title && pos.beschreibung === placeholder) onMaterialChange(row, 'beschreibung', cleanPartTitle(data.title));
+        if (data.title && pos.beschreibung === placeholder) onMaterialChange(row, 'beschreibung', parsePartTitle(data.title).name);
         // Setting the EK recalculates the VK; a VK typed in by hand is put back
         // afterwards, which turns it into the row's Marge instead.
         onMaterialChange(row, 'ek', data.ek ?? '');

@@ -3,7 +3,7 @@ import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
 import { getMargin } from '../../lib/settings';
 import { margeAusPreisen } from '../../lib/marge';
-import { cleanPartTitle } from '../../lib/partTitle';
+import { parsePartTitle } from '../../lib/partTitle';
 import { offerteNr } from '../../lib/offerte-docs';
 import { detectPrice, resolveChfPrice, fxHinweis, preisWarnung as warnungFuer } from '../../lib/currency';
 import type { Customer, MaterialPosition, Offerte, MaterialCatalogItem } from '../../types';
@@ -57,6 +57,8 @@ export default function ImportPartSheet({ payload, customers, offerten, defaultO
   const [stueckpreis, setStueckpreis] = useState('');
   const [menge, setMenge] = useState('1');
   const [artikelnummer, setArtikelnummer] = useState('');
+  /** Title exactly as the shop/marketplace listed it, shown for reference. */
+  const [rohTitel, setRohTitel] = useState('');
   const [quelle, setQuelle] = useState(payload.url ?? '');
   const [margin] = useState(getMargin());
   const [cid, setCid] = useState('');
@@ -70,14 +72,22 @@ export default function ImportPartSheet({ payload, customers, offerten, defaultO
   const [debugInfo, setDebugInfo] = useState<{ raw: string; decoded: string } | null>(null);
   const ekInputRef = useRef<HTMLInputElement>(null);
 
+  /** Prefills "Bezeichnung" with the short part name; part numbers found in the
+      title go to "Artikelnummer" unless the shop already gave one. */
+  function applyTitle(raw: string, artNr: string) {
+    const parsed = parsePartTitle(raw);
+    setRohTitel(raw.replace(/\s+/g, ' ').trim());
+    setBeschreibung(parsed.name);
+    setArtikelnummer(artNr || parsed.artikelnummer);
+  }
+
   useEffect(() => {
     // Bookmarklet path: title/price already extracted client-side from the live,
     // JS-rendered product page — more reliable than a server-side re-fetch (which
     // sees raw HTML and can hit anti-bot blocks), so use it directly.
     let cancelled = false;
     if (payload.title || payload.price) {
-      setBeschreibung(cleanPartTitle(payload.title || ''));
-      setArtikelnummer(payload.artikelnummer || '');
+      applyTitle(payload.title || '', payload.artikelnummer || '');
       (async () => {
         // Into CHF: foreign prices at the ECB rate; unknown currency or no
         // rate leaves the EK empty with a warning — never a guessed value.
@@ -103,9 +113,8 @@ export default function ImportPartSheet({ payload, customers, offerten, defaultO
         });
         const data: ParsedPart = await r.json();
         if (cancelled) return;
-        setBeschreibung(cleanPartTitle(data.title || ''));
+        applyTitle(data.title || '', data.artikelnummer || '');
         setEk(data.ek || '');
-        setArtikelnummer(data.artikelnummer || '');
         if (data.quelle) setQuelle(data.quelle);
         if (data.ek) setStueckpreis(round2(parseFloat(data.ek) * (1 + margin / 100)));
         setEkHinweis(data.ekHinweis);
@@ -243,6 +252,11 @@ export default function ImportPartSheet({ payload, customers, offerten, defaultO
         <div className="cf-field" style={{ marginBottom: 10 }}>
           <label className="cf-label">Bezeichnung *</label>
           <input className="cf-input" value={beschreibung} onChange={(e) => setBeschreibung(e.target.value)} placeholder="Ersatzteil…" />
+          {rohTitel && rohTitel !== beschreibung && (
+            <p style={{ fontSize: 11, color: 'var(--label3)', margin: '6px 0 0', wordBreak: 'break-word' }}>
+              Original: {rohTitel}
+            </p>
+          )}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
           <div className="cf-field">

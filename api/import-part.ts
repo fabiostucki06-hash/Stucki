@@ -4,7 +4,7 @@
 // mobile import view can prefill title / purchase price / article number.
 
 import { runShortcutImport } from './import-shortcut.js';
-import { partNameFromUrl } from '../src/lib/partTitle.js';
+import { partNameFromUrl, parsePartTitle } from '../src/lib/partTitle.js';
 import { detectPrice, cleanCurrencyCode, resolveChfPrice, fxHinweis, preisWarnung, type FxInfo } from '../src/lib/currency.js';
 
 export interface ImportRequestBody {
@@ -377,6 +377,9 @@ export async function extractPart(body: ImportRequestBody | undefined): Promise<
   // Blocked or unreadable page: the URL slug often still names the part
   // ("…/autoteile/bremsscheibe-10132" -> "Bremsscheibe"), better than nothing.
   if (!merged.title && merged.quelle) merged.title = partNameFromUrl(merged.quelle) ?? '';
+  // Marketplace titles often carry the OEM number ("… 079105323K"): use it
+  // when the page itself didn't name one.
+  if (!merged.artikelnummer && merged.title) merged.artikelnummer = parsePartTitle(merged.title).artikelnummer;
   const found = Boolean(merged.title || merged.price || merged.artikelnummer);
 
   // Into CHF: converted at the ECB rate, or left empty and flagged — never guessed.
