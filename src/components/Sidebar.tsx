@@ -2,18 +2,19 @@ import { SFHouse, SFWrench, SFDoc, SFBox, SFDocCheck, SFReceipt, SFReceiptHalf, 
 import type { TabId } from '../types';
 import { BUILD_LABEL } from '../lib/buildInfo';
 
-const SIDEBAR_ITEMS: { id: TabId; icon: React.ReactNode; label: string }[] = [
-  { id: 'dashboard',   icon: <SFHouse />,  label: 'Home'      },
-  { id: 'auftraege',   icon: <SFWrench />, label: 'Aufträge'  },
-  { id: 'offerten',    icon: <SFDoc />,     label: 'Offerten'   },
-  { id: 'materialofferten',       icon: <SFBox />,      label: 'Materialofferten'      },
-  { id: 'auftragsbestaetigungen', icon: <SFDocCheck />, label: 'Auftragsbestätigungen' },
-  { id: 'rechnungen', icon: <SFReceipt />, label: 'Rechnungen' },
-  { id: 'anzahlungsrechnungen', icon: <SFReceiptHalf />, label: 'Anzahlungsrechnungen' },
-  { id: 'schlussrechnungen', icon: <SFReceiptCheck />, label: 'Schlussrechnungen' },
-  { id: 'kunden',     icon: <SFPerson />,  label: 'Kunden'     },
-  { id: 'statistiken',   icon: <SFChart />,  label: 'Statistik'     },
-  { id: 'einstellungen', icon: <SFGear />,  label: 'Einstellungen' },
+/** `tile` picks the glossy icon-tile colour (.tile-* in globals.css). */
+const SIDEBAR_ITEMS: { id: TabId; icon: React.ReactNode; label: string; tile: string }[] = [
+  { id: 'dashboard',              icon: <SFHouse />,        label: 'Home',                  tile: 'blue'   },
+  { id: 'auftraege',              icon: <SFWrench />,       label: 'Aufträge',              tile: 'orange' },
+  { id: 'offerten',               icon: <SFDoc />,          label: 'Offerten',              tile: 'indigo' },
+  { id: 'materialofferten',       icon: <SFBox />,          label: 'Materialofferten',      tile: 'brown'  },
+  { id: 'auftragsbestaetigungen', icon: <SFDocCheck />,     label: 'Auftragsbestätigungen', tile: 'green'  },
+  { id: 'rechnungen',             icon: <SFReceipt />,      label: 'Rechnungen',            tile: 'purple' },
+  { id: 'anzahlungsrechnungen',   icon: <SFReceiptHalf />,  label: 'Anzahlungsrechnungen',  tile: 'pink'   },
+  { id: 'schlussrechnungen',      icon: <SFReceiptCheck />, label: 'Schlussrechnungen',     tile: 'mint'   },
+  { id: 'kunden',                 icon: <SFPerson />,       label: 'Kunden',                tile: 'teal'   },
+  { id: 'statistiken',            icon: <SFChart />,        label: 'Statistik',             tile: 'red'    },
+  { id: 'einstellungen',          icon: <SFGear />,         label: 'Einstellungen',         tile: 'gray'   },
 ];
 
 interface SidebarProps {
@@ -53,7 +54,7 @@ export default function Sidebar({ open: openProp, activeTab, onTabChange, onClos
                 aria-current={active ? 'page' : undefined}
                 onClick={() => { onTabChange(item.id); onClose(); }}
               >
-                <span className="sb-icon">{item.icon}</span>
+                <span className={`sb-icon icon-tile tile-${item.tile}`}>{item.icon}</span>
                 {item.label}
               </button>
             );

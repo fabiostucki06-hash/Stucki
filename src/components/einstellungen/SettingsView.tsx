@@ -19,11 +19,11 @@ import type { SyncStatus } from '../../types';
 
 type SectionId = 'werkstatt' | 'dokumente' | 'integrationen' | 'system';
 
-const SECTIONS: { id: SectionId; icon: React.ReactNode; label: string; short: string; hint: string }[] = [
-  { id: 'werkstatt',     icon: <SFWrench />,   label: 'Werkstatt & Firmendaten', short: 'Werkstatt',     hint: 'Adresse, IBAN, Stundensatz, Marge, Pauschalen' },
-  { id: 'dokumente',     icon: <SFDocCheck />, label: 'Unterschrift & Dokumente', short: 'Dokumente',     hint: 'Unterschrift, Zahlungsbedingungen' },
-  { id: 'integrationen', icon: <SFCloud />,    label: 'Integrationen & Cloud',   short: 'Integrationen', hint: 'Sync, Google Drive, Teile-Import' },
-  { id: 'system',        icon: <SFGear />,     label: 'System & App-Info',       short: 'System',        hint: 'Layout, Build' },
+const SECTIONS: { id: SectionId; icon: React.ReactNode; tile: string; label: string; short: string; hint: string }[] = [
+  { id: 'werkstatt',     icon: <SFWrench />,   tile: 'orange',   label: 'Werkstatt & Firmendaten', short: 'Werkstatt',     hint: 'Adresse, IBAN, Stundensatz, Marge, Pauschalen' },
+  { id: 'dokumente',     icon: <SFDocCheck />, tile: 'green', label: 'Unterschrift & Dokumente', short: 'Dokumente',     hint: 'Unterschrift, Zahlungsbedingungen' },
+  { id: 'integrationen', icon: <SFCloud />,    tile: 'blue',    label: 'Integrationen & Cloud',   short: 'Integrationen', hint: 'Sync, Google Drive, Teile-Import' },
+  { id: 'system',        icon: <SFGear />,     tile: 'gray',     label: 'System & App-Info',       short: 'System',        hint: 'Layout, Build' },
 ];
 
 const SECTION_KEY = 'garage_settings_section';
@@ -167,7 +167,7 @@ export default function SettingsView({ syncStatus, userEmail }: SettingsViewProp
             className={`settings-tab${on ? ' active' : ''}`}
             style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', width: '100%', textAlign: 'left' }}
           >
-            <span className="settings-tab-icon">{s.icon}</span>
+            <span className={`settings-tab-icon icon-tile tile-${s.tile}`}>{s.icon}</span>
             <span style={{ minWidth: 0 }}>
               <span style={{ display: 'block', fontSize: 14, fontWeight: on ? 600 : 500 }}>{s.label}</span>
               <span style={{ display: 'block', fontSize: 11.5, color: 'var(--label3)', marginTop: 1 }}>{s.hint}</span>
@@ -187,7 +187,7 @@ export default function SettingsView({ syncStatus, userEmail }: SettingsViewProp
             onClick={() => selectSection(s.id)}
             className={`settings-tab settings-chip${on ? ' active' : ''}`}
           >
-            <span className="settings-tab-icon">{s.icon}</span>
+            <span className={`settings-tab-icon icon-tile tile-${s.tile}`}>{s.icon}</span>
             {s.short}
           </button>
         );
@@ -198,7 +198,7 @@ export default function SettingsView({ syncStatus, userEmail }: SettingsViewProp
   const content = (
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: isDesktop ? '0 0 16px' : '4px 0 16px' }}>
-        <span className="settings-tab-icon active">{active.icon}</span>
+        <span className={`settings-tab-icon icon-tile tile-${active.tile}`}>{active.icon}</span>
         <h2 style={{ fontSize: 17, fontWeight: 600, letterSpacing: -0.2, color: 'var(--label)', margin: 0 }}>{active.label}</h2>
       </div>
 

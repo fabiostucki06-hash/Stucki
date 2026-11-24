@@ -43,6 +43,10 @@ in Komponenten, wenn ein Token existiert.
 
 - **Keine** Glas-Effekte, Glanz-Gradients, inset-Shines oder text-shadows.
   Einzige Ausnahme: Nav-Bar (transluzent schwarz + blur/saturate).
+- **Icons:** gefüllte Glyphen aus `Icons.tsx` (Details ausgestanzt, Linien-Glyphen mit kräftigem
+  runden Strich). Navigation (Sidebar) und Einstellungen-Kategorien: Glyph weiss auf glänzender
+  Farbkachel `.icon-tile tile-<farbe>` (Liquid-Glass-Stil). **Einzige Stelle mit Glanz/Gradient**;
+  Inline-Icons in Buttons, Bannern, Listen bekommen keine Kachel.
 - Container (Cards, Listen, Panels) heben sich durch Tonstufe vom Schwarz ab, **ohne Rahmen**.
   Linien nur als eingerückte Haarlinie zwischen Listenzeilen (iOS-Stil, `.list-row::after`).
   Schatten nur für schwebende Ebenen (Dialoge, Menüs, Toasts): `var(--shadow-lg)`.
@@ -53,7 +57,7 @@ in Komponenten, wenn ein Token existiert.
 - Status-Badges: getönter Hintergrund (`--*-tint`) + farbiger Text, keine gefüllten Farbflächen.
   Gruppen-Header: neutraler Text + kleiner Farbpunkt (`.dot`).
 - Beträge und Zahlen in `--label`, mit `font-variant-numeric: tabular-nums`. Nicht blau/grün einfärben.
-- Keine Emojis als Icons in Karten/Listen; SVG-Icons aus `Icons.tsx` oder gar kein Icon.
+- Keine Emojis als Icons; SVG-Icons aus `Icons.tsx` oder gar kein Icon.
 - Radien: 8–18px (`--radius-sm` 8 · `--radius-md` 10 · `--radius-lg` 14 · `--radius-xl` 18).
 - Typografie: Seitentitel `.sf-title1` 32–40px bold in `.page-head`; Abschnittstitel
   `.section-header` 20px bold `--label`, normale Schreibweise (keine Versalien).
