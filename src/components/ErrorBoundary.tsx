@@ -1,4 +1,5 @@
 import { Component, ReactNode } from 'react';
+import { SFWarning } from './Icons';
 
 interface Props { children: ReactNode }
 interface State { error: Error | null }
@@ -24,7 +25,7 @@ export default class ErrorBoundary extends Component<Props, State> {
     return (
       <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
         <div className="login-card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 44, marginBottom: 12 }}>⚠️</div>
+          <div style={{ color: 'var(--orange)', display: 'flex', justifyContent: 'center', marginBottom: 12 }}><SFWarning size={36} /></div>
           <div className="sf-title3" style={{ marginBottom: 8 }}>Etwas ist schiefgelaufen</div>
           <p className="sf-subhead" style={{ color: 'var(--label2)', marginBottom: 20 }}>
             Die App ist auf einen unerwarteten Fehler gestossen. Deine Daten in der Cloud sind davon nicht betroffen.

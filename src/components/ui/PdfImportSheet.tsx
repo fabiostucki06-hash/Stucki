@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Spinner from './Spinner';
 import { importPdf, pdfImportConfigured, PdfImportError, type PdfImportResult } from '../../lib/pdf-import';
+import { SFDoc } from '../Icons';
 
 export type PdfImportZiel = 'offerte' | 'rechnung';
 
@@ -90,7 +91,7 @@ export default function PdfImportSheet({ token, defaultZiel, onImported }: PdfIm
           </>
         ) : (
           <>
-            <div style={{ fontSize: 40, lineHeight: 1 }} aria-hidden>📄</div>
+            <div style={{ color: 'var(--label3)', display: 'flex' }}><SFDoc /></div>
             <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--label)' }}>PDF hierher ziehen</div>
             <div style={{ fontSize: 13, color: 'var(--label2)' }}>oder tippen, um eine Datei zu wählen (max. 3 MB)</div>
           </>

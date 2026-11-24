@@ -222,6 +222,8 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .alert-banner{border-radius:var(--radius-md);padding:10px 12px;margin-bottom:10px;display:flex;align-items:flex-start;gap:10px;font-size:14px}
 .alert-warning{background:var(--orange-tint);color:var(--label)!important;border:1px solid rgba(245,158,11,0.30)}
 .alert-danger{background:var(--red-tint);color:var(--label)!important;border:1px solid rgba(239,68,68,0.30)}
+.alert-icon{display:flex;flex-shrink:0;margin-top:1px;color:var(--orange)}
+.alert-danger .alert-icon{color:var(--red)}
 
 /* ── STAT CARDS ── */
 .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px}

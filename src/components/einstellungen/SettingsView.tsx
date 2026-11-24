@@ -65,10 +65,10 @@ function StatusDot({ color }: { color: string }) {
 }
 
 const SYNC_TEXT: Record<SyncStatus, { color: string; text: string }> = {
-  idle:   { color: '#64748b', text: 'Bereit' },
-  saving: { color: '#fbbf24', text: 'Synchronisiert…' },
-  ok:     { color: '#4ade80', text: 'Gespeichert' },
-  error:  { color: '#f87171', text: 'Fehler beim Speichern' },
+  idle:   { color: 'var(--label3)', text: 'Bereit' },
+  saving: { color: 'var(--orange)', text: 'Synchronisiert…' },
+  ok:     { color: 'var(--green)', text: 'Gespeichert' },
+  error:  { color: 'var(--red)', text: 'Fehler beim Speichern' },
 };
 
 interface SettingsViewProps {

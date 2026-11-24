@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Sheet from '../ui/Sheet';
 import Spinner from '../ui/Spinner';
-import { SFPlus, SFXmark } from '../Icons';
+import { SFPlus, SFXmark, SFWarning } from '../Icons';
 import { PartLink } from '../ui/DocForm';
 import { DocActions, DocSummary } from '../ui/DocActions';
 import PartsOrder from '../teile/PartsOrder';
@@ -98,7 +98,7 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
     >
       {ov && (
         <div className="alert-banner alert-danger" style={{ marginBottom: 12 }}>
-          <span>⚠️</span>
+          <span className="alert-icon"><SFWarning /></span>
           <span className="sf-subhead">{status === 'offerte_versendet' ? 'Offerte >48h ohne Antwort' : 'Zahlung überfällig'}</span>
         </div>
       )}
@@ -236,7 +236,7 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
                 placeholder="0.00"
                 min={0}
                 step="0.05"
-                style={{ background: 'var(--input-bg)', border: '1.5px solid var(--input-border)', outline: 'none', fontSize: 20, fontWeight: 700, color: '#ffffff', textAlign: 'right', width: 120, letterSpacing: '-0.4px', fontFamily: 'inherit', borderRadius: 8, padding: '4px 8px' }}
+                style={{ background: 'var(--input-bg)', border: '1.5px solid var(--input-border)', outline: 'none', fontSize: 20, fontWeight: 700, color: 'var(--label)', textAlign: 'right', width: 120, letterSpacing: '-0.4px', fontFamily: 'inherit', borderRadius: 8, padding: '4px 8px' }}
               />
             </div>
           </div>
@@ -250,7 +250,7 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
           <div className="form-section" style={{ marginBottom: 16 }}>
             <div style={{ padding: '11px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 16, color: 'var(--label2)' }}>Zahlungsziel (Tage, Standard: 30)</span>
-              <input type="number" value={zahlungsFrist} onChange={(e) => setZahlungsFrist(e.target.value)} placeholder="10" min={1} style={{ background: 'var(--input-bg)', border: '1.5px solid var(--input-border)', outline: 'none', fontSize: 16, color: '#ffffff', textAlign: 'right', width: 60, borderRadius: 8, padding: '4px 8px' }} />
+              <input type="number" value={zahlungsFrist} onChange={(e) => setZahlungsFrist(e.target.value)} placeholder="10" min={1} style={{ background: 'var(--input-bg)', border: '1.5px solid var(--input-border)', outline: 'none', fontSize: 16, color: 'var(--label)', textAlign: 'right', width: 60, borderRadius: 8, padding: '4px 8px' }} />
             </div>
           </div>
         </>
@@ -272,7 +272,7 @@ export default function OrderDetail({ order, customer, onClose, onUpdate, onDele
         <>
           <p className="section-header">Notizen</p>
           <div className="form-section" style={{ marginBottom: 16 }}>
-            <textarea value={notizen} onChange={(e) => setNotizen(e.target.value)} placeholder="Interne Notizen…" rows={3} style={{ display: 'block', width: '100%', padding: '11px 16px', background: 'var(--input-bg)', border: '1.5px solid var(--input-border)', borderRadius: 8, outline: 'none', fontSize: 17, color: '#ffffff', resize: 'vertical' }} />
+            <textarea value={notizen} onChange={(e) => setNotizen(e.target.value)} placeholder="Interne Notizen…" rows={3} style={{ display: 'block', width: '100%', padding: '11px 16px', background: 'var(--input-bg)', border: '1.5px solid var(--input-border)', borderRadius: 8, outline: 'none', fontSize: 17, color: 'var(--label)', resize: 'vertical' }} />
           </div>
         </>
       ) : notizen ? (

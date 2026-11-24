@@ -5,6 +5,7 @@ import { getActiveOfferteId, setActiveOfferteId, subscribeActiveOfferteId } from
 import { isOpenOfferte, useActiveOfferte } from '../../hooks/useActiveOfferte';
 import { offerteNr } from '../../lib/offerte-docs';
 import type { Customer, Offerte } from '../../types';
+import { SFTarget } from '../Icons';
 
 const customerName = (c: Customer | undefined) => (c ? `${c.vorname} ${c.nachname}` : 'Kein Kunde');
 
@@ -36,7 +37,7 @@ export function ActiveOfferteToggle({ offerte }: { offerte: Offerte }) {
       aria-label={label}
       aria-pressed={isActive}
     >
-      <span aria-hidden="true">🎯</span>
+      <SFTarget size={15} />
     </button>
   );
 }
@@ -55,7 +56,7 @@ export function ActiveOfferteBanner({ offerte, customer }: ActiveOfferteBannerPr
   const isActive = activeId === offerte.id;
   return (
     <div className={`ao-banner no-print${isActive ? '' : ' off'}`} role="status">
-      <span aria-hidden="true">🎯</span>
+      <SFTarget size={15} />
       {isActive ? (
         <span className="ao-banner-txt">
           Aktive Offerte: <strong>#{offerteNr(offerte)} – {customerName(customer)}</strong>
@@ -111,7 +112,7 @@ export function ActiveOffertePill({ offerten, customers }: ActiveOffertePillProp
         aria-haspopup="menu"
         aria-expanded={!!menuPos}
       >
-        <span aria-hidden="true">🎯</span>
+        <SFTarget size={15} />
         {active
           ? <span><span className="ao-long">Offerte </span>#{offerteNr(active)}<span className="ao-long"> aktiv</span></span>
           : <span>Keine<span className="ao-long"> Offerte aktiv</span></span>}

@@ -19,7 +19,6 @@ export default function RechnungList({ rechnungen, customers, orders, onRechnung
   if (!rechnungen.length) {
     return (
       <div style={{ padding: '60px 16px', textAlign: 'center' }}>
-        <div style={{ fontSize: 52, marginBottom: 12 }}>🧾</div>
         <p className="sf-headline" style={{ color: 'var(--label2)', marginBottom: 8 }}>Noch keine Rechnungen</p>
         <p className="sf-subhead" style={{ color: 'var(--label3)', marginBottom: 24 }}>Erstelle deine erste Rechnung aus einem Auftrag.</p>
         <button onClick={onNew} className="btn-system" style={{ maxWidth: 240, margin: '0 auto' }}>Neue Rechnung</button>

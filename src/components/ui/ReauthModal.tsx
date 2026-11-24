@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { auth } from '../../lib/supabase';
+import { SFWarning } from '../Icons';
 
 interface ReauthModalProps {
   email: string | null;
@@ -55,7 +56,7 @@ export default function ReauthModal({ email, onResolved }: ReauthModalProps) {
 
         {error && (
           <div className="alert-banner alert-danger" style={{ marginBottom: 14 }}>
-            <span style={{ fontSize: 15 }}>⚠️</span>
+            <span className="alert-icon"><SFWarning /></span>
             <span className="sf-subhead">{error}</span>
           </div>
         )}

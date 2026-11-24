@@ -59,7 +59,6 @@ export default function RechnungenList({ rechnungen: all, customers, onRechnungC
 
       {!rechnungen.length && (
         <div className="glass-panel" style={{ padding: 40, textAlign: 'center' }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🧾</div>
           <div style={{ fontSize: 16, color: 'var(--label2)' }}>Noch keine {titel}.</div>
           {(isAnz || isSchluss) && (
             <div style={{ fontSize: 13, color: 'var(--label3)', marginTop: 6 }}>

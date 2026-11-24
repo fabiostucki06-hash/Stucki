@@ -5,6 +5,7 @@ import Spinner from '../ui/Spinner';
 import { showToast } from '../ui/Toast';
 import { buildOrderList, groupPartsBySupplier, materialProgress, type SupplierGroup } from '../../lib/suppliers';
 import type { MaterialStatus, Position } from '../../types';
+import { SFCart } from '../Icons';
 
 interface PartsOrderProps {
   /** e.g. "Auftrag #12" */
@@ -57,7 +58,7 @@ export default function PartsOrder({ docLabel, positionen, onSave }: PartsOrderP
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className="po-entry no-print">
-        <span aria-hidden="true">🛒</span>
+        <SFCart size={17} />
         <span className="po-entry-txt">Teile bestellen</span>
         <span className={`po-chip${done ? ' done' : ''}`}>{done ? 'Alle Teile bestellt' : `${ordered} von ${total} bestellt`}</span>
       </button>
@@ -89,7 +90,7 @@ export default function PartsOrder({ docLabel, positionen, onSave }: PartsOrderP
                 {group.supplier.cart && (
                   <>
                     <button type="button" className="btn-system" onClick={() => prepareCart(group)}>
-                      🛒 Alle {group.supplier.name}-Teile in den Warenkorb
+                      <SFCart size={16} /> Alle {group.supplier.name}-Teile in den Warenkorb
                     </button>
                     <p className="po-hint">Kopiert die Bestellliste (Menge, Artikelnummer, Link) und öffnet {shopHost}.</p>
                   </>

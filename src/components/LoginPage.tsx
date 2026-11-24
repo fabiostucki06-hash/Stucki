@@ -9,6 +9,7 @@ import {
   authenticateWithPasskey,
 } from '../lib/passkey';
 import Spinner from './ui/Spinner';
+import { SFWarning } from './Icons';
 
 interface LoginPageProps {
   onLogin: (token: string, email: string) => void;
@@ -160,7 +161,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
         {error && (
           <div className="alert-banner alert-danger" style={{ marginBottom: 16 }}>
-            <span style={{ fontSize: 15 }}>⚠️</span>
+            <span className="alert-icon"><SFWarning /></span>
             <span className="sf-subhead">{error}</span>
           </div>
         )}

@@ -272,7 +272,7 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
           >
             <input
               type="checkbox" checked={mitAnzahlung} onChange={(e) => toggleAnzahlung(e.target.checked)}
-              style={{ width: 22, height: 22, accentColor: '#3b82f6', flexShrink: 0, cursor: 'pointer' }}
+              style={{ width: 22, height: 22, accentColor: 'var(--accent)', flexShrink: 0, cursor: 'pointer' }}
             />
             <span style={{ flex: 1 }}>
               <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: 'var(--label)' }}>{ANZAHLUNG_PROZENT}% Anzahlung erforderlich</span>

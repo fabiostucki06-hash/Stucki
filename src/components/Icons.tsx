@@ -154,3 +154,27 @@ export const SFGear = () => (
     <path d="M10.5 3.5h4l.4 2.2c.6.2 1.1.5 1.6.9l2.1-.8 2 3.5-1.7 1.4a6.5 6.5 0 010 1.9l1.7 1.4-2 3.5-2.1-.8c-.5.4-1 .7-1.6.9l-.4 2.2h-4l-.4-2.2a6.5 6.5 0 01-1.6-.9l-2.1.8-2-3.5 1.7-1.4a6.5 6.5 0 010-1.9l-1.7-1.4 2-3.5 2.1.8c.5-.4 1-.7 1.6-.9l.4-2.2z" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round"/>
   </svg>
 );
+
+export const SFWarning = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M10.3 4.2L2.6 17.6A2 2 0 004.3 20.6h15.4a2 2 0 001.7-3L13.7 4.2a2 2 0 00-3.4 0z" stroke="currentColor" strokeWidth={1.8} strokeLinejoin="round"/>
+    <path d="M12 9.5v4.5" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round"/>
+    <circle cx="12" cy="17" r="1.1" fill="currentColor"/>
+  </svg>
+);
+
+export const SFTarget = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth={1.8}/>
+    <circle cx="12" cy="12" r="4.5" stroke="currentColor" strokeWidth={1.8}/>
+    <circle cx="12" cy="12" r="1.3" fill="currentColor"/>
+  </svg>
+);
+
+export const SFCart = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M3 4h2.2l2.3 11.2a1.5 1.5 0 001.5 1.2h8.6a1.5 1.5 0 001.5-1.1L21 8H6.3" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/>
+    <circle cx="9.5" cy="20" r="1.3" fill="currentColor"/>
+    <circle cx="17" cy="20" r="1.3" fill="currentColor"/>
+  </svg>
+);

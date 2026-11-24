@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Sheet from '../ui/Sheet';
 import Spinner from '../ui/Spinner';
-import { SFPlus, SFXmark } from '../Icons';
+import { SFPlus, SFXmark, SFWarning } from '../Icons';
 import { PartLink, PosWerte, SaveStatus } from '../ui/DocForm';
 import { DocActions, DocSummary, type DocAction } from '../ui/DocActions';
 import { useAutoSave } from '../../hooks/useAutoSave';
@@ -426,7 +426,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
 
       {isExpired && offerte.status === 'versendet' && (
         <div className="alert-banner alert-danger" style={{ marginBottom: 10 }}>
-          <span>⚠️</span><span className="sf-subhead">Offerte abgelaufen</span>
+          <span className="alert-icon"><SFWarning /></span><span className="sf-subhead">Offerte abgelaufen</span>
         </div>
       )}
 
@@ -477,7 +477,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
         <input
           type="checkbox" checked={mitAnzahlung} onChange={(e) => toggleAnzahlung(e.target.checked)}
           disabled={!editing}
-          style={{ width: 22, height: 22, accentColor: '#3b82f6', flexShrink: 0, cursor: editing ? 'pointer' : 'default' }}
+          style={{ width: 22, height: 22, accentColor: 'var(--accent)', flexShrink: 0, cursor: editing ? 'pointer' : 'default' }}
         />
         <span style={{ flex: 1 }}>
           <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: 'var(--label)' }}>{ANZAHLUNG_PROZENT}% Anzahlung erforderlich</span>

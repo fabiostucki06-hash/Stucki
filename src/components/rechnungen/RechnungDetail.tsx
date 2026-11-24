@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Sheet from '../ui/Sheet';
 import Spinner from '../ui/Spinner';
 import { DocActions, DocSummary } from '../ui/DocActions';
-import { SFPlus, SFXmark } from '../Icons';
+import { SFPlus, SFXmark, SFWarning } from '../Icons';
 import { PartLink, PosWerte, SaveStatus } from '../ui/DocForm';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { exportRechnungPDF } from '../../lib/pdf-rechnung';
@@ -227,7 +227,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
     >
       {isOverdue && (
         <div className="alert-banner alert-danger" style={{ marginBottom: 10 }}>
-          <span>⚠️</span><span className="sf-subhead">Rechnung überfällig</span>
+          <span className="alert-icon"><SFWarning /></span><span className="sf-subhead">Rechnung überfällig</span>
         </div>
       )}
 
