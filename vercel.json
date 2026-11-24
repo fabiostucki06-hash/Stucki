@@ -1,6 +1,7 @@
 {
   "functions": {
     "api/pdf-import.ts": { "maxDuration": 120 },
+    "api/wartung-lookup.ts": { "maxDuration": 300 },
     "api/drive-upload.ts": { "maxDuration": 60 }
   },
   "rewrites": [

@@ -8,10 +8,11 @@ import {
   neueServiceId, ohneEntfernteService, serviceErledigt, serviceZuruecksetzen, serviceZustand, type ServiceZustand,
 } from '../../lib/vehicles';
 import {
-  GETRIEBE, HINWEIS_STANDARD, abgleichBericht, fahrzeugProfil, labelVon, mitWartungsplan, profilSignatur, quelleVon, specId, specVariante,
+  GETRIEBE, HINWEIS_STANDARD, abgleichBericht, fahrzeugProfil, konfigSchluessel, labelVon, mitWartungsplan, profilSignatur, quelleVon, specId, specVariante,
   vorlageVon, wartungsVorlagen, type AbgleichBericht, type FahrzeugProfil, type QuelleAnzeige, type Vorlage,
 } from '../../lib/wartung';
 import { exportWartungsplanPDF } from '../../lib/pdf-wartungsplan';
+import { LookupError, intervalleRecherchieren, lookupKonfiguriert, rechercheAnwenden, type LookupBericht } from '../../lib/wartung-lookup';
 import { useApp } from '../../context/AppContext';
 import type { Customer, FahrzeugFeld, IntervallQuelle, Nachweis, Order, ServiceItem, Vehicle, WartungSpec } from '../../types';
 
@@ -33,7 +34,7 @@ const RANG: Record<ServiceZustand, number> = { ueberfaellig: 0, bald: 1, unbekan
 const BADGE: Record<ServiceZustand, { label: string; cls: string }> = {
   ueberfaellig: { label: 'Überfällig',  cls: 'sp-badge-red' },
   bald:         { label: 'Bald fällig', cls: 'sp-badge-orange' },
-  unbekannt:    { label: 'Daten fehlen', cls: 'sp-badge-orange' },
+  unbekannt:    { label: 'Letzter Service fehlt', cls: 'sp-badge-orange' },
   faellig:      { label: 'In Zukunft',  cls: 'sp-badge-accent' },
   gemacht:      { label: 'Erledigt',    cls: 'sp-badge-green' },
 };
@@ -41,6 +42,7 @@ const BADGE: Record<ServiceZustand, { label: string; cls: string }> = {
 /** Source of an interval: checked against the OEM schedule, manufacturer Richtwert, generic Standardwert. */
 const QUELLE: Record<QuelleAnzeige, { label: string; dot: string }> = {
   geprueft:  { label: 'Herstellervorgabe geprüft', dot: 'var(--green)' },
+  recherchiert: { label: 'Herstellervorgabe recherchiert', dot: 'var(--green)' },
   richtwert: { label: 'Richtwert – prüfen',        dot: 'var(--accent)' },
   standard:  { label: 'Standardwert – prüfen',     dot: 'var(--orange)' },
   eigen:     { label: 'Eigener Wert – nicht geprüft', dot: 'var(--label3)' },
@@ -113,15 +115,38 @@ function Pruefhinweis({ profil, ungeprueft, unbekannt, unbelegt, onFahrzeug, onP
   );
 }
 
-/** "2 Positionen ergänzt (…) · 1 Intervall angepasst (…)" */
-function berichtText(b: AbgleichBericht): string {
-  const teil = (n: string[], eins: string, mehr: string, was: string) =>
-    n.length ? `${n.length} ${n.length === 1 ? eins : mehr} ${was} (${n.join(', ')})` : '';
-  return [
-    teil(b.neu, 'Position', 'Positionen', 'ergänzt'),
-    teil(b.intervall, 'Intervall', 'Intervalle', 'angepasst'),
-    teil(b.entfernt, 'Position', 'Positionen', 'entfällt'),
-  ].filter(Boolean).join(' · ') || 'Wartungsplan ist aktuell – nichts geändert.';
+const teil = (n: string[], was: string) => (n.length ? `${was}: ${n.join(', ')}` : '');
+
+/** Result of "Intervalle aktualisieren": the local match, then the lookup. */
+interface Bericht {
+  abgleich: AbgleichBericht;
+  lookup?: LookupBericht;
+  /** Why the lookup didn't run / failed. */
+  fehler?: string;
+  hinweis?: string;
+  /** Items still without a last service: no next due date / km yet. */
+  ohneLetzten: string[];
+}
+
+/** Lines of the summary, most important first. */
+function berichtZeilen(b: Bericht): { text: string; ton?: 'ok' | 'warn' }[] {
+  const l = b.lookup;
+  const z: { text: string; ton?: 'ok' | 'warn' }[] = [];
+  if (l) {
+    if (l.belegt.length) z.push({ text: teil(l.belegt, `Herstellervorgabe mit Quelle übernommen (${l.belegt.length})`), ton: 'ok' });
+    if (l.entfernt.length) z.push({ text: teil(l.entfernt, 'Entfällt laut Quelle, entfernt'), ton: 'ok' });
+    if (l.entfaelltPruefen.length) z.push({ text: teil(l.entfaelltPruefen, 'Entfällt laut Quelle – hat Einträge, bitte prüfen'), ton: 'warn' });
+    if (l.offen.length) z.push({ text: teil(l.offen, `Keine verlässliche Quelle gefunden, Richtwert bleibt – prüfen (${l.offen.length})`), ton: 'warn' });
+    if (l.behalten.length) z.push({ text: teil(l.behalten, 'Geprüft / eigener Wert, unverändert') });
+  }
+  if (b.fehler) z.push({ text: `Recherche nicht möglich: ${b.fehler}`, ton: 'warn' });
+  const a = b.abgleich;
+  if (a.neu.length) z.push({ text: teil(a.neu, 'Ergänzt') });
+  if (a.entfernt.length) z.push({ text: teil(a.entfernt, 'Entfällt für dieses Fahrzeug') });
+  if (!l && a.intervall.length) z.push({ text: teil(a.intervall, 'Intervall angepasst') });
+  if (b.ohneLetzten.length) z.push({ text: teil(b.ohneLetzten, 'Letzter Service fehlt (für nächste Fälligkeit erfassen)'), ton: 'warn' });
+  if (b.hinweis) z.push({ text: b.hinweis });
+  return z.length ? z : [{ text: 'Wartungsplan ist aktuell – nichts geändert.' }];
 }
 
 /** "05/2027" */
@@ -159,7 +184,7 @@ interface WartungsplanProps {
     and undo live in the editor behind the pencil. Due dates / mileages follow
     from the last service plus the interval. */
 export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onFahrzeugBearbeiten, auftraege = [], onAuftrag }: WartungsplanProps) {
-  const { wartungSpecs, saveWartungSpec } = useApp();
+  const { wartungSpecs, saveWartungSpec, token } = useApp();
   const items = ohneEntfernteService(vehicle.service ?? []);
   const profil = fahrzeugProfil(vehicle);
   const vorlagen = wartungsVorlagen(vehicle, wartungSpecs);
@@ -220,14 +245,47 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onF
   // before that, or before the data changed, can be matched on request.
   const anlegen = () => save(mitWartungsplan({ ...vehicle, service: undefined }, undefined, wartungSpecs));
   const veraltet = items.length > 0 && vehicle.wartungsprofil !== profilSignatur(vehicle, wartungSpecs);
-  // Re-match on request (also when nothing changed: shows that the plan is
-  // current). Recorded services, own positions and own intervals stay.
-  const [bericht, setBericht] = useState<AbgleichBericht | null>(null);
+  // "Intervalle aktualisieren": match the plan to the vehicle, then research
+  // the manufacturer's intervals for this exact configuration. Recorded
+  // services, own positions and own / checked intervals always stay.
+  const [bericht, setBericht] = useState<Bericht | null>(null);
+  const [recherche, setRecherche] = useState(false);
+  const schluessel = konfigSchluessel(vehicle);
   async function anpassen() {
-    const v = mitWartungsplan({ ...vehicle, service: items }, undefined, wartungSpecs);
-    await save(v);
-    setBericht(abgleichBericht(items, ohneEntfernteService(v.service ?? [])));
+    if (busy || recherche) return;
+    setBericht(null);
+    const lokal = mitWartungsplan({ ...vehicle, service: items }, undefined, wartungSpecs);
+    const lokalItems = ohneEntfernteService(lokal.service ?? []);
+    const b: Bericht = { abgleich: abgleichBericht(items, lokalItems), ohneLetzten: [] };
+    let neu: Vehicle = lokal;
+    const ok = await lookupKonfiguriert();
+    if (!ok) b.fehler = ok === false ? 'KI-Recherche ist nicht eingerichtet (ANTHROPIC_API_KEY in Vercel fehlt).' : 'Server nicht erreichbar.';
+    else if (!token) b.fehler = 'nicht angemeldet.';
+    else {
+      setRecherche(true);
+      try {
+        const r = await intervalleRecherchieren(lokal, lokalItems, token);
+        const x = rechercheAnwenden(lokalItems, r, lokal);
+        b.lookup = x.bericht;
+        b.hinweis = r.hinweis || undefined;
+        neu = { ...lokal, service: x.items, wartungsRecherche: { schluessel, am: todayISO(), belegt: x.bericht.belegt.length, offen: x.bericht.offen.length } };
+      } catch (e) {
+        b.fehler = e instanceof LookupError || e instanceof Error ? e.message : 'unbekannter Fehler';
+      } finally { setRecherche(false); }
+    }
+    b.ohneLetzten = (neu.service ?? []).filter((i) => serviceZustand(i, neu) === 'unbekannt').map((i) => i.name);
+    await save(neu);
+    setBericht(b);
   }
+  // Every detail entered and this configuration not yet researched: runs once on its own.
+  const autoVersucht = useRef<string | null>(null);
+  useEffect(() => {
+    if (!items.length || profil.fehlt.length || vehicle.wartungsRecherche?.schluessel === schluessel) return;
+    if (autoVersucht.current === `${vehicle.id}|${schluessel}`) return;
+    autoVersucht.current = `${vehicle.id}|${schluessel}`;
+    void lookupKonfiguriert().then((ok) => { if (ok) void anpassen(); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicle.id, schluessel, items.length, profil.fehlt.length, vehicle.wartungsRecherche?.schluessel]);
 
   const mitZustand = items
     .map((item) => ({ item, zustand: serviceZustand(item, vehicle) }))
@@ -302,10 +360,10 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onF
           />
         </label>
         <button
-          className="sp-text-btn" disabled={busy} onClick={() => void anpassen()}
-          title="Positionen und Intervalle mit Marke, Motorkennbuchstabe, Antrieb, Getriebe, Steuertrieb und Antriebsart abgleichen. Erfasste Services, eigene Positionen und eigene Intervalle bleiben."
+          className="sp-text-btn" disabled={busy || recherche} onClick={() => void anpassen()}
+          title="Positionen an das Fahrzeug anpassen und die Herstellervorgaben für genau diese Konfiguration recherchieren. Erfasste Services, eigene Positionen und eigene / geprüfte Intervalle bleiben."
         >
-          {veraltet ? 'An Fahrzeug anpassen' : 'Intervalle aktualisieren'}
+          {recherche ? 'Recherchiere …' : veraltet ? 'An Fahrzeug anpassen' : 'Intervalle aktualisieren'}
         </button>
         <button className="sp-text-btn" disabled={busy} onClick={neuePosition}><SFPlus size={12} /> Position</button>
         <button className="sp-text-btn" onClick={() => void exportWartungsplanPDF(vehicle, customer)} title="Wartungsplan als PDF herunterladen">PDF</button>
@@ -319,15 +377,27 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onF
           <span className="sp-offerte-count">{offerteItems.length}</span>
         </button>
       </div>
-      {veraltet && !bericht && (
+      {recherche && (
+        <div className="sp-auswahl" role="status" aria-live="polite">
+          <span>Herstellervorgaben für {[vehicle.marke, vehicle.modell, vehicle.motorcode].filter(Boolean).join(' ')} werden recherchiert … das dauert bis zu 2 Minuten.</span>
+        </div>
+      )}
+      {veraltet && !bericht && !recherche && (
         <div className="sp-auswahl" role="status">
           <span>Fahrzeugdaten oder geprüfte Intervalle haben sich geändert.</span>
           <button className="sp-text-btn" disabled={busy} onClick={() => void anpassen()}>Jetzt anpassen</button>
         </div>
       )}
       {bericht && (
-        <div className="sp-auswahl" role="status">
-          <span>{berichtText(bericht)}</span>
+        <div className="sp-auswahl sp-bericht" role="status">
+          <ul>
+            {berichtZeilen(bericht).map((z, i) => (
+              <li key={i}>
+                <span className="dot" style={{ background: z.ton === 'ok' ? 'var(--green)' : z.ton === 'warn' ? 'var(--orange)' : 'var(--label3)' }} />
+                {z.text}
+              </li>
+            ))}
+          </ul>
           <button className="sp-text-btn" onClick={() => setBericht(null)}>OK</button>
         </div>
       )}
@@ -407,6 +477,7 @@ function WartungsplanKachel({ item, naechste, zustand, busy, vorlage, selected, 
   const naechsteVonHand = faelligVonHand(item);
   const quelleTitel = q === 'geprueft'
     ? [item.quelleText, item.geprueftAm && `geprüft ${formatDateCH(item.geprueftAm)}`].filter(Boolean).join(' · ') || undefined
+    : q === 'recherchiert' ? [item.quelleText, item.quelleUrl].filter(Boolean).join(' – ')
     : vorlage?.hinweis ?? HINWEIS_STANDARD;
 
   return (
@@ -444,7 +515,7 @@ function WartungsplanKachel({ item, naechste, zustand, busy, vorlage, selected, 
       {quelle && (
         <p className="sp-quelle" title={quelleTitel}>
           <span className="dot" style={{ background: quelle.dot }} />
-          {quelle.label}{q === 'geprueft' && item.quelleText ? ` · ${item.quelleText}` : ''}
+          {quelle.label}{(q === 'geprueft' || q === 'recherchiert') && item.quelleText ? ` · ${item.quelleText}` : ''}
         </p>
       )}
       {item.notiz && <p className="sp-foot">{item.notiz}</p>}
@@ -549,7 +620,10 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, vehicl
       // An edited or checked interval is the vehicle's own: kept when its profile changes.
       intervallManuell: item.intervallManuell || geaendert || (geprueft && !warGeprueft) || undefined,
       quelle,
-      quelleText: geprueft ? opt(f.quelleText) : undefined,
+      // A researched interval left as it is keeps its source.
+      quelleText: geprueft ? opt(f.quelleText) : quelle === 'recherchiert' ? item.quelleText : undefined,
+      quelleUrl: quelle === 'recherchiert' ? item.quelleUrl : undefined,
+      rechercheFuer: quelle === 'recherchiert' ? item.rechercheFuer : undefined,
       geprueftAm: geprueft ? (warGeprueft && !geaendert && item.geprueftAm ? item.geprueftAm : todayISO()) : undefined,
       notiz: opt(f.notiz),
     };
@@ -579,7 +653,13 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, vehicl
           <div className="cf-field"><label className="cf-label" htmlFor="sp-imt">Alle … Monate</label><input id="sp-imt" className="cf-input" type="number" inputMode="numeric" value={f.intervallMonate} onChange={s('intervallMonate')} placeholder="12" /></div>
         </div>
 
-        {q !== 'geprueft' && (vorlage?.hinweis || q === 'standard') && <p className="sp-hinweis">{vorlage?.hinweis ?? HINWEIS_STANDARD}</p>}
+        {q === 'recherchiert' && (
+          <p className="sp-hinweis">
+            Herstellervorgabe recherchiert: {item.quelleText}
+            {item.quelleUrl && <> · <a href={item.quelleUrl} target="_blank" rel="noreferrer">Quelle öffnen</a></>}
+          </p>
+        )}
+        {q !== 'geprueft' && q !== 'recherchiert' && (vorlage?.hinweis || q === 'standard') && <p className="sp-hinweis">{vorlage?.hinweis ?? HINWEIS_STANDARD}</p>}
         <label className="sp-check">
           <input type="checkbox" checked={geprueft} onChange={(e) => setGeprueft(e.target.checked)} />
           <span>

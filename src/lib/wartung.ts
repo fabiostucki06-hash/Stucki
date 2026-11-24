@@ -462,10 +462,17 @@ const ausVorlage = (x: Vorlage): ServiceItem => ({
 export const wartungsplanFuer = (v: ProfilQuelle, specs: WartungSpec[] = []): ServiceItem[] => wartungsVorlagen(v, specs).map(ausVorlage);
 
 /** Never done, never edited: safe to drop when it no longer applies. */
-const unberuehrt = (i: ServiceItem) =>
+export const unberuehrt = (i: ServiceItem) =>
   !i.historie?.length && !i.letztesDatum && !i.letzteKm && !i.faelligDatum && !i.faelligKm && !i.notiz && !i.intervallManuell;
 
 const gleich = (i: ServiceItem, [km, mt]: Intervall) => (i.intervallKm ?? undefined) === km && (i.intervallMonate ?? undefined) === mt;
+
+/** The vehicle data a researched interval depends on: marke, modell, year of
+    the 1. Inverkehrsetzung, engine, engine code, fuel, drivetrain, gearbox,
+    timing drive. */
+export const konfigSchluessel = (v: ProfilQuelle): string =>
+  [norm(v.marke), norm(v.modell), (v.erstzulassung ?? '').slice(0, 4), norm(v.motor), normMotorcode(v.motorcode),
+    v.antrieb ?? '', v.achsantrieb ?? '', v.getriebe ?? '', v.steuertrieb ?? ''].join('|');
 
 /** Matches an existing plan to the vehicle's (new) profile:
     - items that don't apply any more are dropped, unless they carry history or edits;
@@ -488,12 +495,15 @@ export function wartungsplanAbgleichen(items: ServiceItem[], v: ProfilQuelle, vo
     const s = soll.get(key);
     if (!s) { if (!unberuehrt(i)) out.push(i); continue; }
     const a = alt.get(key);
+    // Researched for exactly this configuration: kept, unless the workshop has
+    // since checked this interval for the engine (that wins).
+    if (i.quelle === 'recherchiert' && i.rechercheFuer === konfigSchluessel(v) && s.quelle !== 'geprueft') { out.push({ ...i, vorlage: key }); continue; }
     const auto = !i.intervallManuell && (i.quelle != null || gleich(i, LEGACY[key].iv) || (a && gleich(i, [a.intervallKm, a.intervallMonate])));
     if (!auto) { out.push({ ...i, vorlage: key }); continue; }
 
     const n: ServiceItem = { ...i, vorlage: key, name: s.name, intervallKm: s.intervallKm, intervallMonate: s.intervallMonate, quelle: s.quelle };
     if (s.quelleText) n.quelleText = s.quelleText; else delete n.quelleText;
-    delete n.geprueftAm;
+    delete n.geprueftAm; delete n.quelleUrl; delete n.rechercheFuer;
     // Due values set by "Gemacht" (last service + old interval) follow the new interval.
     const vorher = faelligAus(i, i.letztesDatum, i.letzteKm), nachher = faelligAus(n, i.letztesDatum, i.letzteKm);
     if (i.faelligDatum && i.faelligDatum === vorher.faelligDatum) n.faelligDatum = nachher.faelligDatum;

@@ -46,7 +46,10 @@ export interface Customer {
     item counts as due anyway once faelligDatum or faelligKm is reached. */
 export type ServiceStatus = 'gemacht' | 'faellig';
 
-export type IntervallQuelle = 'standard' | 'richtwert' | 'geprueft';
+/** 'recherchiert': manufacturer / technical-data interval found by the
+    lookup (api/wartung-lookup) with a source URL; 'geprueft': checked by the
+    workshop. */
+export type IntervallQuelle = 'standard' | 'richtwert' | 'recherchiert' | 'geprueft';
 
 /** An interval checked against the OEM schedule for one engine (table
     `maintenance_specs`): every vehicle with that Motorkennbuchstabe gets it. */
@@ -99,6 +102,11 @@ export interface ServiceItem {
   quelleText?: string;
   /** ISO date the interval was checked. */
   geprueftAm?: string;
+  /** Source page of a researched interval (quelle 'recherchiert'). */
+  quelleUrl?: string;
+  /** Vehicle configuration (lib/wartung konfigSchluessel) a researched
+      interval applies to: it is dropped when the configuration changes. */
+  rechercheFuer?: string;
   /** Last time it was done. ISO date. */
   letztesDatum?: string;
   letzteKm?: string;
@@ -134,6 +142,8 @@ export interface Vehicle {
   service?: ServiceItem[];
   /** Profile (lib/wartung profilSignatur) the plan was last matched to. */
   wartungsprofil?: string;
+  /** Last interval lookup: for which configuration, when, and the summary. */
+  wartungsRecherche?: { schluessel: string; am: string; belegt: number; offen: number };
 }
 
 export interface OrderItem {

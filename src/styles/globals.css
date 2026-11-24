@@ -1024,6 +1024,10 @@ select.mf-add-pos.df-pauschale-select{-webkit-appearance:none;appearance:none;co
 .sp-select input:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring);border-radius:4px}
 @media (pointer:coarse){.sp-select input{width:22px;height:22px;margin:-1px 0 0}}
 .sp-auswahl{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;padding:4px 4px 4px 12px;font-size:13px;font-weight:500;color:var(--accent-text);background:var(--accent-soft);border:1px solid var(--border);border-radius:var(--radius-md);font-variant-numeric:tabular-nums}
+.sp-bericht{align-items:flex-start;padding:10px 4px 10px 12px;color:var(--label);background:var(--surface-2);border:none}
+.sp-bericht ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;min-width:0}
+.sp-bericht li{display:flex;align-items:baseline;gap:8px;font-weight:400;line-height:1.35;overflow-wrap:anywhere}
+.sp-bericht li .dot{flex:none;transform:translateY(-1px)}
 .sp-group-select{margin-left:6px;padding:2px 6px;border:none;border-radius:var(--radius-sm);background:transparent;color:var(--accent-text);font-family:inherit;font-size:11px;font-weight:500;letter-spacing:0;text-transform:none;cursor:pointer}
 .sp-group-select:hover{background:var(--surface-hover)}
 .sp-group-select:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring)}
