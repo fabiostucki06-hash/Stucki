@@ -38,13 +38,13 @@ export default function OrderList({ orders, customers, onOrderClick, onEditClick
   const done = filtered.filter((o) => o.status === 'abgeschlossen').sort(sortByName);
 
   return (
-    <div style={{ padding: '14px 16px 0' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+    <div style={{ padding: '0 16px' }}>
+      <div className="page-head">
         <h1 className="sf-title1">Aufträge</h1>
         <button onClick={onNew} className="btn-tinted">+ Neue</button>
       </div>
 
-      <div className="search-bar-wrap" style={{ padding: '8px 0 12px' }}>
+      <div className="search-bar-wrap" style={{ padding: '0 0 12px' }}>
         <div className="search-bar">
           <span className="search-icon">⌕</span>
           <input

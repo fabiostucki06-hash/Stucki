@@ -27,10 +27,10 @@ const STATUS_LABELS: Record<OfferteStatus, string> = { entwurf: 'Entwurf', verse
 const STATUS_COLORS: Record<OfferteStatus, string> = { entwurf: 'var(--label2)', versendet: 'var(--orange)', angenommen: 'var(--green)', abgelehnt: 'var(--red)' };
 
 const TITLES: Record<OfferteListVariant, string> = { alle: 'Offerten', material: 'Materialofferten', ab: 'Auftragsbestätigungen' };
-const EMPTY: Record<OfferteListVariant, { icon: string; text: string }> = {
-  alle: { icon: '📄', text: 'Noch keine Offerten.' },
-  material: { icon: '📦', text: 'Noch keine Materialofferten. Eine Materialofferte wird in einer Offerte über „Materialofferte erstellen“ angelegt.' },
-  ab: { icon: '✅', text: 'Noch keine Auftragsbestätigungen. Sobald eine Offerte angenommen ist, erscheint sie hier.' },
+const EMPTY: Record<OfferteListVariant, { text: string }> = {
+  alle: { text: 'Noch keine Offerten.' },
+  material: { text: 'Noch keine Materialofferten. Eine Materialofferte wird in einer Offerte über „Materialofferte erstellen“ angelegt.' },
+  ab: { text: 'Noch keine Auftragsbestätigungen. Sobald eine Offerte angenommen ist, erscheint sie hier.' },
 };
 
 // Older records may lack `art`, so fall back to the generated title prefix.
@@ -67,12 +67,12 @@ export default function OfferteList({ offerten, customers, onOfferteClick, onEdi
       ));
 
   return (
-    <div style={{ padding: '14px 16px 0' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 12 }}>
+    <div style={{ padding: '0 16px' }}>
+      <div className="page-head">
         <h1 className="sf-title1">{TITLES[variant]}</h1>
         {/* Materialofferten and ABs are derived from an existing Offerte, not created from scratch. */}
         {variant === 'alle' && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <div className="page-actions">
             {onImportPdf && <button onClick={onImportPdf} className="btn-tinted btn-quiet">PDF importieren</button>}
             <button onClick={onNew} className="btn-tinted">+ Neue</button>
           </div>
@@ -81,7 +81,6 @@ export default function OfferteList({ offerten, customers, onOfferteClick, onEdi
 
       {!list.length && (
         <div className="glass-panel" style={{ padding: 40, textAlign: 'center' }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>{EMPTY[variant].icon}</div>
           <div style={{ fontSize: 16, color: 'var(--label2)' }}>{EMPTY[variant].text}</div>
         </div>
       )}

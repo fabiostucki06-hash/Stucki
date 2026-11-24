@@ -2,7 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Liquid Glass Design System – iOS 26 Ultra Edition ── */
+/* ── GarageOS – Minimal Dark (Zinc / Slate) ── flat, calm, one accent.
+   Apple-inspired rhythm: large confident titles, generous air between sections,
+   compact rows inside them. */
 :root {
   /* ── Canvas & surfaces (zinc) ── one dark canvas, two quiet elevations. */
   --bg:          #09090b;   /* app canvas */
@@ -75,6 +77,11 @@
   --radius-md: 8px;
   --radius-lg: 10px;
   --radius-xl: 12px;
+
+  /* Type: SF Display for titles and figures, SF Text for running copy. */
+  --font-display: -apple-system,BlinkMacSystemFont,"SF Pro Display","Inter","Helvetica Neue",Arial,sans-serif;
+  --page-gutter: 16px;
+  --section-gap: 28px;
 }
 
 
@@ -110,9 +117,15 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 ::-webkit-scrollbar-track{background:transparent}
 
 /* ── TYPOGRAPHY ── */
-.sf-title1   {font-size:24px;font-weight:700;letter-spacing:-0.5px;line-height:1.2}
-.sf-title2   {font-size:20px;font-weight:650;letter-spacing:-0.3px;line-height:1.25}
-.sf-title3   {font-size:17px;font-weight:650;letter-spacing:-0.2px;line-height:1.3}
+.sf-title1   {font-family:var(--font-display);font-size:32px;font-weight:700;letter-spacing:-0.025em;line-height:1.1}
+.sf-title2   {font-family:var(--font-display);font-size:21px;font-weight:650;letter-spacing:-0.02em;line-height:1.2}
+.sf-title3   {font-family:var(--font-display);font-size:17px;font-weight:650;letter-spacing:-0.01em;line-height:1.3}
+
+/* Page header: large title left, the page's actions right (wrap under on narrow screens). */
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:20px 0 14px}
+.page-head.page-head-pad{padding-left:var(--page-gutter);padding-right:var(--page-gutter)}
+.page-head>.sf-title1{min-width:0;overflow-wrap:anywhere}
+.page-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .sf-headline {font-size:15px;font-weight:600;letter-spacing:-0.2px;line-height:1.3}
 .sf-body     {font-size:15px;font-weight:400;letter-spacing:-0.2px;line-height:1.47}
 .sf-callout  {font-size:14px;font-weight:400;letter-spacing:-0.1px;line-height:1.4}
@@ -122,7 +135,7 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .sf-caption2 {font-size:11px;font-weight:400;letter-spacing:0.02em;line-height:1.27}
 
 /* ── GROUPED LIST ── */
-.section-header{font-size:11px;font-weight:600;color:var(--label3);letter-spacing:0.06em;text-transform:uppercase;padding:16px 16px 6px}
+.section-header{font-size:11px;font-weight:600;color:var(--label3);letter-spacing:0.06em;text-transform:uppercase;padding:var(--section-gap) 16px 8px}
 .inset-grouped-list{background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);overflow:hidden;margin-bottom:16px}
 .list-row{display:flex;align-items:center;gap:12px;padding:10px 14px;min-height:44px;border-bottom:1px solid var(--border);cursor:pointer;background:transparent;transition:background 0.12s ease;position:relative}
 .list-row:hover{background:var(--surface-hover)}
@@ -211,10 +224,10 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .alert-danger{background:var(--red-tint);color:var(--label)!important;border:1px solid rgba(239,68,68,0.30)}
 
 /* ── STAT CARDS ── */
-.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
-.stat-card{background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);padding:12px 14px;overflow:hidden;position:relative}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px}
+.stat-card{background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);padding:14px 16px;overflow:hidden;position:relative}
 .stat-icon{font-size:18px;margin-bottom:6px;opacity:0.9}
-.stat-number{font-size:24px;font-weight:650;letter-spacing:-0.5px;line-height:1;color:var(--label);font-variant-numeric:tabular-nums}
+.stat-number{font-family:var(--font-display);font-size:30px;font-weight:650;letter-spacing:-0.03em;line-height:1;color:var(--label);font-variant-numeric:tabular-nums}
 .stat-label{font-size:12px;font-weight:500;color:var(--label2);margin-top:4px}
 
 /* ── CONTEXT MENU ── */
@@ -301,7 +314,7 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 .ds-status{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600}
 .ds-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .ds-title{font-size:15px;font-weight:600;color:var(--label);margin-top:3px;overflow-wrap:anywhere}
-.ds-amount{flex-shrink:0;text-align:right;font-size:20px;font-weight:650;letter-spacing:-0.4px;color:var(--label);font-variant-numeric:tabular-nums}
+.ds-amount{flex-shrink:0;text-align:right;font-family:var(--font-display);font-size:22px;font-weight:650;letter-spacing:-0.4px;color:var(--label);font-variant-numeric:tabular-nums}
 .ds-amount-lbl{display:block;font-size:10.5px;font-weight:600;color:var(--label3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:1px}
 .ds-meta{font-size:13.5px;color:var(--label2);margin-top:4px;overflow-wrap:anywhere}
 .ds-meta:first-of-type{margin-top:8px}
@@ -378,12 +391,17 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
   .app-shell.is-desktop{padding-bottom:16px!important}
   .is-desktop .tab-bar{display:none}
   .is-desktop .nav-bar-inner{max-width:none;padding:0 24px}
-  .is-desktop .app-main{max-width:none;margin:0 0 0 var(--sidebar-width);padding:8px 24px 16px}
-  .is-desktop .app-main>*{max-width:1240px;margin-left:auto;margin-right:auto}
+  .is-desktop .app-main{max-width:none;margin:0 0 0 var(--sidebar-width);padding:16px 40px 40px}
+  .is-desktop .app-main>*{max-width:1200px;margin-left:auto;margin-right:auto}
+  .sf-title1{font-size:36px}
+  .page-head{padding:24px 0 18px}
+  :root{--section-gap:32px}
   .sidebar-docked{box-shadow:none}
 
-  .stat-grid{grid-template-columns:repeat(4,1fr);gap:14px}
-  .dash-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:0 24px;align-items:start}
+  .stat-grid{grid-template-columns:repeat(4,1fr);gap:16px}
+  .stat-card{padding:18px 20px}
+  .stat-number{font-size:36px}
+  .dash-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:0 32px;align-items:start}
 
   /* Lists as tables: Dokument | Betrag | Kunde on one line, column labels on top. */
   .doc-row-main{display:flex;align-items:center;gap:16px;min-width:0}
@@ -431,10 +449,11 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
   .btn-system:hover,.btn-tinted:hover,.btn-system.btn-primary:hover{transform:none}
 }
 @media screen and (max-width:640px){
-  .sf-title1{font-size:24px;letter-spacing:-0.4px}
+  .sf-title1{font-size:30px}
   .sf-title2{font-size:20px}
   .sf-title3{font-size:18px}
-  .section-header{padding:16px 16px 6px}
+  .section-header{padding:24px 16px 8px}
+  .page-head{padding:16px 0 12px}
 
   /* Landscape notch: keep chrome and content out of the side insets. */
   .nav-bar-inner{padding:0 calc(8px + env(safe-area-inset-right)) 0 calc(8px + env(safe-area-inset-left))}
@@ -448,7 +467,7 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
   .stat-grid{gap:8px}
   .stat-card{padding:14px}
   .stat-icon{font-size:26px;margin-bottom:6px}
-  .stat-number{font-size:26px}
+  .stat-number{font-size:28px}
   .doc-group,.ab-panel,.doc-terms{padding:12px}
 
   .sheet-container{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
@@ -486,7 +505,7 @@ button{touch-action:manipulation;-webkit-font-smoothing:antialiased;font-family:
 }
 @media screen and (max-width:400px){
   .df-grid,.cf-grid-2,.cf-grid-21,.mf-row-2{grid-template-columns:minmax(0,1fr)}
-  .stat-number{font-size:24px}
+  .stat-number{font-size:26px}
 }
 
 /* ── PRINT ── hide app chrome, show only the sheet content ── */
@@ -1087,8 +1106,8 @@ select.mf-add-pos.df-pauschale-select{-webkit-appearance:none;appearance:none;co
 .sb.sb-docked{top:calc(53px + env(safe-area-inset-top));width:var(--sidebar-width);z-index:150;background:var(--bg);transition:none;padding-top:0}
 .sb-head{height:52px;display:flex;align-items:center;padding:0 8px 0 16px;border-bottom:1px solid var(--border)}
 .sb-title{font-weight:600;font-size:15px;color:var(--label);flex:1}
-.sb-nav{flex:1;min-height:0;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:1px}
-.sb-item{display:flex;align-items:center;gap:10px;padding:0 10px;min-height:36px;border-radius:6px;border:none;cursor:pointer;width:100%;text-align:left;background:transparent;color:var(--label2);font-family:inherit;font-weight:500;font-size:14px;transition:background 0.12s,color 0.12s}
+.sb-nav{flex:1;min-height:0;overflow-y:auto;padding:12px 10px;display:flex;flex-direction:column;gap:2px}
+.sb-item{display:flex;align-items:center;gap:10px;padding:0 10px;min-height:38px;border-radius:var(--radius-md);border:none;cursor:pointer;width:100%;text-align:left;background:transparent;color:var(--label2);font-family:inherit;font-weight:500;font-size:14px;transition:background 0.12s,color 0.12s}
 .sb-item:hover{background:var(--surface-2);color:var(--label)}
 .sb-item.active{background:var(--surface-2);color:var(--label);box-shadow:inset 2px 0 0 var(--accent)}
 .sb-icon{width:20px;height:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:inherit}
@@ -1098,7 +1117,7 @@ select.mf-add-pos.df-pauschale-select{-webkit-appearance:none;appearance:none;co
 .sb-logout{color:var(--red)}
 .sb-logout:hover{background:var(--red-tint);color:var(--red)}
 .sb-build{margin:6px 10px 0;font-size:10.5px;color:var(--label4);font-variant-numeric:tabular-nums;user-select:none}
-.sidebar-item{min-height:36px}
+.sidebar-item{min-height:38px}
 @media screen and (pointer:coarse){.sb-item{min-height:44px;font-size:15px}}
 
 /* ── SETTINGS ── */
@@ -1123,9 +1142,8 @@ select.mf-add-pos.df-pauschale-select{-webkit-appearance:none;appearance:none;co
 
 /* ── STATISTIK ── */
 :root{--chart-arbeit:#3b82f6;--chart-pauschale:#0d9488;--chart-material:#8b7fd6}
-.stx{padding:16px 16px 24px;max-width:1120px;margin:0 auto}
-.stx-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
-.stx-eyebrow{font-size:11px;font-weight:600;color:var(--label3);letter-spacing:.06em;text-transform:uppercase;margin:0 0 2px}
+.stx{padding:0 16px 24px;max-width:1120px;margin:0 auto}
+.stx-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:20px 0 14px}
 .stx-stepper{display:flex;align-items:center;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:2px}
 .stx-stepper button{width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:transparent;border:0;border-radius:var(--radius-sm);color:var(--label2);cursor:pointer}
 .stx-stepper button:hover:not(:disabled){background:var(--surface-hover)}
@@ -1184,7 +1202,8 @@ select.mf-add-pos.df-pauschale-select{-webkit-appearance:none;appearance:none;co
 .stx-service-count{text-align:right;font-size:12px;font-weight:600;color:var(--label2);font-variant-numeric:tabular-nums}
 .stx-empty{margin:0;padding:16px 0;text-align:center;font-size:13px;color:var(--label3)}
 @media(min-width:900px){
-  .stx{padding:20px 24px 32px}
+  .stx{padding:0 24px 32px}
+  .stx-head{padding:24px 0 18px}
   .stx-kpis{grid-template-columns:1.6fr 1fr 1fr 1fr}
   .stx-hero,.stx-kpis .stx-card:last-child{grid-column:auto}
   .stx-columns{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}

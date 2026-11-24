@@ -46,11 +46,11 @@ export default function RechnungenList({ rechnungen: all, customers, onRechnungC
   };
 
   return (
-    <div style={{ padding: '14px 16px 0' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 12 }}>
+    <div style={{ padding: '0 16px' }}>
+      <div className="page-head">
         <h1 className="sf-title1">{titel}</h1>
         {(onNew || onImportPdf) && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <div className="page-actions">
             {onImportPdf && <button onClick={onImportPdf} className="btn-tinted btn-quiet">PDF importieren</button>}
             {onNew && <button onClick={onNew} className="btn-tinted">+ Neue</button>}
           </div>

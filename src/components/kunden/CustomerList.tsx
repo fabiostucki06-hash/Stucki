@@ -34,7 +34,7 @@ export default function CustomerList({ customers, orders, onCustomerClick, onNew
 
   return (
     <div>
-      <div style={{ padding: '16px 16px 0', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+      <div className="page-head page-head-pad">
         <h1 className="sf-title1">Kunden</h1>
         <button onClick={onNew} className="btn-tinted">+ Neue</button>
       </div>

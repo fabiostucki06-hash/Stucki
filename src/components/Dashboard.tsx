@@ -15,11 +15,11 @@ export default function Dashboard({ customers, orders, onOrderClick }: Dashboard
 
   return (
     <div>
-      <div style={{ padding: '14px 16px 0' }}>
+      <div className="page-head page-head-pad">
         <h1 className="sf-title1">Übersicht</h1>
       </div>
 
-      <div style={{ padding: '10px 16px' }}>
+      <div style={{ padding: '0 16px 16px' }}>
         <div className="stat-grid">
           {[
             { label: 'Kunden',          v: customers.length },

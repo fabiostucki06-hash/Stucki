@@ -107,7 +107,6 @@ export default function StatistikDashboard({ orders, offerten, rechnungen, custo
     <div className="stx">
       <header className="stx-head">
         <div>
-          <p className="stx-eyebrow">Chef-Blick</p>
           <h1 className="sf-title1">Statistiken</h1>
         </div>
         <div className="stx-stepper">
