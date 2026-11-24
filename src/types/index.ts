@@ -57,6 +57,9 @@ export interface WartungSpec {
   hersteller: string;
   motorcode: string;
   vorlage: NonNullable<ServiceItem['vorlage']>;
+  /** Gearbox / drivetrain the interval was checked for (lib/wartung
+      specVariante): set for items that depend on it, e.g. Getriebeöl. */
+  variante?: string;
   intervallKm?: number;
   intervallMonate?: number;
   quelleText?: string;

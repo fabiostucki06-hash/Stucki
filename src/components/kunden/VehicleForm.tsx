@@ -255,14 +255,14 @@ export function VehicleFields({ f, onChange }: { f: FahrzeugFelder; onChange: (k
       <div className="cf-grid-2" style={{ marginTop: 10 }}>
         <div className="cf-field">
           <label className="cf-label">Steuertrieb</label>
-          <select className="cf-select" value={f.steuertrieb ?? ''} onChange={s('steuertrieb')}>
+          <select className="cf-select" data-feld="steuertrieb" value={f.steuertrieb ?? ''} onChange={s('steuertrieb')}>
             <option value="">{AUTO}</option>
             {STEUERTRIEBE.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
         <div className="cf-field">
           <label className="cf-label" htmlFor="vf-achsantrieb">Antriebsart</label>
-          <select id="vf-achsantrieb" className="cf-select" value={f.achsantrieb ?? ''} onChange={s('achsantrieb')}>
+          <select id="vf-achsantrieb" className="cf-select" data-feld="achsantrieb" value={f.achsantrieb ?? ''} onChange={s('achsantrieb')}>
             <option value="">{AUTO}</option>
             {ACHSANTRIEBE.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>

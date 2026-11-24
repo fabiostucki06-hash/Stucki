@@ -264,6 +264,12 @@ export function fahrzeugProfil(v: ProfilQuelle): FahrzeugProfil {
   }
   if (!v.antrieb) fehlend('antrieb', 'Antrieb');
   if (!/^\d{4}/.test(v.erstzulassung ?? '')) fehlend('erstzulassung', '1. Inverkehrsetzung');
+  if (antrieb !== 'elektro') {
+    // Engine code given but its timing drive not documented: only the vehicle can tell.
+    if (motorcode && steuertriebQuelle !== 'fahrzeug' && steuertriebQuelle !== 'motor') fehlend('steuertrieb', 'Steuertrieb');
+    // Decides whether the Allrad items (Haldex / Verteilergetriebe / Differenzial) apply.
+    if (!v.achsantrieb) fehlend('achsantrieb', 'Antriebsart (Front/Heck/Allrad)');
+  }
 
   const hersteller = gruppe !== 'andere' ? gruppe : marke;
   return { gruppe, hersteller, motorcode, motor, antrieb, getriebe, steuertrieb, steuertriebQuelle, baujahr, erkannt, fehlt, fehltFelder };
@@ -315,8 +321,26 @@ const ZAHNRIEMEN: Partial<Record<Gruppe, Intervall>> = {
 export const HINWEIS_STANDARD = 'Standardwert – bitte anhand Motorkennbuchstabe/VIN prüfen';
 export const HINWEIS_RICHTWERT = 'Richtwert – mit Herstellervorgabe (Serviceheft / Motorkennbuchstabe) abgleichen';
 
-/** "vag|CFFB|zahnriemen" */
-export const specId = (hersteller: string, motorcode: string, key: VorlageKey) => `${hersteller}|${normMotorcode(motorcode)}|${key}`;
+/** Items whose OEM interval depends on more than the engine: a checked
+    interval only applies to the same variant (gearbox / drivetrain). */
+const VARIANTE_VON: Partial<Record<VorlageKey, (v: ProfilQuelle) => string | undefined>> = {
+  getriebeoel: (v) => v.getriebe,
+  allradkupplung: (v) => v.achsantrieb,
+  verteilergetriebe: (v) => v.achsantrieb,
+  hinterachsgetriebe: (v) => v.achsantrieb,
+};
+
+/** Variant a checked interval of this item is stored for: only from values
+    entered on the vehicle, never inferred. `null` = the item depends on a
+    variant that isn't entered, so no checked interval can match or be stored. */
+export function specVariante(key: VorlageKey, v: ProfilQuelle): string | undefined | null {
+  const f = VARIANTE_VON[key];
+  return f ? f(v) ?? null : undefined;
+}
+
+/** "vag|CFFB|zahnriemen", "vag|CFFB|getriebeoel|dsg" */
+export const specId = (hersteller: string, motorcode: string, key: VorlageKey, variante?: string) =>
+  `${hersteller}|${normMotorcode(motorcode)}|${key}${variante ? `|${variante}` : ''}`;
 
 /** The items that apply to this vehicle, with intervals and their source.
     Intervals checked for the vehicle's engine (specs) replace the Richtwerte. */
@@ -384,11 +408,16 @@ export function wartungsVorlagen(v: ProfilQuelle, specs: WartungSpec[] = []): Vo
     add('hinterachsgetriebe', 'Allrad: Hinterachsdifferenzial-Öl', undefined, [100000, undefined], hinweis);
   }
 
-  // Intervals checked against the OEM schedule for this engine.
+  // Intervals checked against the OEM schedule for exactly this engine (and,
+  // where it matters, the same gearbox / drivetrain). A checked interval of a
+  // variant-dependent item stored without its variant (older entries) is not
+  // applied: it may have been checked for another gearbox.
   if (p.motorcode) {
-    const geprueft = new Map(specs.filter((s) => s.hersteller === p.hersteller && s.motorcode === p.motorcode).map((s) => [s.vorlage, s]));
+    const eigene = specs.filter((s) => s.hersteller === p.hersteller && s.motorcode === p.motorcode);
     for (const x of out) {
-      const s = geprueft.get(x.key);
+      const variante = specVariante(x.key, v);
+      if (variante === null) continue;
+      const s = eigene.find((s) => s.vorlage === x.key && (s.variante ?? undefined) === variante);
       if (s) Object.assign(x, { intervallKm: s.intervallKm, intervallMonate: s.intervallMonate, quelle: 'geprueft', quelleText: s.quelleText, hinweis: undefined });
     }
   }
@@ -473,6 +502,22 @@ export function wartungsplanAbgleichen(items: ServiceItem[], v: ProfilQuelle, vo
   }
   for (const [key, s] of soll) if (!gesehen.has(key)) out.push(ausVorlage(s));
   return out;
+}
+
+/** What matching changed, for the confirmation after "Aktualisieren". */
+export interface AbgleichBericht { neu: string[]; entfernt: string[]; intervall: string[] }
+
+export function abgleichBericht(vorher: ServiceItem[], nachher: ServiceItem[]): AbgleichBericht {
+  const alt = new Map(vorher.map((i) => [i.id, i]));
+  const ids = new Set(nachher.map((i) => i.id));
+  return {
+    neu: nachher.filter((i) => !alt.has(i.id)).map((i) => i.name),
+    entfernt: vorher.filter((i) => !ids.has(i.id)).map((i) => i.name),
+    intervall: nachher.filter((i) => {
+      const a = alt.get(i.id);
+      return a && (a.intervallKm !== i.intervallKm || a.intervallMonate !== i.intervallMonate || a.quelle !== i.quelle);
+    }).map((i) => i.name),
+  };
 }
 
 /** The vehicle with its plan matched to its profile (created when it has none

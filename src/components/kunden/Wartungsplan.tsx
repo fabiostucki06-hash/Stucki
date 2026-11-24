@@ -8,8 +8,8 @@ import {
   neueServiceId, ohneEntfernteService, serviceErledigt, serviceZuruecksetzen, serviceZustand, type ServiceZustand,
 } from '../../lib/vehicles';
 import {
-  HINWEIS_STANDARD, fahrzeugProfil, mitWartungsplan, profilSignatur, quelleVon, specId, vorlageVon, wartungsVorlagen,
-  type FahrzeugProfil, type QuelleAnzeige, type Vorlage,
+  GETRIEBE, HINWEIS_STANDARD, abgleichBericht, fahrzeugProfil, labelVon, mitWartungsplan, profilSignatur, quelleVon, specId, specVariante,
+  vorlageVon, wartungsVorlagen, type AbgleichBericht, type FahrzeugProfil, type QuelleAnzeige, type Vorlage,
 } from '../../lib/wartung';
 import { exportWartungsplanPDF } from '../../lib/pdf-wartungsplan';
 import { useApp } from '../../context/AppContext';
@@ -70,7 +70,7 @@ function Pruefhinweis({ profil, ungeprueft, unbekannt, unbelegt, onFahrzeug, onP
   // Vehicle data only assumed, not entered: the field to confirm it in
   // (fields already listed as missing are not repeated).
   const annahmen = ([
-    profil.steuertriebQuelle === 'marke' && { label: 'Steuerkette (nach Marke)', feld: 'motorcode' },
+    profil.steuertriebQuelle === 'marke' && { label: 'Steuerkette (nach Marke)', feld: 'steuertrieb' },
     profil.erkannt.antrieb && { label: 'Antrieb (aus Modell/Motor)', feld: 'antrieb' },
     profil.erkannt.getriebe && { label: 'Getriebe (aus Modell/Motor)', feld: 'getriebe' },
   ].filter(Boolean) as { label: string; feld: FahrzeugFeld }[]).filter((a) => !profil.fehltFelder.includes(a.feld));
@@ -111,6 +111,17 @@ function Pruefhinweis({ profil, ungeprueft, unbekannt, unbelegt, onFahrzeug, onP
       )}
     </div>
   );
+}
+
+/** "2 Positionen ergänzt (…) · 1 Intervall angepasst (…)" */
+function berichtText(b: AbgleichBericht): string {
+  const teil = (n: string[], eins: string, mehr: string, was: string) =>
+    n.length ? `${n.length} ${n.length === 1 ? eins : mehr} ${was} (${n.join(', ')})` : '';
+  return [
+    teil(b.neu, 'Position', 'Positionen', 'ergänzt'),
+    teil(b.intervall, 'Intervall', 'Intervalle', 'angepasst'),
+    teil(b.entfernt, 'Position', 'Positionen', 'entfällt'),
+  ].filter(Boolean).join(' · ') || 'Wartungsplan ist aktuell – nichts geändert.';
 }
 
 /** "05/2027" */
@@ -182,9 +193,11 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onF
     const service = edit?.neu ? [...items, it] : ersetze(it);
     setEdit(null);
     const key = vorlageVon(it);
-    if (!teilen || !key || !profil.motorcode || it.quelle !== 'geprueft') { void setItems(service); return; }
+    const variante = key ? specVariante(key, vehicle) : null;
+    if (!teilen || !key || variante === null || !profil.motorcode || it.quelle !== 'geprueft') { void setItems(service); return; }
     const spec: WartungSpec = {
-      id: specId(profil.hersteller, profil.motorcode, key), hersteller: profil.hersteller, motorcode: profil.motorcode, vorlage: key,
+      id: specId(profil.hersteller, profil.motorcode, key, variante), hersteller: profil.hersteller, motorcode: profil.motorcode, vorlage: key,
+      ...(variante ? { variante } : {}),
       intervallKm: it.intervallKm, intervallMonate: it.intervallMonate, quelleText: it.quelleText, geprueftAm: it.geprueftAm ?? todayISO(),
     };
     try { await saveWartungSpec(spec); } catch { return; /* toast shown by the context */ }
@@ -207,7 +220,14 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onF
   // before that, or before the data changed, can be matched on request.
   const anlegen = () => save(mitWartungsplan({ ...vehicle, service: undefined }, undefined, wartungSpecs));
   const veraltet = items.length > 0 && vehicle.wartungsprofil !== profilSignatur(vehicle, wartungSpecs);
-  const anpassen = () => save(mitWartungsplan({ ...vehicle, service: items }, undefined, wartungSpecs));
+  // Re-match on request (also when nothing changed: shows that the plan is
+  // current). Recorded services, own positions and own intervals stay.
+  const [bericht, setBericht] = useState<AbgleichBericht | null>(null);
+  async function anpassen() {
+    const v = mitWartungsplan({ ...vehicle, service: items }, undefined, wartungSpecs);
+    await save(v);
+    setBericht(abgleichBericht(items, ohneEntfernteService(v.service ?? [])));
+  }
 
   const mitZustand = items
     .map((item) => ({ item, zustand: serviceZustand(item, vehicle) }))
@@ -252,7 +272,7 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onF
 
   const sheet = edit && (
     <WartungsplanEditor
-      item={edit.item} neu={edit.neu} fokus={edit.fokus} busy={busy} vorlage={vorlageZu(edit.item)} motorcode={profil.motorcode}
+      item={edit.item} neu={edit.neu} fokus={edit.fokus} busy={busy} vorlage={vorlageZu(edit.item)} motorcode={profil.motorcode} vehicle={vehicle}
       auftraege={auftraege} onAuftrag={onAuftrag}
       onSave={(it, teilen) => void speichern(it, teilen)} onUndo={() => rueckgaengig(edit.item)} onDelete={() => entfernen(edit.item)} onClose={() => setEdit(null)}
     />
@@ -281,14 +301,12 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onF
             onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
           />
         </label>
-        {veraltet && (
-          <button
-            className="sp-text-btn" disabled={busy} onClick={anpassen}
-            title="Positionen und Intervalle an Antrieb, Getriebe und Marke anpassen. Erledigte Positionen und eigene Intervalle bleiben."
-          >
-            An Fahrzeug anpassen
-          </button>
-        )}
+        <button
+          className="sp-text-btn" disabled={busy} onClick={() => void anpassen()}
+          title="Positionen und Intervalle mit Marke, Motorkennbuchstabe, Antrieb, Getriebe, Steuertrieb und Antriebsart abgleichen. Erfasste Services, eigene Positionen und eigene Intervalle bleiben."
+        >
+          {veraltet ? 'An Fahrzeug anpassen' : 'Intervalle aktualisieren'}
+        </button>
         <button className="sp-text-btn" disabled={busy} onClick={neuePosition}><SFPlus size={12} /> Position</button>
         <button className="sp-text-btn" onClick={() => void exportWartungsplanPDF(vehicle, customer)} title="Wartungsplan als PDF herunterladen">PDF</button>
         <button
@@ -301,6 +319,18 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onF
           <span className="sp-offerte-count">{offerteItems.length}</span>
         </button>
       </div>
+      {veraltet && !bericht && (
+        <div className="sp-auswahl" role="status">
+          <span>Fahrzeugdaten oder geprüfte Intervalle haben sich geändert.</span>
+          <button className="sp-text-btn" disabled={busy} onClick={() => void anpassen()}>Jetzt anpassen</button>
+        </div>
+      )}
+      {bericht && (
+        <div className="sp-auswahl" role="status">
+          <span>{berichtText(bericht)}</span>
+          <button className="sp-text-btn" onClick={() => setBericht(null)}>OK</button>
+        </div>
+      )}
       {ausgewaehlt.length > 0 && (
         <div className="sp-auswahl" role="status">
           <span>{ausgewaehlt.length} {ausgewaehlt.length === 1 ? 'Position' : 'Positionen'} ausgewählt</span>
@@ -453,6 +483,8 @@ interface EditorProps {
   vorlage?: Vorlage;
   /** The vehicle's Motorkennbuchstabe: a checked interval can be stored for it. */
   motorcode?: string;
+  /** Gearbox / drivetrain a checked interval is stored for (specVariante). */
+  vehicle: Vehicle;
   /** The vehicle's Aufträge, to link a service entry to. */
   auftraege: Order[];
   onAuftrag?: (o: Order) => void;
@@ -464,7 +496,7 @@ interface EditorProps {
   onClose: () => void;
 }
 
-function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, auftraege, onAuftrag, onSave, onUndo, onDelete, onClose }: EditorProps) {
+function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, vehicle, auftraege, onAuftrag, onSave, onUndo, onDelete, onClose }: EditorProps) {
   const fokusRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = fokusRef.current;
@@ -493,7 +525,10 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, auftra
   const [teilen, setTeilen] = useState(true);
   const s = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF((p) => ({ ...p, [k]: e.target.value }));
   const q = quelleVon(item, vorlage);
-  const kannTeilen = !!motorcode && !!vorlageVon(item);
+  const key = vorlageVon(item);
+  const variante = key ? specVariante(key, vehicle) : null;
+  const kannTeilen = !!motorcode && !!key && variante !== null;
+  const fuer = `Motor ${motorcode}${variante ? ` · ${key === 'getriebeoel' ? labelVon(GETRIEBE, vehicle.getriebe) : 'Allrad'}` : ''}`;
   const num = (v: string) => (parseInt(v, 10) > 0 ? parseInt(v, 10) : undefined);
   const opt = (v: string) => v.trim() || undefined;
   const ok = !!f.name.trim() && !busy;
@@ -560,11 +595,14 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, auftra
             <input id="sp-quelle" className="cf-input" value={f.quelleText} onChange={s('quelleText')} placeholder="z.B. VW Serviceplan, Autodata" />
           </div>
         )}
+        {geprueft && !kannTeilen && motorcode && key && (
+          <p className="sp-hinweis">Gilt nur für dieses Fahrzeug: {key === 'getriebeoel' ? 'Getriebeart' : 'Antriebsart'} nicht erfasst – das Intervall hängt davon ab.</p>
+        )}
         {geprueft && kannTeilen && (
           <label className="sp-check">
             <input type="checkbox" checked={teilen} onChange={(e) => setTeilen(e.target.checked)} />
             <span>
-              <span className="sp-check-title">Für alle Fahrzeuge mit Motor {motorcode} übernehmen</span>
+              <span className="sp-check-title">Für alle Fahrzeuge mit {fuer} übernehmen</span>
               <span className="sp-check-sub">Wird gespeichert und bei diesen Fahrzeugen statt des Richtwerts verwendet</span>
             </span>
           </label>
