@@ -465,11 +465,7 @@ export default function OfferteDetail({ offerte, customer, onClose, onUpdate, on
       </DocSummary>
 
       {editing && (
-        <div className="edit-banner no-print">
-          <div className="edit-banner-txt">
-            Bearbeitungsmodus
-            <small>Positionen, Preise und Bedingungen sind bearbeitbar und werden automatisch gespeichert.</small>
-          </div>
+        <div className="edit-meta-row no-print">
           <button onClick={formularOeffnen} className="mf-btn-cancel">Titel, Kunde &amp; Details…</button>
         </div>
       )}

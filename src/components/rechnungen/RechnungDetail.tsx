@@ -255,11 +255,7 @@ export default function RechnungDetail({ rechnung, customer, onClose, onUpdate, 
       </DocSummary>
 
       {editing && (
-        <div className="edit-banner no-print">
-          <div className="edit-banner-txt">
-            Bearbeitungsmodus
-            <small>Positionen, Preise und Zahlungsziel sind bearbeitbar und werden automatisch gespeichert.</small>
-          </div>
+        <div className="edit-meta-row no-print">
           <button onClick={formularOeffnen} className="mf-btn-cancel">Titel, Kunde &amp; Details…</button>
         </div>
       )}
