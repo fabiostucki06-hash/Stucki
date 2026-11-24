@@ -177,6 +177,9 @@ interface WartungsplanProps {
   onAuftrag?: (o: Order) => void;
 }
 
+/** Automatic lookups already tried this session ("<vehicle id>|<konfigSchluessel>"). */
+const autoVersucht = new Set<string>();
+
 /** Wartungsplan of a vehicle: one tile per service item (two columns on wide
     screens), grouped into Jetzt fällig / In Zukunft fällig / Erledigt. A tile
     shows interval and next due; its status switch sets "Gemacht" (ticked off
@@ -277,12 +280,18 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onF
     await save(neu);
     setBericht(b);
   }
-  // Every detail entered and this configuration not yet researched: runs once on its own.
-  const autoVersucht = useRef<string | null>(null);
+  // Never on page load: the lookup runs on "Intervalle aktualisieren", or on its
+  // own only after the vehicle's specs changed (a lookup exists for other specs,
+  // or the specs were edited while this plan is open) and these specs have no
+  // lookup yet. At most once per vehicle + configuration per session, so a
+  // failed attempt (e.g. rate limit) is not repeated on every visit.
+  const schluesselBeimOeffnen = useRef(schluessel);
   useEffect(() => {
     if (!items.length || profil.fehlt.length || vehicle.wartungsRecherche?.schluessel === schluessel) return;
-    if (autoVersucht.current === `${vehicle.id}|${schluessel}`) return;
-    autoVersucht.current = `${vehicle.id}|${schluessel}`;
+    const geaendert = (!!vehicle.wartungsRecherche && vehicle.wartungsRecherche.schluessel !== schluessel) || schluesselBeimOeffnen.current !== schluessel;
+    const id = `${vehicle.id}|${schluessel}`;
+    if (!geaendert || autoVersucht.has(id)) return;
+    autoVersucht.add(id);
     void lookupKonfiguriert().then((ok) => { if (ok) void anpassen(); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle.id, schluessel, items.length, profil.fehlt.length, vehicle.wartungsRecherche?.schluessel]);

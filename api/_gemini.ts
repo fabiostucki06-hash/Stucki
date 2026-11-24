@@ -5,8 +5,12 @@
 
 declare const process: { env: Record<string, string | undefined> };
 
-/** Fast, low-cost Flash model; the alias always points at the current one. */
-export const GEMINI_MODEL_DEFAULT = 'gemini-flash-latest';
+/** Lightweight Flash model with the high free-tier quota. */
+export const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
+/** Used once if the pinned model is no longer offered (404): the alias always points at the current Flash. */
+const GEMINI_MODEL_ALIAS = 'gemini-flash-latest';
+/** Wait before the one automatic retry after a rate limit (429). */
+const RETRY_429_MS = 2500;
 
 // Trimmed: a key pasted into Vercel with a trailing newline would fail authentication.
 export const geminiKey = (): string => process.env.GEMINI_API_KEY?.trim() ?? '';
@@ -68,16 +72,26 @@ export async function geminiGenerate(req: GeminiRequest): Promise<GeminiAntwort>
   if (req.system) body.systemInstruction = { parts: [{ text: req.system }] };
   if (req.search) body.tools = [{ google_search: {} }];
 
-  let r: Response;
-  try {
-    r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(geminiModel())}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(req.timeoutMs ?? 110_000),
-    });
-  } catch (e) {
-    throw new GeminiError((e as Error)?.name === 'TimeoutError' ? 'KI-Dienst antwortet nicht (Zeitüberschreitung)' : 'KI-Dienst nicht erreichbar (Netzwerk)', 502);
+  const senden = async (model: string): Promise<Response> => {
+    try {
+      return await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(req.timeoutMs ?? 110_000),
+      });
+    } catch (e) {
+      throw new GeminiError((e as Error)?.name === 'TimeoutError' ? 'KI-Dienst antwortet nicht (Zeitüberschreitung)' : 'KI-Dienst nicht erreichbar (Netzwerk)', 502);
+    }
+  };
+  let model = geminiModel();
+  let r = await senden(model);
+  // Pinned default retired by Google: fall back to the Flash alias (an explicit GEMINI_MODEL stays as set).
+  if (r.status === 404 && !process.env.GEMINI_MODEL?.trim()) r = await senden((model = GEMINI_MODEL_ALIAS));
+  // Rate limit (free tier): wait briefly and retry exactly once before giving up.
+  if (r.status === 429) {
+    await new Promise((ok) => setTimeout(ok, RETRY_429_MS));
+    r = await senden(model);
   }
   const json = (await r.json().catch(() => null)) as {
     error?: { message?: string; status?: string; details?: { reason?: string }[] };
@@ -91,7 +105,7 @@ export async function geminiGenerate(req: GeminiRequest): Promise<GeminiAntwort>
     const schluessel = r.status === 401 || r.status === 403 || json?.error?.details?.some((d) => d.reason === 'API_KEY_INVALID') || /api key/i.test(msg);
     if (schluessel) throw new GeminiError('Der Gemini API Key in Vercel ist ungültig oder hat keinen Zugriff auf die Gemini API.', 502, 'invalid_key');
     if (r.status === 429) throw new GeminiError('Zu viele Anfragen – bitte kurz warten und erneut versuchen', 429);
-    if (r.status === 404) throw new GeminiError(`Gemini-Modell "${geminiModel()}" nicht verfügbar (GEMINI_MODEL prüfen)`, 502);
+    if (r.status === 404) throw new GeminiError(`Gemini-Modell "${model}" nicht verfügbar (GEMINI_MODEL prüfen)`, 502);
     if (r.status === 400) throw new GeminiError(`Anfrage wurde abgelehnt: ${msg || 'ungültige Anfrage'}`, 422);
     throw new GeminiError(`KI-Dienst nicht erreichbar (${r.status})`, 502);
   }

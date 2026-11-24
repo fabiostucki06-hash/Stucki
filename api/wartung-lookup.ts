@@ -12,12 +12,16 @@
 // 'unbelegt' with its intervals cleared, and the app keeps its Richtwert.
 // Gemini's grounding links are Google redirects: they are resolved to the
 // real pages before the check.
+// Cache: results are stored per vehicle configuration + item in
+// public.wartung_lookup_cache. Identical specs are answered from there; only
+// items not cached yet (or cached without a source for more than 30 days) go
+// to the AI provider, which keeps the Gemini free-tier quota for new vehicles.
 // Environment variables: GEMINI_API_KEY (primary), GEMINI_MODEL (optional),
 // ANTHROPIC_API_KEY (optional fallback).
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { VercelLikeRequest, VercelLikeResponse } from './import-part.js';
-import { supabaseUserId } from './_drive.js';
+import { SUPA_KEY, SUPA_URL, supabaseUserId } from './_drive.js';
 import { GeminiError, NOT_CONFIGURED, anthropicKey, geminiGenerate, geminiKey, jsonAusText, zielUrl } from './_gemini.js';
 
 const MODEL = 'claude-opus-5-5';
@@ -180,6 +184,50 @@ async function mitClaude(apiKey: string, anfrage: string): Promise<{ ki: KiAntwo
   return { ki: null, urls };
 }
 
+/* ── Shared cache (public.wartung_lookup_cache) ── */
+
+type Ergebnis = ReturnType<typeof auswerten>;
+type CachePosition = Ergebnis['positionen'][number];
+const UNBELEGT_TAGE = 30;
+
+/** Same fields and normalisation as konfigSchluessel in src/lib/wartung.ts (km excluded). */
+const cacheSchluessel = (f: Fahrzeug): string =>
+  [(f.marke ?? '').trim().toLowerCase(), (f.modell ?? '').trim().toLowerCase(), (f.erstzulassung ?? '').slice(0, 4),
+    (f.motor ?? '').trim().toLowerCase(), (f.motorcode ?? '').toUpperCase().replace(/[^A-Z0-9]/g, ''),
+    f.antrieb ?? '', f.achsantrieb ?? '', f.getriebe ?? '', f.steuertrieb ?? ''].join('|');
+
+const restHeaders = (token: string) => ({ apikey: SUPA_KEY, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' });
+
+/** Cached positions for this configuration that are still valid. A failing cache never blocks the lookup. */
+async function cacheLesen(token: string, schluessel: string): Promise<Map<Key, CachePosition>> {
+  const out = new Map<Key, CachePosition>();
+  try {
+    const r = await fetch(`${SUPA_URL}/rest/v1/wartung_lookup_cache?select=vorlage,data,belegt,updated_at&schluessel=eq.${encodeURIComponent(schluessel)}`,
+      { headers: restHeaders(token), signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return out;
+    const grenze = Date.now() - UNBELEGT_TAGE * 86_400_000;
+    for (const z of (await r.json()) as { vorlage: Key; data: CachePosition; belegt: boolean; updated_at: string }[]) {
+      if (!KEYS.includes(z.vorlage) || !z.data) continue;
+      if (!z.belegt && Date.parse(z.updated_at) < grenze) continue;
+      out.set(z.vorlage, z.data);
+    }
+  } catch { /* no cache: research everything */ }
+  return out;
+}
+
+async function cacheSchreiben(token: string, schluessel: string, positionen: CachePosition[]) {
+  if (!positionen.length) return;
+  const jetzt = new Date().toISOString();
+  try {
+    await fetch(`${SUPA_URL}/rest/v1/wartung_lookup_cache?on_conflict=schluessel,vorlage`, {
+      method: 'POST',
+      headers: { ...restHeaders(token), Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(positionen.map((p) => ({ schluessel, vorlage: p.key, data: p, belegt: p.status === 'belegt', updated_at: jetzt }))),
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch (e) { console.error('[wartung-lookup] cache', e); }
+}
+
 export default async function handler(req: VercelLikeRequest, res: VercelLikeResponse) {
   // Gemini is the primary provider; Claude only when no Gemini key is set.
   const gemini = geminiKey(), claude = anthropicKey();
@@ -209,12 +257,23 @@ export default async function handler(req: VercelLikeRequest, res: VercelLikeRes
   if (!fahrzeug.marke || !fahrzeug.modell) return res.status(400).json({ ok: false, error: 'Marke und Modell fehlen' });
   if (!positionen.length) return res.status(400).json({ ok: false, error: 'Keine Positionen angefragt' });
 
+  // Identical specs: answered from the shared cache, only missing items are researched.
+  const schluessel = cacheSchluessel(fahrzeug);
+  const cache = await cacheLesen(token, schluessel);
+  const ausCache = positionen.flatMap((p) => { const c = cache.get(p.key); return c ? [c] : []; });
+  const offen = positionen.filter((p) => !cache.has(p.key));
+  if (!offen.length) {
+    return res.status(200).json({ ok: true, cached: true, result: { positionen: ausCache, hinweis: 'Aus dem Recherche-Speicher (gleiche Fahrzeugkonfiguration).' } });
+  }
+
   const anfrage = `Fahrzeug:\n${FELDER.filter((k) => fahrzeug[k]).map((k) => `- ${k}: ${fahrzeug[k]}`).join('\n')}\n\nPositionen:\n${
-    positionen.map((p) => `- ${p.key}: ${p.name}`).join('\n')}`;
+    offen.map((p) => `- ${p.key}: ${p.name}`).join('\n')}`;
   try {
     const { ki, urls } = gemini ? await mitGemini(anfrage) : await mitClaude(claude, anfrage);
     if (!ki) return res.status(502).json({ ok: false, error: 'Die Recherche lieferte kein auswertbares Ergebnis' });
-    return res.status(200).json({ ok: true, result: auswerten(ki, positionen, urls) });
+    const neu = auswerten(ki, offen, urls);
+    await cacheSchreiben(token, schluessel, neu.positionen);
+    return res.status(200).json({ ok: true, cached: false, result: { positionen: [...ausCache, ...neu.positionen], hinweis: neu.hinweis } });
   } catch (e) {
     if (e instanceof GeminiError) return res.status(e.status).json({ ok: false, ...(e.code ? { code: e.code } : {}), error: e.message });
     if (e instanceof Anthropic.RateLimitError) return res.status(429).json({ ok: false, error: 'Zu viele Anfragen – bitte kurz warten und erneut versuchen' });

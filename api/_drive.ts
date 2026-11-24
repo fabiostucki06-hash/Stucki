@@ -9,9 +9,9 @@ import type { VercelLikeRequest } from './import-part.js';
 
 declare const process: { env: Record<string, string | undefined> };
 
-const SUPA_URL = 'https://xpggpkmqwescbcrnnpod.supabase.co';
+export const SUPA_URL = 'https://xpggpkmqwescbcrnnpod.supabase.co';
 // Public anon key (same as in src/lib/supabase.ts).
-const SUPA_KEY =
+export const SUPA_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhwZ2dwa21xd2VzY2Jjcm5ucG9kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NjIxMjIsImV4cCI6MjA5NjEzODEyMn0.egPJ4OYOegRKIBV6PHUz_VfRib8g7sVIcNNy_7bFxjg';
 
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
