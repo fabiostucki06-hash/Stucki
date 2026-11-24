@@ -195,12 +195,17 @@ export function anstehendeServices(v: Vehicle | undefined): { item: ServiceItem;
     .sort((a, b) => rang[a.zustand] - rang[b.zustand]);
 }
 
-/** Offerte positions for Wartungsplan items: one Arbeit line each (note
-    appended), without ZE / price yet, so the Offerte is priced afterwards. */
+/** Offerte positions for Wartungsplan items: one Arbeit line each (note and
+    interval appended), without ZE / price yet, so the Offerte is priced
+    afterwards. Only values set on the item are carried over, nothing assumed. */
 export const wartungsPositionen = (items: ServiceItem[]): ArbeitPosition[] =>
   items.map((i) => ({
     typ: 'arbeit',
-    beschreibung: [i.name, i.notiz].filter(Boolean).join(' – '),
+    beschreibung: [
+      [i.name, i.notiz].filter(Boolean).join(' – '),
+      (i.intervallKm || i.intervallMonate) &&
+        `(Intervall ${[i.intervallKm ? `${formatKm(i.intervallKm)} km` : '', i.intervallMonate ? `${i.intervallMonate} Mt.` : ''].filter(Boolean).join(' / ')})`,
+    ].filter(Boolean).join(' '),
     ze: '',
     stundenansatz: STD_SATZ,
     preis: '0.00',

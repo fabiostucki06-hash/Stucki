@@ -151,10 +151,25 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte }: W
     .sort((a, b) => RANG[a.zustand] - RANG[b.zustand]);
   const faellige = mitZustand.filter((x) => GRUPPE_VON[x.zustand] === 'faellig').map((x) => x.item);
 
+  // Positions picked for the Offerte. Without a pick it covers the due items.
+  const [auswahl, setAuswahl] = useState<Set<string>>(() => new Set());
+  const ausgewaehlt = mitZustand.filter((x) => auswahl.has(x.item.id)).map((x) => x.item);
+  const offerteItems = ausgewaehlt.length ? ausgewaehlt : faellige;
+  const umschalten = (id: string) => setAuswahl((s) => {
+    const n = new Set(s);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
+  const gruppeUmschalten = (ids: string[], alle: boolean) => setAuswahl((s) => {
+    const n = new Set(s);
+    ids.forEach((id) => (alle ? n.delete(id) : n.add(id)));
+    return n;
+  });
+
   async function offerteErstellen() {
-    if (busy || !faellige.length) return;
+    if (busy || !offerteItems.length) return;
     setBusy(true);
-    try { await onOfferte(faellige); }
+    try { await onOfferte(offerteItems); setAuswahl(new Set()); }
     catch { /* toast shown by the context */ }
     finally { setBusy(false); }
   }
@@ -200,31 +215,46 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte }: W
         <button className="sp-text-btn" disabled={busy} onClick={neuePosition}><SFPlus size={12} /> Position</button>
         <button className="sp-text-btn" onClick={() => void exportWartungsplanPDF(vehicle, customer)} title="Wartungsplan als PDF herunterladen">PDF</button>
         <button
-          className="btn-tinted sp-offerte" disabled={busy || !faellige.length} onClick={offerteErstellen}
-          title={faellige.length ? `Offerte mit ${faellige.length} fälligen Positionen erstellen` : 'Keine fälligen Positionen'}
+          className="btn-tinted sp-offerte" disabled={busy || !offerteItems.length} onClick={offerteErstellen}
+          title={ausgewaehlt.length
+            ? `Offerte mit ${ausgewaehlt.length} ausgewählten Positionen erstellen`
+            : faellige.length ? `Offerte mit ${faellige.length} fälligen Positionen erstellen` : 'Positionen auswählen'}
         >
           Offerte erstellen
-          <span className="sp-offerte-count">{faellige.length}</span>
+          <span className="sp-offerte-count">{offerteItems.length}</span>
         </button>
       </div>
+      {ausgewaehlt.length > 0 && (
+        <div className="sp-auswahl" role="status">
+          <span>{ausgewaehlt.length} {ausgewaehlt.length === 1 ? 'Position' : 'Positionen'} ausgewählt</span>
+          <button className="sp-text-btn" disabled={busy} onClick={() => setAuswahl(new Set())}>Auswahl aufheben</button>
+        </div>
+      )}
       {hinweis && <p className="sp-hinweis">{hinweis}</p>}
 
       {GRUPPEN.map(({ key, label, dot }) => {
         const tiles = mitZustand.filter((x) => GRUPPE_VON[x.zustand] === key);
         if (!tiles.length) return null;
         const farbe = key === 'faellig' && tiles.some((x) => x.zustand === 'ueberfaellig') ? 'var(--red)' : dot;
+        const ids = tiles.map((x) => x.item.id);
+        const alle = ids.every((id) => auswahl.has(id));
         return (
           <section key={key} className="sp-group" aria-label={label}>
             <h4 className="sp-group-head">
               <span className="dot" style={{ background: farbe }} />
               {label}
               <span className="sp-group-count">{tiles.length}</span>
+              <button type="button" className="sp-group-select" onClick={() => gruppeUmschalten(ids, alle)}>
+                {alle ? 'Keine' : 'Alle wählen'}
+              </button>
             </h4>
             <ul className="sp-grid">
               {tiles.map(({ item, zustand }) => (
                 <WartungsplanKachel
                   key={item.id} item={item} naechste={naechsteText(item, vehicle)} zustand={zustand} busy={busy}
                   vorlage={vorlageZu(item)}
+                  selected={auswahl.has(item.id)}
+                  onSelect={() => umschalten(item.id)}
                   onGemacht={() => gemacht(item)}
                   onVormerken={() => vormerken(item)}
                   onOpen={() => setEdit({ item, neu: false })}
@@ -247,6 +277,9 @@ interface KachelProps {
   busy: boolean;
   /** The Vorlage the item was made from: source and what to check. */
   vorlage?: Vorlage;
+  /** Picked for the Offerte. */
+  selected: boolean;
+  onSelect: () => void;
   onGemacht: () => void;
   onVormerken: () => void;
   onOpen: () => void;
@@ -255,7 +288,7 @@ interface KachelProps {
 /** Tile: name + badge · Intervall / Nächste · status switch + pencil.
     "Gemacht" ticks the item off (again, when it is due); "In Zukunft" flags a
     done item as upcoming. The active side shows the current status. */
-function WartungsplanKachel({ item, naechste, zustand, busy, vorlage, onGemacht, onVormerken, onOpen }: KachelProps) {
+function WartungsplanKachel({ item, naechste, zustand, busy, vorlage, selected, onSelect, onGemacht, onVormerken, onOpen }: KachelProps) {
   const badge = BADGE[zustand];
   const intervall = intervallText(item);
   const zuletzt = datumKm(item.letztesDatum, item.letzteKm);
@@ -269,9 +302,12 @@ function WartungsplanKachel({ item, naechste, zustand, busy, vorlage, onGemacht,
     : vorlage?.hinweis ?? HINWEIS_STANDARD;
 
   return (
-    <li className={`sp-tile sp-tile-${zustand}`}>
+    <li className={`sp-tile sp-tile-${zustand}${selected ? ' sp-tile-selected' : ''}`}>
       <div className="sp-tile-head">
-        <span className="sp-name">{item.name}</span>
+        <label className="sp-select" title="Für Offerte auswählen">
+          <input type="checkbox" checked={selected} onChange={onSelect} aria-label={`${item.name} für Offerte auswählen`} />
+          <span className="sp-name">{item.name}</span>
+        </label>
         <span className={`sp-badge ${badge.cls}`}>{badge.label}</span>
       </div>
 
