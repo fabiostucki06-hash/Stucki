@@ -1,4 +1,5 @@
 import type { MaterialPosition, Pauschale, Position } from '../types';
+import { positionTotals } from './ze';
 
 /* Special material positions with a fixed price:
    - Versandkosten ('versand'): passed on 1:1 at cost — never a Marge, no EK, no ZE.
@@ -51,6 +52,31 @@ export const neueVersandPosition = (): MaterialPosition => ({
 export function pauschalePosition(b: Pauschale): MaterialPosition {
   const preis = fN(b.preis).toFixed(2);
   return { typ: 'material', art: 'pauschale', beschreibung: b.name, menge: '1', stueckpreis: preis, preis };
+}
+
+/* Offerte: Kleinteil Pauschale (CHF 10), charged automatically once the
+   Offerte has more than 100 ZE – Arbeit ZE and material ZE, each position
+   counted once (positionTotals). Stored as a plain material line under this
+   name; the views and the PDF list it in the totals. */
+export const KLEINTEIL_OFFERTE = 'Kleinteil Pauschale';
+export const KLEINTEIL_OFFERTE_AB_ZE = 100;
+export const KLEINTEIL_OFFERTE_PREIS = '10.00';
+
+export const istKleinteilOfferte = (p: Position): boolean =>
+  p.typ === 'material' && !p.art && p.beschreibung === KLEINTEIL_OFFERTE;
+
+export const kleinteilOffertePosition = (): MaterialPosition => ({
+  typ: 'material', beschreibung: KLEINTEIL_OFFERTE, menge: '1', stueckpreis: '10', preis: KLEINTEIL_OFFERTE_PREIS,
+});
+
+/** Whether the ZE of these positions (without a Kleinteil line) call for the Pauschale. */
+export const kleinteilFaellig = (positionen: Position[]): boolean =>
+  positionTotals(positionen.filter((p) => !istKleinteilOfferte(p))).totalZE > KLEINTEIL_OFFERTE_AB_ZE;
+
+/** The positions with exactly one Kleinteil Pauschale when it is due, none otherwise. */
+export function mitKleinteilPauschale(positionen: Position[]): Position[] {
+  const ohne = positionen.filter((p) => !istKleinteilOfferte(p));
+  return kleinteilFaellig(ohne) ? [...ohne, kleinteilOffertePosition()] : ohne;
 }
 
 /** Keeps only well-formed bundles (data from storage / another device). */

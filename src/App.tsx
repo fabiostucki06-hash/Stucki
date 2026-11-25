@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useApp } from './context/AppContext';
 import { showToast } from './components/ui/Toast';
-import { needsAttention, decodeMaybeDouble } from './lib/utils';
+import { needsAttention, decodeMaybeDouble, materialZuerst } from './lib/utils';
+import { mitKleinteilPauschale } from './lib/sonderpositionen';
 import { getActiveOfferteId, setActiveOfferteId, getMargin } from './lib/settings';
 import { vkAusEk } from './lib/marge';
 import { parsePartTitle } from './lib/partTitle';
@@ -370,7 +371,10 @@ export default function App() {
       vehicle and its Wartungsplan are not written here. Intervals advance only
       via "Gemacht" (serviceErledigt). */
   async function handleOfferteAusWartungsplan(vehicle: Vehicle, items: ServiceItem[]) {
-    const { positionen, wartung, uebernommen } = wartungsOfferte(vehicle, items, wartungTeile);
+    const plan = wartungsOfferte(vehicle, items, wartungTeile);
+    const { wartung, uebernommen } = plan;
+    // Over 100 ZE (Arbeit + material ZE, each once): the Kleinteil Pauschale, as in the Offerte form.
+    const positionen = materialZuerst(mitKleinteilPauschale(plan.positionen));
     const t = sumPositions(positionen);
     const created = await addOfferte({
       customerId: vehicle.customerId, vehicleId: vehicle.id,

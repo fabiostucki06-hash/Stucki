@@ -5,7 +5,7 @@ import { offerteNotizen, anzahlungErforderlich, anzahlungMoeglich, anzahlungAuft
 import NummerField, { parseNummer } from '../ui/NummerField';
 import { materialPreis, materialZeSumme, ohneMaterialZe, positionTotals, zeBetrag, zeMinuten } from '../../lib/ze';
 import { setMaterialFeld } from '../../lib/marge';
-import { festpreisSummen } from '../../lib/sonderpositionen';
+import { festpreisSummen, istKleinteilOfferte, kleinteilFaellig, kleinteilOffertePosition, KLEINTEIL_OFFERTE_PREIS } from '../../lib/sonderpositionen';
 import { materialZuerst } from '../../lib/utils';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { useApp } from '../../context/AppContext';
@@ -110,7 +110,7 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
   const [material,   setMaterial]   = useState<MaterialRow[]>(() => {
     const mp = (initial?.positionen ?? [])
       .filter((p): p is MaterialPosition => p.typ === 'material')
-      .filter((p) => p.beschreibung !== 'Kleinteil Pauschale');
+      .filter((p) => !istKleinteilOfferte(p));
     // A Materialofferte prices the parts only: no ZE on its positions.
     if (mp.length) return istMaterial ? mp.map(ohneMaterialZe) : [...mp];
     if (!initial && prefillMaterial) return [{ ...prefillMaterial }];
@@ -165,8 +165,8 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
 
   // Material = Menge × Stückpreis only; Arbeit = every ZE (incl. material positions) at its rate.
   const { totalArbeit: totA, totalMaterial: totM, totalZE: totZE } = positionTotals([...material, ...arbeit.map(toArbeitPosition)]);
-  const kleinteilActive = totZE > 100;
-  const kleinteilBetrag = kleinteilActive ? 10 : 0;
+  const kleinteilActive = kleinteilFaellig([...material, ...arbeit.map(toArbeitPosition)]);
+  const kleinteilBetrag = kleinteilActive ? parseFloat(KLEINTEIL_OFFERTE_PREIS) : 0;
   const totMeff = totM + kleinteilBetrag;
   // Versandkosten / Pauschalen are in totM; shown on their own lines.
   const fest = festpreisSummen(material);
@@ -185,9 +185,7 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
     : !saved && !hatInhalt ? 'Speichert automatisch, sobald Betreff oder Position erfasst ist'
     : null;
 
-  const autoPauschale: MaterialPosition[] = kleinteilActive
-    ? [{ typ: 'material', beschreibung: 'Kleinteil Pauschale', menge: '1', stueckpreis: '10', preis: '10.00' }]
-    : [];
+  const autoPauschale: MaterialPosition[] = kleinteilActive ? [kleinteilOffertePosition()] : [];
   const data: OfferteData | null = hinweis || nr == null ? null : {
     offertNumber: nr, customerId: cid, vehicleId: vid || undefined, titel,
     positionen: materialZuerst([...material.filter((p) => p.art || p.beschreibung.trim()).map((p) => ({ ...p, wartung: p.wartung || undefined })), ...autoPauschale, ...arbeit.filter((p) => p.beschreibung.trim()).map(toArbeitPosition)]),
