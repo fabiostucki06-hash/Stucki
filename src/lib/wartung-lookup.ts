@@ -1,5 +1,5 @@
 import { faelligAus, kmZahl } from './vehicles';
-import { konfigSchluessel, unberuehrt, vorlageVon, type VorlageKey } from './wartung';
+import { inspektionWieOel, konfigSchluessel, unberuehrt, vorlageVon, type VorlageKey } from './wartung';
 import type { ServiceItem, Vehicle } from '../types';
 
 /* ── Interval lookup (api/wartung-lookup) ──
@@ -44,7 +44,8 @@ const FELDER = ['marke', 'modell', 'erstzulassung', 'motor', 'motorcode', 'antri
 
 export async function intervalleRecherchieren(v: Vehicle, items: ServiceItem[], token: string): Promise<LookupResult> {
   const fahrzeug = Object.fromEntries(FELDER.filter((k) => v[k]).map((k) => [k, String(v[k])]));
-  const positionen = items.flatMap((i) => { const key = vorlageVon(i); return key ? [{ key, name: i.name }] : []; });
+  // The Inspektion is not researched on its own: it takes the oil change's result.
+  const positionen = items.flatMap((i) => { const key = vorlageVon(i); return key && key !== 'inspektion' ? [{ key, name: i.name }] : []; });
   const r = await fetch('/api/wartung-lookup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -103,5 +104,5 @@ export function rechercheAnwenden(items: ServiceItem[], r: LookupResult, v: Vehi
     b.belegt.push(i.name);
     out.push(n);
   }
-  return { items: out, bericht: b };
+  return { items: inspektionWieOel(out), bericht: b };
 }

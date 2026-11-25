@@ -8,7 +8,7 @@ import {
   neueServiceId, ohneEntfernteService, serviceErledigt, serviceZuruecksetzen, serviceZustand, type ServiceZustand,
 } from '../../lib/vehicles';
 import {
-  GETRIEBE, HINWEIS_STANDARD, abgleichBericht, fahrzeugProfil, konfigSchluessel, labelVon, mitWartungsplan, profilSignatur, quelleVon, specId, specVariante,
+  GETRIEBE, HINWEIS_STANDARD, abgleichBericht, fahrzeugProfil, istInspektion, konfigSchluessel, labelVon, mitWartungsplan, profilSignatur, quelleVon, specId, specVariante,
   vorlageVon, wartungsVorlagen, type AbgleichBericht, type FahrzeugProfil, type QuelleAnzeige, type Vorlage,
 } from '../../lib/wartung';
 import { exportWartungsplanPDF } from '../../lib/pdf-wartungsplan';
@@ -195,7 +195,8 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onF
   const items = ohneEntfernteService(vehicle.service ?? []);
   const profil = fahrzeugProfil(vehicle);
   const vorlagen = wartungsVorlagen(vehicle, wartungSpecs);
-  const vorlageZu = (it: ServiceItem) => vorlagen.find((x) => x.key === vorlageVon(it));
+  // The Inspektion shows the oil change's Vorlage: same interval, same source.
+  const vorlageZu = (it: ServiceItem) => vorlagen.find((x) => x.key === (istInspektion(it) ? 'oel' : vorlageVon(it)));
   const [edit, setEdit] = useState<{ item: ServiceItem; neu: boolean; fokus?: EditorFokus } | null>(null);
   const [km, setKm] = useState(vehicle.km ?? '');
   const [busy, setBusy] = useState(false);
@@ -323,7 +324,7 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onF
     .map((item) => ({ item, zustand: serviceZustand(item, vehicle) }))
     .sort((a, b) => RANG[a.zustand] - RANG[b.zustand]);
   const faellige = mitZustand.filter((x) => GRUPPE_VON[x.zustand] === 'faellig').map((x) => x.item);
-  const ungeprueft = mitZustand.map((x) => x.item).filter((it) => {
+  const ungeprueft = mitZustand.map((x) => x.item).filter((it) => !istInspektion(it)).filter((it) => {
     const q = quelleVon(it, vorlageZu(it));
     return q === 'richtwert' || q === 'standard';
   });
@@ -364,6 +365,7 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onF
     <WartungsplanEditor
       item={edit.item} neu={edit.neu} fokus={edit.fokus} busy={busy} vorlage={vorlageZu(edit.item)} motorcode={profil.motorcode} vehicle={vehicle}
       teile={edit.neu ? undefined : gespeicherteTeile(vehicle, teilKey(edit.item), wartungTeile)}
+      oelVorhanden={items.some((x) => vorlageVon(x) === 'oel')}
       auftraege={auftraege} onAuftrag={onAuftrag}
       onSave={(it, teilen, material) => void speichern(it, teilen, material)} onUndo={() => rueckgaengig(edit.item)} onDelete={() => entfernen(edit.item)} onClose={() => setEdit(null)}
     />
@@ -601,6 +603,8 @@ interface EditorProps {
   vehicle: Vehicle;
   /** Parts stored for this item and vehicle (lib/wartung-teile). */
   teile?: WartungTeile;
+  /** The plan has a "Motoröl & Ölfilter" item: the Inspektion takes its interval. */
+  oelVorhanden: boolean;
   /** The vehicle's Aufträge, to link a service entry to. */
   auftraege: Order[];
   onAuftrag?: (o: Order) => void;
@@ -615,7 +619,7 @@ interface EditorProps {
 
 const leeresMaterial = (): MaterialPosition => ({ typ: 'material', beschreibung: '', menge: '1', stueckpreis: '', preis: '' });
 
-function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, vehicle, teile, auftraege, onAuftrag, onSave, onUndo, onDelete, onClose }: EditorProps) {
+function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, vehicle, teile, oelVorhanden, auftraege, onAuftrag, onSave, onUndo, onDelete, onClose }: EditorProps) {
   const fokusRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = fokusRef.current;
@@ -663,9 +667,11 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, vehicl
   };
   const s = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF((p) => ({ ...p, [k]: e.target.value }));
   const q = quelleVon(item, vorlage);
+  // Inspektion: interval and source come from "Motoröl & Ölfilter", not edited here.
+  const folgtOel = istInspektion(item) && oelVorhanden;
   const key = vorlageVon(item);
   const variante = key ? specVariante(key, vehicle) : null;
-  const kannTeilen = !!motorcode && !!key && variante !== null;
+  const kannTeilen = !istInspektion(item) && !!motorcode && !!key && variante !== null;
   const fuer = `Motor ${motorcode}${variante ? ` · ${key === 'getriebeoel' ? labelVon(GETRIEBE, vehicle.getriebe) : 'Allrad'}` : ''}`;
   const num = (v: string) => (parseInt(v, 10) > 0 ? parseInt(v, 10) : undefined);
   const opt = (v: string) => v.trim() || undefined;
@@ -673,6 +679,13 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, vehicl
 
   function submit() {
     if (!ok) return;
+    if (folgtOel) {
+      onSave(letztenServiceSetzen({ ...item, name: f.name.trim(), notiz: opt(f.notiz) }, {
+        datum: opt(f.letztesDatum), km: opt(f.letzteKm), beleg: { nachweis, auftragId: opt(auftragId) },
+        faelligDatum: opt(f.faelligDatum), faelligKm: opt(f.faelligKm),
+      }), false, material);
+      return;
+    }
     const intervallKm = num(f.intervallKm), intervallMonate = num(f.intervallMonate);
     const geaendert = intervallKm !== item.intervallKm || intervallMonate !== item.intervallMonate;
     const warGeprueft = item.quelle === 'geprueft';
@@ -716,18 +729,23 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, vehicl
 
         <p className="sp-editor-head">Intervall</p>
         <div className="cf-grid-2" ref={fokus === 'intervall' ? fokusRef : undefined}>
-          <div className="cf-field"><label className="cf-label" htmlFor="sp-ikm">Alle … km</label><input id="sp-ikm" className="cf-input" type="number" inputMode="numeric" value={f.intervallKm} onChange={s('intervallKm')} placeholder="15000" /></div>
-          <div className="cf-field"><label className="cf-label" htmlFor="sp-imt">Alle … Monate</label><input id="sp-imt" className="cf-input" type="number" inputMode="numeric" value={f.intervallMonate} onChange={s('intervallMonate')} placeholder="12" /></div>
+          <div className="cf-field"><label className="cf-label" htmlFor="sp-ikm">Alle … km</label><input id="sp-ikm" className="cf-input" type="number" inputMode="numeric" value={f.intervallKm} onChange={s('intervallKm')} placeholder={folgtOel ? '—' : '15000'} disabled={folgtOel} /></div>
+          <div className="cf-field"><label className="cf-label" htmlFor="sp-imt">Alle … Monate</label><input id="sp-imt" className="cf-input" type="number" inputMode="numeric" value={f.intervallMonate} onChange={s('intervallMonate')} placeholder={folgtOel ? '—' : '12'} disabled={folgtOel} /></div>
         </div>
+        {folgtOel && (
+          <p className="sp-hinweis">
+            Gleiches Intervall wie „Motoröl &amp; Ölfilter“ – inklusive Quelle und Prüfung. Änderungen am Ölwechsel-Intervall werden automatisch übernommen.
+          </p>
+        )}
 
-        {q === 'recherchiert' && (
+        {!folgtOel && q === 'recherchiert' && (
           <p className="sp-hinweis">
             Herstellervorgabe recherchiert: {item.quelleText}
             {item.quelleUrl && <> · <a href={item.quelleUrl} target="_blank" rel="noreferrer">Quelle öffnen</a></>}
           </p>
         )}
-        {q !== 'geprueft' && q !== 'recherchiert' && (vorlage?.hinweis || q === 'standard') && <p className="sp-hinweis">{vorlage?.hinweis ?? HINWEIS_STANDARD}</p>}
-        <label className="sp-check">
+        {!folgtOel && q !== 'geprueft' && q !== 'recherchiert' && (vorlage?.hinweis || q === 'standard') && <p className="sp-hinweis">{vorlage?.hinweis ?? HINWEIS_STANDARD}</p>}
+        {!folgtOel && <label className="sp-check">
           <input type="checkbox" checked={geprueft} onChange={(e) => setGeprueft(e.target.checked)} />
           <span>
             <span className="sp-check-title">Intervall nach Herstellervorgabe geprüft</span>
@@ -735,8 +753,8 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, vehicl
               {item.quelle === 'geprueft' && item.geprueftAm ? `Geprüft am ${formatDateCH(item.geprueftAm)}` : 'Serviceheft, Herstellerportal, Autodata, HaynesPro, TecDoc …'}
             </span>
           </span>
-        </label>
-        {geprueft && (
+        </label>}
+        {!folgtOel && geprueft && (
           <div className="cf-field">
             <label className="cf-label" htmlFor="sp-quelle">Quelle</label>
             <input id="sp-quelle" className="cf-input" value={f.quelleText} onChange={s('quelleText')} placeholder="z.B. VW Serviceplan, Autodata" />

@@ -7,7 +7,7 @@ import { offerteNr } from '../lib/offerte-docs';
 import { alsReineMaterialofferte, mitGetrenntenTotals } from '../lib/ze';
 import { hoechsteRechnungNr, rechnungArt, rechnungDocName } from '../lib/rechnung-totals';
 import { hatFahrzeugDaten, kundeMitFahrzeug, legacyFahrzeug, sortiereFahrzeuge, splitFahrzeug } from '../lib/vehicles';
-import { mitWartungsplan, profilSignatur } from '../lib/wartung';
+import { inspektionWieOel, mitWartungsplan, profilSignatur } from '../lib/wartung';
 import { teileAusOfferte } from '../lib/wartung-teile';
 import type { Customer, FahrzeugFelder, Order, Offerte, Rechnung, RechnungArt, MaterialCatalogItem, SyncStatus, Vehicle, WartungSpec, WartungTeile } from '../types';
 
@@ -168,7 +168,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (cancelled || writesInFlight.current > 0 || seq !== writeSeq.current) return;
       // db.get resolves with an error object on HTTP errors; never let that wipe good data.
       if (Array.isArray(cr)) setKunden(parseRows(cr) as Customer[]);
-      if (Array.isArray(vr)) setVehicles(parseRows(vr) as Vehicle[]);
+      // Every plan shows its Inspektion with the oil change's interval; stored with the next save.
+      if (Array.isArray(vr)) setVehicles((parseRows(vr) as Vehicle[]).map((v) => (v.service?.length ? { ...v, service: inspektionWieOel(v.service) } : v)));
       if (Array.isArray(specr)) setWartungSpecs(parseRows(specr) as unknown as WartungSpec[]);
       // Per-vehicle rows only (lib/wartung-teile): parts never move to another vehicle.
       if (Array.isArray(teiler)) setWartungTeile((parseRows(teiler) as unknown as WartungTeile[]).filter((t) => t.id.startsWith('fz:')));
@@ -287,7 +288,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await migrateLegacy(neu.customerId);
     // Changed technical data (Marke, Modell, Antrieb, Getriebe, VIN, …): the
     // Wartungsplan is matched to the vehicle's new profile.
-    const v = vorher && profilSignatur(vorher, wartungSpecs) !== profilSignatur(neu, wartungSpecs) ? mitWartungsplan(neu, vorher, wartungSpecs) : neu;
+    const m = vorher && profilSignatur(vorher, wartungSpecs) !== profilSignatur(neu, wartungSpecs) ? mitWartungsplan(neu, vorher, wartungSpecs) : neu;
+    // A changed oil-change interval (by hand, check, research) carries over to the Inspektion.
+    const v = m.service?.length ? { ...m, service: inspektionWieOel(m.service) } : m;
     await syncOk(() => upsertVehicle(v));
     setVehicles((p) => (p.some((x) => x.id === v.id) ? p.map((x) => (x.id === v.id ? v : x)) : [...p, v]));
   }

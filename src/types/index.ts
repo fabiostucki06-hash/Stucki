@@ -89,7 +89,7 @@ export interface ServiceItem {
   name: string;
   status: ServiceStatus;
   /** The vehicle-specific Vorlage it was made from (lib/wartung); unset = own position. */
-  vorlage?: 'oel' | 'luftfilter' | 'innenraumfilter' | 'kraftstofffilter' | 'zuendkerzen' | 'bremsfluessigkeit' | 'zahnriemen' | 'getriebeoel' | 'allradkupplung' | 'verteilergetriebe' | 'hinterachsgetriebe';
+  vorlage?: 'oel' | 'inspektion' | 'luftfilter' | 'innenraumfilter' | 'kraftstofffilter' | 'zuendkerzen' | 'bremsfluessigkeit' | 'zahnriemen' | 'getriebeoel' | 'allradkupplung' | 'verteilergetriebe' | 'hinterachsgetriebe';
   /** Interval after which the item is due again (either or both). */
   intervallKm?: number;
   intervallMonate?: number;

@@ -432,6 +432,8 @@ export const profilSignatur = (v: ProfilQuelle, specs: WartungSpec[] = []): stri
 /** Generic defaults of earlier versions: an item still carrying them was never adjusted by hand. */
 const LEGACY: Record<VorlageKey, { name: string; iv: Intervall }> = {
   oel:               { name: 'Motoröl & Ölfilter',             iv: [15000, 12] },
+  // Never generated with an own interval: it follows the oil change (inspektionWieOel).
+  inspektion:        { name: 'Inspektion',                     iv: [undefined, undefined] },
   luftfilter:        { name: 'Luftfilter',                     iv: [30000, 24] },
   innenraumfilter:   { name: 'Innenraumfilter / Pollenfilter', iv: [15000, 12] },
   kraftstofffilter:  { name: 'Kraftstofffilter',               iv: [60000, 48] },
@@ -458,8 +460,47 @@ const ausVorlage = (x: Vorlage): ServiceItem => ({
   quelle: x.quelle, ...(x.quelleText ? { quelleText: x.quelleText } : {}),
 });
 
-/** A fresh Wartungsplan with only the items that apply to the vehicle. */
-export const wartungsplanFuer = (v: ProfilQuelle, specs: WartungSpec[] = []): ServiceItem[] => wartungsVorlagen(v, specs).map(ausVorlage);
+/* ── Inspektion: on every vehicle, with exactly the oil change's interval ── */
+
+/** Interval and its source, as taken over from the oil change. */
+const OEL_FELDER = ['intervallKm', 'intervallMonate', 'intervallManuell', 'quelle', 'quelleText', 'quelleUrl', 'rechercheFuer', 'geprueftAm'] as const;
+
+export const istInspektion = (i: ServiceItem) => vorlageVon(i) === 'inspektion';
+
+/** Every plan has an "Inspektion" item whose interval (km and months) and
+    source / check data are those of the vehicle's "Motoröl & Ölfilter" item,
+    whatever set them (Richtwert, checked spec, research, by hand). Added when
+    missing (right after the oil change); a plan without an oil change (e.g. an
+    EV) gets it without an interval: nothing is assumed. Last service, history
+    and due values entered by hand are never touched; due values that followed
+    from the old interval move to the new one, like everywhere else. Returns
+    the same array when nothing changed. */
+export function inspektionWieOel(items: ServiceItem[]): ServiceItem[] {
+  if (!items.length) return items;
+  const oel = items.find((i) => vorlageVon(i) === 'oel');
+  const idx = items.findIndex(istInspektion);
+  if (idx < 0) {
+    const neu: ServiceItem = { id: oel ? `${oel.id}_inspektion` : neueServiceId(), vorlage: 'inspektion', name: 'Inspektion', status: 'faellig' };
+    if (oel) for (const k of OEL_FELDER) if (oel[k] !== undefined) (neu as unknown as Record<string, unknown>)[k] = oel[k];
+    const nach = oel ? items.indexOf(oel) + 1 : items.length;
+    return [...items.slice(0, nach), neu, ...items.slice(nach)];
+  }
+  const i = items[idx];
+  if (!oel) return i.vorlage === 'inspektion' ? items : items.map((x, j) => (j === idx ? { ...x, vorlage: 'inspektion' } : x));
+  if (i.vorlage === 'inspektion' && OEL_FELDER.every((k) => (i[k] ?? undefined) === (oel[k] ?? undefined))) return items;
+  const n: ServiceItem = { ...i, vorlage: 'inspektion' };
+  for (const k of OEL_FELDER) {
+    if (oel[k] === undefined) delete n[k];
+    else (n as unknown as Record<string, unknown>)[k] = oel[k];
+  }
+  const vorher = faelligAus(i, i.letztesDatum, i.letzteKm), nachher = faelligAus(n, i.letztesDatum, i.letzteKm);
+  if (i.faelligDatum && i.faelligDatum === vorher.faelligDatum) n.faelligDatum = nachher.faelligDatum;
+  if (i.faelligKm && kmZahl(i.faelligKm) === kmZahl(vorher.faelligKm)) n.faelligKm = nachher.faelligKm;
+  return items.map((x, j) => (j === idx ? n : x));
+}
+
+/** A fresh Wartungsplan with only the items that apply to the vehicle (plus the Inspektion). */
+export const wartungsplanFuer = (v: ProfilQuelle, specs: WartungSpec[] = []): ServiceItem[] => inspektionWieOel(wartungsVorlagen(v, specs).map(ausVorlage));
 
 /** Never done, never edited: safe to drop when it no longer applies. */
 export const unberuehrt = (i: ServiceItem) =>
@@ -490,7 +531,8 @@ export function wartungsplanAbgleichen(items: ServiceItem[], v: ProfilQuelle, vo
 
   for (const i of items) {
     const key = vorlageVon(i);
-    if (!key) { out.push(i); continue; }
+    // Own positions stay; the Inspektion follows the oil change (below).
+    if (!key || key === 'inspektion') { out.push(i); continue; }
     gesehen.add(key);
     const s = soll.get(key);
     if (!s) { if (!unberuehrt(i)) out.push(i); continue; }
@@ -511,7 +553,7 @@ export function wartungsplanAbgleichen(items: ServiceItem[], v: ProfilQuelle, vo
     out.push(n);
   }
   for (const [key, s] of soll) if (!gesehen.has(key)) out.push(ausVorlage(s));
-  return out;
+  return inspektionWieOel(out);
 }
 
 /** What matching changed, for the confirmation after "Aktualisieren". */
