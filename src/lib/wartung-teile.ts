@@ -49,10 +49,15 @@ export function wartungsOfferte(
     if (gespeichert.length) {
       uebernommen.push(it.name);
       vorbelegt.push(key);
-      const zeilen = gespeichert.map(({ autoText, ...p }): Position =>
-        p.typ === 'arbeit' ? { ...p, beschreibung: autoText ? text : p.beschreibung, wartung: key } : { ...p, wartung: key });
-      // Only material entered on the vehicle: the item still gets its Arbeit line.
-      return zeilen.some((p) => p.typ === 'arbeit') ? zeilen : [...zeilen, { ...texte[i], wartung: key }];
+      // Material with its own ZE already carries the work: no extra Arbeit line
+      // (neither the generated one nor a stored bare one without ZE).
+      const zeImMaterial = gespeichert.some((p) => p.typ === 'material' && (parseFloat(p.ze ?? '') || 0) > 0);
+      const zeilen = gespeichert
+        .filter((p) => !(zeImMaterial && p.typ === 'arbeit' && p.autoText && !(parseFloat(p.ze) > 0)))
+        .map(({ autoText, ...p }): Position =>
+          p.typ === 'arbeit' ? { ...p, beschreibung: autoText ? text : p.beschreibung, wartung: key } : { ...p, wartung: key });
+      // Only material entered on the vehicle, without ZE: the item still gets its Arbeit line.
+      return zeImMaterial || zeilen.some((p) => p.typ === 'arbeit') ? zeilen : [...zeilen, { ...texte[i], wartung: key }];
     }
     return [{ ...texte[i], wartung: key }];
   });
