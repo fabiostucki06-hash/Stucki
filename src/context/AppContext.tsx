@@ -8,7 +8,7 @@ import { alsReineMaterialofferte, mitGetrenntenTotals } from '../lib/ze';
 import { hoechsteRechnungNr, rechnungArt, rechnungDocName } from '../lib/rechnung-totals';
 import { hatFahrzeugDaten, kundeMitFahrzeug, legacyFahrzeug, sortiereFahrzeuge, splitFahrzeug } from '../lib/vehicles';
 import { inspektionWieOel, mitWartungsplan, profilSignatur } from '../lib/wartung';
-import { teileAusOfferte } from '../lib/wartung-teile';
+import { ohneInspektionIntervall, teileAusOfferte } from '../lib/wartung-teile';
 import type { Customer, FahrzeugFelder, Order, Offerte, Rechnung, RechnungArt, MaterialCatalogItem, SyncStatus, Vehicle, WartungSpec, WartungTeile } from '../types';
 
 /** Anything that belongs to a customer's vehicle: Auftrag, Offerte, Rechnung. */
@@ -175,7 +175,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (Array.isArray(teiler)) setWartungTeile((parseRows(teiler) as unknown as WartungTeile[]).filter((t) => t.id.startsWith('fz:')));
       if (Array.isArray(or)) setOrders((parseRows(or) as Order[]).map(mitGetrenntenTotals));
       if (Array.isArray(offr)) {
-        setOfferten((parseRows(offr) as Offerte[]).map((o) => (o.art === 'material' ? alsReineMaterialofferte(o) : mitGetrenntenTotals(o))));
+        setOfferten((parseRows(offr) as Offerte[]).map((o) => ohneInspektionIntervall(o.art === 'material' ? alsReineMaterialofferte(o) : mitGetrenntenTotals(o))));
       }
       if (Array.isArray(rechr)) setRechnungen((parseRows(rechr) as Rechnung[]).map(mitGetrenntenTotals));
     };

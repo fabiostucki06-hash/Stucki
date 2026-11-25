@@ -270,7 +270,7 @@ export function anstehendeServices(v: Vehicle | undefined): { item: ServiceItem;
 }
 
 /** Offerte positions for Wartungsplan items: one Arbeit line each (note and
-    interval appended), without ZE / price yet, so the Offerte is priced
+    interval appended; the Inspektion is named without its interval), without ZE / price yet, so the Offerte is priced
     afterwards. Only values set on the item are carried over, nothing assumed.
     Read-only: the items (last service, next due, status) stay as they are. */
 export const wartungsPositionen = (items: ServiceItem[]): ArbeitPosition[] =>
@@ -278,7 +278,7 @@ export const wartungsPositionen = (items: ServiceItem[]): ArbeitPosition[] =>
     typ: 'arbeit',
     beschreibung: [
       [i.name, i.notiz].filter(Boolean).join(' – '),
-      (i.intervallKm || i.intervallMonate) &&
+      i.vorlage !== 'inspektion' && (i.intervallKm || i.intervallMonate) &&
         `(Intervall ${[i.intervallKm ? `${formatKm(i.intervallKm)} km` : '', i.intervallMonate ? `${i.intervallMonate} Mt.` : ''].filter(Boolean).join(' / ')})`,
     ].filter(Boolean).join(' '),
     ze: '',

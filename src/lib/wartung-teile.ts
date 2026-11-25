@@ -45,6 +45,25 @@ function mitInspektionZe(zeilen: Position[], text: string, ze: number): Position
   });
 }
 
+const INTERVALL_ZUSATZ = /\s*\(Intervall [^)]*\)\s*$/;
+
+/** An Offerte from the Wartungsplan saved while the Inspektion line still
+    carried its interval ("Inspektion (Intervall 15'000 km / 12 Mt.)"): shown
+    as "Inspektion". Only the generated suffix of the line tagged with the
+    Inspektion is dropped; the plan's interval data are not touched. */
+export function ohneInspektionIntervall<D extends { positionen?: Position[]; wartung?: OfferteWartung }>(d: D): D {
+  const w = d.wartung;
+  const sauber = (t: string) => t.replace(INTERVALL_ZUSATZ, '');
+  if (!w?.items.some((it) => it.key === OHNE_MATERIAL && INTERVALL_ZUSATZ.test(it.text))
+    && !d.positionen?.some((p) => p.typ === 'arbeit' && p.wartung === OHNE_MATERIAL && INTERVALL_ZUSATZ.test(p.beschreibung))) return d;
+  return {
+    ...d,
+    positionen: d.positionen?.map((p) =>
+      p.typ === 'arbeit' && p.wartung === OHNE_MATERIAL ? { ...p, beschreibung: sauber(p.beschreibung) } : p),
+    ...(w && { wartung: { ...w, items: w.items.map((it) => (it.key === OHNE_MATERIAL ? { ...it, text: sauber(it.text) } : it)) } }),
+  };
+}
+
 /** Stored lines of the Inspektion without ZE on its generated Arbeit line:
     the Inspektion's ZE live in the Wartungsplan (ServiceItem.arbeitZe), an
     Offerte does not change them. Lines entered with their own text keep theirs. */
