@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf';
 import { PAGE_TOP, PAGE_BOTTOM, addPageNumbers } from './pdf-paging';
 import { formatDateCH, buildDocumentFilename, echteBeanstandungen } from './utils';
 import { CO_NAME, CO_ADDR, CO_CITY, CO_PHONE, CO_LOC, STD_SATZ } from './company';
-import { archiveToDrive } from './drive';
+import { pdfSpeichern } from './drive';
 import type { ArbeitPosition, Customer, Order } from '../types';
 
 const dateCH = (iso?: string) => iso ? formatDateCH(iso) : '';
@@ -199,8 +199,7 @@ export async function exportOrderPDF(order: Order, customer: Customer | undefine
     drawDoc(doc, order, customer);
     addPageNumbers(doc, TR);
     const filename = buildDocumentFilename(customer, 'Auftrag', order.orderNumber ?? '');
-    doc.save(`${filename}.pdf`);
-    void archiveToDrive(doc, 'Aufträge', filename, customer);
+    void pdfSpeichern(doc, filename, 'Aufträge', customer);
   } catch (err) {
     alert(`PDF-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);
   }

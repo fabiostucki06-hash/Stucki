@@ -7,7 +7,7 @@ import { mitMaterialHinweis } from './offerte-docs';
 import { formatDateCH, buildDocumentFilename, materialZuerst } from './utils';
 import { getIban } from './settings';
 import { CO_NAME, CO_ADDR, CO_CITY, CO_PHONE, CO_LOC, CO_ZIP, CO_CITY_NAME, STD_SATZ } from './company';
-import { archiveToDrive } from './drive';
+import { pdfSpeichern } from './drive';
 import { festpreisSummen, positionsText } from './sonderpositionen';
 import type { ArbeitPosition, Customer, MaterialPosition, Position, Rechnung } from '../types';
 
@@ -371,8 +371,7 @@ export async function exportRechnungPDF(rechnung: Rechnung, customer: Customer |
     }
 
     const filename = buildDocumentFilename(customer, rechnungDocName(rechnung), rechnung.rechnungNumber ?? '');
-    doc.save(`${filename}.pdf`);
-    void archiveToDrive(doc, rechnung.art === 'anzahlung' ? 'Anzahlungsrechnungen' : 'Rechnungen', filename, customer);
+    void pdfSpeichern(doc, filename, rechnung.art === 'anzahlung' ? 'Anzahlungsrechnungen' : 'Rechnungen', customer);
   } catch (err) {
     alert(`PDF-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);
   }

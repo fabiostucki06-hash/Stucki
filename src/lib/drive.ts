@@ -32,6 +32,11 @@ const STATUS_TIMEOUT_MS = 15_000;
 const MAX_UPLOAD_ATTEMPTS = 3;
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024; // same limit as api/drive-upload.ts
 const FAILURE_TOAST_MS = 10_000; // long enough to read that the PDF is only local
+/** An interrupted upload is continued at most this often, and for this long. */
+const MAX_RESUMES = 6;
+const MAX_PENDING_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+/** Waiting for the pending copy to be stored before the download starts, at most. */
+const STORE_WAIT_MS = 800;
 
 /** A request that never answers must not block the upload queue forever. */
 async function fetchWithTimeout(url: string, init: RequestInit, ms: number): Promise<Response> {
@@ -115,6 +120,9 @@ async function blockedReason(): Promise<string | null> {
     : `Nicht eingerichtet, in Vercel fehlen: ${s.missing.join(', ')}`;
 }
 
+/** Customer fields the server needs for the folder; nothing else is kept with a pending upload. */
+type DriveKunde = Pick<Customer, 'id' | 'vorname' | 'nachname'>;
+
 function reportFailure(docType: DriveDocType, message: string, detail: Record<string, unknown> = {}): void {
   console.error('[Drive-Upload] fehlgeschlagen', { docType, message, ...detail });
   showToast(`Google Drive: ${message}. Das PDF bleibt nur lokal, es gibt keinen automatischen Nachversuch.`, 'error', FAILURE_TOAST_MS);
@@ -122,15 +130,15 @@ function reportFailure(docType: DriveDocType, message: string, detail: Record<st
 
 /** A failure with a readable message for the user and details for the console. */
 class UploadError extends Error {
-  constructor(message: string, readonly detail: Record<string, unknown>) {
+  constructor(message: string, readonly detail: Record<string, unknown>, readonly interrupted = false) {
     super(message);
   }
 }
 
 /** The server finds or creates the folder and opens a Drive upload session for this file. */
-async function openUploadSession(docType: DriveDocType, filename: string, size: number, customer: Customer | undefined): Promise<{ uploadUrl: string; folder?: string }> {
+async function openUploadSession(docType: DriveDocType, filename: string, size: number, customer: DriveKunde | undefined): Promise<{ uploadUrl: string; folder?: string }> {
   const token = await getFreshToken();
-  if (!token) throw new UploadError('Sitzung abgelaufen, bitte neu anmelden', { stage: 'session' });
+  if (!token) throw new UploadError('Sitzung abgelaufen, bitte neu anmelden', { stage: 'session' }, true);
   const r = await fetchWithTimeout('/api/drive-upload', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -148,7 +156,7 @@ async function openUploadSession(docType: DriveDocType, filename: string, size: 
   }
   throw new UploadError(j.error ?? (r.status === 413 ? 'PDF ist grösser als 25 MB' : `Fehler ${r.status}`), {
     stage: 'session', status: r.status, connected: j.connected, reconnect: j.reconnect,
-  });
+  }, j.connected !== false && isTemporary(r.status));
 }
 
 /** Success counts only when Drive names the stored file and holds every byte. */
@@ -186,7 +194,10 @@ async function sendPdf(uploadUrl: string, pdf: ArrayBuffer): Promise<boolean> {
       body: pdf,
     }, Math.max(MIN_TRANSFER_TIMEOUT_MS, size / MIN_BYTES_PER_MS));
   } catch (err) {
-    if (!(err instanceof TypeError)) throw new UploadError(err instanceof Error ? err.message : 'Upload fehlgeschlagen', { stage: 'transfer', bytes: size });
+    if (!(err instanceof TypeError)) {
+      const message = err instanceof Error ? err.message : 'Upload fehlgeschlagen';
+      throw new UploadError(message, { stage: 'transfer', bytes: size }, message === 'Zeitüberschreitung');
+    }
     return finishedAnyway(uploadUrl, size); // network error
   }
   if (r.ok) return holdsCompleteFile(r, size);
@@ -194,35 +205,173 @@ async function sendPdf(uploadUrl: string, pdf: ArrayBuffer): Promise<boolean> {
   throw new UploadError(await driveFailure(r), { stage: 'transfer', status: r.status, bytes: size });
 }
 
-/** One upload at a time, so quick successive exports can't create the same folder twice. */
-let uploadQueue: Promise<void> = Promise.resolve();
+/* ── Pending uploads ────────────────────────────────────────────────────────
+   On a phone the local download hands the screen to the PDF viewer / download
+   sheet (iOS, the home-screen app above all): the app is paused or reloaded
+   and an upload started at that moment is cut off without a word. So every
+   export is kept on the device (IndexedDB) until Drive holds the file, and an
+   interrupted upload continues as soon as the app is back in front or online,
+   also after a reload. A definite answer (not connected, quota, too large, …)
+   ends it with an error toast. The server replaces a file of the same name,
+   so a resumed upload never creates a second copy. */
 
-/** Uploads a generated PDF to the connected Google Drive in the background.
-    Never throws: the local download already happened, Drive is the backup copy. */
-export function archiveToDrive(doc: jsPDF, docType: DriveDocType, filename: string, customer: Customer | undefined): Promise<void> {
-  uploadQueue = uploadQueue.then(() => uploadToDrive(doc, docType, filename, customer));
-  return uploadQueue;
+interface PendingUpload {
+  id: string;
+  docType: DriveDocType;
+  filename: string;
+  customer?: DriveKunde;
+  pdf: ArrayBuffer;
+  createdAt: number;
+  /** Interrupted attempts so far. */
+  tries: number;
 }
 
-async function uploadToDrive(doc: jsPDF, docType: DriveDocType, filename: string, customer: Customer | undefined): Promise<void> {
+const DB_NAME = 'garage-drive', STORE = 'uploads';
+let dbPromise: Promise<IDBDatabase> | null = null;
+
+function openDb(): Promise<IDBDatabase> {
+  dbPromise ??= new Promise<IDBDatabase>((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(STORE, { keyPath: 'id' });
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  }).catch((err) => { dbPromise = null; throw err; });
+  return dbPromise;
+}
+
+async function idb<T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
+  const db = await openDb();
+  return new Promise<T>((resolve, reject) => {
+    const tx = db.transaction(STORE, mode);
+    const req = run(tx.objectStore(STORE));
+    tx.oncomplete = () => resolve(req.result);
+    tx.onerror = tx.onabort = () => reject(tx.error ?? req.error);
+  });
+}
+
+const merken = (u: PendingUpload) => idb('readwrite', (s) => s.put(u));
+const vergessen = (id: string) => idb('readwrite', (s) => s.delete(id)).catch(() => undefined);
+const alleOffenen = () => idb('readonly', (s) => s.getAll() as IDBRequest<PendingUpload[]>).catch(() => [] as PendingUpload[]);
+
+/** Network gone, request cut off or timed out: worth continuing later. */
+const unterbrochen = (err: unknown) =>
+  err instanceof TypeError || (err instanceof Error && err.message === 'Zeitüberschreitung') || navigator.onLine === false;
+
+type Ergebnis = 'ok' | 'fehler' | 'unterbrochen';
+
+async function uploadOnce(u: PendingUpload, nachgeholt: boolean): Promise<Ergebnis> {
   try {
-    const blocked = await blockedReason();
-    if (blocked) return reportFailure(docType, blocked, { stage: 'status' });
-    const pdf = doc.output('arraybuffer');
-    if (pdf.byteLength > MAX_UPLOAD_BYTES) return reportFailure(docType, 'PDF ist grösser als 25 MB', { stage: 'size', bytes: pdf.byteLength });
-    showToast('Wird in Google Drive gespeichert, Tab bitte offen lassen', 'info');
+    let blocked: string | null;
+    try { blocked = await blockedReason(); } catch (err) {
+      if (unterbrochen(err) || (err instanceof Error && err.message === 'Nicht angemeldet')) return 'unterbrochen';
+      throw err;
+    }
+    if (blocked) { reportFailure(u.docType, blocked, { stage: 'status' }); return 'fehler'; }
+    showToast(nachgeholt ? `Google Drive: ${u.filename} wird nachträglich gespeichert` : 'Wird in Google Drive gespeichert', 'info');
     // Every attempt gets a new session; the server then replaces a file that already arrived.
     for (let attempt = 1; attempt <= MAX_UPLOAD_ATTEMPTS; attempt++) {
-      const { uploadUrl, folder } = await openUploadSession(docType, filename, pdf.byteLength, customer);
-      if (await sendPdf(uploadUrl, pdf)) {
-        showSavedToast(folder ? `In Google Drive gespeichert (${folder})` : 'In Google Drive gespeichert');
-        return;
+      const { uploadUrl, folder } = await openUploadSession(u.docType, u.filename, u.pdf.byteLength, u.customer);
+      if (await sendPdf(uploadUrl, u.pdf)) {
+        const wo = folder ? ` (${folder})` : '';
+        showSavedToast(nachgeholt ? `${u.filename} nachträglich in Google Drive gespeichert${wo}` : `In Google Drive gespeichert${wo}`);
+        return 'ok';
       }
       if (attempt < MAX_UPLOAD_ATTEMPTS) await new Promise((resolve) => window.setTimeout(resolve, 1000 * 3 ** (attempt - 1)));
     }
-    reportFailure(docType, 'Upload nach mehreren Versuchen fehlgeschlagen', { stage: 'transfer', bytes: pdf.byteLength });
+    return 'unterbrochen'; // only temporary answers / lost connections
   } catch (err) {
-    if (err instanceof UploadError) return reportFailure(docType, err.message, err.detail);
-    reportFailure(docType, err instanceof Error ? err.message : 'Upload fehlgeschlagen', { stage: 'request' });
+    if (err instanceof UploadError) {
+      if (err.interrupted) return 'unterbrochen';
+      reportFailure(u.docType, err.message, err.detail);
+      return 'fehler';
+    }
+    if (unterbrochen(err)) return 'unterbrochen';
+    reportFailure(u.docType, err instanceof Error ? err.message : 'Upload fehlgeschlagen', { stage: 'request' });
+    return 'fehler';
+  }
+}
+
+/** One upload at a time, so quick successive exports can't create the same folder twice. */
+let uploadQueue: Promise<void> = Promise.resolve();
+const imGange = new Set<string>();
+let nachversuch: number | undefined;
+
+function einreihen(u: PendingUpload, nachgeholt: boolean): void {
+  if (imGange.has(u.id)) return;
+  imGange.add(u.id);
+  uploadQueue = uploadQueue.then(async () => {
+    try {
+      const r = await uploadOnce(u, nachgeholt);
+      if (r !== 'unterbrochen') { await vergessen(u.id); return; }
+      const tries = u.tries + 1;
+      if (tries >= MAX_RESUMES || Date.now() - u.createdAt > MAX_PENDING_AGE_MS) {
+        await vergessen(u.id);
+        reportFailure(u.docType, `${u.filename} konnte nicht hochgeladen werden (Verbindung)`, { stage: 'resume', tries });
+        return;
+      }
+      if (!(await merken({ ...u, tries }).then(() => true, () => false))) {
+        reportFailure(u.docType, 'Verbindung unterbrochen', { stage: 'resume', tries });
+        return;
+      }
+      if (document.visibilityState === 'visible') {
+        showToast('Google Drive: Verbindung unterbrochen, wird automatisch nachgeholt', 'info', 5000);
+        // Still in front and online: try again shortly (a paused phase may simply be over).
+        if (navigator.onLine !== false) {
+          window.clearTimeout(nachversuch);
+          nachversuch = window.setTimeout(() => void offeneNachholen(), 15_000);
+        }
+      }
+    } finally {
+      imGange.delete(u.id);
+    }
+  });
+}
+
+/** Continues every upload that was cut off (app paused, reloaded, offline). */
+export async function offeneNachholen(): Promise<void> {
+  if (typeof indexedDB === 'undefined' || !localStorage.getItem('garage_token')) return;
+  for (const u of await alleOffenen()) einreihen(u, true);
+}
+
+let nachholenAktiv = false;
+/** Resumes pending uploads now and whenever the app comes back to the front or online. */
+export function driveNachholenStarten(): void {
+  void offeneNachholen();
+  if (nachholenAktiv) return;
+  nachholenAktiv = true;
+  const los = () => { if (document.visibilityState === 'visible') void offeneNachholen(); };
+  document.addEventListener('visibilitychange', los);
+  window.addEventListener('online', los);
+  window.addEventListener('pageshow', los);
+}
+
+/** Saves a generated PDF locally and to the connected Google Drive. The Drive
+    copy is kept on the device and its upload started before the local
+    download, which on a phone can pause the app. Never throws for Drive:
+    the local download is the primary copy, Drive the backup. */
+export async function pdfSpeichern(doc: jsPDF, filename: string, docType: DriveDocType, customer: Customer | undefined): Promise<void> {
+  let u: PendingUpload | null = null;
+  try {
+    const pdf = doc.output('arraybuffer');
+    if (pdf.byteLength > MAX_UPLOAD_BYTES) reportFailure(docType, 'PDF ist grösser als 25 MB', { stage: 'size', bytes: pdf.byteLength });
+    else {
+      u = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, docType, filename, pdf, createdAt: Date.now(), tries: 0,
+        customer: customer ? { id: customer.id, vorname: customer.vorname, nachname: customer.nachname } : undefined,
+      };
+      const gemerkt = typeof indexedDB === 'undefined'
+        ? Promise.resolve()
+        : merken(u).catch((err) => console.warn('[Drive-Upload] nicht vorgemerkt', err));
+      await Promise.race([gemerkt, new Promise((resolve) => window.setTimeout(resolve, STORE_WAIT_MS))]);
+    }
+  } catch (err) {
+    reportFailure(docType, err instanceof Error ? err.message : 'PDF konnte nicht vorbereitet werden', { stage: 'prepare' });
+  }
+  if (u) einreihen(u, false);
+  try {
+    doc.save(`${filename}.pdf`);
+  } catch (err) {
+    alert(`PDF-Export fehlgeschlagen:
+${err instanceof Error ? err.message : String(err)}`);
   }
 }

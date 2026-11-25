@@ -3,7 +3,7 @@ import { PAGE_TOP, PAGE_BOTTOM, addPageNumbers } from './pdf-paging';
 import { buildDocumentFilename, formatDateCH } from './utils';
 import { CO_NAME, CO_ADDR, CO_CITY, CO_PHONE } from './company';
 import { fahrzeugLabel, formatKm, letzterBeleg, naechsteFaelligkeit, ohneEntfernteService, serviceZustand, type ServiceZustand } from './vehicles';
-import { archiveToDrive } from './drive';
+import { pdfSpeichern } from './drive';
 import { quelleVon } from './wartung';
 import type { Customer, ServiceItem, Vehicle } from '../types';
 
@@ -93,8 +93,7 @@ export async function exportWartungsplanPDF(vehicle: Vehicle, customer: Customer
 
     addPageNumbers(doc, TR);
     const filename = buildDocumentFilename(customer, 'Wartungsplan', vehicle.kennzeichen || fahrzeugLabel(vehicle));
-    doc.save(`${filename}.pdf`);
-    void archiveToDrive(doc, 'Wartungsplaene', filename, customer);
+    void pdfSpeichern(doc, filename, 'Wartungsplaene', customer);
   } catch (err) {
     alert(`PDF-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);
   }

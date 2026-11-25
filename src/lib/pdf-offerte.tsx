@@ -4,7 +4,7 @@ import { CO_NAME, CO_ADDR, CO_CITY, CO_PHONE, CO_LOC, STD_SATZ } from './company
 import { PAGE_TOP, PAGE_BOTTOM, addPageNumbers } from './pdf-paging';
 import { offerteNr, offerteZahlungszeilen, offerteNotizen, anzahlungErforderlich, anzahlungAufteilung, sumPositions, ANZAHLUNG_PROZENT } from './offerte-docs';
 import { ohneMaterialZe, ohneZeAnteil } from './ze';
-import { archiveToDrive } from './drive';
+import { pdfSpeichern } from './drive';
 import { festpreisSummen, positionsText } from './sonderpositionen';
 import type { ArbeitPosition, Customer, MaterialPosition, Offerte } from '../types';
 
@@ -340,8 +340,7 @@ function exportDoc(offerte: Offerte, customer: Customer | undefined, mode: DocMo
     drawDoc(doc, offerte, customer, mode, ownSignature);
     addPageNumbers(doc, TR);
     const filename = buildDocumentFilename(customer, docType, offerteNr(offerte));
-    doc.save(`${filename}.pdf`);
-    void archiveToDrive(doc, mode === 'ab' ? 'Auftragsbestätigungen' : offerte.art === 'material' ? 'Materialofferten' : 'Offerten', filename, customer);
+    void pdfSpeichern(doc, filename, mode === 'ab' ? 'Auftragsbestätigungen' : offerte.art === 'material' ? 'Materialofferten' : 'Offerten', customer);
   } catch (err) {
     alert(`PDF-Export fehlgeschlagen:\n${err instanceof Error ? err.message : String(err)}`);
   }

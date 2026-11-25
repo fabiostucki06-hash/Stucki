@@ -11,7 +11,7 @@ import { useIsDesktop } from './hooks/useIsDesktop';
 import { useSwipeToOpen } from './hooks/useSwipeToOpen';
 import { offerteNr, nextVersion, sumPositions, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_BEDINGUNG, ANZAHLUNG_PROZENT, mitMaterialHinweis, ohneMaterialHinweis, ersetzeNummer, OFFERTE_REF, ANZAHLUNG_REF } from './lib/offerte-docs';
 import { hardReload } from './lib/reload';
-import { finishDriveCallback, isDriveCallback } from './lib/drive';
+import { driveNachholenStarten, finishDriveCallback, isDriveCallback } from './lib/drive';
 import { naechsteNr } from './lib/nummern';
 import { computeRechnungTotals, withOffertePositionen, migrateAnzahlungEntwurf, findQuellOfferte, hoechsteRechnungNr, rechnungArt } from './lib/rechnung-totals';
 import { ohneMaterialZe } from './lib/ze';
@@ -72,6 +72,8 @@ export default function App() {
   });
   // Back from Google's consent page: finish the Drive connection once signed in.
   useEffect(() => { if (token) void finishDriveCallback(); }, [token]);
+  // Drive uploads cut off on a phone (app paused by the PDF viewer, reload, offline) continue once signed in.
+  useEffect(() => { if (token) driveNachholenStarten(); }, [token]);
   const [fabOpen, setFabOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // Laptop / desktop: docked sidebar, centered dialogs, table lists (see globals.css).
