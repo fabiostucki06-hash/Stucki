@@ -701,7 +701,7 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, vehicl
       title={neu ? 'Neue Position' : 'Position bearbeiten'} onClose={onClose}
       barRight={<button className="bar-btn" onClick={onClose}>Abbrechen</button>}
     >
-      <form className="sp-editor" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+      <form className="sp-editor" noValidate onSubmit={(e) => { e.preventDefault(); submit(); }}>
         <div className="cf-field">
           <label className="cf-label" htmlFor="sp-name">Bezeichnung</label>
           <input id="sp-name" className="cf-input" value={f.name} onChange={s('name')} placeholder="z.B. Motoröl & Ölfilter" autoFocus={neu} />
@@ -798,11 +798,11 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, vehicl
                   </button>
                 </div>
                 <div className="sp-teil-werte">
-                  <label><span>Menge</span><input className="cf-input" type="number" inputMode="decimal" min={0} value={m.menge} onChange={(e) => updM(i, 'menge', e.target.value)} /></label>
-                  <label><span>EK CHF</span><input className="cf-input" type="number" inputMode="decimal" min={0} value={fest ? '' : m.ek ?? ''} disabled={fest} placeholder="—" onChange={(e) => updM(i, 'ek', e.target.value)} /></label>
-                  <label><span>Marge %</span><input className="cf-input" type="number" inputMode="decimal" value={fest ? '' : m.marge ?? ''} disabled={fest || !mitEk} placeholder={fest ? '0' : String(getMargin())} title={mitEk ? undefined : 'Zuerst EK eingeben'} onChange={(e) => updM(i, 'marge', e.target.value)} /></label>
-                  <label><span>VK CHF</span><input className="cf-input" type="number" inputMode="decimal" min={0} value={m.stueckpreis} placeholder="0.00" onChange={(e) => updM(i, 'stueckpreis', e.target.value)} /></label>
-                  <label><span>ZE</span><input className="cf-input" type="number" inputMode="decimal" min={0} value={fest ? '' : m.ze ?? ''} disabled={fest} placeholder="—" onChange={(e) => updM(i, 'ze', e.target.value)} /></label>
+                  <label><span>Menge</span><input className="cf-input" type="number" inputMode="decimal" step="any" min={0} value={m.menge} onChange={(e) => updM(i, 'menge', e.target.value)} /></label>
+                  <label><span>EK CHF</span><input className="cf-input" type="number" inputMode="decimal" step="any" min={0} value={fest ? '' : m.ek ?? ''} disabled={fest} placeholder="—" onChange={(e) => updM(i, 'ek', e.target.value)} /></label>
+                  <label><span>Marge %</span><input className="cf-input" type="number" inputMode="decimal" step="any" value={fest ? '' : m.marge ?? ''} disabled={fest || !mitEk} placeholder={fest ? '0' : String(getMargin())} title={mitEk ? undefined : 'Zuerst EK eingeben'} onChange={(e) => updM(i, 'marge', e.target.value)} /></label>
+                  <label><span>VK CHF</span><input className="cf-input" type="number" inputMode="decimal" step="any" min={0} value={m.stueckpreis} placeholder="0.00" onChange={(e) => updM(i, 'stueckpreis', e.target.value)} /></label>
+                  <label><span>ZE</span><input className="cf-input" type="number" inputMode="decimal" step="any" min={0} value={fest ? '' : m.ze ?? ''} disabled={fest} placeholder="—" onChange={(e) => updM(i, 'ze', e.target.value)} /></label>
                 </div>
               </div>
             );
