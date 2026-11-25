@@ -988,6 +988,11 @@ select.mf-add-pos.df-pauschale-select{-webkit-appearance:none;appearance:none;co
   .df-line.df-bean{align-items:center}
   .df-c-ki,.df-c-total{padding-bottom:10px}
   .df-c-del{align-self:center}
+  /* Delete column wide enough for the 40px touch target, so the × is never clipped. */
+  .df-line.df-arbeit,.df-line.df-material{column-gap:6px}
+  .df-line.df-arbeit{grid-template-columns:40px minmax(0,1fr) 30px minmax(0,1fr) minmax(0,1.2fr) 40px}
+  .df-line.df-material{grid-template-columns:40px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr) 40px}
+  .df-c-del.mf-pos-del{width:40px;height:40px;justify-self:end}
 }
 @media(max-width:480px){
   .df-bar{gap:8px;flex-wrap:nowrap}

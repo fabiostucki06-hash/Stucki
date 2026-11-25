@@ -102,7 +102,10 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
   const [titel,      setTitel]      = useState(initial?.titel ?? '');
   const [arbeit,     setArbeit]     = useState<ArbeitRow[]>(() => {
     const ap = (initial?.positionen ?? []).filter((p): p is ArbeitPosition => p.typ === 'arbeit');
-    return ap.length ? ap.map((p) => ({ ...p, zeLoading: false, zeHint: p.zeHint ?? '' })) : [{ ...newArbeit(), wartung: tagFuer([]) }];
+    if (ap.length) return ap.map((p) => ({ ...p, zeLoading: false, zeHint: p.zeHint ?? '' }));
+    // A new Offerte starts with an empty row to type into; a stored one whose labor
+    // was deleted stays without (like Material), "+ Arbeit" adds one again.
+    return initial ? [] : [{ ...newArbeit(), wartung: tagFuer([]) }];
   });
   const [material,   setMaterial]   = useState<MaterialRow[]>(() => {
     const mp = (initial?.positionen ?? [])

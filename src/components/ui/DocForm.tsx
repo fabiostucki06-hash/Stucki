@@ -568,9 +568,11 @@ export function PositionenEditor({
           <span className="df-cell df-c-rate df-ze-min" title="100 ZE = 60 Min.">{parseFloat(pos.ze) > 0 ? `${Math.round(zeMinuten(parseFloat(pos.ze)))} Min.` : ''}</span>
           {/* Arbeit has no own price: its ZE count towards Arbeit Total. */}
           <span className="df-total df-c-total">—</span>
-          {arbeit.length > 1
-            ? <button type="button" className="mf-pos-del df-c-del" onClick={() => onArbeitRemove(i)} aria-label="Position entfernen"><SFXmark /></button>
-            : <span className="df-c-del" />}
+          {/* Every labor row can be removed, the last one too: the list may be empty ("+ Arbeit" adds one). */}
+          <button
+            type="button" className="mf-pos-del df-c-del" onClick={() => onArbeitRemove(i)}
+            disabled={arbeitBusy} aria-label="Arbeit entfernen" title="Arbeit entfernen"
+          ><SFXmark /></button>
         </div>
       ); })}
       {pauschalZeilen.map(({ pos, i }) => { const row = rowProps('pauschale', i); return (
