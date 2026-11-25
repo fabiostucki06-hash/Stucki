@@ -465,6 +465,7 @@ export function PositionenEditor({
               aria-label={`Beschreibung ${positionsArt(pos)}`}
             />
             {busy && <span className="df-desc-busy" role="status" aria-label="Link wird geladen"><Spinner size={12} /></span>}
+            {!busy && <PartLink url={pos.link} />}
             {wartungCell(pos.wartung, (v) => onMaterialChange(i, 'wartung', v))}
           </div>
           <label className="df-cell df-c-qty">

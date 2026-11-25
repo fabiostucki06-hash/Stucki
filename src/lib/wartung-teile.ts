@@ -1,6 +1,6 @@
 import { wartungsPositionen } from './vehicles';
 import { vorlageVon } from './wartung';
-import { materialZuerst } from './utils';
+import { materialZuerst, parsePartLink } from './utils';
 import type { ArbeitPosition, MaterialPosition, Offerte, OfferteWartung, Position, ServiceItem, Vehicle, WartungTeile } from '../types';
 
 /* Parts per Wartungsplan item and vehicle: the positions entered in an Offerte
@@ -123,7 +123,10 @@ export function teileMitMaterial(
   const rest = (alt?.positionen ?? []).filter((p) => p.typ !== 'material');
   const neu: TeilPosition[] = material
     .filter((m) => m.beschreibung.trim())
-    .map(({ bestellt, wartung, ...m }) => ({ ...m, beschreibung: m.beschreibung.trim() }));
+    .map(({ bestellt, wartung, link, ...m }) => {
+      const href = parsePartLink(link)?.href;
+      return { ...m, beschreibung: m.beschreibung.trim(), ...(href ? { link: href } : {}) };
+    });
   const positionen = [...neu, ...rest];
   if (!positionen.some(erfasst)) return null;
   return {

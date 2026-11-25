@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Sheet from '../ui/Sheet';
 import { SFCheckmark, SFClock, SFPencil, SFPlus, SFXmark } from '../Icons';
-import { formatDateCH } from '../../lib/utils';
+import { formatDateCH, parsePartLink } from '../../lib/utils';
 import { todayISO } from '../../lib/offerte-docs';
 import {
   NACHWEIS, eintragNachweis, faelligVonHand, formatKm, letzterBeleg, letzterService, letztenServiceSetzen, naechsteFaelligkeit,
@@ -654,6 +654,13 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, vehicl
   }));
   const addM = () => setMaterial((rows) => [...rows, leeresMaterial()]);
   const remM = (i: number) => setMaterial((rows) => rows.filter((_, j) => j !== i));
+  /** Link typed in: normalized to the full URL ("autodoc.ch/…" → "https://…"); an
+      unusable one stays as typed with a hint and is not stored. Never fetched. */
+  const linkFertig = (i: number) => {
+    const raw = material[i]?.link?.trim() ?? '';
+    const ok = parsePartLink(raw);
+    updM(i, 'link', raw ? ok?.href ?? raw : '');
+  };
   const s = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF((p) => ({ ...p, [k]: e.target.value }));
   const q = quelleVon(item, vorlage);
   const key = vorlageVon(item);
@@ -804,6 +811,27 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, vehicl
                   <label><span>VK CHF</span><input className="cf-input" type="number" inputMode="decimal" step="any" min={0} value={m.stueckpreis} placeholder="0.00" onChange={(e) => updM(i, 'stueckpreis', e.target.value)} /></label>
                   <label><span>ZE</span><input className="cf-input" type="number" inputMode="decimal" step="any" min={0} value={fest ? '' : m.ze ?? ''} disabled={fest} placeholder="—" onChange={(e) => updM(i, 'ze', e.target.value)} /></label>
                 </div>
+                {(() => {
+                  const raw = m.link?.trim() ?? '';
+                  const link = parsePartLink(raw);
+                  const fehler = !!raw && !link;
+                  return (
+                    <div className="sp-teil-link">
+                      <label htmlFor={`sp-link-${i}`}>Link (optional)</label>
+                      <div className="sp-teil-link-feld">
+                        <input
+                          id={`sp-link-${i}`} className="cf-input" type="url" inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false}
+                          value={m.link ?? ''} placeholder="https://www.autodoc.ch/…" aria-invalid={fehler || undefined}
+                          onChange={(e) => updM(i, 'link', e.target.value)} onBlur={() => linkFertig(i)}
+                        />
+                        {link && (
+                          <a className="btn-tinted sp-teil-oeffnen" href={link.href} target="_blank" rel="noopener noreferrer" title={link.href}>Öffnen</a>
+                        )}
+                      </div>
+                      {fehler && <span className="sp-teil-fehler">Kein gültiger Link – nur http:// oder https://. Wird so nicht gespeichert.</span>}
+                    </div>
+                  );
+                })()}
               </div>
             );
           })}

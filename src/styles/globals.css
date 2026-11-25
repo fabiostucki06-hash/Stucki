@@ -1147,6 +1147,13 @@ select.mf-add-pos.df-pauschale-select{-webkit-appearance:none;appearance:none;co
 .sp-teil-werte span{font-size:11px;color:var(--label2)}
 .sp-teil-werte .cf-input{padding-left:8px;padding-right:8px;text-align:right}
 .sp-teil-add{align-self:flex-start}
+.sp-teil-link{display:flex;flex-direction:column;gap:3px;min-width:0}
+.sp-teil-link label{font-size:11px;color:var(--label2)}
+.sp-teil-link-feld{display:flex;align-items:center;gap:6px}
+.sp-teil-link-feld .cf-input{flex:1;min-width:0;text-align:left}
+.sp-teil-link .cf-input[aria-invalid]{border-color:var(--red)}
+.sp-teil-oeffnen{flex-shrink:0;text-decoration:none}
+.sp-teil-fehler{font-size:12px;color:var(--red)}
 @media(max-width:480px){.sp-teil-werte{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .sp-undo{margin:6px 0 0 -10px}
 @media (max-width:400px){
