@@ -8,6 +8,7 @@ import { parsePartTitle } from './lib/partTitle';
 import { detectPrice, resolveChfPrice, fxHinweis } from './lib/currency';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { useIsDesktop } from './hooks/useIsDesktop';
+import { useSwipeToOpen } from './hooks/useSwipeToOpen';
 import { offerteNr, nextVersion, sumPositions, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_BEDINGUNG, ANZAHLUNG_PROZENT, mitMaterialHinweis, ohneMaterialHinweis, ersetzeNummer, OFFERTE_REF, ANZAHLUNG_REF } from './lib/offerte-docs';
 import { hardReload } from './lib/reload';
 import { finishDriveCallback, isDriveCallback } from './lib/drive';
@@ -75,6 +76,8 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // Laptop / desktop: docked sidebar, centered dialogs, table lists (see globals.css).
   const isDesktop = useIsDesktop();
+  // Phone / tablet: a right swipe opens the menu drawer (menu button keeps working).
+  useSwipeToOpen(!isDesktop && !sidebarOpen && !fabOpen && !sessionExpired, () => setSidebarOpen(true));
 
   /* Keyboard: clickable list rows are focusable (tabIndex); Enter or Space on a
      focused row opens it like a click. */
