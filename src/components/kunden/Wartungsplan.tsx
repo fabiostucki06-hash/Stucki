@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import Sheet from '../ui/Sheet';
-import { SFCheckmark, SFClock, SFPencil, SFPlus } from '../Icons';
+import { SFCheckmark, SFClock, SFPencil, SFPlus, SFXmark } from '../Icons';
 import { formatDateCH } from '../../lib/utils';
 import { todayISO } from '../../lib/offerte-docs';
 import {
@@ -12,10 +12,13 @@ import {
   vorlageVon, wartungsVorlagen, type AbgleichBericht, type FahrzeugProfil, type QuelleAnzeige, type Vorlage,
 } from '../../lib/wartung';
 import { exportWartungsplanPDF } from '../../lib/pdf-wartungsplan';
-import { gespeicherteTeile, teilKey } from '../../lib/wartung-teile';
+import { fzId, gespeicherteTeile, teilKey, teileMaterial, teileMitMaterial } from '../../lib/wartung-teile';
+import { setMaterialFeld } from '../../lib/marge';
+import { materialPreis } from '../../lib/ze';
+import { getMargin } from '../../lib/settings';
 import { LookupError, intervalleRecherchieren, lookupKonfiguriert, rechercheAnwenden, type LookupBericht } from '../../lib/wartung-lookup';
 import { useApp } from '../../context/AppContext';
-import type { Customer, FahrzeugFeld, IntervallQuelle, Nachweis, Order, ServiceItem, Vehicle, WartungSpec, WartungTeile } from '../../types';
+import type { Customer, FahrzeugFeld, IntervallQuelle, MaterialPosition, Nachweis, Order, ServiceItem, Vehicle, WartungSpec, WartungTeile } from '../../types';
 
 /** Status groups, in display order. "Jetzt fällig" = overdue or due soon;
     "Fälligkeit unbekannt" = no last service / due value entered (nothing assumed). */
@@ -53,7 +56,7 @@ const QUELLE: Record<QuelleAnzeige, { label: string; dot: string }> = {
 const ohneBeleg = (it: ServiceItem) => letzterBeleg(it)?.belegt === false;
 
 /** Which part of the editor to jump to. */
-type EditorFokus = 'intervall' | 'letzte' | 'naechste';
+type EditorFokus = 'intervall' | 'letzte' | 'naechste' | 'material';
 
 interface PruefhinweisProps {
   profil: FahrzeugProfil;
@@ -188,7 +191,7 @@ const autoVersucht = new Set<string>();
     and undo live in the editor behind the pencil. Due dates / mileages follow
     from the last service plus the interval. */
 export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onFahrzeugBearbeiten, auftraege = [], onAuftrag }: WartungsplanProps) {
-  const { wartungSpecs, saveWartungSpec, wartungTeile, token } = useApp();
+  const { wartungSpecs, saveWartungSpec, wartungTeile, wartungTeileSetzen, token, userEmail } = useApp();
   const items = ohneEntfernteService(vehicle.service ?? []);
   const profil = fahrzeugProfil(vehicle);
   const vorlagen = wartungsVorlagen(vehicle, wartungSpecs);
@@ -218,9 +221,11 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onF
   const vormerken = (it: ServiceItem) => setItems(ersetze({ ...it, status: 'faellig' }));
 
   /** `teilen`: the checked interval becomes the one of every vehicle with this Motorkennbuchstabe. */
-  async function speichern(it: ServiceItem, teilen: boolean) {
+  async function speichern(it: ServiceItem, teilen: boolean, material: MaterialPosition[]) {
     const service = edit?.neu ? [...items, it] : ersetze(it);
+    const vorher = edit && !edit.neu ? edit.item : undefined;
     setEdit(null);
+    void materialSpeichern(it, vorher, material);
     const key = vorlageVon(it);
     const variante = key ? specVariante(key, vehicle) : null;
     if (!teilen || !key || variante === null || !profil.motorcode || it.quelle !== 'geprueft') { void setItems(service); return; }
@@ -233,6 +238,22 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onF
     // This plan already carries the checked interval: it stays matched to the profile.
     const specs = [...wartungSpecs.filter((x) => x.id !== spec.id), spec];
     void save({ service, wartungsprofil: profilSignatur(vehicle, specs) });
+  }
+  /** Material entered on the item: stored for this vehicle only (lib/wartung-teile),
+      inserted into every Offerte from this Wartungsplan. Only writes on a change;
+      a renamed own item moves its parts to the new key. Never touches the plan. */
+  async function materialSpeichern(it: ServiceItem, vorher: ServiceItem | undefined, material: MaterialPosition[]) {
+    const altKey = teilKey(vorher ?? it);
+    const alt = gespeicherteTeile(vehicle, altKey, wartungTeile);
+    const sauber = (m: MaterialPosition[]) =>
+      JSON.stringify(m.filter((x) => x.beschreibung.trim()).map(({ bestellt, wartung, ...x }) => ({ ...x, beschreibung: x.beschreibung.trim() })));
+    const umbenannt = altKey !== teilKey(it);
+    if (!umbenannt && sauber(material) === sauber(teileMaterial(alt))) return;
+    const neu = teileMitMaterial(vehicle, it, material, alt, userEmail ?? undefined);
+    try {
+      if (umbenannt && alt) await wartungTeileSetzen(fzId(vehicle.id, altKey), null);
+      await wartungTeileSetzen(fzId(vehicle.id, teilKey(it)), neu);
+    } catch { /* toast shown by the context */ }
   }
   function rueckgaengig(it: ServiceItem) {
     void setItems(ersetze(serviceZuruecksetzen(it)));
@@ -342,8 +363,9 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onF
   const sheet = edit && (
     <WartungsplanEditor
       item={edit.item} neu={edit.neu} fokus={edit.fokus} busy={busy} vorlage={vorlageZu(edit.item)} motorcode={profil.motorcode} vehicle={vehicle}
+      teile={edit.neu ? undefined : gespeicherteTeile(vehicle, teilKey(edit.item), wartungTeile)}
       auftraege={auftraege} onAuftrag={onAuftrag}
-      onSave={(it, teilen) => void speichern(it, teilen)} onUndo={() => rueckgaengig(edit.item)} onDelete={() => entfernen(edit.item)} onClose={() => setEdit(null)}
+      onSave={(it, teilen, material) => void speichern(it, teilen, material)} onUndo={() => rueckgaengig(edit.item)} onDelete={() => entfernen(edit.item)} onClose={() => setEdit(null)}
     />
   );
 
@@ -489,6 +511,7 @@ function WartungsplanKachel({ item, naechste, zustand, busy, vorlage, teile, sel
   const q = quelleVon(item, vorlage);
   const quelle = q && QUELLE[q];
   const naechsteVonHand = faelligVonHand(item);
+  const material = teileMaterial(teile);
   const quelleTitel = q === 'geprueft'
     ? [item.quelleText, item.geprueftAm && `geprüft ${formatDateCH(item.geprueftAm)}`].filter(Boolean).join(' · ') || undefined
     : q === 'recherchiert' ? [item.quelleText, item.quelleUrl].filter(Boolean).join(' – ')
@@ -532,12 +555,12 @@ function WartungsplanKachel({ item, naechste, zustand, busy, vorlage, teile, sel
           {quelle.label}{(q === 'geprueft' || q === 'recherchiert') && item.quelleText ? ` · ${item.quelleText}` : ''}
         </p>
       )}
-      {teile && (
-        <p className="sp-quelle" title="Wird beim Erstellen der Offerte für dieses Fahrzeug vorausgefüllt">
-          <span className="dot" style={{ background: 'var(--accent)' }} />
-          Teile gespeichert · {teile.positionen.length} {teile.positionen.length === 1 ? 'Position' : 'Positionen'}
-        </p>
-      )}
+      <p className="sp-quelle" title="Wird beim Erstellen der Offerte für dieses Fahrzeug unter Material eingefügt">
+        <span className="dot" style={{ background: material.length ? 'var(--accent)' : 'var(--label4)' }} />
+        {material.length ? `Material: ${material.map((m) => m.beschreibung).join(', ')}` : 'Kein Material gespeichert'}
+        {' · '}
+        <button type="button" className="sp-erfassen" onClick={() => onOpen('material')}>{material.length ? 'Bearbeiten' : 'Erfassen'}</button>
+      </p>
       {item.notiz && <p className="sp-foot">{item.notiz}</p>}
 
       <div className="sp-tile-actions">
@@ -576,18 +599,23 @@ interface EditorProps {
   motorcode?: string;
   /** Gearbox / drivetrain a checked interval is stored for (specVariante). */
   vehicle: Vehicle;
+  /** Parts stored for this item and vehicle (lib/wartung-teile). */
+  teile?: WartungTeile;
   /** The vehicle's Aufträge, to link a service entry to. */
   auftraege: Order[];
   onAuftrag?: (o: Order) => void;
-  /** `teilen`: store the checked interval for every vehicle with this Motorkennbuchstabe. */
-  onSave: (it: ServiceItem, teilen: boolean) => void;
+  /** `teilen`: store the checked interval for every vehicle with this Motorkennbuchstabe;
+      `material`: the item's material rows for Offerten of this vehicle. */
+  onSave: (it: ServiceItem, teilen: boolean, material: MaterialPosition[]) => void;
   /** Undoes the last "Gemacht". */
   onUndo: () => void;
   onDelete: () => void;
   onClose: () => void;
 }
 
-function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, vehicle, auftraege, onAuftrag, onSave, onUndo, onDelete, onClose }: EditorProps) {
+const leeresMaterial = (): MaterialPosition => ({ typ: 'material', beschreibung: '', menge: '1', stueckpreis: '', preis: '' });
+
+function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, vehicle, teile, auftraege, onAuftrag, onSave, onUndo, onDelete, onClose }: EditorProps) {
   const fokusRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = fokusRef.current;
@@ -614,6 +642,18 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, vehicl
   const [auftragId, setAuftragId] = useState(alt?.auftragId ?? '');
   const [geprueft, setGeprueft] = useState(item.quelle === 'geprueft');
   const [teilen, setTeilen] = useState(true);
+  // Material for Offerten of this vehicle: only what is entered here, nothing assumed.
+  const [material, setMaterial] = useState<MaterialPosition[]>(() => {
+    const m = teileMaterial(teile);
+    return m.length ? m : fokus === 'material' ? [leeresMaterial()] : [];
+  });
+  const updM = (i: number, k: string, v: string) => setMaterial((rows) => rows.map((m, j) => {
+    if (j !== i) return m;
+    const n = setMaterialFeld(m, k, v);
+    return { ...n, preis: materialPreis(n) };
+  }));
+  const addM = () => setMaterial((rows) => [...rows, leeresMaterial()]);
+  const remM = (i: number) => setMaterial((rows) => rows.filter((_, j) => j !== i));
   const s = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF((p) => ({ ...p, [k]: e.target.value }));
   const q = quelleVon(item, vorlage);
   const key = vorlageVon(item);
@@ -650,7 +690,7 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, vehicl
     onSave(letztenServiceSetzen(neuItem, {
       datum: opt(f.letztesDatum), km: opt(f.letzteKm), beleg: { nachweis, auftragId: opt(auftragId) },
       faelligDatum: opt(f.faelligDatum), faelligKm: opt(f.faelligKm),
-    }), geprueft && kannTeilen && teilen);
+    }), geprueft && kannTeilen && teilen, material);
   }
   const auftragVon = (id?: string) => (id ? auftraege.find((o) => o.id === id) : undefined);
 
@@ -739,6 +779,39 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, vehicl
         <div className="cf-grid-2" ref={fokus === 'naechste' ? fokusRef : undefined}>
           <div className="cf-field"><label className="cf-label" htmlFor="sp-fd">Datum</label><input id="sp-fd" className="cf-input" type="date" value={f.faelligDatum} onChange={s('faelligDatum')} /></div>
           <div className="cf-field"><label className="cf-label" htmlFor="sp-fkm">KM-Stand</label><input id="sp-fkm" className="cf-input" type="number" inputMode="numeric" value={f.faelligKm} onChange={s('faelligKm')} /></div>
+        </div>
+
+        <p className="sp-editor-head">Material für Offerten</p>
+        <div className="sp-teile" ref={fokus === 'material' ? fokusRef : undefined}>
+          {material.map((m, i) => {
+            const fest = !!m.art;
+            const mitEk = parseFloat(m.ek ?? '') > 0;
+            return (
+              <div key={i} className="sp-teil">
+                <div className="sp-teil-kopf">
+                  <input
+                    className="cf-input" value={m.beschreibung} onChange={(e) => updM(i, 'beschreibung', e.target.value)}
+                    placeholder="z.B. Motoröl 5W-30" aria-label="Beschreibung Material"
+                  />
+                  <button type="button" className="mf-pos-del sp-teil-del" onClick={() => remM(i)} aria-label={`${m.beschreibung || 'Material'} entfernen`} title="Entfernen">
+                    <SFXmark />
+                  </button>
+                </div>
+                <div className="sp-teil-werte">
+                  <label><span>Menge</span><input className="cf-input" type="number" inputMode="decimal" min={0} value={m.menge} onChange={(e) => updM(i, 'menge', e.target.value)} /></label>
+                  <label><span>EK CHF</span><input className="cf-input" type="number" inputMode="decimal" min={0} value={fest ? '' : m.ek ?? ''} disabled={fest} placeholder="—" onChange={(e) => updM(i, 'ek', e.target.value)} /></label>
+                  <label><span>Marge %</span><input className="cf-input" type="number" inputMode="decimal" value={fest ? '' : m.marge ?? ''} disabled={fest || !mitEk} placeholder={fest ? '0' : String(getMargin())} title={mitEk ? undefined : 'Zuerst EK eingeben'} onChange={(e) => updM(i, 'marge', e.target.value)} /></label>
+                  <label><span>VK CHF</span><input className="cf-input" type="number" inputMode="decimal" min={0} value={m.stueckpreis} placeholder="0.00" onChange={(e) => updM(i, 'stueckpreis', e.target.value)} /></label>
+                  <label><span>ZE</span><input className="cf-input" type="number" inputMode="decimal" min={0} value={fest ? '' : m.ze ?? ''} disabled={fest} placeholder="—" onChange={(e) => updM(i, 'ze', e.target.value)} /></label>
+                </div>
+              </div>
+            );
+          })}
+          <button type="button" className="sp-text-btn sp-teil-add" onClick={addM}><SFPlus size={12} /> Material</button>
+          <p className="sp-hinweis">
+            Nur für dieses Fahrzeug: wird bei jeder Offerte aus dem Wartungsplan mit dieser Position unter Material eingefügt.
+            Ohne Eintrag wird kein Material angenommen.
+          </p>
         </div>
 
         <div className="cf-field">

@@ -1134,6 +1134,20 @@ select.mf-add-pos.df-pauschale-select{-webkit-appearance:none;appearance:none;co
 .sp-history-beleg{color:var(--label)}
 .sp-dt-hint{color:var(--label3);font-weight:400}
 .sp-editor .text-danger-btn{margin-top:0}
+/* Wartungsplan editor: material stored per vehicle + item for Offerten. Rows are
+   Surface-2 tone steps inside the sheet, no borders. */
+.sp-teile{display:flex;flex-direction:column;gap:8px}
+.sp-teil{background:var(--surface-2);border-radius:var(--radius-md);padding:10px;display:flex;flex-direction:column;gap:8px}
+.sp-teil .cf-input{background:var(--surface);font-variant-numeric:tabular-nums}
+.sp-teil-kopf{display:flex;align-items:center;gap:6px}
+.sp-teil-kopf .cf-input{flex:1;min-width:0}
+.sp-teil-del{width:40px;height:40px;flex-shrink:0}
+.sp-teil-werte{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.sp-teil-werte label{display:flex;flex-direction:column;gap:3px;min-width:0}
+.sp-teil-werte span{font-size:11px;color:var(--label2)}
+.sp-teil-werte .cf-input{padding-left:8px;padding-right:8px;text-align:right}
+.sp-teil-add{align-self:flex-start}
+@media(max-width:480px){.sp-teil-werte{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .sp-undo{margin:6px 0 0 -10px}
 @media (max-width:400px){
   .sp-km>span{font-size:12px}

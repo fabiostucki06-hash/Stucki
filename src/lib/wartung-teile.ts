@@ -43,8 +43,10 @@ export function wartungsOfferte(
     if (g) {
       uebernommen.push(it.name);
       vorbelegt.push(key);
-      return g.positionen.map(({ autoText, ...p }): Position =>
+      const zeilen = g.positionen.map(({ autoText, ...p }): Position =>
         p.typ === 'arbeit' ? { ...p, beschreibung: autoText ? text : p.beschreibung, wartung: key } : { ...p, wartung: key });
+      // Only material entered on the vehicle: the item still gets its Arbeit line.
+      return zeilen.some((p) => p.typ === 'arbeit') ? zeilen : [...zeilen, { ...texte[i], wartung: key }];
     }
     return [{ ...texte[i], wartung: key }];
   });
@@ -101,4 +103,34 @@ export function teileAusOfferte(
     });
   }
   return { speichern, loeschen };
+}
+
+/** Material rows stored for an item (parts and Versandkosten), in order. */
+export function teileMaterial(t?: WartungTeile): MaterialPosition[] {
+  return (t?.positionen ?? []).filter((p): p is MaterialPosition & { autoText?: boolean } => p.typ === 'material')
+    .map(({ autoText, ...m }) => m);
+}
+
+/** Stored parts of a vehicle's item with the material entered directly in the
+    Wartungsplan: the item's other stored lines (Arbeit) are kept, the material
+    rows replaced by `material` (empty descriptions dropped). `null` when
+    nothing entered remains, i.e. the stored row is to be removed. Strictly
+    for this vehicle: id `fz:<vehicleId>:<key>`. */
+export function teileMitMaterial(
+  v: Vehicle, item: ServiceItem, material: MaterialPosition[], alt: WartungTeile | undefined, von?: string,
+): WartungTeile | null {
+  const key = teilKey(item);
+  const rest = (alt?.positionen ?? []).filter((p) => p.typ !== 'material');
+  const neu: TeilPosition[] = material
+    .filter((m) => m.beschreibung.trim())
+    .map(({ bestellt, wartung, ...m }) => ({ ...m, beschreibung: m.beschreibung.trim() }));
+  const positionen = [...neu, ...rest];
+  if (!positionen.some(erfasst)) return null;
+  return {
+    id: fzId(v.id, key), key, name: item.name, vehicleId: v.id,
+    fahrzeug: [v.marke, v.modell, v.kennzeichen].filter(Boolean).join(' ') || undefined,
+    // Entered on the vehicle, not from an Offerte: an older Offerte re-saved without
+    // lines for the item does not clear it.
+    positionen, updatedAt: new Date().toISOString(), von,
+  };
 }

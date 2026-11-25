@@ -33,6 +33,9 @@ interface AppContextValue {
   /** Positions entered per Wartungsplan item (lib/wartung-teile); stored
       automatically when an Offerte from the Wartungsplan is saved. */
   wartungTeile: WartungTeile[];
+  /** Stores (or with `null` removes) the parts of one vehicle's Wartungsplan
+      item, entered directly in the Wartungsplan. Rejects when the write failed. */
+  wartungTeileSetzen: (id: string, t: WartungTeile | null) => Promise<void>;
   orders: Order[];
   offerten: Offerte[];
   rechnungen: Rechnung[];
@@ -417,6 +420,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function wartungTeileSetzen(id: string, t: WartungTeile | null) {
+    // Only vehicle-scoped rows: `fz:<vehicleId>:<key>` of exactly that vehicle.
+    if (!id.startsWith('fz:') || (t && (t.id !== id || id !== `fz:${t.vehicleId}:${t.key}`))) throw new Error('ungültige Teile-ID');
+    const vorher = teileRef.current;
+    teileRef.current = [...vorher.filter((x) => x.id !== id), ...(t ? [t] : [])];
+    setWartungTeile(teileRef.current);
+    try {
+      if (t) await db.upsert('maintenance_parts', { id, data: t, updated_at: t.updatedAt }, token!);
+      else if (vorher.some((x) => x.id === id)) await db.delete('maintenance_parts', id, token!);
+    } catch (e) {
+      console.error('[Supabase] maintenance_parts:', e);
+      teileRef.current = vorher;
+      setWartungTeile(vorher);
+      showToast('Material für den Wartungsplan nicht gespeichert', 'error');
+      throw e;
+    }
+  }
+
   async function deleteOfferte(id: string) {
     await syncOk(() => db.delete('offerten', id, token!));
     setOfferten((p) => p.filter((o) => o.id !== id));
@@ -465,7 +486,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AppContext.Provider value={{ customers, vehicles, vehiclesOf, docVehicle, docKunde, addVehicle, updateVehicle, deleteVehicle, wartungSpecs, saveWartungSpec, wartungTeile, orders, offerten, rechnungen, naechsteNummer, loading, syncStatus, token, userEmail, authChecked, sessionExpired, updateToken, addCustomer, updateCustomer, deleteCustomer, addOrder, updateOrder, deleteOrder, addOfferte, updateOfferte, deleteOfferte, addRechnung, updateRechnung, deleteRechnung, addMaterial, handleLogin, handleLogout }}>
+    <AppContext.Provider value={{ customers, vehicles, vehiclesOf, docVehicle, docKunde, addVehicle, updateVehicle, deleteVehicle, wartungSpecs, saveWartungSpec, wartungTeile, wartungTeileSetzen, orders, offerten, rechnungen, naechsteNummer, loading, syncStatus, token, userEmail, authChecked, sessionExpired, updateToken, addCustomer, updateCustomer, deleteCustomer, addOrder, updateOrder, deleteOrder, addOfferte, updateOfferte, deleteOfferte, addRechnung, updateRechnung, deleteRechnung, addMaterial, handleLogin, handleLogout }}>
       {children}
     </AppContext.Provider>
   );
