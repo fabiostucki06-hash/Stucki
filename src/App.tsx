@@ -12,7 +12,7 @@ import { useSwipeToOpen } from './hooks/useSwipeToOpen';
 import { offerteNr, nextVersion, sumPositions, roundToRappen, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ, ANZAHLUNG_BEDINGUNG, ANZAHLUNG_PROZENT, mitMaterialHinweis, ohneMaterialHinweis, ersetzeNummer, OFFERTE_REF, ANZAHLUNG_REF } from './lib/offerte-docs';
 import { hardReload } from './lib/reload';
 import { driveNachholenStarten, finishDriveCallback, isDriveCallback } from './lib/drive';
-import { naechsteNr } from './lib/nummern';
+import { naechsteNr, kleinsteFreieNr } from './lib/nummern';
 import { computeRechnungTotals, withOffertePositionen, migrateAnzahlungEntwurf, findQuellOfferte, hoechsteRechnungNr, rechnungArt } from './lib/rechnung-totals';
 import { ohneMaterialZe } from './lib/ze';
 
@@ -349,7 +349,8 @@ export default function App() {
   }
   /* Next automatic numbers (highest existing + 1) and duplicate checks. */
   const naechsteOrderNr = naechsteNr(orders.map((o) => o.orderNumber));
-  const naechsteOffertNr = naechsteNr(offerten.map((o) => o.offertNumber));
+  /** Offerten fill gaps: the smallest number not in use (else highest + 1). */
+  const naechsteOffertNr = kleinsteFreieNr(offerten.map((o) => o.offertNumber));
   /** Each Rechnung type has its own sequence; the new-Rechnung form creates normal Rechnungen. */
   const naechsteRechnungNr = hoechsteRechnungNr(rechnungen, 'standard') + 1;
   /** Versions share their number ("12", "12_2"), so only the same version counts as taken. */

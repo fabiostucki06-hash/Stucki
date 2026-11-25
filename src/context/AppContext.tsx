@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useMemo, useRef, ReactNode } from 'react';
 import { auth, db, setAuthHandlers, tokenUserId, type DocTable } from '../lib/supabase';
-import { naechsteNr, neueDokId } from '../lib/nummern';
+import { naechsteNr, kleinsteFreieNr, neueDokId } from '../lib/nummern';
 import { startSettingsSync, whenSettingsLoaded } from '../lib/settingsSync';
 import { showToast } from '../components/ui/Toast';
 import { offerteNr } from '../lib/offerte-docs';
@@ -375,7 +375,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // opts.offertNumber keeps that number (manual entry, or a new version like "12_2");
   // without it the database assigns the next one.
   async function addOfferte(data: Omit<Offerte, 'id' | 'offertNumber' | 'status' | 'createdAt'>, opts?: { offertNumber?: number }): Promise<Offerte> {
-    const num = opts?.offertNumber ?? naechsteNr(offerten.map((o) => o.offertNumber));
+    const num = opts?.offertNumber ?? kleinsteFreieNr(offerten.map((o) => o.offertNumber));
     const newOff: Offerte = { id: neueDokId('off'), offertNumber: num, status: 'entwurf', createdAt: new Date().toISOString(), ...data };
     let saved = newOff;
     await syncOk(async () => {
