@@ -1360,6 +1360,15 @@ select.mf-add-pos.df-pauschale-select{-webkit-appearance:none;appearance:none;co
   .sf-title1{font-size:32px}
   .section-header{font-size:19px;padding:24px 16px 8px}
 }
+/* Phone / tablet: solid, crisp top bars. iOS Safari renders a translucent
+   backdrop-filter bar (and the text/buttons on it) soft while content scrolls
+   underneath, so on touch screens and narrow windows the nav bar is opaque black
+   with no blur. Safe-area padding stays on the bar itself (see .nav-bar). */
+@media screen and (max-width:1023px),screen and (pointer:coarse){
+  .nav-bar{background:var(--bg);-webkit-backdrop-filter:none;backdrop-filter:none}
+  .sheet-nav{position:relative;z-index:1;background:var(--bg)}
+  .sheet-container.sheet-full{background:var(--bg)}
+}
 
 /* ══ NEUTRAL ICON TILES ══ Navigation and Einstellungen icons sit on a flat, monochrome
    squircle (Surface-2 grey, white glyph). No colour per item, no gloss or gradient.

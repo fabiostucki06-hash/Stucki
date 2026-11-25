@@ -42,7 +42,8 @@ in Komponenten, wenn ein Token existiert.
 ## Regeln
 
 - **Keine** Glas-Effekte, Glanz-Gradients, inset-Shines oder text-shadows.
-  Einzige Ausnahme: Nav-Bar (transluzent schwarz + blur/saturate).
+  Einzige Ausnahme: Nav-Bar auf Desktop (transluzent schwarz + blur/saturate). Auf iPhone /
+  Touch / <1024px ist die Nav-Bar deckend `--bg` ohne backdrop-filter (iOS rendert sie sonst unscharf).
 - **Icons:** gefüllte Glyphen aus `Icons.tsx` (Details ausgestanzt, Linien-Glyphen mit kräftigem
   runden Strich). Navigation (Sidebar) und Einstellungen-Kategorien: Glyph weiss auf neutraler,
   flacher Kachel `.icon-tile` (Surface-2, aktiv/hover `--border-strong`). **Keine** Farbe pro Eintrag,
