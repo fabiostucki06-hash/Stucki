@@ -1,6 +1,7 @@
 import { wartungsPositionen } from './vehicles';
 import { vorlageVon } from './wartung';
 import { materialZuerst, parsePartLink } from './utils';
+import { zeBetrag } from './ze';
 import type { ArbeitPosition, MaterialPosition, Offerte, OfferteWartung, Position, ServiceItem, Vehicle, WartungTeile } from '../types';
 
 /* Parts per Wartungsplan item and vehicle: the positions entered in an Offerte
@@ -26,6 +27,38 @@ export const fzId = (vehicleId: string, key: string) => `fz:${vehicleId}:${key}`
     it is only edited in the Wartungsplan. */
 const OHNE_MATERIAL = 'inspektion';
 
+/** The Inspektion's own ZE as entered in the Wartungsplan (> 0), else 0. */
+export const inspektionZe = (it: ServiceItem): number =>
+  teilKey(it) === OHNE_MATERIAL ? Math.max(0, parseFloat(it.arbeitZe ?? '') || 0) : 0;
+
+/** The Inspektion's ZE on its Arbeit line: the one with the generated text,
+    else the first Arbeit line. Never adds a line, so nothing is counted twice. */
+function mitInspektionZe(zeilen: Position[], text: string, ze: number): Position[] {
+  if (!ze) return zeilen;
+  const idx = zeilen.findIndex((p) => p.typ === 'arbeit' && p.beschreibung.trim() === text.trim());
+  const i = idx >= 0 ? idx : zeilen.findIndex((p) => p.typ === 'arbeit');
+  if (i < 0) return zeilen;
+  return zeilen.map((p, j) => {
+    if (j !== i || p.typ !== 'arbeit') return p;
+    const { zeKI, zeHint, ...a } = p;
+    return { ...a, ze: String(ze), preis: zeBetrag(ze).toFixed(2) };
+  });
+}
+
+/** Stored lines of the Inspektion without ZE on its generated Arbeit line:
+    the Inspektion's ZE live in the Wartungsplan (ServiceItem.arbeitZe), an
+    Offerte does not change them. Lines entered with their own text keep theirs. */
+function ohneInspektionZe(positionen: TeilPosition[]): TeilPosition[] {
+  return positionen.map((p) => (p.typ === 'arbeit' && p.autoText && p.ze ? { ...p, ze: '', preis: '0.00' } : p));
+}
+
+/** ZE stored on the Inspektion's generated Arbeit line by an earlier Offerte
+    (before its ZE were set in the Wartungsplan), '' when none. */
+export function gespeicherteInspektionZe(t?: WartungTeile): string {
+  const a = t?.key === OHNE_MATERIAL ? t.positionen.find((p) => p.typ === 'arbeit' && p.autoText && parseFloat(p.ze) > 0) : undefined;
+  return a?.ze ?? '';
+}
+
 /** Stored positions of this vehicle for an item (never those of another vehicle). */
 export function gespeicherteTeile(v: Vehicle, key: string, alle: WartungTeile[]): WartungTeile | undefined {
   const t = alle.find((x) => x.id === fzId(v.id, key) && x.vehicleId === v.id);
@@ -41,7 +74,7 @@ export function wartungsOfferte(
   const texte = wartungsPositionen(items);
   const uebernommen: string[] = [];
   const vorbelegt: string[] = [];
-  const positionen: Position[] = items.flatMap((it, i) => {
+  const zeilenFuer = (it: ServiceItem, i: number): Position[] => {
     const key = teilKey(it);
     const text = texte[i].beschreibung;
     const g = gespeicherteTeile(v, key, alle);
@@ -60,7 +93,9 @@ export function wartungsOfferte(
       return zeImMaterial || zeilen.some((p) => p.typ === 'arbeit') ? zeilen : [...zeilen, { ...texte[i], wartung: key }];
     }
     return [{ ...texte[i], wartung: key }];
-  });
+  };
+  // Inspektion: the ZE set in the Wartungsplan go onto its Arbeit line.
+  const positionen = items.flatMap((it, i) => mitInspektionZe(zeilenFuer(it, i), texte[i].beschreibung, inspektionZe(it)));
   return {
     positionen: materialZuerst(positionen),
     wartung: { vehicleId: v.id, items: items.map((it, i) => ({ key: teilKey(it), name: it.name, text: texte[i].beschreibung })), vorbelegt },
@@ -102,9 +137,9 @@ export function teileAusOfferte(
     const id = fzId(v.id, it.key);
     const alt = alle.find((t) => t.id === id);
     const eigene = (o.positionen ?? []).filter((p) => p.wartung === it.key).map((p) => alsTeil(p, it.text));
-    // Inspektion: the stored material stays as entered in the Wartungsplan.
+    // Inspektion: the stored material and its ZE stay as entered in the Wartungsplan.
     const positionen = it.key === OHNE_MATERIAL
-      ? [...(alt?.positionen ?? []).filter((p) => p.typ === 'material'), ...eigene.filter((p) => p.typ !== 'material')]
+      ? [...(alt?.positionen ?? []).filter((p) => p.typ === 'material'), ...ohneInspektionZe(eigene.filter((p) => p.typ !== 'material'))]
       : eigene;
     if (!positionen.some(erfasst)) {
       if (alt && (alt.offertId === o.id || w.vorbelegt?.includes(it.key))) loeschen.push(id);
@@ -135,7 +170,9 @@ export function teileMitMaterial(
   v: Vehicle, item: ServiceItem, material: MaterialPosition[], alt: WartungTeile | undefined, von?: string,
 ): WartungTeile | null {
   const key = teilKey(item);
-  const rest = (alt?.positionen ?? []).filter((p) => p.typ !== 'material');
+  const andere = (alt?.positionen ?? []).filter((p) => p.typ !== 'material');
+  // Inspektion: its ZE are now kept on the item itself (arbeitZe), not on a stored line.
+  const rest = key === OHNE_MATERIAL ? ohneInspektionZe(andere) : andere;
   const neu: TeilPosition[] = material
     .filter((m) => m.beschreibung.trim())
     .map(({ bestellt, wartung, link, ...m }) => {

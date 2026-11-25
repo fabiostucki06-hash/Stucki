@@ -12,9 +12,9 @@ import {
   vorlageVon, wartungsVorlagen, type AbgleichBericht, type FahrzeugProfil, type QuelleAnzeige, type Vorlage,
 } from '../../lib/wartung';
 import { exportWartungsplanPDF } from '../../lib/pdf-wartungsplan';
-import { fzId, gespeicherteTeile, teilKey, teileMaterial, teileMitMaterial } from '../../lib/wartung-teile';
+import { fzId, gespeicherteInspektionZe, gespeicherteTeile, teilKey, teileMaterial, teileMitMaterial } from '../../lib/wartung-teile';
 import { setMaterialFeld } from '../../lib/marge';
-import { materialPreis } from '../../lib/ze';
+import { materialPreis, zeSatz, zeText } from '../../lib/ze';
 import { getMargin } from '../../lib/settings';
 import { LookupError, intervalleRecherchieren, lookupKonfiguriert, rechercheAnwenden, type LookupBericht } from '../../lib/wartung-lookup';
 import { useApp } from '../../context/AppContext';
@@ -56,7 +56,7 @@ const QUELLE: Record<QuelleAnzeige, { label: string; dot: string }> = {
 const ohneBeleg = (it: ServiceItem) => letzterBeleg(it)?.belegt === false;
 
 /** Which part of the editor to jump to. */
-type EditorFokus = 'intervall' | 'letzte' | 'naechste' | 'material';
+type EditorFokus = 'intervall' | 'letzte' | 'naechste' | 'material' | 'arbeit';
 
 interface PruefhinweisProps {
   profil: FahrzeugProfil;
@@ -249,7 +249,8 @@ export default function Wartungsplan({ vehicle, customer, onSave, onOfferte, onF
     const sauber = (m: MaterialPosition[]) =>
       JSON.stringify(m.filter((x) => x.beschreibung.trim()).map(({ bestellt, wartung, ...x }) => ({ ...x, beschreibung: x.beschreibung.trim() })));
     const umbenannt = altKey !== teilKey(it);
-    if (!umbenannt && sauber(material) === sauber(teileMaterial(alt))) return;
+    // An Inspektion with ZE stored by an earlier Offerte: they now live on the item (arbeitZe).
+    if (!umbenannt && sauber(material) === sauber(teileMaterial(alt)) && !gespeicherteInspektionZe(alt)) return;
     const neu = teileMitMaterial(vehicle, it, material, alt, userEmail ?? undefined);
     try {
       if (umbenannt && alt) await wartungTeileSetzen(fzId(vehicle.id, altKey), null);
@@ -514,6 +515,7 @@ function WartungsplanKachel({ item, naechste, zustand, busy, vorlage, teile, sel
   const quelle = q && QUELLE[q];
   const naechsteVonHand = faelligVonHand(item);
   const material = teileMaterial(teile);
+  const arbeitZe = istInspektion(item) ? item.arbeitZe ?? gespeicherteInspektionZe(teile) : '';
   const quelleTitel = q === 'geprueft'
     ? [item.quelleText, item.geprueftAm && `geprüft ${formatDateCH(item.geprueftAm)}`].filter(Boolean).join(' · ') || undefined
     : q === 'recherchiert' ? [item.quelleText, item.quelleUrl].filter(Boolean).join(' – ')
@@ -563,6 +565,14 @@ function WartungsplanKachel({ item, naechste, zustand, busy, vorlage, teile, sel
         {' · '}
         <button type="button" className="sp-erfassen" onClick={() => onOpen('material')}>{material.length ? 'Bearbeiten' : 'Erfassen'}</button>
       </p>
+      {istInspektion(item) && (
+        <p className="sp-quelle" title="Wird beim Erstellen der Offerte in die Arbeit-Zeile der Inspektion übernommen">
+          <span className="dot" style={{ background: arbeitZe ? 'var(--accent)' : 'var(--label4)' }} />
+          {arbeitZe ? `Arbeit: ${arbeitZe} ZE` : 'Keine ZE gespeichert'}
+          {' · '}
+          <button type="button" className="sp-erfassen" onClick={() => onOpen('arbeit')}>{arbeitZe ? 'Bearbeiten' : 'Erfassen'}</button>
+        </p>
+      )}
       {item.notiz && <p className="sp-foot">{item.notiz}</p>}
 
       <div className="sp-tile-actions">
@@ -665,6 +675,12 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, vehicl
     const ok = parsePartLink(raw);
     updM(i, 'link', raw ? ok?.href ?? raw : '');
   };
+  // Inspektion: its own ZE for the Arbeit line of Offerten (apart from the material's ZE).
+  // ZE an earlier Offerte stored for it are shown until saved here.
+  const [arbeitZe, setArbeitZe] = useState(() => (istInspektion(item) ? item.arbeitZe ?? gespeicherteInspektionZe(teile) : ''));
+  const zeWert = parseFloat(arbeitZe);
+  const zeFehler = arbeitZe.trim() !== '' && !(zeWert >= 0);
+  const zeNeu = istInspektion(item) && zeWert > 0 ? String(zeWert) : undefined;
   const s = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF((p) => ({ ...p, [k]: e.target.value }));
   const q = quelleVon(item, vorlage);
   // Inspektion: interval and source come from "Motoröl & Ölfilter", not edited here.
@@ -675,12 +691,12 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, vehicl
   const fuer = `Motor ${motorcode}${variante ? ` · ${key === 'getriebeoel' ? labelVon(GETRIEBE, vehicle.getriebe) : 'Allrad'}` : ''}`;
   const num = (v: string) => (parseInt(v, 10) > 0 ? parseInt(v, 10) : undefined);
   const opt = (v: string) => v.trim() || undefined;
-  const ok = !!f.name.trim() && !busy;
+  const ok = !!f.name.trim() && !busy && !zeFehler;
 
   function submit() {
     if (!ok) return;
     if (folgtOel) {
-      onSave(letztenServiceSetzen({ ...item, name: f.name.trim(), notiz: opt(f.notiz) }, {
+      onSave(letztenServiceSetzen({ ...item, name: f.name.trim(), notiz: opt(f.notiz), arbeitZe: zeNeu }, {
         datum: opt(f.letztesDatum), km: opt(f.letzteKm), beleg: { nachweis, auftragId: opt(auftragId) },
         faelligDatum: opt(f.faelligDatum), faelligKm: opt(f.faelligKm),
       }), false, material);
@@ -706,6 +722,7 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, vehicl
       rechercheFuer: quelle === 'recherchiert' ? item.rechercheFuer : undefined,
       geprueftAm: geprueft ? (warGeprueft && !geaendert && item.geprueftAm ? item.geprueftAm : todayISO()) : undefined,
       notiz: opt(f.notiz),
+      arbeitZe: zeNeu,
     };
     onSave(letztenServiceSetzen(neuItem, {
       datum: opt(f.letztesDatum), km: opt(f.letzteKm), beleg: { nachweis, auftragId: opt(auftragId) },
@@ -805,6 +822,24 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, vehicl
           <div className="cf-field"><label className="cf-label" htmlFor="sp-fd">Datum</label><input id="sp-fd" className="cf-input" type="date" value={f.faelligDatum} onChange={s('faelligDatum')} /></div>
           <div className="cf-field"><label className="cf-label" htmlFor="sp-fkm">KM-Stand</label><input id="sp-fkm" className="cf-input" type="number" inputMode="numeric" value={f.faelligKm} onChange={s('faelligKm')} /></div>
         </div>
+
+        {istInspektion(item) && (
+          <>
+            <p className="sp-editor-head">Arbeit für Offerten</p>
+            <div className="cf-field" ref={fokus === 'arbeit' ? fokusRef : undefined}>
+              <label className="cf-label" htmlFor="sp-ze">ZE</label>
+              <input
+                id="sp-ze" className="cf-input" type="number" inputMode="decimal" step="any" min={0}
+                value={arbeitZe} onChange={(e) => setArbeitZe(e.target.value)} placeholder="—" aria-invalid={zeFehler || undefined}
+              />
+              {zeFehler && <span className="sp-teil-fehler">Keine gültige Zahl – ZE ab 0 eingeben.</span>}
+            </div>
+            <p className="sp-hinweis">
+              {zeWert > 0 ? `${zeText(zeWert, zeSatz())}. ` : ''}
+              Nur für dieses Fahrzeug: wird beim Erstellen der Offerte in die Arbeit-Zeile der Inspektion übernommen. Unabhängig von den ZE beim Material. Ohne Eintrag werden keine ZE angenommen.
+            </p>
+          </>
+        )}
 
         <p className="sp-editor-head">Material für Offerten</p>
         <div className="sp-teile" ref={fokus === 'material' ? fokusRef : undefined}>

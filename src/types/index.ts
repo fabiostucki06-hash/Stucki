@@ -115,6 +115,10 @@ export interface ServiceItem {
   faelligDatum?: string;
   faelligKm?: string;
   notiz?: string;
+  /** Inspektion only: its working time in ZE, set in the Wartungsplan and
+      carried into the Arbeit line of an Offerte from the Wartungsplan. Kept
+      apart from the ZE of material rows; unset = no ZE assumed. */
+  arbeitZe?: string;
   /** Every time it was ticked off, newest last. */
   historie?: ServiceEintrag[];
 }
