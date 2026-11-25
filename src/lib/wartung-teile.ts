@@ -21,6 +21,11 @@ export function teilKey(i: ServiceItem): string {
 
 export const fzId = (vehicleId: string, key: string) => `fz:${vehicleId}:${key}`;
 
+/** The Inspektion's stored material is never inserted into an Offerte
+    automatically (only its Arbeit lines are), and an Offerte never changes it:
+    it is only edited in the Wartungsplan. */
+const OHNE_MATERIAL = 'inspektion';
+
 /** Stored positions of this vehicle for an item (never those of another vehicle). */
 export function gespeicherteTeile(v: Vehicle, key: string, alle: WartungTeile[]): WartungTeile | undefined {
   const t = alle.find((x) => x.id === fzId(v.id, key) && x.vehicleId === v.id);
@@ -40,10 +45,11 @@ export function wartungsOfferte(
     const key = teilKey(it);
     const text = texte[i].beschreibung;
     const g = gespeicherteTeile(v, key, alle);
-    if (g) {
+    const gespeichert = g?.positionen.filter((p) => key !== OHNE_MATERIAL || p.typ !== 'material') ?? [];
+    if (gespeichert.length) {
       uebernommen.push(it.name);
       vorbelegt.push(key);
-      const zeilen = g.positionen.map(({ autoText, ...p }): Position =>
+      const zeilen = gespeichert.map(({ autoText, ...p }): Position =>
         p.typ === 'arbeit' ? { ...p, beschreibung: autoText ? text : p.beschreibung, wartung: key } : { ...p, wartung: key });
       // Only material entered on the vehicle: the item still gets its Arbeit line.
       return zeilen.some((p) => p.typ === 'arbeit') ? zeilen : [...zeilen, { ...texte[i], wartung: key }];
@@ -90,7 +96,11 @@ export function teileAusOfferte(
   for (const it of w.items) {
     const id = fzId(v.id, it.key);
     const alt = alle.find((t) => t.id === id);
-    const positionen = (o.positionen ?? []).filter((p) => p.wartung === it.key).map((p) => alsTeil(p, it.text));
+    const eigene = (o.positionen ?? []).filter((p) => p.wartung === it.key).map((p) => alsTeil(p, it.text));
+    // Inspektion: the stored material stays as entered in the Wartungsplan.
+    const positionen = it.key === OHNE_MATERIAL
+      ? [...(alt?.positionen ?? []).filter((p) => p.typ === 'material'), ...eigene.filter((p) => p.typ !== 'material')]
+      : eigene;
     if (!positionen.some(erfasst)) {
       if (alt && (alt.offertId === o.id || w.vorbelegt?.includes(it.key))) loeschen.push(id);
       continue;

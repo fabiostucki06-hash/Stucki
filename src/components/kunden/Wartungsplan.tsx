@@ -557,7 +557,7 @@ function WartungsplanKachel({ item, naechste, zustand, busy, vorlage, teile, sel
           {quelle.label}{(q === 'geprueft' || q === 'recherchiert') && item.quelleText ? ` · ${item.quelleText}` : ''}
         </p>
       )}
-      <p className="sp-quelle" title="Wird beim Erstellen der Offerte für dieses Fahrzeug unter Material eingefügt">
+      <p className="sp-quelle" title={istInspektion(item) ? 'Wird beim Erstellen der Offerte nicht automatisch eingefügt' : 'Wird beim Erstellen der Offerte für dieses Fahrzeug unter Material eingefügt'}>
         <span className="dot" style={{ background: material.length ? 'var(--accent)' : 'var(--label4)' }} />
         {material.length ? `Material: ${material.map((m) => m.beschreibung).join(', ')}` : 'Kein Material gespeichert'}
         {' · '}
@@ -855,8 +855,9 @@ function WartungsplanEditor({ item, neu, fokus, busy, vorlage, motorcode, vehicl
           })}
           <button type="button" className="sp-text-btn sp-teil-add" onClick={addM}><SFPlus size={12} /> Material</button>
           <p className="sp-hinweis">
-            Nur für dieses Fahrzeug: wird bei jeder Offerte aus dem Wartungsplan mit dieser Position unter Material eingefügt.
-            Ohne Eintrag wird kein Material angenommen.
+            {istInspektion(item)
+              ? 'Nur für dieses Fahrzeug. Bei der Inspektion wird das Material nicht automatisch in die Offerte eingefügt.'
+              : 'Nur für dieses Fahrzeug: wird bei jeder Offerte aus dem Wartungsplan mit dieser Position unter Material eingefügt. Ohne Eintrag wird kein Material angenommen.'}
           </p>
         </div>
 
