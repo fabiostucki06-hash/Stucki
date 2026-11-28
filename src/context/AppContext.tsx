@@ -8,8 +8,9 @@ import { alsReineMaterialofferte, mitGetrenntenTotals } from '../lib/ze';
 import { hoechsteRechnungNr, rechnungArt, rechnungDocName } from '../lib/rechnung-totals';
 import { hatFahrzeugDaten, kundeMitFahrzeug, legacyFahrzeug, sortiereFahrzeuge, splitFahrzeug } from '../lib/vehicles';
 import { inspektionWieOel, mitWartungsplan, profilSignatur } from '../lib/wartung';
-import { ohneInspektionIntervall, teileAusOfferte } from '../lib/wartung-teile';
-import type { Customer, FahrzeugFelder, Order, Offerte, Rechnung, RechnungArt, MaterialCatalogItem, SyncStatus, Vehicle, WartungSpec, WartungTeile } from '../types';
+import { ohneInspektionIntervall, teileAusOfferte, teilKey } from '../lib/wartung-teile';
+import { zeLernen, type ZeQuelle } from '../lib/ze-memory';
+import type { Customer, FahrzeugFelder, Order, Offerte, Rechnung, RechnungArt, MaterialCatalogItem, SyncStatus, Vehicle, WartungSpec, WartungTeile, ZeEintrag, Position } from '../types';
 
 /** Anything that belongs to a customer's vehicle: Auftrag, Offerte, Rechnung. */
 type FahrzeugDok = { customerId: string; vehicleId?: string };
@@ -36,6 +37,9 @@ interface AppContextValue {
   /** Stores (or with `null` removes) the parts of one vehicle's Wartungsplan
       item, entered directly in the Wartungsplan. Rejects when the write failed. */
   wartungTeileSetzen: (id: string, t: WartungTeile | null) => Promise<void>;
+  /** ZE entered for a task on a vehicle configuration (lib/ze-memory); learned
+      automatically whenever an Offerte, Rechnung or the Wartungsplan is saved. */
+  zeEintraege: ZeEintrag[];
   orders: Order[];
   offerten: Offerte[];
   rechnungen: Rechnung[];
@@ -100,6 +104,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Latest rows for the comparison in teileMerken (called from save chains that may hold an old render).
   const teileRef = useRef<WartungTeile[]>([]);
   teileRef.current = wartungTeile;
+  const [zeEintraege, setZeEintraege] = useState<ZeEintrag[]>([]);
+  const zeRef = useRef<ZeEintrag[]>([]);
+  zeRef.current = zeEintraege;
+  const zeFehlerGemeldet = useRef(false);
+  const zeTabelleFehlt = useRef(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [offerten, setOfferten] = useState<Offerte[]>([]);
   const [rechnungen, setRechnungen] = useState<Rechnung[]>([]);
@@ -155,7 +164,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const sync = async () => {
       lastSyncAt.current = Date.now();
       const seq = writeSeq.current;
-      const [cr, vr, or, offr, rechr, specr, teiler] = await Promise.all([
+      const [cr, vr, or, offr, rechr, specr, teiler, zer] = await Promise.all([
         db.get('customers', token),
         db.get('vehicles', token).catch((e) => { console.error('[Supabase] get(vehicles):', e); return null; }),
         db.get('orders', token),
@@ -163,6 +172,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         db.get('rechnungen', token).catch((e) => { console.error('[Supabase] get(rechnungen):', e); return null; }),
         db.get('maintenance_specs', token).catch((e) => { console.error('[Supabase] get(maintenance_specs):', e); return null; }),
         db.get('maintenance_parts', token).catch((e) => { console.error('[Supabase] get(maintenance_parts):', e); return null; }),
+        db.get('ze_memory', token).catch((e) => { console.error('[Supabase] get(ze_memory):', e); return null; }),
       ]);
       // A save overlapped this fetch: the response may predate it and would revert local state.
       if (cancelled || writesInFlight.current > 0 || seq !== writeSeq.current) return;
@@ -173,6 +183,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (Array.isArray(specr)) setWartungSpecs(parseRows(specr) as unknown as WartungSpec[]);
       // Per-vehicle rows only (lib/wartung-teile): parts never move to another vehicle.
       if (Array.isArray(teiler)) setWartungTeile((parseRows(teiler) as unknown as WartungTeile[]).filter((t) => t.id.startsWith('fz:')));
+      if (Array.isArray(zer)) setZeEintraege((parseRows(zer) as unknown as ZeEintrag[]).filter((e) => e?.id?.startsWith('ze|') && e.fz));
       if (Array.isArray(or)) setOrders((parseRows(or) as Order[]).map(mitGetrenntenTotals));
       if (Array.isArray(offr)) {
         setOfferten((parseRows(offr) as Offerte[]).map((o) => ohneInspektionIntervall(o.art === 'material' ? alsReineMaterialofferte(o) : mitGetrenntenTotals(o))));
@@ -293,6 +304,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const v = m.service?.length ? { ...m, service: inspektionWieOel(m.service) } : m;
     await syncOk(() => upsertVehicle(v));
     setVehicles((p) => (p.some((x) => x.id === v.id) ? p.map((x) => (x.id === v.id ? v : x)) : [...p, v]));
+    // The Inspektion's ZE set in the Wartungsplan: offered for the same vehicle configuration.
+    const inspektion: Position[] = (v.service ?? [])
+      .filter((it) => teilKey(it) === 'inspektion' && it.arbeitZe)
+      .map((it) => ({ typ: 'arbeit', beschreibung: it.name, ze: it.arbeitZe!, stundenansatz: '', preis: '' }));
+    void zeMerken(inspektion, v, { art: 'wartungsplan' });
   }
 
   async function deleteVehicle(v: Vehicle) {
@@ -383,6 +399,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
     setOfferten((p) => [...p, saved]);
     showToast(`Offerte #${offerteNr(saved)} gespeichert`, 'success');
+    void zeAusDokument(saved, 'offerte');
     return saved;
   }
 
@@ -396,6 +413,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
     setOfferten((p) => p.map((o) => (o.id === saved.id ? saved : o)));
     void teileMerken(saved);
+    void zeAusDokument(saved, 'offerte');
     return saved;
   }
 
@@ -423,6 +441,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  /** Learns the ZE entered in a document's lines for its vehicle. A Materialofferte carries no ZE. */
+  function zeAusDokument(d: Offerte | Rechnung, art: 'offerte' | 'rechnung') {
+    if ((d as Offerte).art === 'material' || !d.positionen?.length) return;
+    const nr = art === 'offerte' ? `Offerte #${offerteNr(d as Offerte)}` : `${rechnungDocName(d as Rechnung)} #${(d as Rechnung).rechnungNumber}`;
+    return zeMerken(d.positionen, docVehicle(d), { art, id: d.id, nr });
+  }
+
+  /** Stores new / changed ZE entries (lib/ze-memory). The document itself is
+      saved already: a failure is reported once and retried with the next save. */
+  async function zeMerken(positionen: Position[], v: Vehicle | undefined, quelle: ZeQuelle) {
+    const neu = zeLernen(positionen, v, zeRef.current, quelle, userEmail ?? undefined);
+    if (!neu.length || !token || zeTabelleFehlt.current) return;
+    const vorher = zeRef.current;
+    zeRef.current = [...vorher.filter((e) => !neu.some((n) => n.id === e.id)), ...neu];
+    setZeEintraege(zeRef.current);
+    try {
+      for (const e of neu) await db.upsert('ze_memory', { id: e.id, data: e, updated_at: e.updatedAt }, token);
+    } catch (e) {
+      zeRef.current = vorher;
+      setZeEintraege(vorher);
+      // Table not created yet (migration 20261128100000): ZE stay unlearned, no error per save.
+      if (/ze_memory|schema cache|PGRST205|42P01/i.test(String(e))) {
+        console.warn('[Supabase] table ze_memory missing – ZE are not learned until the migration is applied.');
+        zeTabelleFehlt.current = true;
+        return;
+      }
+      console.error('[Supabase] ze_memory:', e);
+      if (!zeFehlerGemeldet.current) showToast('ZE für spätere Offerten nicht gespeichert', 'error');
+      zeFehlerGemeldet.current = true;
+    }
+  }
+
   async function wartungTeileSetzen(id: string, t: WartungTeile | null) {
     // Only vehicle-scoped rows: `fz:<vehicleId>:<key>` of exactly that vehicle.
     if (!id.startsWith('fz:') || (t && (t.id !== id || id !== `fz:${t.vehicleId}:${t.key}`))) throw new Error('ungültige Teile-ID');
@@ -439,6 +489,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       showToast('Material für den Wartungsplan nicht gespeichert', 'error');
       throw e;
     }
+    // Material with its ZE entered on the vehicle: offered for the same configuration.
+    if (t) void zeMerken(t.positionen.filter((p) => p.typ === 'material'), vehicles.find((x) => x.id === t.vehicleId), { art: 'wartungsplan' });
   }
 
   async function deleteOfferte(id: string) {
@@ -457,6 +509,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
     } catch { return; }
     setRechnungen((p) => [...p, saved]);
+    void zeAusDokument(saved, 'rechnung');
     showToast(`${rechnungDocName(saved)} #${saved.rechnungNumber} gespeichert`, 'success');
     return saved;
   }
@@ -464,6 +517,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   async function updateRechnung(upd: Rechnung) {
     await syncOk(() => db.upsert('rechnungen', { id: upd.id, data: upd }, token!));
     setRechnungen((p) => p.map((r) => (r.id === upd.id ? upd : r)));
+    void zeAusDokument(upd, 'rechnung');
   }
 
   async function deleteRechnung(id: string) {
@@ -485,11 +539,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!window.confirm('Abmelden?')) return;
     await auth.signOut(token!);
     localStorage.removeItem('garage_token'); localStorage.removeItem('garage_email');
-    setToken(null); setUserEmail(null); setKunden([]); setVehicles([]); setOrders([]);
+    setToken(null); setUserEmail(null); setKunden([]); setVehicles([]); setOrders([]); setZeEintraege([]);
   }
 
   return (
-    <AppContext.Provider value={{ customers, vehicles, vehiclesOf, docVehicle, docKunde, addVehicle, updateVehicle, deleteVehicle, wartungSpecs, saveWartungSpec, wartungTeile, wartungTeileSetzen, orders, offerten, rechnungen, naechsteNummer, loading, syncStatus, token, userEmail, authChecked, sessionExpired, updateToken, addCustomer, updateCustomer, deleteCustomer, addOrder, updateOrder, deleteOrder, addOfferte, updateOfferte, deleteOfferte, addRechnung, updateRechnung, deleteRechnung, addMaterial, handleLogin, handleLogout }}>
+    <AppContext.Provider value={{ customers, vehicles, vehiclesOf, docVehicle, docKunde, addVehicle, updateVehicle, deleteVehicle, wartungSpecs, saveWartungSpec, wartungTeile, wartungTeileSetzen, zeEintraege, orders, offerten, rechnungen, naechsteNummer, loading, syncStatus, token, userEmail, authChecked, sessionExpired, updateToken, addCustomer, updateCustomer, deleteCustomer, addOrder, updateOrder, deleteOrder, addOfferte, updateOfferte, deleteOfferte, addRechnung, updateRechnung, deleteRechnung, addMaterial, handleLogin, handleLogout }}>
       {children}
     </AppContext.Provider>
   );

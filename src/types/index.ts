@@ -315,6 +315,40 @@ export interface WartungTeile {
   von?: string;
 }
 
+/** Vehicle data a learned ZE applies to (lib/ze-memory zeFahrzeug): only
+    fields entered on the vehicle, normalized; nothing inferred. */
+export interface ZeFahrzeug {
+  marke: string;
+  modell: string;
+  motorcode?: string;
+  /** Year of the 1. Inverkehrsetzung. */
+  jahr?: number;
+  getriebe?: Getriebe;
+  antrieb?: Antrieb;
+  achsantrieb?: Achsantrieb;
+  /** VIN of the vehicle it was last entered for (17 characters). */
+  vin?: string;
+}
+
+/** A ZE entered by the workshop for a task on a vehicle configuration (table
+    `ze_memory`, lib/ze-memory), offered again for the same task and vehicle. */
+export interface ZeEintrag {
+  /** `ze|<typ>|<task>|<marke>|<modell>|<motorcode>|<jahr>|<getriebe>|<antrieb>|<achsantrieb>`. */
+  id: string;
+  typ: 'arbeit' | 'material';
+  /** Normalized description (lib/ze-memory normTask). */
+  task: string;
+  /** Description as last entered. */
+  beschreibung: string;
+  ze: string;
+  fz: ZeFahrzeug;
+  vehicleId?: string;
+  /** Where it was entered: document type, id and number ("Offerte #12"). */
+  quelle?: { art: 'offerte' | 'rechnung' | 'wartungsplan'; id?: string; nr?: string };
+  updatedAt: string;
+  von?: string;
+}
+
 export type RechnungStatus = 'entwurf' | 'versendet' | 'bezahlt' | 'storniert';
 
 /** Document type of a Rechnung; each has its own number sequence. */

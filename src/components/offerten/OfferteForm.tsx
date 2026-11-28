@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FormCard, FormBar, SaveStatus, SummaryRow, VehicleSelect, PositionenEditor, arrayMove, fCHF, type ArbeitRow, type MaterialRow } from '../ui/DocForm';
 import type { Customer, ArbeitPosition, MaterialPosition, Offerte, OfferteStatus } from '../../types';
 import { offerteNotizen, anzahlungErforderlich, anzahlungMoeglich, anzahlungAufteilung, sindVorkasseTerms, ANZAHLUNG_PROZENT, VORKASSE_BEDINGUNG, SCHLUSSRECHNUNG_NOTIZ } from '../../lib/offerte-docs';
 import NummerField, { parseNummer } from '../ui/NummerField';
 import { materialPreis, materialZeSumme, ohneMaterialZe, positionTotals, zeBetrag, zeMinuten } from '../../lib/ze';
+import { zeAutomatisch } from '../../lib/ze-memory';
 import { setMaterialFeld } from '../../lib/marge';
 import { festpreisSummen, istKleinteilOfferte, kleinteilFaellig, kleinteilOffertePosition, KLEINTEIL_OFFERTE_PREIS } from '../../lib/sonderpositionen';
 import { materialZuerst } from '../../lib/utils';
@@ -36,17 +37,6 @@ interface OfferteFormProps {
   /** Pre-fills the material tab with one row (e.g. from the part-import flow). Ignored when `initial` is set. */
   prefillMaterial?: MaterialPosition;
   prefillCustomerId?: string;
-}
-
-function schaetzeZE(desc: string): string {
-  const t = desc.toLowerCase();
-  const rules: [RegExp, number][] = [
-    [/oelwechsel|ölwechsel/, 2], [/inspektion|service/, 6], [/bremsen|bremsbelag/, 4],
-    [/reifen|pneu/, 2], [/getriebe/, 10], [/kupplung/, 8], [/zahnriemen/, 8],
-    [/batterie/, 1], [/diagnose/, 1], [/klima/, 3],
-  ];
-  for (const [re, ze] of rules) if (re.test(t)) return String(ze);
-  return '1';
 }
 
 async function schaetzeZEmitKI(beschreibung: string, fz: string): Promise<{ ze: string; begruendung: string }> {
@@ -94,7 +84,7 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
   const tagFuer = (rows: { wartung?: string }[]) =>
     rows[rows.length - 1]?.wartung || (wartungItems?.length === 1 ? wartungItems[0].key : undefined);
   const [mitAnzahlung, setMitAnzahlung] = useState(() => (initial ? anzahlungErforderlich(initial) : false));
-  const { vehiclesOf, docVehicle, naechsteNummer } = useApp();
+  const { vehiclesOf, docVehicle, naechsteNummer, zeEintraege } = useApp();
   const nummerung = useDokNummer(initial?.offertNumber, nummerVorschlag, () => naechsteNummer('offerten'));
   const { nummer, setNummer, vorschlag } = nummerung;
   const [cid,        setCid]       = useState(initial?.customerId ?? prefillCustomerId ?? '');
@@ -124,12 +114,29 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
 
   const selectedVehicle = vehiclesOf(cid).find((v) => v.id === vid);
 
+  /* Another vehicle picked: rows whose ZE came from the memory (or have none yet)
+     get the ZE stored for that vehicle. Skipped on open, so a stored document
+     is not changed just by looking at it. */
+  const vidGeprueft = useRef(vid);
+  useEffect(() => {
+    if (vidGeprueft.current === vid) return;
+    vidGeprueft.current = vid;
+    setArbeit((a) => a.map((p) => {
+      const q = zeAutomatisch(p, 'arbeit', zeEintraege, selectedVehicle);
+      if (q === p) return p;
+      const ze = parseFloat(q.ze) || 0;
+      return { ...q, preis: ze ? zeBetrag(ze).toFixed(2) : '' };
+    }));
+    setMaterial((m) => m.map((p) => (p.art ? p : zeAutomatisch(p, 'material', zeEintraege, selectedVehicle))));
+  }, [vid]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const addA = () => setArbeit((a) => [...a, { ...newArbeit(), wartung: tagFuer(a) }]);
   const remA = (i: number) => setArbeit((a) => a.filter((_, j) => j !== i));
   const updA = (i: number, k: string, v: string) => setArbeit((a) => {
     const n = [...a]; n[i] = { ...n[i], [k]: v };
-    if (k === 'beschreibung' && v.trim().length > 3) { n[i].ze = schaetzeZE(v); n[i].zeKI = false; n[i].zeHint = ''; }
-    if (k === 'ze') { n[i].zeKI = false; n[i].zeHint = ''; }
+    // The ZE stored for this task and vehicle (lib/ze-memory); never a guess, and a ZE typed by hand stays.
+    if (k === 'beschreibung') n[i] = zeAutomatisch(n[i], 'arbeit', zeEintraege, selectedVehicle);
+    if (k === 'ze') { n[i].zeKI = false; n[i].zeHint = ''; n[i].zeAuto = false; }
     const ze = parseFloat(k === 'ze' ? v : n[i].ze) || 0;
     n[i].preis = ze ? zeBetrag(ze).toFixed(2) : '';
     return n;
@@ -155,10 +162,12 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
   /** Versandkosten / Pauschale: replaces untouched empty rows, so the list doesn't keep a blank line. */
   const insM = (row: MaterialRow) => setMaterial((m) => [
     ...m.filter((p) => p.art || p.beschreibung.trim() || p.stueckpreis || p.ek || p.ze),
-    row,
+    row.art ? row : zeAutomatisch(row, 'material', zeEintraege, selectedVehicle),
   ]);
   const updM = (i: number, k: string, v: string) => setMaterial((m) => {
     const n = [...m]; n[i] = setMaterialFeld(n[i], k, v);
+    if (k === 'beschreibung' && !n[i].art) n[i] = zeAutomatisch(n[i], 'material', zeEintraege, selectedVehicle);
+    if (k === 'ze') n[i] = { ...n[i], zeAuto: false, zeHint: '' };
     if (k === 'stueckpreis' || k === 'menge' || k === 'ze' || k === 'ek' || k === 'marge') n[i].preis = materialPreis(n[i]);
     return n;
   });
@@ -188,7 +197,7 @@ export default function OfferteForm({ customers, onSave, onDone, initial, prefil
   const autoPauschale: MaterialPosition[] = kleinteilActive ? [kleinteilOffertePosition()] : [];
   const data: OfferteData | null = hinweis || nr == null ? null : {
     offertNumber: nr, customerId: cid, vehicleId: vid || undefined, titel,
-    positionen: materialZuerst([...material.filter((p) => p.art || p.beschreibung.trim()).map((p) => ({ ...p, wartung: p.wartung || undefined })), ...autoPauschale, ...arbeit.filter((p) => p.beschreibung.trim()).map(toArbeitPosition)]),
+    positionen: materialZuerst([...material.filter((p) => p.art || p.beschreibung.trim()).map(({ zeAuto, zeHint, ...p }) => ({ ...p, wartung: p.wartung || undefined })), ...autoPauschale, ...arbeit.filter((p) => p.beschreibung.trim()).map(toArbeitPosition)]),
     notizen, gueltigBis, zahlungsziel, status,
     ...zahlungsterms(),
     totalBetrag: (totA + totMeff).toFixed(2), totalArbeit: totA.toFixed(2),

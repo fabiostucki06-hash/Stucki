@@ -50,6 +50,7 @@ import RechnungDetail from './components/rechnungen/RechnungDetail';
 
 import type { MaterialPosition, Customer, Order, Offerte, Position, Rechnung, ServiceItem, TabId, Vehicle } from './types';
 import { wartungsOfferte } from './lib/wartung-teile';
+import { mitGelernterArbeitZe } from './lib/ze-memory';
 
 export default function App() {
   const {
@@ -61,7 +62,7 @@ export default function App() {
     addOrder, updateOrder, deleteOrder,
     addOfferte, updateOfferte, deleteOfferte,
     addRechnung, updateRechnung, deleteRechnung,
-    addMaterial, docKunde, wartungTeile,
+    addMaterial, docKunde, wartungTeile, zeEintraege,
   } = useApp();
 
   const updateAvailable = useVersionCheck();
@@ -392,8 +393,10 @@ export default function App() {
   async function handleOfferteAusWartungsplan(vehicle: Vehicle, items: ServiceItem[]) {
     const plan = wartungsOfferte(vehicle, items, wartungTeile);
     const { wartung, uebernommen } = plan;
+    // Arbeit lines without ZE: the ZE stored for this task and vehicle configuration, if any.
+    const gelernt = mitGelernterArbeitZe(plan.positionen, zeEintraege, vehicle);
     // Over 100 ZE (Arbeit + material ZE, each once): the Kleinteil Pauschale, as in the Offerte form.
-    const positionen = materialZuerst(mitKleinteilPauschale(plan.positionen));
+    const positionen = materialZuerst(mitKleinteilPauschale(gelernt.positionen));
     const t = sumPositions(positionen);
     const created = await addOfferte({
       customerId: vehicle.customerId, vehicleId: vehicle.id,

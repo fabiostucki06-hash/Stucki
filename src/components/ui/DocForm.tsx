@@ -17,8 +17,9 @@ import { useApp } from '../../context/AppContext';
 /* Shared building blocks for the Offerte / Rechnung / Auftrag creation forms
    (styles: `.df-*` in globals.css). */
 
-export type ArbeitRow   = ArbeitPosition & { zeLoading: boolean; zeHint: string };
-export type MaterialRow = MaterialPosition;
+/** `zeAuto`: the ZE was filled in from a stored entry (lib/ze-memory); UI only, never stored. */
+export type ArbeitRow   = ArbeitPosition & { zeLoading: boolean; zeHint: string; zeAuto?: boolean };
+export type MaterialRow = MaterialPosition & { zeAuto?: boolean; zeHint?: string };
 
 export const fCHF = (n: number) => 'CHF ' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, "'");
 
@@ -519,6 +520,7 @@ export function PositionenEditor({
         {!fest && parseFloat(pos.ze ?? '') > 0 && (
           <div className="df-ze-hint">
             Einbauzeit {zeText(parseFloat(pos.ze!), materialSatz(pos))} – zählt zu Arbeit Total
+            {pos.zeAuto && pos.zeHint && <><br />{pos.zeHint}</>}
           </div>
         )}
         </Fragment>
@@ -540,7 +542,8 @@ export function PositionenEditor({
         <span className="df-c-move" /><span className="df-c-desc">Beschreibung</span><span className="r">ZE</span><span /><span className="r">Min.</span><span className="r">Preis</span><span />
       </div>
       {arbeit.map((pos, i) => { const row = rowProps('arbeit', i); return (
-        <div key={i} {...row.data} className={`df-line df-arbeit${row.cls}`} onKeyDown={(e) => onEnterNextRow(e, i === arbeit.length - 1, addArbeit)}>
+        <Fragment key={i}>
+        <div {...row.data} className={`df-line df-arbeit${row.cls}`} onKeyDown={(e) => onEnterNextRow(e, i === arbeit.length - 1, addArbeit)}>
           {moveCell('arbeit', i, arbeitBusy)}
           <div className="df-c-desc df-desc">
             <input
@@ -575,6 +578,8 @@ export function PositionenEditor({
             disabled={arbeitBusy} aria-label="Arbeit entfernen" title="Arbeit entfernen"
           ><SFXmark /></button>
         </div>
+        {pos.zeAuto && pos.zeHint && <div className="df-ze-hint">{pos.zeHint}</div>}
+        </Fragment>
       ); })}
       {pauschalZeilen.map(({ pos, i }) => { const row = rowProps('pauschale', i); return (
         <div key={`p${i}`} {...row.data} className={`df-line df-arbeit df-fest${row.cls}`}>

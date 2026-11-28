@@ -1,10 +1,11 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FormCard, FormBar, SaveStatus, SummaryRow, VehicleSelect, PositionenEditor, arrayMove, fCHF, type ArbeitRow, type MaterialRow } from '../ui/DocForm';
 import { computeRechnungTotals, KLEINTEIL_BETRAG, KLEINTEIL_LABEL, rechnungArt } from '../../lib/rechnung-totals';
 import { useDokNummer } from '../../hooks/useDokNummer';
 import { offerteNr } from '../../lib/offerte-docs';
 import NummerField, { parseNummer } from '../ui/NummerField';
 import { materialPreis, materialZeSumme, zeBetrag, zeMinuten } from '../../lib/ze';
+import { zeAutomatisch } from '../../lib/ze-memory';
 import { setMaterialFeld } from '../../lib/marge';
 import { festpreisSummen } from '../../lib/sonderpositionen';
 import { useAutoSave } from '../../hooks/useAutoSave';
@@ -30,17 +31,6 @@ interface RechnungFormProps {
   nummerVorschlag: number;
   /** Whether another Rechnung already has this number. */
   nummerVergeben: (n: number) => boolean;
-}
-
-function schaetzeZE(desc: string): string {
-  const t = desc.toLowerCase();
-  const rules: [RegExp, number][] = [
-    [/oelwechsel|ölwechsel/, 2], [/inspektion|service/, 6], [/bremsen|bremsbelag/, 4],
-    [/reifen|pneu/, 2], [/getriebe/, 10], [/kupplung/, 8], [/zahnriemen/, 8],
-    [/batterie/, 1], [/diagnose/, 1], [/klima/, 3],
-  ];
-  for (const [re, ze] of rules) if (re.test(t)) return String(ze);
-  return '1';
 }
 
 async function schaetzeZEmitKI(beschreibung: string, fz: string): Promise<{ ze: string; begruendung: string }> {
@@ -95,7 +85,7 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
   const [dupOk, setDupOk] = useState<number | null>(null);
   const [selectedAuftragId, setSelectedAuftragId] = useState(initial?.auftragId ?? '');
   const [selectedOfferteId, setSelectedOfferteId] = useState('');
-  const { vehiclesOf, docVehicle, naechsteNummer } = useApp();
+  const { vehiclesOf, docVehicle, naechsteNummer, zeEintraege } = useApp();
   const nummerung = useDokNummer(initial?.rechnungNumber, nummerVorschlag, () => naechsteNummer('rechnungen', initial ? rechnungArt(initial) : 'standard'));
   const { nummer, setNummer, vorschlag } = nummerung;
   const [cid,          setCid]          = useState(initial?.customerId ?? '');
@@ -121,6 +111,22 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
   const [detailsOffen, setDetailsOffen] = useState(false);
 
   const selectedVehicle = vehiclesOf(cid).find((v) => v.id === vid);
+
+  /* Another vehicle picked: rows whose ZE came from the memory (or have none yet)
+     get the ZE stored for that vehicle. Skipped on open, so a stored document
+     is not changed just by looking at it. */
+  const vidGeprueft = useRef(vid);
+  useEffect(() => {
+    if (vidGeprueft.current === vid) return;
+    vidGeprueft.current = vid;
+    setArbeit((a) => a.map((p) => {
+      const q = zeAutomatisch(p, 'arbeit', zeEintraege, selectedVehicle);
+      if (q === p) return p;
+      const ze = parseFloat(q.ze) || 0;
+      return { ...q, preis: ze ? zeBetrag(ze).toFixed(2) : '' };
+    }));
+    setMaterial((m) => m.map((p) => (p.art ? p : zeAutomatisch(p, 'material', zeEintraege, selectedVehicle))));
+  }, [vid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sortedAuftraege = [...orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   const sortedOfferten  = [...offerten].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -194,8 +200,9 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
   const remA = (i: number) => setArbeit((a) => a.filter((_, j) => j !== i));
   const updA = (i: number, k: string, v: string) => setArbeit((a) => {
     const n = [...a]; n[i] = { ...n[i], [k]: v };
-    if (k === 'beschreibung' && v.trim().length > 3) { n[i].ze = schaetzeZE(v); n[i].zeKI = false; n[i].zeHint = ''; }
-    if (k === 'ze') { n[i].zeKI = false; n[i].zeHint = ''; }
+    // The ZE stored for this task and vehicle (lib/ze-memory); never a guess, and a ZE typed by hand stays.
+    if (k === 'beschreibung') n[i] = zeAutomatisch(n[i], 'arbeit', zeEintraege, selectedVehicle);
+    if (k === 'ze') { n[i].zeKI = false; n[i].zeHint = ''; n[i].zeAuto = false; }
     const ze = parseFloat(k === 'ze' ? v : n[i].ze) || 0;
     n[i].preis = ze ? zeBetrag(ze).toFixed(2) : '';
     return n;
@@ -221,16 +228,18 @@ export default function RechnungForm({ customers, orders, offerten, onSave, onDo
   /** Versandkosten / Pauschale: replaces untouched empty rows, so the list doesn't keep a blank line. */
   const insM = (row: MaterialRow) => setMaterial((m) => [
     ...m.filter((p) => p.art || p.beschreibung.trim() || p.stueckpreis || p.ek || p.ze),
-    row,
+    row.art ? row : zeAutomatisch(row, 'material', zeEintraege, selectedVehicle),
   ]);
   const updM = (i: number, k: string, v: string) => setMaterial((m) => {
     const n = [...m]; n[i] = setMaterialFeld(n[i], k, v);
+    if (k === 'beschreibung' && !n[i].art) n[i] = zeAutomatisch(n[i], 'material', zeEintraege, selectedVehicle);
+    if (k === 'ze') n[i] = { ...n[i], zeAuto: false, zeHint: '' };
     if (k === 'stueckpreis' || k === 'menge' || k === 'ze' || k === 'ek' || k === 'marge') n[i].preis = materialPreis(n[i]);
     return n;
   });
 
   const ap = arbeit.filter((p) => p.beschreibung.trim());
-  const mp = material.filter((p) => p.art || p.beschreibung.trim());
+  const mp = material.filter((p) => p.art || p.beschreibung.trim()).map(({ zeAuto, zeHint, ...p }) => p);
   // Versandkosten / Pauschalen are in totM; shown on their own lines.
   const fest = festpreisSummen(mp);
   const { totalMaterial: totM, totalArbeit: totA, totalZE: totZE, kleinteil, rechnungstotal, kleinteilApplied } =
