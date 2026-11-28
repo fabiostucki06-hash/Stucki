@@ -1,6 +1,6 @@
 import { RealtimeClient } from '@supabase/realtime-js';
 import { SUPA_URL, SUPA_KEY, db, getFreshToken } from './supabase';
-import { getSettings, applyRemoteSettings, onLocalSettingsChange, resetSettings, type Settings } from './settings';
+import { getSettings, applyRemoteSettings, onLocalSettingsChange, resetSettings, sanitizeTodos, type Settings } from './settings';
 import { sanitizePauschalen } from './sonderpositionen';
 
 /* ── Cross-device settings sync ──
@@ -24,6 +24,8 @@ const POLL_MS = 20_000;
     20261110100000 not applied yet): the bundles then stay on this device and
     every other setting keeps syncing. */
 let pauschalenSpalteFehlt = false;
+/** Same for the `todos` column (migration 20261128100000). */
+let todosSpalteFehlt = false;
 
 type Row = Record<string, unknown>;
 
@@ -38,6 +40,7 @@ function toRow(p: Partial<Settings>): Row {
   if (p.signature !== undefined) row.signature = p.signature;
   if (p.driveFolderId !== undefined) row.drive_folder_id = p.driveFolderId;
   if (p.pauschalen !== undefined && !pauschalenSpalteFehlt) row.pauschalen = p.pauschalen;
+  if (p.todos !== undefined && !todosSpalteFehlt) row.todos = p.todos;
   return row;
 }
 
@@ -54,6 +57,8 @@ function fromRow(row: Row): Partial<Settings> {
   if (row.margin != null && Number.isFinite(Number(row.margin))) p.margin = Number(row.margin);
   const pauschalen = sanitizePauschalen(row.pauschalen);
   if (pauschalen) p.pauschalen = pauschalen;
+  const todos = sanitizeTodos(row.todos);
+  if (todos) p.todos = todos;
   return p;
 }
 
@@ -110,13 +115,21 @@ export function startSettingsSync(userId: string): () => void {
       const token = await getFreshToken();
       if (!token) throw new Error('no session');
       const upsert = () => db.upsert(TABLE, { user_id: userId, ...toRow(patch), updated_at: new Date().toISOString() }, token);
-      try {
-        await upsert();
-      } catch (e) {
-        if (pauschalenSpalteFehlt || patch.pauschalen === undefined || !/pauschalen/i.test(String(e))) throw e;
-        console.warn('[Settings] column user_settings.pauschalen missing – Pauschalen stay on this device until the migration is applied.');
-        pauschalenSpalteFehlt = true;
-        await upsert();
+      // A column the database doesn't know yet: that setting stays on this device, the rest syncs.
+      for (let versuch = 0; ; versuch++) {
+        try {
+          await upsert();
+          break;
+        } catch (e) {
+          const msg = String(e);
+          if (versuch < 2 && !pauschalenSpalteFehlt && patch.pauschalen !== undefined && /pauschalen/i.test(msg)) {
+            console.warn('[Settings] column user_settings.pauschalen missing – Pauschalen stay on this device until the migration is applied.');
+            pauschalenSpalteFehlt = true;
+          } else if (versuch < 2 && !todosSpalteFehlt && patch.todos !== undefined && /todos/i.test(msg)) {
+            console.warn('[Settings] column user_settings.todos missing – the To-Do list stays on this device until the migration is applied.');
+            todosSpalteFehlt = true;
+          } else throw e;
+        }
       }
     } catch (e) {
       // Keep it for the next attempt (wake-up / poll); newer local changes win.

@@ -1,4 +1,5 @@
 import Badge from './ui/Badge';
+import TodoListe from './TodoListe';
 import { SFChevron } from './Icons';
 import { daysSince, hoursSince, isOverdue, needsAttention } from '../lib/utils';
 import type { Customer, Order } from '../types';
@@ -36,6 +37,7 @@ export default function Dashboard({ customers, orders, onOrderClick }: Dashboard
 
         {/* Desktop: Nachzuhaken and Aktive Aufträge side by side. */}
         <div className="dash-cols">
+        <TodoListe />
         {todos.length > 0 && (
           <section>
             <p className="section-header" style={{ paddingLeft: 0 }}>Nachzuhaken</p>

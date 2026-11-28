@@ -29,6 +29,23 @@ export interface Settings {
   driveFolderId: string;
   /** Flat-rate packages offered in the position editor (Radwechsel, Reifenwechsel …). */
   pauschalen: Pauschale[];
+  /** To-Do list of the Übersicht; starts empty. */
+  todos: TodoItem[];
+}
+
+export interface TodoItem {
+  id: string;
+  text: string;
+  erledigt: boolean;
+  createdAt: string;
+}
+
+/** Keeps only well-formed entries (data from storage / another device). */
+export function sanitizeTodos(v: unknown): TodoItem[] | null {
+  if (!Array.isArray(v)) return null;
+  return v
+    .filter((t): t is TodoItem => !!t && typeof t === 'object' && typeof t.id === 'string' && typeof t.text === 'string')
+    .map((t) => ({ id: t.id, text: t.text, erledigt: t.erledigt === true, createdAt: String(t.createdAt ?? '') }));
 }
 
 const KEYS: Record<keyof Settings, string> = {
@@ -41,6 +58,7 @@ const KEYS: Record<keyof Settings, string> = {
   signature: 'garage_signature',
   driveFolderId: 'garage_drive_folder',
   pauschalen: 'garage_pauschalen',
+  todos: 'garage_todos',
 };
 
 function readPauschalen(): Pauschale[] {
@@ -49,6 +67,14 @@ function readPauschalen(): Pauschale[] {
     return (raw && sanitizePauschalen(JSON.parse(raw))) || DEFAULT_PAUSCHALEN;
   } catch {
     return DEFAULT_PAUSCHALEN;
+  }
+}
+function readTodos(): TodoItem[] {
+  try {
+    const raw = localStorage.getItem(KEYS.todos);
+    return (raw && sanitizeTodos(JSON.parse(raw))) || [];
+  } catch {
+    return [];
   }
 }
 const SETTING_NAMES = Object.keys(KEYS) as (keyof Settings)[];
@@ -66,6 +92,7 @@ function readLocal(): Settings {
     signature: localStorage.getItem(KEYS.signature) ?? '',
     driveFolderId: localStorage.getItem(KEYS.driveFolderId) ?? '',
     pauschalen: readPauschalen(),
+    todos: readTodos(),
   };
 }
 

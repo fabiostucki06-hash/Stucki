@@ -1391,3 +1391,24 @@ select.mf-add-pos.df-pauschale-select{-webkit-appearance:none;appearance:none;co
 .settings-tab-icon.icon-tile{background:var(--surface-2);color:var(--label)}
 .settings-tab.active .settings-tab-icon.icon-tile,.settings-tab-icon.icon-tile.active{background:var(--border-strong);color:var(--label)}
 .settings-chip .settings-tab-icon.icon-tile{width:28px;height:28px;border-radius:7.5px}
+
+/* ── To-Do list (Übersicht) ── iOS Reminders style: round check, inset hairlines,
+   add row at the bottom. Rows are not clickable as a whole. */
+.todo .inset-grouped-list{margin-bottom:6px}
+.todo-row,.todo-add{cursor:default;gap:12px}
+.todo-row:active{background:transparent}
+.todo-check{flex-shrink:0;width:24px;height:24px;border-radius:50%;border:2px solid var(--label3);background:transparent;color:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:background 0.12s,border-color 0.12s}
+.todo-check svg{width:13px;height:13px}
+.todo-row.done .todo-check{background:var(--accent);border-color:var(--accent)}
+.todo-check:active{transform:scale(0.9)}
+.todo-check:focus-visible,.todo-del:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring)}
+.todo-text{flex:1;min-width:0;font-size:16px;color:var(--label);overflow-wrap:anywhere;cursor:pointer;-webkit-user-select:none;user-select:none}
+.todo-row.done .todo-text{color:var(--label3);text-decoration:line-through}
+.todo-del{flex-shrink:0;width:32px;height:32px;border-radius:50%;border:none;background:transparent;color:var(--label3);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.todo-del:hover{background:var(--surface-2);color:var(--red)}
+.todo-input{flex:1;min-width:0;height:36px;padding:0 12px;border-radius:var(--radius-md);border:1px solid transparent;background:var(--surface-2);color:var(--label);font-family:inherit;font-size:16px;outline:none}
+.todo-input::placeholder{color:var(--label3)}
+.todo-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
+.todo-add .btn-tinted{flex-shrink:0}
+.todo-add .btn-tinted:disabled{background:var(--surface-2);color:var(--label4);cursor:default}
+.todo .todo-clear{margin:0 0 8px auto}
