@@ -99,6 +99,8 @@ export default function ImportPartSheet({ payload, customers, offerten, defaultO
           setEkHinweis(chf.fx ? fxHinweis(chf.fx) : undefined);
         }
         setPreisWarnung(warnungFuer(chf));
+        if (chf.status === 'none') showToast('Kein Preis auf der Shopseite gefunden – bitte Einkaufspreis eintragen', 'error');
+        else if (!payload.title) showToast('Keine Bezeichnung gefunden – bitte eintragen', 'error');
         setLoading(false);
       })();
       return () => { cancelled = true; };

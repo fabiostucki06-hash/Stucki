@@ -370,9 +370,11 @@ export default function SettingsView({ syncStatus, userEmail }: SettingsViewProp
 
           <p className="cf-label" style={{ marginTop: 20, marginBottom: 6 }}>Teile per Desktop-Browser importieren</p>
           <p style={{ fontSize: 12, color: 'var(--label2)', lineHeight: 1.5, margin: '0 0 10px' }}>
-            Dieses Lesezeichen liest Titel, Preis und Artikelnummer direkt von der geöffneten Autodoc/ATP-Produktseite
-            und öffnet GarageOS damit vorausgefüllt. Ist eine Offerte aktiv (zuletzt geöffnet oder im Offerten-Tab
-            gewählt), landet das Teil direkt darin und der Tab schliesst sich wieder – sonst erscheint der Import-Dialog.
+            Dieses Lesezeichen liest Bezeichnung, Preis, Währung, Artikelnummer und Link direkt von der geöffneten
+            Autodoc/ATP-Produktseite (aus den strukturierten Produktdaten der Seite) und öffnet GarageOS damit in einem
+            neuen Tab. Ist eine Offerte für den Import ausgewählt, landet das Teil direkt darin und der Tab schliesst sich
+            wieder – sonst erscheint der Import-Dialog. Was nicht eindeutig gefunden wird, bleibt leer und wird von Hand
+            ergänzt; auf der Shopseite zeigt ein kleines Fenster, was übernommen wurde.
           </p>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>
@@ -383,7 +385,7 @@ export default function SettingsView({ syncStatus, userEmail }: SettingsViewProp
               onClick={(e) => e.preventDefault()}
               draggable
             >
-              🔧 Teil importieren
+              Teil importieren
             </a>
             <span style={{ fontSize: 12, color: 'var(--label3)' }}>← zur Lesezeichenleiste ziehen</span>
           </div>
@@ -394,7 +396,12 @@ export default function SettingsView({ syncStatus, userEmail }: SettingsViewProp
           <ol style={{ fontSize: 12, color: 'var(--label2)', lineHeight: 1.6, margin: '0 0 10px', paddingLeft: 18 }}>
             <li>Neues Lesezeichen anlegen (beliebiger Name, z.B. „Teil importieren&quot;).</li>
             <li>Unten stehenden Code als URL/Adresse einfügen und speichern.</li>
+            <li>iPhone/iPad (Safari): beliebige Seite als Lesezeichen sichern, dann bearbeiten und die Adresse durch den Code ersetzen. Auf der Produktseite über das Lesezeichen-Menü antippen.</li>
           </ol>
+          <p style={{ fontSize: 12, color: 'var(--label3)', lineHeight: 1.5, margin: '0 0 8px' }}>
+            Blockiert der Browser das neue Fenster, erscheint auf der Shopseite „In GarageOS öffnen&quot; zum Antippen.
+            Nach einem Update des Lesezeichens meldet GarageOS ein veraltetes Lesezeichen – dann hier neu anlegen.
+          </p>
           <textarea
             readOnly
             value={bookmarklet}

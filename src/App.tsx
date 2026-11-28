@@ -7,6 +7,7 @@ import { getActiveOfferteId, setActiveOfferteId, getMargin } from './lib/setting
 import { vkAusEk } from './lib/marge';
 import { parsePartTitle } from './lib/partTitle';
 import { detectPrice, resolveChfPrice, fxHinweis } from './lib/currency';
+import { BOOKMARKLET_VERSION } from './lib/bookmarklet';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { useIsDesktop } from './hooks/useIsDesktop';
 import { useSwipeToOpen } from './hooks/useSwipeToOpen';
@@ -153,14 +154,32 @@ export default function App() {
         console.warn('[Import] received an unresolved Shortcuts placeholder instead of real data.', { rawUrl, rawText, decodedUrl: url, decodedText: text });
       }
 
-      setPendingImport({
+      const fromBookmarklet = params.get('import_src') === 'bookmarklet';
+      // Bookmarks saved before v2 opened every import twice (window.open with
+      // "noopener" always returns null, so the fallback link fired as well).
+      // The second, identical import within a few seconds is dropped.
+      const dupKey = 'garageos.lastImport';
+      const sig = JSON.stringify([url, text, title, price, artnr]);
+      let duplicate = false;
+      try {
+        const last = JSON.parse(localStorage.getItem(dupKey) || 'null') as { sig: string; at: number } | null;
+        duplicate = !!last && last.sig === sig && Date.now() - last.at < 8000;
+        if (!duplicate) localStorage.setItem(dupKey, JSON.stringify({ sig, at: Date.now() }));
+      } catch { /* storage unavailable: import normally */ }
+      if (fromBookmarklet && params.get('import_v') !== BOOKMARKLET_VERSION) {
+        setTimeout(() => showToast('Lesezeichen veraltet – bitte unter Einstellungen → Teile-Import neu anlegen', 'error', 7000), 600);
+      }
+      if (duplicate) {
+        console.warn('[Import] identical import a moment ago, skipped:', sig);
+        if (window.history.length <= 1) window.close();
+      } else setPendingImport({
         payload: { url, text, title, price, currency, artikelnummer: artnr, _rawUrl: rawUrl ?? undefined, _rawText: rawText ?? undefined },
         offerteId: params.get('offerte_id') || undefined,
-        fromBookmarklet: params.get('import_src') === 'bookmarklet',
+        fromBookmarklet,
       });
       params.delete('import_url'); params.delete('import_text');
       params.delete('import_title'); params.delete('import_price'); params.delete('import_artnr'); params.delete('import_currency');
-      params.delete('offerte_id'); params.delete('import_src');
+      params.delete('offerte_id'); params.delete('import_src'); params.delete('import_v');
       const rest = params.toString();
       window.history.replaceState({}, '', window.location.pathname + (rest ? `?${rest}` : ''));
     }

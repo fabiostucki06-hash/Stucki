@@ -47,8 +47,9 @@ const TOKENS: { cur: Currency; re: RegExp }[] = [
   { cur: 'USD', re: /\bUSD\b|\bUS\s?\$|(?:^|[^A-Za-z])\$/i },
 ];
 
-// "29.90", "1'234.50", "1.234,50", "1,234.50", "1 234,50", "45,-"
-const AMOUNT_RE = /\d+(?:[.,'’   ]\d{3})*(?:[.,]\d{1,2})?/g;
+// "29.90", "1'234.50", "1.234,50", "1,234.50", "1 234,50", "45,-", and
+// AUTODOC's "CHF 69. 99" (Rappen in a superscript, a space before them)
+const AMOUNT_RE = /\d+(?:[.,'’   ]\d{3})*(?:[.,](?:\d{1,2}|[  ]\d{2}(?!\d)))?/g;
 
 function currencyOf(s: string): Currency | null {
   const found = TOKENS.filter((t) => t.re.test(s)).map((t) => t.cur);
